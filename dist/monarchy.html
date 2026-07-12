@@ -2038,10 +2038,261 @@ body.fog-active #menu { z-index: 9999 !important; }
 body.fog-active .tab-btn { z-index: 9999 !important; }
 body.fog-active #sidemenu { z-index: 9999 !important; }
 </style>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   SHELL: TITLE SCREEN, TABLE SCENE, WINDOW CHROME, DOCK
+   Added when the character sheet was split out from being "the app"
+   into one window living on a table scene. Extends the existing
+   parchment/ink palette rather than introducing a new one.
+   Load order: after 04-overrides.css (newest layer), but doesn't
+   re-open the override contract for old sheet elements — the only
+   old-element rule here is the .window-content .sheet fit-to-window
+   fix at the bottom, scoped narrowly and explained inline.
+══════════════════════════════════════════════════════════════ */
+
+:root{
+  --table-dark: #1c140c;
+  --table-dark2: #0c0805;
+  --table-line: rgba(122,92,30,.18);
+}
+
+/* ---------- TITLE SCREEN ----------
+   z-index:1000 — sits as an opaque cover OVER the table scene, which
+   stays normally rendered underneath the whole time (not display:none).
+   That way anything inside the sheet that the title screen needs to
+   reach (server list, the Manage Servers modal) still works via the
+   DOM without a hidden ancestor blocking it later. */
+#title-screen{
+  position:fixed; inset:0; z-index:1000;
+  display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(122,92,30,.16) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, var(--table-dark) 0%, var(--table-dark2) 100%);
+  text-align:center;
+}
+#title-screen.hidden{ display:none; }
+
+.title-card{ max-width:420px; padding:40px 30px; }
+.title-card .game-title{ color:#c8a85a; text-shadow:0 0 24px rgba(200,160,60,.35),0 3px 0 rgba(0,0,0,.5); }
+.title-tagline{
+  font-family:'Cinzel',serif; font-size:9px; letter-spacing:.4em; text-transform:uppercase;
+  color:#8a7550; margin:10px 0 28px;
+}
+.title-rule{ border:none; border-top:1.5px solid var(--table-line); width:55%; margin:0 auto 28px; }
+
+.title-buttons{ display:flex; flex-direction:column; gap:11px; }
+.title-btn{
+  font-family:'Cinzel',serif; font-size:11px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+  border:1.5px solid #7a5c1e; background:rgba(122,92,30,.08); color:#e8d9b5;
+  padding:14px 20px; cursor:pointer; transition:all .18s cubic-bezier(.25,.8,.25,1);
+}
+.title-btn:hover{ background:rgba(122,92,30,.24); border-color:#c8a85a; color:#fff3d6; transform:translateY(-1px); }
+.title-btn:active{ transform:translateY(0); }
+
+/* ---------- HOST / JOIN MODALS ---------- */
+.title-modal-backdrop{
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1010;
+  align-items:center; justify-content:center;
+}
+.title-modal-backdrop.show{ display:flex; }
+.title-modal-box{
+  background:var(--paper); border:3px solid var(--ink); padding:24px 28px;
+  max-width:340px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,.8);
+}
+.title-modal-box .modal-title{
+  font-family:'Cinzel',serif; font-size:13px; font-weight:700; letter-spacing:.15em;
+  text-transform:uppercase; margin-bottom:6px;
+}
+.title-modal-hint{
+  font-family:'Crimson Text',serif; font-style:italic; font-size:11px; opacity:.5; margin-bottom:14px;
+}
+.title-modal-box label{
+  display:block; font-family:'Cinzel',serif; font-size:8px; letter-spacing:.15em;
+  text-transform:uppercase; opacity:.6; margin-bottom:4px;
+}
+.title-modal-box select, .title-modal-box input[type="text"]{
+  width:100%; font-family:'Crimson Text',serif; font-size:14px; padding:7px 8px;
+  border:1.5px solid var(--mid); background:var(--paper2); color:var(--ink); margin-bottom:12px;
+}
+.title-modal-actions{ display:flex; gap:8px; margin-top:6px; }
+.title-modal-actions button{
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  border:1.5px solid var(--ink); background:transparent; color:var(--ink);
+  padding:9px 14px; cursor:pointer; flex:1; transition:all .12s;
+}
+.title-modal-actions button.primary{ background:var(--ink); color:var(--paper); }
+.title-modal-actions button:hover{ opacity:.75; }
+.title-modal-manage-link{
+  display:block; text-align:center; font-family:'Cinzel',serif; font-size:8px; letter-spacing:.1em;
+  text-transform:uppercase; opacity:.5; margin-top:14px; cursor:pointer; text-decoration:underline;
+}
+.title-modal-manage-link:hover{ opacity:1; }
+
+/* ---------- TABLE SCENE ---------- */
+#table-scene{
+  position:fixed; inset:0; z-index:10; overflow:hidden;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(122,92,30,.09) 0%, transparent 60%),
+    linear-gradient(180deg, var(--table-dark) 0%, var(--table-dark2) 100%);
+}
+
+#table-surface{ position:absolute; inset:0; }
+
+/* The existing "Manage Servers" modal (#server-modal, lives inside the
+   sheet markup) is coded at z-index:500 — enough to beat anything on
+   the table, but not the title screen (z:1000) or its host/join modal
+   (z:1010) sitting above it. Bumped here so it's reachable from either
+   place; no other behavior changes. */
+#server-modal{ z-index:1500 !important; }
+
+#table-home-btn{
+  position:fixed; top:14px; left:14px; z-index:900;
+  font-family:'Cinzel',serif; font-size:9px; letter-spacing:.15em; text-transform:uppercase;
+  border:1.5px solid rgba(200,168,90,.4); background:rgba(20,14,8,.7); color:#c8a85a;
+  padding:6px 12px; cursor:pointer; transition:all .15s;
+}
+#table-home-btn:hover{ border-color:#c8a85a; background:rgba(20,14,8,.92); }
+
+/* ---------- WINDOW CHROME ---------- */
+.table-window{
+  position:absolute; display:flex; flex-direction:column;
+  background:var(--paper); border:3px solid var(--ink);
+  box-shadow:
+    inset 0 0 0 5px var(--paper), inset 0 0 0 7px var(--ink),
+    0 16px 50px rgba(0,0,0,.65);
+}
+.table-window.focused{
+  box-shadow:
+    inset 0 0 0 5px var(--paper), inset 0 0 0 7px var(--gold),
+    0 20px 60px rgba(0,0,0,.75);
+}
+
+.window-titlebar{
+  flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--ink); color:var(--paper);
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+  padding:9px 10px 9px 14px; cursor:grab; user-select:none; touch-action:none;
+}
+.window-titlebar:active{ cursor:grabbing; }
+.window-close{
+  background:none; border:1px solid rgba(240,230,204,.35); color:var(--paper);
+  font-size:10px; width:20px; height:20px; line-height:1; cursor:pointer; flex-shrink:0;
+  transition:all .12s;
+}
+.window-close:hover{ background:var(--red); border-color:var(--red); }
+
+.window-content{ flex:1; overflow:auto; position:relative; background:var(--paper2); }
+
+.window-resize-handle{
+  position:absolute; right:1px; bottom:1px; width:18px; height:18px; cursor:nwse-resize;
+  background:linear-gradient(135deg,
+    transparent 0 38%, var(--gold) 38% 46%, transparent 46% 58%,
+    var(--gold) 58% 66%, transparent 66% 100%);
+  opacity:.45; touch-action:none;
+}
+.window-resize-handle:hover{ opacity:1; }
+
+/* The sheet was originally laid out for a full page (centered, fixed
+   max-width). Inside a resizable window it should fill the window
+   instead. Narrow, intentional override — not reopening the cascade
+   for anything else. */
+.window-content .sheet{
+  max-width:none !important;
+  margin:0 !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+/* ---------- DOCK ---------- */
+#table-dock{
+  position:fixed; left:0; right:0; bottom:0; z-index:900;
+  display:flex; gap:6px; padding:9px 14px; flex-wrap:wrap;
+  background:linear-gradient(0deg, rgba(12,8,5,.96) 0%, rgba(12,8,5,.7) 100%);
+  border-top:1.5px solid rgba(200,168,90,.25);
+}
+.dock-btn{
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  border:1.5px solid rgba(200,168,90,.35); background:rgba(122,92,30,.08); color:#a8925f;
+  padding:7px 14px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .15s;
+}
+.dock-btn:hover{ border-color:#c8a85a; color:#e8d9b5; }
+.dock-btn.active{ background:rgba(200,168,90,.22); color:#fff3d6; border-color:#c8a85a; }
+.dock-icon{ font-size:12px; }
+
+@media (max-width:640px){
+  .title-card{ padding:30px 20px; }
+  .title-card .game-title{ font-size:40px; }
+}
+</style>
 </head>
 <body>
 
 <canvas id="fx-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TITLE SCREEN
+     Opaque cover over the table scene until a choice is made. See
+     05-shell.css for why the table scene is never display:none.
+══════════════════════════════════════════════════════════════ -->
+<div id="title-screen">
+  <div class="title-card">
+    <div class="game-title">Monarchy</div>
+    <div class="title-tagline">Character Companion &amp; Table</div>
+    <hr class="title-rule">
+    <div class="title-buttons">
+      <button class="title-btn" onclick="titleOpenLocal()">Open Local Table</button>
+      <button class="title-btn" onclick="titleOpenHostModal()">Host Game Table</button>
+      <button class="title-btn" onclick="titleOpenJoinModal()">Join Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- Host modal -->
+<div id="title-host-modal" class="title-modal-backdrop">
+  <div class="title-modal-box">
+    <div class="modal-title">Host Game Table</div>
+    <div class="title-modal-hint">Everyone on the same server sees the same battlefield.</div>
+    <label for="title-host-server-sel">Server</label>
+    <select id="title-host-server-sel"></select>
+    <div class="title-modal-actions">
+      <button onclick="titleCloseModal('title-host-modal')">Cancel</button>
+      <button class="primary" onclick="titleConfirmHost()">Host</button>
+    </div>
+    <div class="title-modal-manage-link" onclick="titleManageServers('title-host-server-sel')">Manage Servers</div>
+  </div>
+</div>
+
+<!-- Join modal -->
+<div id="title-join-modal" class="title-modal-backdrop">
+  <div class="title-modal-box">
+    <div class="modal-title">Join Game</div>
+    <div class="title-modal-hint">You'll be asked for a player name if you haven't set one.</div>
+    <label for="title-join-server-sel">Server</label>
+    <select id="title-join-server-sel"></select>
+    <div class="title-modal-actions">
+      <button onclick="titleCloseModal('title-join-modal')">Cancel</button>
+      <button class="primary" onclick="titleConfirmJoin()">Join</button>
+    </div>
+    <div class="title-modal-manage-link" onclick="titleManageServers('title-join-server-sel')">Manage Servers</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TABLE SCENE
+     The new hub. Today it hosts one window (the character sheet);
+     future windows (combat, rulebook, etc.) register the same way
+     via WM.register() — see 14-window-manager.js.
+══════════════════════════════════════════════════════════════ -->
+<div id="table-scene">
+  <button id="table-home-btn" onclick="returnToTitle()">⌂ Title</button>
+
+  <div id="table-surface">
+    <div class="table-window" data-window-id="sheet">
+      <div class="window-titlebar">
+        <span>📜 Character Sheet</span>
+        <button class="window-close" title="Close (reopen from the dock)">✕</button>
+      </div>
+      <div class="window-content">
 
 <button id="menu-toggle" onclick="openMenu()">☰ Menu</button>
 <button id="darkmode-btn" onclick="toggleDarkMode()" title="Toggle dark mode">🌙 Dark</button>
@@ -2604,9 +2855,19 @@ body.fog-active #sidemenu { z-index: 9999 !important; }
 </div>
 
 
+      </div><!-- /window-content -->
+      <div class="window-resize-handle"></div>
+    </div><!-- /table-window sheet -->
+  </div><!-- /table-surface -->
+
+  <div id="table-dock"></div>
+</div><!-- /table-scene -->
+
 <!--
   Load order matters below: every file relies on globals (consts, functions)
   declared by the files before it. Keep this order when adding new files.
+  14-window-manager.js and 15-app-shell.js must load LAST — they call
+  functions (startSession, getServers, etc.) defined by everything above.
 -->
 <script>
 const _memStore = {};
@@ -7392,6 +7653,288 @@ bindCurSync('hp-cur', 'c-hp-cur');
 bindCurSync('st-cur', 'c-st-cur');
 bindCurSync('str-cur', 'c-str-cur');
 recalcDerived();
+</script>
+<script>
+'use strict';
+/* ══════════════════════════════════════════════════════════════
+   WINDOW MANAGER
+   Generic system for windows living on the table scene: drag by
+   titlebar, resize by corner handle, click-to-front z-ordering,
+   open/close with a dock/taskbar to reopen, and position/size
+   persisted per window id so layouts survive a reload.
+
+   This file knows nothing about character sheets, combat, or any
+   specific window's content — it only operates on markup already
+   present in the DOM shaped like:
+
+     <div class="table-window" data-window-id="ID">
+       <div class="window-titlebar">...<button class="window-close">
+       <div class="window-content">...actual content...</div>
+       <div class="window-resize-handle"></div>
+     </div>
+
+   To add a new window type later (combat, rulebook, etc.), give it
+   that markup shape and call WM.register(id, opts) once — no
+   changes needed here.
+══════════════════════════════════════════════════════════════ */
+
+const WM = (function () {
+  const windows = {};   // id -> state
+  let zTop = 100;
+
+  function storageKey(id) { return 'monarchy_window_' + id; }
+
+  function saveRect(id) {
+    const w = windows[id]; if (!w) return;
+    try {
+      _ls.set(storageKey(id), JSON.stringify({ x: w.x, y: w.y, w: w.width, h: w.height, open: w.isOpen }));
+    } catch (e) {}
+  }
+
+  function loadRect(id) {
+    try {
+      const raw = _ls.get(storageKey(id));
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function clampToViewport(w) {
+    const maxX = Math.max(0, window.innerWidth - 120);
+    const maxY = Math.max(0, window.innerHeight - 60);
+    w.x = Math.min(Math.max(0, w.x), maxX);
+    w.y = Math.min(Math.max(0, w.y), maxY);
+  }
+
+  function applyRect(id) {
+    const w = windows[id];
+    w.el.style.left = w.x + 'px';
+    w.el.style.top = w.y + 'px';
+    w.el.style.width = w.width + 'px';
+    w.el.style.height = w.height + 'px';
+  }
+
+  function focus(id) {
+    const w = windows[id]; if (!w) return;
+    zTop += 1;
+    w.el.style.zIndex = zTop;
+    Object.keys(windows).forEach(k => windows[k].el.classList.toggle('focused', k === id));
+  }
+
+  function setOpen(id, isOpen, skipSave) {
+    const w = windows[id]; if (!w) return;
+    w.isOpen = isOpen;
+    w.el.style.display = isOpen ? 'flex' : 'none';
+    const dockBtn = document.getElementById('dock-btn-' + id);
+    if (dockBtn) dockBtn.classList.toggle('active', isOpen);
+    if (isOpen) focus(id);
+    if (!skipSave) saveRect(id);
+  }
+
+  function open(id) { setOpen(id, true); }
+  function close(id) { setOpen(id, false); }
+  function toggle(id) { const w = windows[id]; if (!w) return; setOpen(id, !w.isOpen); }
+
+  function addDockButton(id) {
+    const dock = document.getElementById('table-dock');
+    if (!dock) return;
+    const w = windows[id];
+    const btn = document.createElement('button');
+    btn.className = 'dock-btn';
+    btn.id = 'dock-btn-' + id;
+    btn.type = 'button';
+    btn.innerHTML = '<span class="dock-icon">' + w.icon + '</span><span class="dock-label">' + w.title + '</span>';
+    btn.addEventListener('click', () => toggle(id));
+    dock.appendChild(btn);
+  }
+
+  function makeDraggable(id) {
+    const w = windows[id];
+    let dragging = false, startX, startY, origX, origY;
+
+    w.titlebar.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.window-close')) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      origX = w.x; origY = w.y;
+      try { w.titlebar.setPointerCapture(e.pointerId); } catch (err) {}
+      focus(id);
+    });
+    w.titlebar.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      w.x = Math.max(0, origX + (e.clientX - startX));
+      w.y = Math.max(0, origY + (e.clientY - startY));
+      applyRect(id);
+    });
+    function endDrag() { if (dragging) { dragging = false; saveRect(id); } }
+    w.titlebar.addEventListener('pointerup', endDrag);
+    w.titlebar.addEventListener('pointercancel', endDrag);
+  }
+
+  function makeResizable(id, handle) {
+    const w = windows[id];
+    let resizing = false, startX, startY, origW, origH;
+
+    handle.addEventListener('pointerdown', (e) => {
+      resizing = true;
+      startX = e.clientX; startY = e.clientY;
+      origW = w.width; origH = w.height;
+      try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+      focus(id);
+      e.stopPropagation();
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!resizing) return;
+      w.width = Math.max(w.minW, origW + (e.clientX - startX));
+      w.height = Math.max(w.minH, origH + (e.clientY - startY));
+      applyRect(id);
+    });
+    function endResize() { if (resizing) { resizing = false; saveRect(id); } }
+    handle.addEventListener('pointerup', endResize);
+    handle.addEventListener('pointercancel', endResize);
+  }
+
+  /**
+   * Register a window that already exists in the DOM.
+   * opts: { title, icon, defaultRect:{x,y,w,h}, minW, minH, startOpen }
+   */
+  function register(id, opts) {
+    opts = opts || {};
+    const el = document.querySelector('.table-window[data-window-id="' + id + '"]');
+    if (!el) { console.warn('WM.register: no element for id', id); return; }
+
+    const titlebar = el.querySelector('.window-titlebar');
+    const closeBtn = el.querySelector('.window-close');
+    const resizeHandle = el.querySelector('.window-resize-handle');
+
+    const saved = loadRect(id);
+    const base = opts.defaultRect || { x: 60, y: 50, w: 640, h: 700 };
+    const rect = saved || base;
+
+    windows[id] = {
+      el, titlebar,
+      x: rect.x, y: rect.y, width: rect.w, height: rect.h,
+      minW: opts.minW || 320, minH: opts.minH || 260,
+      isOpen: saved ? !!saved.open : (opts.startOpen !== false),
+      title: opts.title || id,
+      icon: opts.icon || '\u25AB'
+    };
+
+    clampToViewport(windows[id]);
+    applyRect(id);
+
+    if (closeBtn) closeBtn.addEventListener('click', () => close(id));
+    if (titlebar) makeDraggable(id);
+    if (resizeHandle) makeResizable(id, resizeHandle);
+    el.addEventListener('pointerdown', () => focus(id));
+
+    addDockButton(id);
+    setOpen(id, windows[id].isOpen, true);
+  }
+
+  window.addEventListener('resize', () => {
+    Object.keys(windows).forEach(id => { clampToViewport(windows[id]); applyRect(id); });
+  });
+
+  return { register, open, close, toggle, focus };
+})();
+</script>
+<script>
+'use strict';
+/* ══════════════════════════════════════════════════════════════
+   APP SHELL
+   Title screen -> table scene handoff. Registers the character
+   sheet as the first table window and wires the title screen's
+   three entry points into the EXISTING session-sync system
+   (startSession/getServers) rather than duplicating that logic.
+══════════════════════════════════════════════════════════════ */
+
+function dismissTitleScreen() {
+  const el = document.getElementById('title-screen');
+  if (el) el.classList.add('hidden');
+}
+
+function returnToTitle() {
+  if (typeof _sessionRole !== 'undefined' && _sessionRole) {
+    if (!confirm('Leave the current session and return to the title screen?')) return;
+    leaveSession();
+  }
+  const el = document.getElementById('title-screen');
+  if (el) el.classList.remove('hidden');
+}
+
+/* ---- Title screen: Open Local Table (no session) ---- */
+function titleOpenLocal() {
+  dismissTitleScreen();
+  WM.open('sheet');
+}
+
+/* ---- Shared server-picker rendering for the host/join modals ---- */
+function _renderTitleServerSelect(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const servers = getServers();
+  const prevValue = sel.value;
+  sel.innerHTML = servers.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+  if (prevValue && servers.find(s => s.id === prevValue)) sel.value = prevValue;
+}
+
+function titleOpenHostModal() {
+  _renderTitleServerSelect('title-host-server-sel');
+  document.getElementById('title-host-modal').classList.add('show');
+}
+function titleOpenJoinModal() {
+  _renderTitleServerSelect('title-join-server-sel');
+  document.getElementById('title-join-modal').classList.add('show');
+}
+function titleCloseModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+/* Manage Servers is opened from inside a title modal; when it closes,
+   refresh whichever title select is currently open so new/renamed
+   servers show up immediately. */
+function titleManageServers(fromSelectId) {
+  openServerManageModal();
+  const check = setInterval(() => {
+    const modal = document.getElementById('server-modal');
+    if (modal && modal.style.display === 'none') {
+      clearInterval(check);
+      _renderTitleServerSelect(fromSelectId);
+    }
+  }, 300);
+}
+
+function _applyChosenServer(fromSelectId) {
+  const chosen = document.getElementById(fromSelectId).value;
+  const realSel = document.getElementById('session-server-sel');
+  if (realSel && chosen) realSel.value = chosen;
+}
+
+function titleConfirmHost() {
+  _applyChosenServer('title-host-server-sel');
+  titleCloseModal('title-host-modal');
+  dismissTitleScreen();
+  WM.open('sheet');
+  startSession('gm');
+}
+
+function titleConfirmJoin() {
+  _applyChosenServer('title-join-server-sel');
+  titleCloseModal('title-join-modal');
+  dismissTitleScreen();
+  WM.open('sheet');
+  startSession('player');
+}
+
+/* ---- Register the character sheet as the first table window ---- */
+WM.register('sheet', {
+  title: 'Character Sheet',
+  icon: '\uD83D\uDCDC',
+  defaultRect: { x: 60, y: 40, w: 720, h: 780 },
+  minW: 380,
+  minH: 340,
+  startOpen: true
+});
 </script>
 </body>
 </html>

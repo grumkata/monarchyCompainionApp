@@ -1,7 +1,7 @@
 # MONARCHY — Project Reference
 
 **Status:** Active development
-**Last updated:** 2026-07-11 (baseline)
+**Last updated:** 2026-07-12
 
 > **Purpose of this document:** this is the single place to check before
 > working on the project — what exists, how it's built, and what rules to
@@ -20,6 +20,12 @@ can join from their own device and see a synced battlefield and push their
 own HP/vitals back to the GM in real time. It also works completely
 standalone for a single person building/viewing a character sheet with no
 network involved.
+
+The app opens to a **title screen**, which leads into a **table scene** — a
+shared surface where windows (the character sheet today; combat, a rulebook,
+and other group-facing tools in the future) can be opened, dragged, resized,
+and dismissed. The character sheet is no longer "the app" — it's the first
+tenant of the table. See 3.10 for how this works.
 
 It ships as a **single self-contained `.html` file** — no install, no
 server, works for tech-illiterate players: they double-click it and it
@@ -41,7 +47,8 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     01-base.css             core theme, colors, layout
     02-components.css       sheet UI components
     03-patches.css          later fixes + GM tool modals
-    04-overrides.css        MUST STAY LAST — cascade-wins over everything above
+    04-overrides.css        MUST STAY LAST of the original 4 — cascade-wins over everything above
+    05-shell.css            title screen, table scene, window chrome, dock — see 3.10
   js/
     00-storage.js            localStorage-safe wrapper — must load first
     01-fx-polish.js          canvas particle fx, header ornaments, QoL fixes
@@ -56,7 +63,9 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     10-gm-tools.js           server management, saved NPCs, saved encounters
     11-combat-extras.js      fog of war, global mana, chip-player linking
     12-app-utils.js          dark mode, undo system
-    13-turn-and-init.js      turn counter + page init — MUST STAY LAST
+    13-turn-and-init.js      turn counter + page init — MUST STAY LAST of the original 14
+    14-window-manager.js     generic drag/resize/dock window system — see 3.10
+    15-app-shell.js          title screen logic + wiring into session-sync — MUST STAY LAST
 
 build.js                  ← run `node build.js` to produce the distributable
 dist/monarchy.html        ← THE FILE YOU HAND TO PLAYERS (generated, don't hand-edit)
@@ -240,6 +249,68 @@ Lives in `js/08-saves-io.js`.
 - Toasts, side menu, keyboard shortcuts (small, scattered across
   `08-saves-io.js`).
 
+### 3.10 Title screen, table scene & window manager
+
+Added 2026-07-12 — the character sheet stopped being "the app" and became
+the first window living on a shared table. Markup and CSS in
+`index.html`/`05-shell.css`; behavior in `14-window-manager.js` (generic)
+and `15-app-shell.js` (this app's specific wiring).
+
+**Title screen** (`#title-screen`): three entry points, each a thin wrapper
+around the existing session-sync system — no session logic was duplicated:
+
+| Button | What it does |
+|---|---|
+| Open Local Table | Dismiss title screen, open the sheet window. No session. |
+| Host Game Table | Pick/manage a server in a modal, then `startSession('gm')` (unchanged, in `09-session-sync.js`) |
+| Join Game | Pick a server, then `startSession('player')` (unchanged) |
+
+The host/join modals read `getServers()` (existing, `10-gm-tools.js`) and,
+on confirm, set the value of the sheet's own `#session-server-sel` element
+before calling `startSession()` — that select is what `getActiveServer()`
+actually reads, so this is the only touch point, not a rewrite of server
+logic. "Manage Servers" from either modal opens the **existing**
+`#server-modal` (same one the sheet's own session panel uses); a short
+poll (`titleManageServers`, 300ms interval) detects when it closes and
+refreshes the title modal's list. A bit informal but fully isolated to
+`15-app-shell.js` — see Known Issues 5.4 if you want to make it a real
+callback instead.
+
+**Table scene** (`#table-scene`): always rendered (never `display:none`) —
+the title screen is just an opaque `z-index:1000` layer on top of it. This
+matters: it means the sheet's own modals (server management, skill picker,
+etc.) still work correctly via the DOM even while the title screen is up,
+since nothing hides their actual ancestor. Don't "fix" this into a
+show/hide toggle without re-checking that.
+
+**Window manager** (`WM`, in `14-window-manager.js`): fully generic, knows
+nothing about character sheets specifically. To add a new window type later
+(combat, rulebook, a read-only player-sheet viewer, etc.):
+
+1. Give it markup shaped like the sheet's:
+   ```html
+   <div class="table-window" data-window-id="YOUR_ID">
+     <div class="window-titlebar"><span>Title</span><button class="window-close">✕</button></div>
+     <div class="window-content">...</div>
+     <div class="window-resize-handle"></div>
+   </div>
+   ```
+2. Call `WM.register('YOUR_ID', { title, icon, defaultRect:{x,y,w,h}, minW, minH, startOpen })` once, after the markup exists (i.e. from a script loading after `14-window-manager.js`).
+
+That's it — drag, resize, focus/z-order, dock button, and position/size
+persistence (`localStorage`, key `monarchy_window_<id>`) all come for free.
+
+**Known limitation, not yet solved**: the sheet's own code (files 00–13)
+reaches its elements by fixed global ids (`attr-for`, `hp-cur`, etc.). That
+means exactly **one** live/interactive sheet can exist at a time — you
+cannot open two independent, fully-interactive copies of the sheet window
+side by side without rewriting those files to be instance-scoped. Viewing
+*other* players' sheets read-only (already fetched as data via
+`openPlayerSheet` in session-sync) doesn't hit this problem, since that's
+rendered from data, not live singleton ids — a read-only viewer window is a
+reasonable future window type that sidesteps this entirely. Full multi-
+instance editing is a bigger, separate project if it's ever needed.
+
 ---
 
 ## 4. Game system summary (content, not code)
@@ -292,6 +363,18 @@ else, and so they're not mistaken for split-related bugs.
    `13-turn-and-init.js`, not `07-combat-tracker.js`, purely because of
    where they fell in the original file. Keep this in mind if the combat
    overhaul touches turn logic.
+4. **`#server-modal` z-index bumped to 1500** (in `05-shell.css`, via ID
+   selector, `!important`). It was originally 500 — fine for use inside
+   the table scene, but not high enough to appear above the title screen
+   (z:1000) or its host/join modals (z:1010) when opened from there. No
+   other behavior changed; if you ever restructure z-index layers, remember
+   this modal needs to beat both the table AND the title screen.
+5. **`titleManageServers()` refresh is a 300ms poll**, not a callback —
+   it watches `#server-modal`'s `display` style to notice when the user
+   closes it, then refreshes the title screen's server dropdown. Simple,
+   isolated to `15-app-shell.js`, but not elegant. Fine to replace with a
+   real callback/event if `closeServerModal()` (in `10-gm-tools.js`) ever
+   grows one.
 
 ---
 
@@ -323,6 +406,14 @@ else, and so they're not mistaken for split-related bugs.
    compatible or updated on both ends together.
 9. **This document is not optional documentation — treat it as part of
    the codebase.** See Maintenance rules below.
+10. **New table windows (combat, rulebook, etc.) register with `WM`,
+    they don't get bespoke drag/resize code.** Give the window the markup
+    shape shown in 3.10 and call `WM.register()` once — don't hand-roll
+    dragging for a new panel.
+11. **Don't make `#table-scene` `display:none`.** The title screen works
+    by covering it, not by hiding it — see 3.10. Toggling table-scene's
+    display would hide everything inside it (including modals the title
+    screen still needs to reach) regardless of their own z-index.
 
 ### Maintenance rules for this document
 
@@ -344,3 +435,4 @@ comments, minor CSS tweaks) don't need a changelog entry.
 | Date | Change |
 |---|---|
 | 2026-07-11 | **Baseline.** Split the original single 7,394-line/422KB `monarchy_8_4_2.html` into the modular `src/` structure described in Section 2, with `build.js` regenerating an equivalent single-file `dist/monarchy.html`. Pure mechanical split — verified zero behavior change (all 200 function defs, all top-level declarations, all element IDs, and all brace/paren pairs matched exactly between original and rebuilt output; every split file and every rebuilt script block passes a JS syntax check clean). This document created as the standing project reference. |
+| 2026-07-12 | **Title screen + table scene.** The character sheet stopped being "the app" — added a title screen (Open Local Table / Host Game Table / Join Game) leading into a table scene where the sheet now lives as one draggable, resizable, closeable/dockable window. New generic window manager (`14-window-manager.js`) built to support future window types (combat, rulebook) without more infrastructure work. No changes to sheet internals (files 00–13) — only wrapped, verified via a jsdom-based runtime smoke test (title screen dismissal, window open/close/drag/resize, position persistence, host/join modal server population) in addition to the usual syntax checks. See 3.10 for full details and the known limitation on multiple live sheet instances. |

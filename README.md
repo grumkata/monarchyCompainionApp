@@ -16,7 +16,8 @@ src/
     01-base.css           ← core theme, colors, layout
     02-components.css     ← sheet UI components
     03-patches.css        ← later fixes + GM tool modals
-    04-overrides.css      ← MUST STAY LAST — wins over everything above
+    04-overrides.css      ← MUST STAY LAST of the original 4 — wins over everything above
+    05-shell.css          ← title screen, table scene, window chrome, dock
   js/
     00-storage.js         ← tiny localStorage-safe wrapper, loads first
     01-fx-polish.js       ← canvas particle fx, header ornaments, QoL fixes
@@ -31,11 +32,17 @@ src/
     10-gm-tools.js        ← server management, saved NPCs, saved encounters
     11-combat-extras.js   ← fog of war, global mana, chip-player linking
     12-app-utils.js       ← dark mode, undo system
-    13-turn-and-init.js   ← turn counter + page init, MUST STAY LAST
+    13-turn-and-init.js   ← turn counter + page init, MUST STAY LAST of the original 14
+    14-window-manager.js  ← generic drag/resize/dock window system
+    15-app-shell.js       ← title screen logic, MUST STAY LAST
 
 build.js                  ← run this to produce the single distributable file
 dist/monarchy.html        ← the single-file output (what you hand to players)
 ```
+
+> **Full reference:** see `PROJECT.md` for the complete feature list, game
+> content summary, known issues, and every rule to follow when working on
+> this project. This README just covers the day-to-day mechanics.
 
 ## Why it's split this way
 
@@ -76,8 +83,11 @@ file system module.
 
 ## Next steps
 
-1. **Overhaul combat**: `07-combat-tracker.js` is now isolated — safe to
-   rewrite without touching anything else.
-2. **Desktop app (.exe)**: once you're happy with the split, wrapping
-   `dist/monarchy.html` in Electron gets you a double-click desktop app,
-   no browser chrome visible. Separate phase, ask whenever you're ready.
+1. ~~Title screen + table scene~~ — done. The sheet now opens as a
+   draggable/resizable window on a table; see `PROJECT.md` section 3.10.
+2. **Overhaul combat**: `07-combat-tracker.js` is isolated — safe to
+   rewrite without touching anything else. Once rewritten, it can become
+   its own window on the table instead of a tab inside the sheet.
+3. **Desktop app (.exe)**: wrapping `dist/monarchy.html` in Electron gets
+   you a double-click desktop app, no browser chrome visible. Separate
+   phase, ask whenever you're ready.

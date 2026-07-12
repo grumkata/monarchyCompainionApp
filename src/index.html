@@ -11,10 +11,76 @@
 <link rel="stylesheet" href="css/02-components.css">
 <link rel="stylesheet" href="css/03-patches.css">
 <link rel="stylesheet" href="css/04-overrides.css">
+<link rel="stylesheet" href="css/05-shell.css">
 </head>
 <body>
 
 <canvas id="fx-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TITLE SCREEN
+     Opaque cover over the table scene until a choice is made. See
+     05-shell.css for why the table scene is never display:none.
+══════════════════════════════════════════════════════════════ -->
+<div id="title-screen">
+  <div class="title-card">
+    <div class="game-title">Monarchy</div>
+    <div class="title-tagline">Character Companion &amp; Table</div>
+    <hr class="title-rule">
+    <div class="title-buttons">
+      <button class="title-btn" onclick="titleOpenLocal()">Open Local Table</button>
+      <button class="title-btn" onclick="titleOpenHostModal()">Host Game Table</button>
+      <button class="title-btn" onclick="titleOpenJoinModal()">Join Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- Host modal -->
+<div id="title-host-modal" class="title-modal-backdrop">
+  <div class="title-modal-box">
+    <div class="modal-title">Host Game Table</div>
+    <div class="title-modal-hint">Everyone on the same server sees the same battlefield.</div>
+    <label for="title-host-server-sel">Server</label>
+    <select id="title-host-server-sel"></select>
+    <div class="title-modal-actions">
+      <button onclick="titleCloseModal('title-host-modal')">Cancel</button>
+      <button class="primary" onclick="titleConfirmHost()">Host</button>
+    </div>
+    <div class="title-modal-manage-link" onclick="titleManageServers('title-host-server-sel')">Manage Servers</div>
+  </div>
+</div>
+
+<!-- Join modal -->
+<div id="title-join-modal" class="title-modal-backdrop">
+  <div class="title-modal-box">
+    <div class="modal-title">Join Game</div>
+    <div class="title-modal-hint">You'll be asked for a player name if you haven't set one.</div>
+    <label for="title-join-server-sel">Server</label>
+    <select id="title-join-server-sel"></select>
+    <div class="title-modal-actions">
+      <button onclick="titleCloseModal('title-join-modal')">Cancel</button>
+      <button class="primary" onclick="titleConfirmJoin()">Join</button>
+    </div>
+    <div class="title-modal-manage-link" onclick="titleManageServers('title-join-server-sel')">Manage Servers</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TABLE SCENE
+     The new hub. Today it hosts one window (the character sheet);
+     future windows (combat, rulebook, etc.) register the same way
+     via WM.register() — see 14-window-manager.js.
+══════════════════════════════════════════════════════════════ -->
+<div id="table-scene">
+  <button id="table-home-btn" onclick="returnToTitle()">⌂ Title</button>
+
+  <div id="table-surface">
+    <div class="table-window" data-window-id="sheet">
+      <div class="window-titlebar">
+        <span>📜 Character Sheet</span>
+        <button class="window-close" title="Close (reopen from the dock)">✕</button>
+      </div>
+      <div class="window-content">
 
 <button id="menu-toggle" onclick="openMenu()">☰ Menu</button>
 <button id="darkmode-btn" onclick="toggleDarkMode()" title="Toggle dark mode">🌙 Dark</button>
@@ -577,9 +643,19 @@
 </div>
 
 
+      </div><!-- /window-content -->
+      <div class="window-resize-handle"></div>
+    </div><!-- /table-window sheet -->
+  </div><!-- /table-surface -->
+
+  <div id="table-dock"></div>
+</div><!-- /table-scene -->
+
 <!--
   Load order matters below: every file relies on globals (consts, functions)
   declared by the files before it. Keep this order when adding new files.
+  14-window-manager.js and 15-app-shell.js must load LAST — they call
+  functions (startSession, getServers, etc.) defined by everything above.
 -->
 <script src="js/00-storage.js"></script>
 <script src="js/01-fx-polish.js"></script>
@@ -595,5 +671,7 @@
 <script src="js/11-combat-extras.js"></script>
 <script src="js/12-app-utils.js"></script>
 <script src="js/13-turn-and-init.js"></script>
+<script src="js/14-window-manager.js"></script>
+<script src="js/15-app-shell.js"></script>
 </body>
 </html>
