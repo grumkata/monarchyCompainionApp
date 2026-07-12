@@ -1,0 +1,645 @@
+
+/* ══════════════════════════════════════════════════
+   BODY , atmospheric deep background
+══════════════════════════════════════════════════ */
+body {
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(139,26,26,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 80% 20%, rgba(122,92,30,0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(10,7,5,1) 0%, #080503 100%);
+}
+body.dark-mode {
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 85%, rgba(139,26,26,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 85% 15%, rgba(180,130,40,0.08) 0%, transparent 60%),
+    #060402;
+}
+
+/* ══════════════════════════════════════════════════
+   VIGNETTE
+══════════════════════════════════════════════════ */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;will-change:transform;transform:translateZ(0);
+  background:radial-gradient(ellipse at center,transparent 38%,rgba(0,0,0,0.65) 100%);}
+
+/* ══════════════════════════════════════════════════
+   SHEET HEADER , Grand starburst banner centerpiece
+══════════════════════════════════════════════════ */
+.sheet-header {
+  position: relative;
+  padding: 48px 20px 24px;
+  margin-bottom: 24px;
+  border-bottom: none !important;
+  overflow: visible;
+  text-align: center;
+}
+
+/* Starburst rays behind header */
+.sheet-header::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 340px; height: 340px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg, rgba(200,168,90,0.07) 3deg, transparent 6deg,
+    transparent 18deg, rgba(200,168,90,0.05) 21deg, transparent 24deg,
+    transparent 36deg, rgba(200,168,90,0.08) 39deg, transparent 42deg,
+    transparent 54deg, rgba(200,168,90,0.04) 57deg, transparent 60deg,
+    transparent 72deg, rgba(200,168,90,0.07) 75deg, transparent 78deg,
+    transparent 90deg, rgba(200,168,90,0.06) 93deg, transparent 96deg,
+    transparent 108deg, rgba(200,168,90,0.05) 111deg, transparent 114deg,
+    transparent 126deg, rgba(200,168,90,0.08) 129deg, transparent 132deg,
+    transparent 144deg, rgba(200,168,90,0.04) 147deg, transparent 150deg,
+    transparent 162deg, rgba(200,168,90,0.07) 165deg, transparent 168deg,
+    transparent 180deg, rgba(200,168,90,0.06) 183deg, transparent 186deg,
+    transparent 198deg, rgba(200,168,90,0.05) 201deg, transparent 204deg,
+    transparent 216deg, rgba(200,168,90,0.08) 219deg, transparent 222deg,
+    transparent 234deg, rgba(200,168,90,0.04) 237deg, transparent 240deg,
+    transparent 252deg, rgba(200,168,90,0.07) 255deg, transparent 258deg,
+    transparent 270deg, rgba(200,168,90,0.06) 273deg, transparent 276deg,
+    transparent 288deg, rgba(200,168,90,0.05) 291deg, transparent 294deg,
+    transparent 306deg, rgba(200,168,90,0.08) 309deg, transparent 312deg,
+    transparent 324deg, rgba(200,168,90,0.04) 327deg, transparent 330deg,
+    transparent 342deg, rgba(200,168,90,0.07) 345deg, transparent 348deg
+  );
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  animation: starburst-spin 60s linear infinite;
+}
+@keyframes starburst-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+/* Blood moon orb behind title */
+.sheet-header::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 180px; height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139,26,26,0.18) 0%, rgba(80,10,10,0.08) 50%, transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.game-title {
+  position: relative;
+  z-index: 2;
+  font-size: 72px;
+  text-shadow:
+    0 0 40px rgba(200,168,90,0.3),
+    0 0 80px rgba(139,26,26,0.15),
+    0 4px 0 rgba(0,0,0,0.3);
+  animation: title-pulse 5s ease-in-out infinite;
+}
+@keyframes title-pulse {
+  0%,100% { text-shadow: 0 0 30px rgba(200,168,90,0.2), 0 4px 0 rgba(0,0,0,0.3); }
+  50%      { text-shadow: 0 0 60px rgba(200,168,90,0.5), 0 0 100px rgba(139,26,26,0.2), 0 4px 0 rgba(0,0,0,0.3); }
+}
+
+.sheet-sublabel {
+  position: relative; z-index: 2;
+  font-size: 9px; letter-spacing: 0.55em;
+  opacity: 0.55; margin-top: 6px;
+}
+
+/* Ribbon banner under title */
+.sheet-header .header-ribbon {
+  display: block;
+  position: relative;
+  z-index: 2;
+  margin: 10px auto 0;
+  width: 100%;
+}
+
+/* SVG ribbon injected by JS */
+.header-ribbon-svg {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 700px;
+}
+
+/* ══════════════════════════════════════════════════
+   SECTION HEADERS , Diagonal ribbon banners
+══════════════════════════════════════════════════ */
+.sec {
+  position: relative;
+  border-bottom: none !important;
+  padding: 0 !important;
+  margin-top: 22px !important;
+  margin-bottom: 16px !important;
+  display: block !important;
+  overflow: visible;
+}
+
+.sec-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  background: var(--ink);
+  color: var(--paper) !important;
+  padding: 5px 18px 5px 14px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
+  font-family: 'Cinzel', serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  min-width: 160px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.3), 0 0 20px rgba(139,26,26,0.15);
+}
+
+/* Trailing line after ribbon */
+.sec::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(to right, var(--ink) 0%, transparent 70%);
+  z-index: -1;
+}
+
+/* Gold accent dot on ribbon */
+.sec-inner .so {
+  color: #c8a85a !important;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════
+   ATTRIBUTE BOXES , Circular orbs
+══════════════════════════════════════════════════ */
+.attr-box {
+  width: 54px !important;
+  height: 54px !important;
+  border-radius: 50% !important;
+  border: 3px solid var(--ink) !important;
+  background: radial-gradient(circle at 35% 35%, var(--paper), var(--paper3)) !important;
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.3),
+    inset 0 2px 0 rgba(255,255,255,0.25),
+    inset 0 -2px 0 rgba(0,0,0,0.1),
+    0 0 0 1px rgba(200,168,90,0.2) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.15s, box-shadow 0.15s !important;
+}
+.attr-box::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(200,168,90,0.3);
+  pointer-events: none;
+}
+.attr-box:hover {
+  transform: scale(1.12) rotate(-3deg) !important;
+  box-shadow:
+    0 8px 24px rgba(139,26,26,0.3),
+    inset 0 2px 0 rgba(255,255,255,0.3),
+    0 0 0 3px rgba(200,168,90,0.4) !important;
+}
+.attr-box input {
+  border: none !important;
+  background: transparent !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+}
+body.dark-mode .attr-box {
+  background: radial-gradient(circle at 35% 35%, #2a2116, #1a130e) !important;
+  border-color: #d4a84b !important;
+}
+body.dark-mode .attr-box input {
+  color: #f0e6cc !important;
+}
+/* attr-group-title uses background:var(--ink) which in dark mode is light cream , force dark bg */
+body.dark-mode .attr-group-title {
+  background: linear-gradient(180deg, #3a2a10 0%, #2a1a08 100%) !important;
+  color: #f0e6cc !important;
+}
+/* deriv-row dark mode - ensure text and inputs are readable */
+body.dark-mode .deriv-row {
+  background: linear-gradient(90deg, #2a2116 0%, #211a12 50%, #2a2116 100%) !important;
+}
+body.dark-mode .deriv-name {
+  color: #e8dfc8 !important;
+}
+body.dark-mode .deriv-vals input[type=number] {
+  color: #f0e6cc !important;
+  border-color: #6a5a3a !important;
+  background: #1a130e !important;
+}
+body.dark-mode .deriv-vals input[type=number].auto-calc {
+  color: #d4a84b !important;
+  border-color: #d4a84b !important;
+  background: rgba(212,168,75,.12) !important;
+}
+/* equipped AV badge: background:var(--ink) in dark mode = light cream, gold text invisible */
+body.dark-mode .equipped-av-badge {
+  background: #1a1208 !important;
+  border-left: 2px solid #3a2a10 !important;
+}
+body.dark-mode .equipped-av-badge-val {
+  color: #d4a84b !important;
+  text-shadow: 0 0 12px rgba(212,168,75,.7) !important;
+}
+body.dark-mode .equipped-armour-middle {
+  background: linear-gradient(to right, #211a12, #18130e) !important;
+}
+body.dark-mode .equipped-armour-icon {
+  background: #1a1208 !important;
+}
+
+/* ══════════════════════════════════════════════════
+   ATTR-GROUP TITLE , Shield / chevron shape
+══════════════════════════════════════════════════ */
+.attr-group {
+  border: none !important;
+  margin-bottom: 14px !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+.attr-group-title {
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%) !important;
+  text-align: center !important;
+  justify-content: center !important;
+  font-size: 8px !important;
+  letter-spacing: 0.2em !important;
+  padding: 6px 10px 16px !important;
+  margin-bottom: -4px !important;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.attr-row {
+  background: var(--paper2);
+  border: 1.5px solid rgba(22,16,10,0.15);
+  border-bottom: 1px solid var(--faint) !important;
+  padding: 6px 8px !important;
+  transition: background 0.12s;
+}
+.attr-row:hover { background: var(--paper3); }
+.attr-row:last-child {
+  border-radius: 0 0 6px 6px !important;
+  border-bottom: 2px solid var(--ink) !important;
+}
+.attr-row:first-of-type { border-radius: 0 !important; }
+
+/* ══════════════════════════════════════════════════
+   DERIVED STATS , Scroll / parchment banner shape
+══════════════════════════════════════════════════ */
+.deriv-wrap {
+  border: none !important;
+  padding: 0 !important;
+  margin-bottom: 18px !important;
+  position: relative;
+  background: transparent !important;
+}
+.deriv-row {
+  position: relative;
+  margin-bottom: 8px;
+  padding: 10px 14px !important;
+  border: none !important;
+  background: var(--paper2);
+  clip-path: polygon(8px 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0% 50%);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.deriv-row:hover {
+  transform: scaleX(1.02);
+  box-shadow: 0 5px 18px rgba(139,26,26,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+/* Ensure derive numbers stay visible inside hexagon clip */
+.deriv-vals input[type=number] {
+  border-radius: 50% !important;
+  border: 2.5px solid var(--heavy) !important;
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 16px !important;
+}
+.hp-adj-btns { opacity: 0; transition: opacity 0.12s; }
+.deriv-row:hover .hp-adj-btns { opacity: 1; }
+
+/* ══════════════════════════════════════════════════
+   HP ADJUST BUTTONS , circular
+══════════════════════════════════════════════════ */
+.hp-adj-btn {
+  border-radius: 50% !important;
+  width: 22px !important;
+  height: 22px !important;
+}
+
+/* ══════════════════════════════════════════════════
+   ADD BUTTONS , styled as banner/ribbon
+══════════════════════════════════════════════════ */
+.add-btn, .add-primary-btn, .add-slot-btn {
+  position: relative;
+  background: transparent !important;
+  border: none !important;
+  opacity: 1 !important;
+  padding: 10px 20px !important;
+  margin-top: 8px !important;
+  overflow: visible;
+  color: var(--ink) !important;
+}
+.add-btn::before, .add-primary-btn::before, .add-slot-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border-top: 2px dashed var(--mid);
+  border-bottom: 2px dashed var(--mid);
+  clip-path: polygon(10px 0%, calc(100% - 10px) 0%, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0% 50%);
+  border: 2px dashed var(--mid);
+  border-radius: 0;
+  pointer-events: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.add-btn:hover::before, .add-primary-btn:hover::before, .add-slot-btn:hover::before {
+  border-color: var(--gold);
+  background: rgba(200,168,90,0.05);
+}
+
+/* ══════════════════════════════════════════════════
+   BACKGROUND CARDS , angled header
+══════════════════════════════════════════════════ */
+.bg-head {
+  clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 20px) 100%, 0 100%) !important;
+  padding-bottom: 12px !important;
+}
+
+/* ══════════════════════════════════════════════════
+   ABILITY SLOTS , angled header
+══════════════════════════════════════════════════ */
+.abil-head {
+  clip-path: polygon(0 0, 100% 0, 100% 60%, calc(100% - 16px) 100%, 16px 100%, 0 60%) !important;
+  padding-bottom: 14px !important;
+}
+
+/* ══════════════════════════════════════════════════
+   EQUIPPED ARMOR , diagonal accent
+══════════════════════════════════════════════════ */
+.equipped-armour-bar {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 12px 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+
+/* ══════════════════════════════════════════════════
+   DIVIDERS , ornate star + sweep
+══════════════════════════════════════════════════ */
+.div { position: relative; margin: 18px 0 !important; }
+.div hr {
+  border: none !important;
+  height: 1px !important;
+  background: linear-gradient(to right, transparent, var(--mid) 20%, var(--mid) 80%, transparent) !important;
+}
+.div span {
+  color: var(--gold) !important;
+  opacity: 1 !important;
+  font-size: 16px !important;
+  text-shadow: 0 0 10px rgba(200,168,90,0.6) !important;
+  animation: star-spin 8s linear infinite;
+}
+@keyframes star-spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════
+   EXHAUSTION PIPS , gem shapes
+══════════════════════════════════════════════════ */
+.exh-pip {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 3px !important;
+  transform: rotate(45deg) !important;
+  border: 2px solid var(--heavy) !important;
+  transition: background 0.12s, box-shadow 0.12s !important;
+}
+.exh-pip.lit {
+  background: var(--red) !important;
+  border-color: var(--red) !important;
+  box-shadow: 0 0 12px rgba(139,26,26,0.9), 0 0 24px rgba(200,50,50,0.4) !important;
+  animation: pip-glow 1.3s ease-in-out infinite !important;
+}
+@keyframes pip-glow {
+  0%,100% { box-shadow: 0 0 8px rgba(139,26,26,0.8); }
+  50%      { box-shadow: 0 0 20px rgba(220,50,50,1), 0 0 36px rgba(139,26,26,0.5); }
+}
+
+/* ══════════════════════════════════════════════════
+   CONDITIONS toggle , diamond
+══════════════════════════════════════════════════ */
+.cond-toggle {
+  border-radius: 3px !important;
+  transform: rotate(45deg) !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0 !important;
+}
+.cond-toggle.on {
+  background: var(--red) !important;
+  box-shadow: 0 0 12px rgba(139,26,26,0.8) !important;
+}
+.cond-toggle.on::after { line-height: 18px !important; font-size: 14px !important; }
+
+/* ══════════════════════════════════════════════════
+   VITALS BAR CELLS , diagonal separators
+══════════════════════════════════════════════════ */
+.vitals-bar {
+  border: none !important;
+  display: flex !important;
+  gap: 4px !important;
+  margin-bottom: 0 !important;
+}
+.vbar-cell {
+  position: relative;
+  flex: 1;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%) !important;
+  border: none !important;
+  border-right: none !important;
+  padding: 8px 16px !important;
+  background: var(--paper2) !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2) !important;
+  transition: transform 0.12s !important;
+}
+.vbar-cell:hover { transform: translateY(-2px) !important; }
+.vbar-cell:last-child { border: none !important; }
+.vbar-inputs input[type=number] {
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: 2px solid var(--heavy) !important;
+}
+
+/* ══════════════════════════════════════════════════
+   COMBAT CHIPS , shaped tokens
+══════════════════════════════════════════════════ */
+.comb-chip {
+  border-radius: 6px 6px 12px 12px !important;
+  transition: transform 0.12s, box-shadow 0.12s !important;
+  position: relative;
+}
+.comb-chip::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 60%; height: 4px;
+  border-radius: 0 0 4px 4px;
+  pointer-events: none;
+}
+.comb-chip.ally::before { background: rgba(30,100,30,0.5); }
+.comb-chip.enemy::before { background: rgba(139,26,26,0.5); }
+.comb-chip:hover {
+  transform: translateY(-5px) rotate(-2deg) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45), 0 0 16px rgba(200,168,90,0.25) !important;
+  z-index: 10 !important;
+}
+
+/* ══════════════════════════════════════════════════
+   BATTLEFIELD , atmospheric gradient lanes
+══════════════════════════════════════════════════ */
+.bf-wrap {
+  border: 2px solid var(--heavy) !important;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.4), inset 0 0 60px rgba(0,0,0,0.06) !important;
+  position: relative;
+}
+.bf-lane.a-lane {
+  background: linear-gradient(180deg, rgba(20,70,20,0.08) 0%, rgba(10,40,10,0.03) 100%) !important;
+}
+.bf-lane.e-lane {
+  background: linear-gradient(180deg, rgba(139,26,26,0.09) 0%, rgba(80,10,10,0.03) 100%) !important;
+}
+
+/* ══════════════════════════════════════════════════
+   SKILL PRIMARY HEAD , diagonal left accent
+══════════════════════════════════════════════════ */
+.skill-prim-head {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%) !important;
+  padding-right: 20px !important;
+}
+
+/* ══════════════════════════════════════════════════
+   WEAPON CARD , angled top-right corner
+══════════════════════════════════════════════════ */
+.weapon-card, .armor-card {
+  position: relative;
+  overflow: visible !important;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%) !important;
+  margin-bottom: 10px !important;
+}
+.weapon-card::after, .armor-card::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 14px 14px 0;
+  border-color: transparent var(--ink) transparent transparent;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ══════════════════════════════════════════════════
+   SECTION ORNAMENT LINES , decorative flanking
+══════════════════════════════════════════════════ */
+.sheet-header-ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0;
+  position: relative;
+  z-index: 2;
+}
+.sheet-header-ornament span {
+  font-size: 13px;
+  color: var(--gold);
+  opacity: 0.7;
+  text-shadow: 0 0 8px rgba(200,168,90,0.5);
+  animation: ornament-spin 12s linear infinite;
+}
+.sheet-header-ornament span:nth-child(2) { animation-direction: reverse; animation-duration: 8s; }
+.sheet-header-ornament span:nth-child(3) { animation-duration: 15s; }
+@keyframes ornament-spin { to { transform: rotate(360deg); } }
+.header-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(200,168,90,0.5) 30%, rgba(200,168,90,0.5) 70%, transparent);
+}
+
+/* ══════════════════════════════════════════════════
+   SCROLLING AMBIENT PARTICLES via CSS
+══════════════════════════════════════════════════ */
+.dust-mote {
+  position: fixed; pointer-events: none; z-index: 9990;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,90,0.7) 0%, transparent 70%);
+  animation: mote linear infinite;
+}
+@keyframes mote {
+  0%   { opacity:0; transform:translate(0,0) scale(1); }
+  10%  { opacity:1; }
+  90%  { opacity:0.5; }
+  100% { opacity:0; transform:translate(var(--dx),var(--dy)) scale(var(--ds)); }
+}
+
+/* ══════════════════════════════════════════════════
+   BUTTON PRESS  
+══════════════════════════════════════════════════ */
+button { transition: transform 0.07s, filter 0.07s !important; }
+button:active { transform: scale(0.93) !important; filter: brightness(1.2) !important; }
+
+/* ══════════════════════════════════════════════════
+   DARK MODE transition
+══════════════════════════════════════════════════ */
+body, .sheet, #sidemenu, .modal-box { transition: background 0.4s, color 0.3s !important; }
+
+/* ══════════════════════════════════════════════════
+   QUICK SAVE pulse
+══════════════════════════════════════════════════ */
+#quicksave-btn { animation: qs-pulse 2.5s ease-in-out infinite; }
+@keyframes qs-pulse {
+  0%,100% { outline-color:#c8652a; }
+  50%      { outline-color:#ff9a4a; box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 22px rgba(255,120,40,0.5),inset 0 1px 0 rgba(255,200,100,.3); }
+}
+
+/* ══════════════════════════════════════════════════
+   TAB active shimmer
+══════════════════════════════════════════════════ */
+.tab-btn.active { animation: tab-sh 4s ease-in-out infinite; }
+@keyframes tab-sh {
+  0%,100% { box-shadow:none; }
+  50%      { box-shadow:inset 0 0 18px rgba(139,26,26,0.07),0 0 8px rgba(200,168,90,0.12); }
+}
+
+/* ══════════════════════════════════════════════════
+   SHEET living shadow
+══════════════════════════════════════════════════ */
+.sheet { animation: sheet-live 7s ease-in-out infinite; }
+@keyframes sheet-live {
+  0%,100% { box-shadow:inset 0 0 0 7px var(--paper),inset 0 0 0 9px var(--ink),0 10px 50px rgba(0,0,0,0.78); }
+  50%      { box-shadow:inset 0 0 0 7px var(--paper),inset 0 0 0 9px var(--ink),0 14px 70px rgba(139,26,26,0.2),0 0 50px rgba(200,168,90,0.06); }
+}
+
+/* ══════════════════════════════════════════════════
+   SCROLL REVEAL
+══════════════════════════════════════════════════ */
+.sr { opacity:0; transform:translateY(12px); transition:opacity 0.4s, transform 0.4s; }
+.sr.vis { opacity:1; transform:translateY(0); }
+
+
+/* ── PLAYER SHEET MODAL (GM view) ── */
+#player-sheet-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;}
+#player-sheet-modal.open{display:flex;}
+#player-sheet-modal-box{background:var(--paper);border:3px solid var(--ink);padding:0;max-width:620px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 60px rgba(0,0,0,.9);position:relative;}
+#player-sheet-modal-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:2px solid var(--ink);background:var(--paper2);position:sticky;top:0;z-index:1;}
+#player-sheet-modal-title{font-family:'Cinzel',serif;font-size:9px;font-weight:700;letter-spacing:.25em;text-transform:uppercase;opacity:.6;}
+#player-sheet-modal-close{background:none;border:2px solid var(--ink);color:var(--ink);font-family:'Cinzel',serif;font-size:9px;font-weight:700;letter-spacing:.12em;padding:4px 12px;cursor:pointer;transition:all .12s;}
+#player-sheet-modal-close:hover{background:var(--ink);color:var(--paper);}
+#player-sheet-modal-body{padding:16px 18px;}
+.ps-section-label{font-family:'Cinzel',serif;font-size:8px;letter-spacing:.22em;text-transform:uppercase;opacity:.45;margin-bottom:5px;border-bottom:1px solid var(--faint);padding-bottom:2px;}

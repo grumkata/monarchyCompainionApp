@@ -1,0 +1,193 @@
+/* ── DARK MODE: GM panel ── */
+body.dark-mode #gm-tools-panel,
+body.dark-mode .gm-tools-wrap { color: #e8dfc8 !important; }
+body.dark-mode .gm-section-head span { color: #e8dfc8 !important; opacity: 1 !important; }
+body.dark-mode .gm-add-btn { color: #e8dfc8 !important; border-color: rgba(232,223,200,.4) !important; }
+body.dark-mode .gm-npc-place, body.dark-mode .gm-enc-place,
+body.dark-mode .gm-npc-edit,  body.dark-mode .gm-enc-edit  { background: var(--paper2) !important; color: #e8dfc8 !important; }
+body.dark-mode .gm-npc-del,   body.dark-mode .gm-enc-del   { background: var(--paper2) !important; color: #ff6666 !important; }
+body.dark-mode .gm-empty-hint { color: #c8b88a !important; opacity: 1 !important; }
+body.dark-mode .gm-modal-title { color: #e8dfc8 !important; }
+body.dark-mode .gm-modal-grid input,
+body.dark-mode .gm-modal-grid select,
+body.dark-mode .gmenc-field { color: #e8dfc8 !important; background: transparent !important; border-bottom-color: rgba(232,223,200,.35) !important; }
+body.dark-mode .gm-mana-adj { color: #e8dfc8 !important; border-color: rgba(232,223,200,.45) !important; }
+
+/* ── DARK MODE: connected player cards , HIGH CONTRAST HP ── */
+body.dark-mode .gm-player-card { background: var(--paper2) !important; border-color: rgba(232,223,200,.2) !important; }
+body.dark-mode .gm-player-card * { color: #e8dfc8 !important; }
+
+/* ── DARK MODE: combat chips , keep light background so text is ALWAYS readable ── */
+body.dark-mode .comb-chip.ally  { background: linear-gradient(160deg,#c8e8c8,#9ecf9e) !important; border-color: #2a6a2a !important; }
+body.dark-mode .comb-chip.enemy { background: linear-gradient(160deg,#e8c4c4,#cc9898) !important; border-color: #7a1414 !important; }
+body.dark-mode .comb-chip.ally  .chip-name,
+body.dark-mode .comb-chip.ally  .chip-stat-pill,
+body.dark-mode .comb-chip.ally  .chip-hp-text,
+body.dark-mode .comb-chip.ally  .chip-note-line { color: #0a280a !important; }
+body.dark-mode .comb-chip.enemy .chip-name,
+body.dark-mode .comb-chip.enemy .chip-stat-pill,
+body.dark-mode .comb-chip.enemy .chip-hp-text,
+body.dark-mode .comb-chip.enemy .chip-note-line { color: #2e0808 !important; }
+body.dark-mode .comb-chip.ally  .chip-stat-pill { background: rgba(0,60,0,.2)   !important; border-color: rgba(0,100,0,.4)   !important; }
+body.dark-mode .comb-chip.enemy .chip-stat-pill { background: rgba(80,0,0,.2)   !important; border-color: rgba(140,20,20,.4) !important; }
+body.dark-mode .chip-cond-tag { color: #ff8888 !important; background: rgba(180,20,20,.3) !important; border-color: rgba(220,60,60,.5) !important; }
+
+/* ── DARK MODE: chip expand panel ── */
+body.dark-mode .chip-expand-overlay { background: #1a130e !important; border-color: #c8a85a !important; }
+body.dark-mode .chip-exp-head { background: #211a12 !important; }
+body.dark-mode .chip-exp-name { color: #f0e6cc !important; }
+body.dark-mode .chip-exp-grid input,
+body.dark-mode .chip-exp-full input,
+body.dark-mode .chip-exp-body input { color: #f0e6cc !important; border-bottom-color: rgba(200,168,90,.3) !important; background: transparent !important; }
+body.dark-mode .chip-exp-body label,
+body.dark-mode .chip-exp-body .lbl { color: #c8b88a !important; }
+body.dark-mode .cond-token-row { background: #211a12 !important; border-color: rgba(200,168,90,.25) !important; }
+body.dark-mode .cond-token-row * { color: #e8dfc8 !important; }
+
+/* ── DARK MODE: abilities panel ── */
+body.dark-mode .abil-rm-slot { color: #e8dfc8 !important; border-color: rgba(232,223,200,.3) !important; }
+body.dark-mode .abil-type-sel { color: #e8dfc8 !important; background: rgba(255,255,255,.05) !important; }
+body.dark-mode .abil-cost-lbl,
+body.dark-mode .abil-slot-lbl { color: rgba(232,223,200,.6) !important; }
+
+/* ── LIGHT MODE: character sheet inputs always dark text ── */
+.deriv-vals input[type=number] { color: #16100a !important; }
+.attr-box input               { color: #16100a !important; }
+.vbar-inputs input[type=number] { color: var(--ink) !important; }
+
+/* ── LIGHT MODE: chip hp text always readable ── */
+.comb-chip.ally  .chip-hp-text { color: #1a4a1a !important; opacity: 1 !important; }
+.comb-chip.enemy .chip-hp-text { color: #6a0e0e !important; opacity: 1 !important; }
+
+/* ── CHIP SIZES ── */
+/* Normal = 1 slot, Large = 2 slots */
+.comb-chip.chip-large { 
+  border-width: 4px !important;
+  min-width: 200px !important;
+  padding: 16px !important;
+  font-size: 17px !important;
+  box-shadow: 0 0 30px rgba(255,215,0,0.7), inset 0 0 15px rgba(255,215,0,0.2) !important;
+  background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,215,0,0.08) 10px, rgba(255,215,0,0.08) 20px) !important;
+  transform: scale(1.05) !important;
+}
+.comb-chip.chip-large .chip-name { 
+  font-size: 17px !important; 
+  font-weight: 900 !important;
+  text-shadow: 0 0 12px rgba(255,215,0,0.9) !important;
+  color: #FFD700 !important;
+}
+.comb-chip.ally.chip-large { 
+  border-color: #FFD700 !important;
+  background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(76,175,80,0.1) 100%), repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,215,0,0.08) 10px, rgba(255,215,0,0.08) 20px) !important;
+}
+.comb-chip.enemy.chip-large { 
+  border-color: #FFD700 !important;
+  background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,107,107,0.1) 100%), repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,215,0,0.08) 10px, rgba(255,215,0,0.08) 20px) !important;
+}
+.comb-chip.chip-large::after { 
+  content: '⚔ L A R G E ⚔' !important; 
+  position: absolute !important; 
+  top: 3px !important; 
+  right: 5px !important; 
+  font-family: 'Cinzel',serif !important; 
+  font-size: 11px !important; 
+  font-weight: 900 !important;
+  letter-spacing: .2em !important; 
+  opacity: 1 !important;
+  color: #FFD700 !important;
+  text-shadow: 0 0 10px rgba(255,215,0,0.9), 0 0 20px rgba(0,0,0,0.9) !important;
+  background: rgba(0,0,0,0.4) !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+  border: 1px solid #FFD700 !important;
+}
+body.dark-mode .comb-chip.chip-large { 
+  box-shadow: 0 0 40px rgba(255,215,0,0.8), inset 0 0 15px rgba(255,215,0,0.2) !important;
+}
+
+/* ── FORMATION COMBATANTS (visual distinction) ── */
+.comb-chip.chip-formation { 
+  border-width: 3px !important;
+  border-style: double !important;
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 4px) !important;
+}
+.comb-chip.chip-formation .chip-name { font-size: 12px !important; font-weight: 700 !important; }
+.comb-chip.chip-formation::before { content: '▲▼ FORMATION ▲▼'; position:absolute; top:1px; left:50%; transform:translateX(-50%); width:100%; text-align:center; font-family:'Cinzel',serif; font-size:5px !important; letter-spacing:.15em; font-weight:700; opacity:.6; z-index:1; }
+.comb-chip.ally.chip-formation::before { color:#1a4a1a; }
+.comb-chip.enemy.chip-formation::before { color:#6a0e0e; }
+body.dark-mode .comb-chip.ally.chip-formation::before { color:#0a2a0a; }
+body.dark-mode .comb-chip.enemy.chip-formation::before { color:#300808; }
+
+/* ── NORMAL COMBATANTS (subtle badge) ── */
+.comb-chip:not(.chip-large):not(.chip-formation)::after { content: '◇ NORMAL'; position:absolute; top:2px; right:4px; font-family:'Cinzel',serif; font-size:5px; letter-spacing:.05em; opacity:.35; }
+.comb-chip.ally:not(.chip-large):not(.chip-formation)::after { color:#1a4a1a; }
+.comb-chip.enemy:not(.chip-large):not(.chip-formation)::after { color:#6a0e0e; }
+
+
+/* ── CONDITION TAGS ON CHIPS , bigger, higher contrast ── */
+.chip-cond-tag {
+  font-family:'Cinzel',serif; font-size:9px !important; letter-spacing:.04em;
+  padding:2px 6px !important; border-radius:3px !important;
+  background:rgba(139,26,26,.15) !important; border:1.5px solid rgba(139,26,26,.4) !important;
+  color:#5a0e0e !important; font-weight:700 !important;
+}
+body.dark-mode .comb-chip.ally  .chip-cond-tag,
+body.dark-mode .comb-chip.enemy .chip-cond-tag {
+  background:rgba(180,20,20,.45) !important; border-color:rgba(255,100,100,.7) !important;
+  color:#ffbbbb !important;
+}
+
+/* ── TOKEN DESIGN on character sheet ── */
+.cond-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--faint);
+}
+.cond-item:last-child { border-bottom: none; }
+.token-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 28px; padding: 0 8px;
+  background: radial-gradient(ellipse at 35% 25%, #d4aa60, #7a5010);
+  border: 2px solid #5a3808; border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,220,120,.4);
+  font-family: 'Cinzel', serif; font-size: 13px; font-weight: 900;
+  color: #fff8e8; text-shadow: 0 1px 3px rgba(0,0,0,.7);
+  flex-shrink: 0;
+}
+body.dark-mode .token-badge {
+  background: radial-gradient(ellipse at 35% 25%, #c89840, #5a3808);
+  border-color: #c8a84a; box-shadow: 0 2px 8px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,220,120,.3);
+}
+.cond-name {
+  font-family: 'Crimson Text', serif; font-size: 15px !important; font-weight: 600;
+  border: none !important; border-bottom: 2px solid var(--heavy) !important;
+  background: transparent; outline: none; color: var(--ink); flex: 1;
+}
+body.dark-mode .cond-name { color: #f0e6cc !important; border-bottom-color: rgba(240,230,204,.4) !important; }
+.cond-count {
+  font-family: 'Cinzel', serif; font-size: 14px !important; font-weight: 700;
+  border: none !important; border-bottom: 2px solid var(--mid) !important;
+  background: transparent; outline: none; color: var(--ink);
+  text-align: center; width: 48px !important;
+}
+body.dark-mode .cond-count { color: #f0e6cc !important; border-bottom-color: rgba(240,230,204,.35) !important; }
+.cond-rm { background: none !important; border: none !important; color: var(--red) !important; cursor: pointer; font-size: 14px; opacity: .6; padding: 2px 4px; }
+.cond-rm:hover { opacity: 1 !important; }
+
+/* ── LANE CAPACITY TOOLTIP ── */
+.bf-col-lbl { position: relative; cursor: default; }
+.bf-col-lbl:hover::after {
+  content: attr(data-capacity);
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--paper);
+  font-family: 'Cinzel', serif; font-size: 9px; letter-spacing: .08em;
+  padding: 3px 8px; white-space: nowrap; z-index: 50;
+  border: 1px solid var(--heavy);
+}
+
+/* ── FOG: suppress fixed UI elements so they can't render above the overlay ── */
+body.fog-active #darkmode-btn,
+body.fog-active #quicksave-bar { display: none !important; }
+body.fog-active #menu-toggle { z-index: 9999 !important; display: block !important; }
+body.fog-active #menu { z-index: 9999 !important; }
+body.fog-active .tab-btn { z-index: 9999 !important; }
+body.fog-active #sidemenu { z-index: 9999 !important; }
