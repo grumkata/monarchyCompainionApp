@@ -36,8 +36,11 @@ src/
     14-window-manager.js  ← generic drag/resize/dock window system
     15-app-shell.js       ← title screen logic, MUST STAY LAST
 
-build.js                  ← run this to produce the single distributable file
-dist/monarchy.html        ← the single-file output (what you hand to players)
+build.js                  ← run this to produce dist/monarchy.html (intermediate, see below)
+dist/monarchy.html        ← intermediate build artifact — fine for a quick browser test, not the distributable
+package.json               ← Electron + electron-builder config
+electron/main.js           ← Electron main process (loads dist/monarchy.html, no browser chrome)
+release/                   ← OUTPUT of `npm run dist` — the actual .exe you hand to players
 ```
 
 > **Full reference:** see `PROJECT.md` for the complete feature list, game
@@ -70,24 +73,35 @@ anything combat-related.
 ## Producing the file you hand to players
 
 ```
-node build.js
+npm install     (one-time)
+npm run dist
 ```
 
-This reads `src/index.html` and inlines every CSS/JS file back into one
-`dist/monarchy.html` — same single-file format as before, just generated
-instead of hand-maintained. Run it any time before sharing a new version.
+This runs `node build.js` (inlines everything into `dist/monarchy.html`,
+same as before) and then packages that into a real native `.exe` at
+`release/Monarchy <version>.exe` — no browser, no webpage tell, works by
+double-clicking. The **portable** target needs no installer and no admin
+rights; a traditional installer (`nsis` target) is also configured but
+needs Wine if you're building it from Linux/macOS (native Windows builds
+need neither).
 
-Requires Node.js (nodejs.org) installed once. No npm packages, no
-internet access needed to build — `build.js` only uses Node's built-in
-file system module.
+Requires Node.js installed once. `npm install` pulls down Electron itself
+(~100MB+), so it needs internet access the first time; after that,
+`npm run dist` works offline.
+
+If you just want to quickly check a change in a browser without producing
+a full exe, `node build.js` alone still works and `dist/monarchy.html` is
+a perfectly normal file to open directly.
 
 ## Next steps
 
-1. ~~Title screen + table scene~~ — done. The sheet now opens as a
-   draggable/resizable window on a table; see `PROJECT.md` section 3.10.
-2. **Overhaul combat**: `07-combat-tracker.js` is isolated — safe to
+1. ~~Title screen + table scene~~ — done, then substantially reworked
+   after first look (table starts empty, tabs removed, global theme,
+   scale-to-fit windows) — see `PROJECT.md` section 3.10.
+2. ~~Electron distribution~~ — done, verified end-to-end (built and
+   launched the actual packaged app) — see `PROJECT.md` section 3.11.
+3. **Overhaul combat**: `07-combat-tracker.js` is isolated — safe to
    rewrite without touching anything else. Once rewritten, it can become
-   its own window on the table instead of a tab inside the sheet.
-3. **Desktop app (.exe)**: wrapping `dist/monarchy.html` in Electron gets
-   you a double-click desktop app, no browser chrome visible. Separate
-   phase, ask whenever you're ready.
+   its own window on the table instead of a page inside the sheet.
+4. **Dice & chat**: `#table-right-panel` is reserved and empty, ready for
+   these whenever you want them.

@@ -65,6 +65,18 @@
   </div>
 </div>
 
+<!-- Open Character modal -->
+<div id="table-open-char-modal" class="title-modal-backdrop">
+  <div class="title-modal-box">
+    <div class="modal-title">Open Character</div>
+    <div class="title-modal-hint">Pick a saved character to load into the sheet window.</div>
+    <div id="table-open-char-list" class="table-open-char-list"></div>
+    <div class="title-modal-actions">
+      <button onclick="titleCloseModal('table-open-char-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════
      TABLE SCENE
      The new hub. Today it hosts one window (the character sheet);
@@ -72,7 +84,20 @@
      via WM.register() — see 14-window-manager.js.
 ══════════════════════════════════════════════════════════════ -->
 <div id="table-scene">
-  <button id="table-home-btn" onclick="returnToTitle()">⌂ Title</button>
+  <div id="table-left-controls">
+    <button class="table-ctrl-btn" onclick="returnToTitle()" title="Return to title screen">⌂ <span>Title</span></button>
+    <div class="table-ctrl-sep"></div>
+    <button class="table-ctrl-btn" onclick="tableCreateCharacter()" title="Create a new blank character">✚ <span>Create Character</span></button>
+    <button class="table-ctrl-btn" onclick="tableOpenCharacterModal()" title="Open a saved character">📂 <span>Open Character</span></button>
+    <button class="table-ctrl-btn" onclick="tableSaveAll()" title="Save the current character">💾 <span>Save Table</span></button>
+    <div class="table-ctrl-sep"></div>
+    <button class="table-ctrl-btn" id="table-theme-btn" onclick="tableToggleTheme()" title="Toggle light/dark theme">🌗 <span>Theme</span></button>
+    <!-- future: dice roller, rulebook, combat, etc. join here -->
+  </div>
+
+  <!-- Reserved for future group-facing panels (dice, chat). Empty on
+       purpose today — see PROJECT.md 3.10/3.11. -->
+  <div id="table-right-panel"></div>
 
   <div id="table-surface">
     <div class="table-window" data-window-id="sheet">
@@ -148,7 +173,7 @@
 <div id="toast"></div>
 <div id="autosave-dot" title="Autosave status"></div>
 
-<div style="max-width:980px;margin:0 auto;">
+<div id="sheet-root" style="max-width:980px;margin:0 auto;">
 <div class="tabs">
   <button class="tab-btn active" onclick="showTab('p1',this)">I , Character &amp; Skills</button>
   <button class="tab-btn" onclick="showTab('p2',this)">II , Backgrounds &amp; Abilities</button>

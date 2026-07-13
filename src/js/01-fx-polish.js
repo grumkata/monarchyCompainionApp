@@ -85,7 +85,10 @@ function flash(x,y,col,ms=150){
     btn.addEventListener("mouseleave", function(){ this.style.color=(_muted?"#8b1a1a":"#6b5530"); this.style.borderColor="#2a1c0a"; });
     document.body.appendChild(btn);
   }
-  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", injectBtn); } else { injectBtn(); }
+  // Disabled: this button floated on top of the new title screen/table
+  // UI and did nothing audible (SOUNDS above has no entries configured).
+  // Re-enable by uncommenting below once real SFX are added back.
+  // if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", injectBtn); } else { injectBtn(); }
 })();
 
 /* ══ EVENTS ══ */

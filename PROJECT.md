@@ -1,7 +1,7 @@
 # MONARCHY — Project Reference
 
 **Status:** Active development
-**Last updated:** 2026-07-12
+**Last updated:** 2026-07-13
 
 > **Purpose of this document:** this is the single place to check before
 > working on the project — what exists, how it's built, and what rules to
@@ -27,9 +27,9 @@ and other group-facing tools in the future) can be opened, dragged, resized,
 and dismissed. The character sheet is no longer "the app" — it's the first
 tenant of the table. See 3.10 for how this works.
 
-It ships as a **single self-contained `.html` file** — no install, no
-server, works for tech-illiterate players: they double-click it and it
-opens.
+It ships as a **native Windows `.exe`** (via Electron — see 3.11) — no
+browser, no install required for the portable build, works for
+tech-illiterate players: they double-click it and it opens.
 
 ---
 
@@ -67,8 +67,12 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     14-window-manager.js     generic drag/resize/dock window system — see 3.10
     15-app-shell.js          title screen logic + wiring into session-sync — MUST STAY LAST
 
-build.js                  ← run `node build.js` to produce the distributable
-dist/monarchy.html        ← THE FILE YOU HAND TO PLAYERS (generated, don't hand-edit)
+build.js                  ← run `node build.js` to produce dist/monarchy.html (intermediate step, see 2.3)
+dist/monarchy.html        ← intermediate build artifact — valid standalone file, but not the distributable anymore
+package.json               ← Electron + electron-builder config; `npm run dist` is the real distributable step
+electron/
+  main.js                  ← Electron main process: loads dist/monarchy.html in a plain native window, no menu bar
+release/                   ← OUTPUT of `npm run dist` — the actual .exe lands here (gitignore this)
 ```
 
 **Golden rule:** `src/` is where all editing happens. `dist/monarchy.html`
@@ -94,16 +98,26 @@ directly (edits will be silently lost on the next build).
 
 ### 2.3 Distribution
 
-```
-node build.js
-```
-Inlines every CSS/JS file back into one `dist/monarchy.html`. Requires
-Node.js installed once; no npm packages needed, no internet required to
-build. Run this before sharing any new version with players.
+**Primary distribution is now a Windows `.exe` via Electron** — not a
+browser file. Two build steps, chained automatically:
 
-**Planned next phase:** wrapping `dist/monarchy.html` in Electron for a
-true double-click `.exe` (no browser chrome visible). Not started yet —
-see Timeline.
+```
+npm install        (one-time)
+npm run dist        (builds dist/monarchy.html, then packages it into an exe)
+```
+
+`npm run dist` runs `node build.js` first (inlines every CSS/JS file into
+one `dist/monarchy.html`, same mechanism as before) and then runs
+`electron-builder`, which wraps that file plus `electron/main.js` into a
+real, standalone native executable at `release/Monarchy <version>.exe` — no
+browser, no "this is secretly a webpage" tell, no install required for the
+portable target. See 3.11 for the full breakdown, targets, and a real
+limitation (Wine) when cross-building the installer target from Linux/Mac.
+
+`dist/monarchy.html` still gets built as an intermediate — and is still a
+perfectly valid standalone file you can open directly in a browser for
+quick testing — but it is **no longer the thing you hand to players.** The
+`.exe` is.
 
 ---
 
@@ -244,24 +258,38 @@ Lives in `js/08-saves-io.js`.
 - **Canvas particle effects** + header ornamentation + several small "QoL"
   fixes, all in `01-fx-polish.js`, wrapped in one IIFE (self-contained,
   doesn't leak helpers globally — see Known Issues 5.1).
-- **Dark mode** toggle, **Undo system** (generic action-undo stack), both
-  in `12-app-utils.js`.
+- **Undo system** (generic action-undo stack), in `12-app-utils.js`.
 - Toasts, side menu, keyboard shortcuts (small, scattered across
   `08-saves-io.js`).
+- **Dark mode**: the toggle function (`toggleDarkMode()`) still lives in
+  `12-app-utils.js` and still works exactly as before (flips a class on
+  `document.body`, always was global). What changed 2026-07-13: the
+  *button* that calls it no longer lives in the sheet — see 3.10.
+- **Sound effects**: infrastructure only, currently inert. See 3.10.
 
 ### 3.10 Title screen, table scene & window manager
 
-Added 2026-07-12 — the character sheet stopped being "the app" and became
-the first window living on a shared table. Markup and CSS in
-`index.html`/`05-shell.css`; behavior in `14-window-manager.js` (generic)
-and `15-app-shell.js` (this app's specific wiring).
+Added 2026-07-12, substantially reworked 2026-07-13 after first-look
+feedback. The character sheet stopped being "the app" and became a window
+living on a shared table — and the table itself grew into something closer
+to a real app shell (Foundry-VTT-style) rather than "the sheet's old UI,
+just smaller." Markup and CSS in `index.html`/`05-shell.css`; behavior in
+`14-window-manager.js` (generic) and `15-app-shell.js` (this app's specific
+wiring).
+
+**The table starts empty.** No window opens automatically on any of the
+three title-screen entry points — the player has to explicitly create or
+open a character from the left control panel. This was a deliberate
+correction: the first version auto-opened a blank sheet immediately, which
+read as "the table IS the sheet, just worse."
 
 **Title screen** (`#title-screen`): three entry points, each a thin wrapper
-around the existing session-sync system — no session logic was duplicated:
+around the existing session-sync system — no session logic was duplicated,
+and none of them open a sheet window:
 
 | Button | What it does |
 |---|---|
-| Open Local Table | Dismiss title screen, open the sheet window. No session. |
+| Open Local Table | Dismiss title screen. No session, no window opened. |
 | Host Game Table | Pick/manage a server in a modal, then `startSession('gm')` (unchanged, in `09-session-sync.js`) |
 | Join Game | Pick a server, then `startSession('player')` (unchanged) |
 
@@ -283,6 +311,93 @@ etc.) still work correctly via the DOM even while the title screen is up,
 since nothing hides their actual ancestor. Don't "fix" this into a
 show/hide toggle without re-checking that.
 
+**Left control panel** (`#table-left-controls`): small, low-opacity,
+non-intrusive buttons that brighten on hover — this is the app-level
+control surface now, not the sheet's old hamburger menu:
+
+| Button | Calls |
+|---|---|
+| ⌂ Title | `returnToTitle()` |
+| ✚ Create Character | `tableCreateCharacter()` — resets the sheet via `restoreSheet({v:3})` (no `location.reload()`, so table/window state survives), opens the sheet window |
+| 📂 Open Character | `tableOpenCharacterModal()` — lists `getSaves()` in a picker, loads the chosen one via the existing `loadCharacter(id)`, opens the sheet window |
+| 💾 Save Table | `tableSaveAll()` — `quickSave()` if a character is already active, otherwise `openSaveModal()` (existing "save as" flow) |
+| 🌗 Theme | `tableToggleTheme()` — just calls the existing `toggleDarkMode()` |
+
+More buttons join this same panel later (combat, rulebook, etc.) — it's
+built to grow, not a fixed set of five.
+
+**Right panel** (`#table-right-panel`): reserved, intentionally empty.
+Structurally present (fixed, right edge, `width:0`, `pointer-events:none`)
+so dice/chat have a defined home later, but nothing renders there yet.
+
+**Global theme, not sheet-owned**: the light/dark toggle used to only be
+reachable from inside the sheet, and the table's own chrome (background,
+dock, title screen) had no light-mode variant at all — meaning the table
+always looked dark regardless of the toggle. Fixed: `05-shell.css` now
+defines light-mode-default CSS custom properties (`--table-bg1`,
+`--table-ink`, `--dock-bg`, etc. — see the `:root` block at the top of that
+file) with a full `body.dark-mode` override block, so toggling from the
+left panel re-themes title screen + table + dock + sheet together. The
+sheet's own dark-mode CSS (in files 01–04) was untouched; only the new
+table-level surfaces needed variants added.
+
+**No more tabs.** `showTab()` (in `03-sheet-basics.js`) still exists and
+is harmless if ever called — it's just that `.window-content .sheet` is
+forced `display:block !important` and `.window-content .tabs` is hidden in
+`05-shell.css`, so all three pages (`p1`/`p2`/`p3`) render stacked in one
+continuous scroll instead of switching. `syncCombatPage()` (which used to
+run automatically on switching to page 3) is now called manually from
+`tableCreateCharacter()`/`tableOpenCharacterConfirm()` so the combat page's
+mirrored HP/Stamina/Stress fields still populate correctly without that
+tab-click trigger.
+
+**Old sheet chrome hidden, not deleted.** `#menu-toggle`, `#darkmode-btn`,
+and `#quicksave-bar` are redundant now (replaced by the left panel) and
+hidden via `05-shell.css` (`.window-content > #menu-toggle` etc.). The
+underlying functions (`openMenu`, `toggleDarkMode`, `quickSave`) are
+untouched and still callable — `quickSave()` in particular is reused
+directly by `tableSaveAll()`.
+
+**Sound effects disabled.** The injected "SFX ON/OFF" button (from
+`01-fx-polish.js`) floated on top of the new UI and controlled sounds that
+were never actually configured (`SOUNDS` was already an empty object — no
+audio ever played). The one line that injects that button is commented out
+in `01-fx-polish.js`; `window.sfx()`/`window.sfxToggleMute()` are still
+defined and safe to call from anywhere if sounds get added back later —
+just uncomment the `injectBtn()` call (see the comment right above it).
+
+**Scale-to-fit windows.** Resizing the sheet window used to just clip/
+scroll a fixed-width sheet — now the whole sheet scales as one unit (like
+a Foundry VTT app window), via `WM.enableScaling(id, opts)` in
+`14-window-manager.js`:
+
+- The sheet's outer content wrapper got a stable id, `#sheet-root`
+  (wraps the tab bar + all three pages, natural width 980px — same width
+  the sheet always designed for). **Don't remove or rename this id** —
+  it's the only hook the scaling system has into the sheet's DOM.
+- At runtime, `enableScaling` wraps `#sheet-root` in a `.window-scale-outer`
+  sizing div, applies `transform:scale()` to `#sheet-root` itself based on
+  the window's current content width, and keeps the outer wrapper's
+  explicit pixel width/height in sync with the *scaled* size (plain CSS
+  transform doesn't shrink an element's contribution to its parent's
+  scrollable area — the outer div is what makes `window-content`'s
+  scrollbars measure correctly).
+- Recomputes via `ResizeObserver` on the window element, so it reacts to
+  both manual drag-resizing and any other cause of the window changing
+  size. Verified in the actual packaged Electron build (not just jsdom) —
+  a live resize produced a real `transform: scale(0.713265)` on `#sheet-root`.
+- Generic: any future window can opt in the same way — see the `opts`
+  shape (`rootSelector`, `naturalWidth`, `minScale`, `maxScale`) in
+  `14-window-manager.js`.
+- **Known side effect**: `#fog-overlay` (fog-of-war, inside page 3) is
+  `position:fixed` and now lives inside a `transform`-scaled ancestor —
+  which changes its containing block from the true viewport to the scaled
+  wrapper (a CSS rule: `transform` on an ancestor creates a new containing
+  block for `position:fixed` descendants). It'll still render, just scoped
+  to the scaled sheet content instead of covering the whole screen. Not
+  fixed — combat/fog is a separate future overhaul (3.6) and this is a
+  cosmetic side effect until then, not a functional break.
+
 **Window manager** (`WM`, in `14-window-manager.js`): fully generic, knows
 nothing about character sheets specifically. To add a new window type later
 (combat, rulebook, a read-only player-sheet viewer, etc.):
@@ -296,6 +411,7 @@ nothing about character sheets specifically. To add a new window type later
    </div>
    ```
 2. Call `WM.register('YOUR_ID', { title, icon, defaultRect:{x,y,w,h}, minW, minH, startOpen })` once, after the markup exists (i.e. from a script loading after `14-window-manager.js`).
+3. Optionally `WM.enableScaling('YOUR_ID', { rootSelector, naturalWidth })` if it should scale-to-fit like the sheet.
 
 That's it — drag, resize, focus/z-order, dock button, and position/size
 persistence (`localStorage`, key `monarchy_window_<id>`) all come for free.
@@ -309,7 +425,44 @@ side by side without rewriting those files to be instance-scoped. Viewing
 `openPlayerSheet` in session-sync) doesn't hit this problem, since that's
 rendered from data, not live singleton ids — a read-only viewer window is a
 reasonable future window type that sidesteps this entirely. Full multi-
-instance editing is a bigger, separate project if it's ever needed.
+instance editing is a bigger, separate project if it's ever needed. This is
+also why "Create Character" / "Open Character" reset/reload content into
+the *same* sheet window rather than spawning a second one.
+
+### 3.11 Distribution: Electron packaging
+
+Added 2026-07-13. The app is no longer distributed as a plain HTML file —
+`npm run dist` produces a real native executable.
+
+- **`electron/main.js`**: the entire main process. Creates one
+  `BrowserWindow`, strips Electron's default menu bar entirely
+  (`Menu.setApplicationMenu(null)`) so it doesn't look/feel like a browser,
+  and loads `dist/monarchy.html` — the same single-file build `build.js`
+  has always produced. `nodeIntegration:false` + `contextIsolation:true` +
+  `sandbox:true`: the app is plain browser JS/HTML/CSS with no need for
+  Node API access from the page, so it stays sandboxed like a normal web
+  page would be.
+- **`package.json` → `build` block**: electron-builder config.
+  - `win.target`: both `portable` (single .exe, no installer, no admin
+    rights — closest match to the original "double-click and it opens"
+    goal) and `nsis` (traditional installer with an uninstaller entry).
+  - `linux.target: AppImage`, `mac.target: dmg` — configured for
+    completeness/cross-platform use even though Windows is the primary
+    target.
+  - No custom icon set yet (uses Electron's default). Add one later via
+    `build.win.icon` / etc. once there's real art.
+- **Verified, not just configured**: built and actually launched from this
+  toolchain — packaging succeeded for both `portable` (Windows) and
+  `AppImage` (Linux); the packaged Linux build was launched headless
+  (Xvfb) and inspected live via the Chrome DevTools Protocol, confirming
+  the title screen, empty table, window manager, and scale-to-fit all work
+  correctly in the real packaged app (not just in dev). The **`nsis`**
+  (full installer) target additionally requires **Wine** when
+  cross-building from Linux or macOS — building it natively on Windows
+  needs neither Wine nor any extra tooling. `portable` doesn't need Wine
+  on any host.
+- **`release/`** is the output directory (gitignore it — it's large,
+  ~85-130MB per platform, and fully regenerable via `npm run dist`).
 
 ---
 
@@ -375,6 +528,26 @@ else, and so they're not mistaken for split-related bugs.
    isolated to `15-app-shell.js`, but not elegant. Fine to replace with a
    real callback/event if `closeServerModal()` (in `10-gm-tools.js`) ever
    grows one.
+6. **`#fog-overlay` (fog-of-war, page 3) no longer covers the true full
+   screen** once the sheet is scaled — see 3.10's scale-to-fit note. A
+   `transform` on an ancestor (the new scaling system) creates a new
+   containing block for `position:fixed` descendants, so the overlay is
+   now scoped to the scaled sheet content instead of the real viewport.
+   Cosmetic today since combat/fog is an explicit future overhaul target
+   (3.6); don't be surprised by it if you touch fog-of-war before then.
+7. **`showTab()` still exists but has no visible effect** — tabs were
+   removed via CSS (`05-shell.css` forces every `.sheet` visible and hides
+   `.tabs`), not by deleting the tab-switching code. If a future change
+   needs real per-page switching again, that logic is still there in
+   `03-sheet-basics.js`, just currently overridden.
+8. **NSIS Windows installer target needs Wine to cross-build from
+   Linux/macOS** (verified: the `portable` target does NOT need Wine and
+   built/ran successfully from this project's Linux dev environment; the
+   `nsis` target failed with `spawn wine ENOENT` under the same
+   conditions). Building either target natively on Windows needs neither.
+   If Wine is ever installed for full installer builds from Linux, no
+   config changes are needed — `npm run dist` already requests both
+   targets.
 
 ---
 
@@ -385,9 +558,11 @@ else, and so they're not mistaken for split-related bugs.
 2. **Never reorder `<link>`/`<script src>` tags in `index.html`** without
    checking dependencies first — both CSS cascade and JS globals rely on
    current order (see 2.2).
-3. **Run `node build.js` before handing a new version to players.** A
-   change in `src/` alone does nothing for someone using the exported
-   `.html`.
+3. **Run `npm run dist` before handing a new version to players** — not
+   `node build.js` alone. `build.js` only produces the intermediate
+   `dist/monarchy.html`; the actual distributable is the packaged `.exe`
+   in `release/`. (`node build.js` alone is still fine for a quick
+   browser-based test of your changes.)
 4. **When splitting or moving code, do it mechanically first.** Cut/paste
    before rewrite. If reorganizing something, land it in its new location
    unchanged, verify it still works, then rewrite — don't do both at once.
@@ -414,6 +589,19 @@ else, and so they're not mistaken for split-related bugs.
     by covering it, not by hiding it — see 3.10. Toggling table-scene's
     display would hide everything inside it (including modals the title
     screen still needs to reach) regardless of their own z-index.
+12. **Don't rename or remove `#sheet-root`'s id.** It's the only hook
+    `WM.enableScaling()` has to find and scale the sheet's content — see
+    3.10.
+13. **Theme colors for table-level UI (title screen, table, dock) go in
+    `05-shell.css`'s `:root` / `body.dark-mode` custom properties**, not
+    hardcoded per-element. Anything new added to the table should use
+    `var(--table-*)` tokens so the global theme toggle keeps working
+    everywhere, not just on the sheet.
+14. **New table-level controls go in `#table-left-controls`, styled with
+    the existing `.table-ctrl-btn` class** — small, low-opacity, brighten
+    on hover. Don't add a second visible control cluster; the dock at the
+    bottom is strictly for window open/close, the left panel is for
+    everything else.
 
 ### Maintenance rules for this document
 
@@ -436,3 +624,4 @@ comments, minor CSS tweaks) don't need a changelog entry.
 |---|---|
 | 2026-07-11 | **Baseline.** Split the original single 7,394-line/422KB `monarchy_8_4_2.html` into the modular `src/` structure described in Section 2, with `build.js` regenerating an equivalent single-file `dist/monarchy.html`. Pure mechanical split — verified zero behavior change (all 200 function defs, all top-level declarations, all element IDs, and all brace/paren pairs matched exactly between original and rebuilt output; every split file and every rebuilt script block passes a JS syntax check clean). This document created as the standing project reference. |
 | 2026-07-12 | **Title screen + table scene.** The character sheet stopped being "the app" — added a title screen (Open Local Table / Host Game Table / Join Game) leading into a table scene where the sheet now lives as one draggable, resizable, closeable/dockable window. New generic window manager (`14-window-manager.js`) built to support future window types (combat, rulebook) without more infrastructure work. No changes to sheet internals (files 00–13) — only wrapped, verified via a jsdom-based runtime smoke test (title screen dismissal, window open/close/drag/resize, position persistence, host/join modal server population) in addition to the usual syntax checks. See 3.10 for full details and the known limitation on multiple live sheet instances. |
+| 2026-07-13 | **Table overhaul + Electron distribution**, after first-look feedback that the table "was just the sheet's UI but worse." Table now starts empty (no auto-opened sheet); added a left control panel (Title/Create Character/Open Character/Save Table/Theme, built to grow) and a reserved-but-empty right panel for future dice/chat. Tabs removed — all sheet pages render stacked. Old sheet chrome (menu, quicksave, dark-mode button) hidden inside the window, replaced by the table-level controls. Dark/light theme is now genuinely global — new `--table-*` CSS custom properties in `05-shell.css` re-theme the title screen/table/dock together, not just the sheet. Sound-effect UI disabled (was non-functional clutter — no sounds were ever configured). Added scale-to-fit windows (`WM.enableScaling()`) so resizing the sheet scales it as a whole instead of clipping/scrolling. **Distribution model changed**: `npm run dist` (Electron + electron-builder) now produces a real `.exe` — verified end-to-end by actually building and launching the packaged app (headless, via Xvfb + Chrome DevTools Protocol) and confirming the full flow (title screen → create character → blank sheet → real computed `scale()` transform) inside the genuine packaged executable, not just in a browser or jsdom. `dist/monarchy.html` still exists as a build intermediate and a quick-test convenience, but is no longer the distributable. See 3.10, 3.11, and Known Issues 5.6–5.8. |

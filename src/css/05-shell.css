@@ -1,18 +1,36 @@
 /* ══════════════════════════════════════════════════════════════
-   SHELL: TITLE SCREEN, TABLE SCENE, WINDOW CHROME, DOCK
-   Added when the character sheet was split out from being "the app"
-   into one window living on a table scene. Extends the existing
-   parchment/ink palette rather than introducing a new one.
-   Load order: after 04-overrides.css (newest layer), but doesn't
-   re-open the override contract for old sheet elements — the only
-   old-element rule here is the .window-content .sheet fit-to-window
-   fix at the bottom, scoped narrowly and explained inline.
+   SHELL: TITLE SCREEN, TABLE SCENE, WINDOW CHROME, DOCK, CONTROLS
+   Extends the existing parchment/ink palette. Light theme is the
+   DEFAULT for every new surface here (matching the sheet's own
+   default); `body.dark-mode` (toggled globally, see 12-app-utils.js,
+   trigger now lives in #table-left-controls) re-themes all of it,
+   not just the sheet.
+   Load order: after 04-overrides.css (newest layer). The only rules
+   here touching pre-existing sheet elements are narrowly scoped and
+   explained inline (fit-to-window sizing, hiding now-redundant sheet
+   chrome, showing all pages since tabs are gone).
 ══════════════════════════════════════════════════════════════ */
 
 :root{
-  --table-dark: #1c140c;
-  --table-dark2: #0c0805;
+  /* Light (default) table surface */
+  --table-bg1: #d8c69a;
+  --table-bg2: #c2ac7a;
+  --table-line: rgba(90,66,20,.15);
+  --table-ink: #2a2015;
+  --table-accent: #7a5c1e;
+  --table-accent-soft: rgba(122,92,30,.10);
+  --dock-bg: rgba(232,217,181,.92);
+  --dock-border: rgba(90,66,20,.25);
+}
+body.dark-mode{
+  --table-bg1: #1c140c;
+  --table-bg2: #0c0805;
   --table-line: rgba(122,92,30,.18);
+  --table-ink: #e8d9b5;
+  --table-accent: #c8a85a;
+  --table-accent-soft: rgba(122,92,30,.14);
+  --dock-bg: rgba(12,8,5,.92);
+  --dock-border: rgba(200,168,90,.25);
 }
 
 /* ---------- TITLE SCREEN ----------
@@ -25,30 +43,31 @@
   position:fixed; inset:0; z-index:1000;
   display:flex; align-items:center; justify-content:center;
   background:
-    radial-gradient(ellipse at 50% 38%, rgba(122,92,30,.16) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 100%, var(--table-dark) 0%, var(--table-dark2) 100%);
+    radial-gradient(ellipse at 50% 38%, var(--table-accent-soft) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, var(--table-bg1) 0%, var(--table-bg2) 100%);
   text-align:center;
+  transition:background .25s;
 }
 #title-screen.hidden{ display:none; }
 
 .title-card{ max-width:420px; padding:40px 30px; }
-.title-card .game-title{ color:#c8a85a; text-shadow:0 0 24px rgba(200,160,60,.35),0 3px 0 rgba(0,0,0,.5); }
+.title-card .game-title{ color:var(--table-accent); text-shadow:0 0 24px rgba(122,92,30,.3),0 3px 0 rgba(0,0,0,.25); }
 .title-tagline{
   font-family:'Cinzel',serif; font-size:9px; letter-spacing:.4em; text-transform:uppercase;
-  color:#8a7550; margin:10px 0 28px;
+  color:var(--table-accent); opacity:.75; margin:10px 0 28px;
 }
 .title-rule{ border:none; border-top:1.5px solid var(--table-line); width:55%; margin:0 auto 28px; }
 
 .title-buttons{ display:flex; flex-direction:column; gap:11px; }
 .title-btn{
   font-family:'Cinzel',serif; font-size:11px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
-  border:1.5px solid #7a5c1e; background:rgba(122,92,30,.08); color:#e8d9b5;
+  border:1.5px solid var(--table-accent); background:var(--table-accent-soft); color:var(--table-ink);
   padding:14px 20px; cursor:pointer; transition:all .18s cubic-bezier(.25,.8,.25,1);
 }
-.title-btn:hover{ background:rgba(122,92,30,.24); border-color:#c8a85a; color:#fff3d6; transform:translateY(-1px); }
+.title-btn:hover{ background:rgba(122,92,30,.22); border-color:var(--table-accent); transform:translateY(-1px); }
 .title-btn:active{ transform:translateY(0); }
 
-/* ---------- HOST / JOIN MODALS ---------- */
+/* ---------- HOST / JOIN / OPEN-CHARACTER MODALS ---------- */
 .title-modal-backdrop{
   display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1010;
   align-items:center; justify-content:center;
@@ -87,12 +106,23 @@
 }
 .title-modal-manage-link:hover{ opacity:1; }
 
+.table-open-char-list{ max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
+.table-open-char-entry{
+  display:flex; align-items:center; gap:8px; padding:7px 9px; cursor:pointer;
+  border:1.5px solid var(--faint); background:var(--paper2); transition:all .12s;
+}
+.table-open-char-entry:hover{ border-color:var(--gold); background:rgba(122,92,30,.08); }
+.table-open-char-name{ flex:1; font-family:'Crimson Text',serif; font-size:13px; }
+.table-open-char-date{ font-family:'Cinzel',serif; font-size:7px; letter-spacing:.08em; opacity:.5; }
+.table-open-char-empty{ font-family:'Crimson Text',serif; font-style:italic; font-size:12px; opacity:.5; padding:10px 2px; }
+
 /* ---------- TABLE SCENE ---------- */
 #table-scene{
   position:fixed; inset:0; z-index:10; overflow:hidden;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(122,92,30,.09) 0%, transparent 60%),
-    linear-gradient(180deg, var(--table-dark) 0%, var(--table-dark2) 100%);
+    radial-gradient(ellipse at 50% 0%, var(--table-accent-soft) 0%, transparent 60%),
+    linear-gradient(180deg, var(--table-bg1) 0%, var(--table-bg2) 100%);
+  transition:background .25s;
 }
 
 #table-surface{ position:absolute; inset:0; }
@@ -104,13 +134,32 @@
    place; no other behavior changes. */
 #server-modal{ z-index:1500 !important; }
 
-#table-home-btn{
-  position:fixed; top:14px; left:14px; z-index:900;
-  font-family:'Cinzel',serif; font-size:9px; letter-spacing:.15em; text-transform:uppercase;
-  border:1.5px solid rgba(200,168,90,.4); background:rgba(20,14,8,.7); color:#c8a85a;
-  padding:6px 12px; cursor:pointer; transition:all .15s;
+/* ---------- LEFT CONTROL PANEL ---------- */
+#table-left-controls{
+  position:fixed; top:0; left:0; bottom:0; z-index:850;
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+  padding:16px 10px; pointer-events:none; /* only real buttons capture clicks */
 }
-#table-home-btn:hover{ border-color:#c8a85a; background:rgba(20,14,8,.92); }
+#table-left-controls .table-ctrl-btn{ pointer-events:auto; }
+.table-ctrl-sep{ width:22px; height:1px; background:var(--table-line); margin:4px 0; }
+
+.table-ctrl-btn{
+  font-family:'Cinzel',serif; font-size:8.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  border:1px solid transparent; background:rgba(122,92,30,.06); color:var(--table-ink);
+  padding:7px 9px; cursor:pointer; display:flex; align-items:center; gap:6px;
+  opacity:.55; transition:all .15s; white-space:nowrap; border-radius:2px;
+}
+.table-ctrl-btn span{ max-width:0; overflow:hidden; opacity:0; transition:max-width .18s ease, opacity .15s ease; }
+.table-ctrl-btn:hover{ opacity:1; background:rgba(122,92,30,.16); border-color:var(--table-line); }
+.table-ctrl-btn:hover span{ max-width:140px; opacity:1; }
+
+/* ---------- RIGHT PANEL (reserved) ---------- */
+#table-right-panel{
+  position:fixed; top:0; right:0; bottom:0; width:0; z-index:850;
+  pointer-events:none;
+  /* Intentionally empty today. Future: dice roller, chat. Widen and
+     give it a background/border once something lives here. */
+}
 
 /* ---------- WINDOW CHROME ---------- */
 .table-window{
@@ -118,12 +167,12 @@
   background:var(--paper); border:3px solid var(--ink);
   box-shadow:
     inset 0 0 0 5px var(--paper), inset 0 0 0 7px var(--ink),
-    0 16px 50px rgba(0,0,0,.65);
+    0 16px 50px rgba(0,0,0,.5);
 }
 .table-window.focused{
   box-shadow:
     inset 0 0 0 5px var(--paper), inset 0 0 0 7px var(--gold),
-    0 20px 60px rgba(0,0,0,.75);
+    0 20px 60px rgba(0,0,0,.6);
 }
 
 .window-titlebar{
@@ -151,10 +200,18 @@
 }
 .window-resize-handle:hover{ opacity:1; }
 
-/* The sheet was originally laid out for a full page (centered, fixed
-   max-width). Inside a resizable window it should fill the window
-   instead. Narrow, intentional override — not reopening the cascade
-   for anything else. */
+/* Scale-to-fit wrapper (built at runtime by WM.enableScaling — see
+   14-window-manager.js). The root keeps its natural width and gets
+   transform:scale(); the outer div is sized in JS to the SCALED
+   pixel dimensions so window-content's scrollbars measure correctly
+   (CSS transform alone doesn't shrink an element's layout size). */
+.window-scale-outer{ position:relative; }
+.window-scale-root{ transform-origin: top left; }
+
+/* The sheet was originally laid out for a full page. Inside a
+   resizable, scaled window: no fixed max-width fighting the scale
+   root, and no double border/shadow (the window chrome already
+   provides that framing). Narrow, intentional overrides only. */
 .window-content .sheet{
   max-width:none !important;
   margin:0 !important;
@@ -162,23 +219,43 @@
   box-shadow:none !important;
 }
 
+/* Tabs removed: show every page stacked instead of switching between
+   them (showTab() in 03-sheet-basics.js still exists and still runs
+   harmlessly if ever called — it just has no visible effect since all
+   pages are forced visible here). */
+.window-content .tabs{ display:none !important; }
+.window-content .sheet{ display:block !important; }
+
+/* Redundant now that table-level controls exist: hamburger menu,
+   quick-save bar, and the sheet's own dark-mode button. Hidden, not
+   deleted — the underlying functions are untouched in case something
+   elsewhere still calls them. */
+.window-content > #menu-toggle,
+.window-content > #darkmode-btn,
+.window-content #quicksave-bar{
+  display:none !important;
+}
+
 /* ---------- DOCK ---------- */
 #table-dock{
   position:fixed; left:0; right:0; bottom:0; z-index:900;
   display:flex; gap:6px; padding:9px 14px; flex-wrap:wrap;
-  background:linear-gradient(0deg, rgba(12,8,5,.96) 0%, rgba(12,8,5,.7) 100%);
-  border-top:1.5px solid rgba(200,168,90,.25);
+  background:var(--dock-bg);
+  border-top:1.5px solid var(--dock-border);
+  transition:background .25s;
 }
 .dock-btn{
   font-family:'Cinzel',serif; font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
-  border:1.5px solid rgba(200,168,90,.35); background:rgba(122,92,30,.08); color:#a8925f;
+  border:1.5px solid var(--dock-border); background:var(--table-accent-soft); color:var(--table-ink);
+  opacity:.75;
   padding:7px 14px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .15s;
 }
-.dock-btn:hover{ border-color:#c8a85a; color:#e8d9b5; }
-.dock-btn.active{ background:rgba(200,168,90,.22); color:#fff3d6; border-color:#c8a85a; }
+.dock-btn:hover{ opacity:1; border-color:var(--table-accent); }
+.dock-btn.active{ background:rgba(122,92,30,.22); opacity:1; border-color:var(--table-accent); }
 .dock-icon{ font-size:12px; }
 
 @media (max-width:640px){
   .title-card{ padding:30px 20px; }
   .title-card .game-title{ font-size:40px; }
+  .table-ctrl-btn span{ display:none; }
 }

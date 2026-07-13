@@ -1,0 +1,44 @@
+{
+  "name": "monarchy",
+  "version": "1.0.0",
+  "description": "Monarchy — TTRPG character companion & table",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "build:html": "node build.js",
+    "start": "npm run build:html && electron .",
+    "dist": "npm run build:html && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.grumkata.monarchy",
+    "productName": "Monarchy",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/monarchy.html",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": ["AppImage"]
+    },
+    "mac": {
+      "target": ["dmg"]
+    }
+  }
+}

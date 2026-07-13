@@ -178,5 +178,63 @@ const WM = (function () {
     Object.keys(windows).forEach(id => { clampToViewport(windows[id]); applyRect(id); });
   });
 
-  return { register, open, close, toggle, focus };
+  /**
+   * Make a window's content scale as a whole (like Foundry VTT app
+   * windows) instead of just clipping/scrolling when the window is
+   * resized smaller than the content's natural width.
+   *
+   * opts: { rootSelector, naturalWidth, minScale, maxScale }
+   * `rootSelector` must match ONE element already inside that window's
+   * `.window-content` — it gets wrapped in a sizing div at runtime (no
+   * HTML changes needed elsewhere) and scaled via CSS transform, with
+   * the wrapper's own width/height kept in sync so scrolling still
+   * measures correctly (transform alone doesn't shrink layout size).
+   */
+  function enableScaling(id, opts) {
+    const w = windows[id]; if (!w) return;
+    const root = w.el.querySelector(opts.rootSelector);
+    if (!root) { console.warn('WM.enableScaling: root not found', opts.rootSelector); return; }
+
+    const naturalWidth = opts.naturalWidth;
+    const minScale = opts.minScale || 0.35;
+    const maxScale = opts.maxScale || 1.75;
+
+    let outer = root.parentElement;
+    if (!outer.classList.contains('window-scale-outer')) {
+      outer = document.createElement('div');
+      outer.className = 'window-scale-outer';
+      root.parentElement.insertBefore(outer, root);
+      outer.appendChild(root);
+    }
+    root.classList.add('window-scale-root');
+    root.style.width = naturalWidth + 'px';
+
+    function rescale() {
+      const contentEl = w.el.querySelector('.window-content');
+      if (!contentEl) return;
+      const availWidth = contentEl.clientWidth;
+      if (availWidth <= 0) return;
+      const scale = Math.max(minScale, Math.min(maxScale, availWidth / naturalWidth));
+      root.style.transform = 'scale(' + scale + ')';
+      // scrollHeight reflects the pre-transform (natural) layout height —
+      // transform is paint-only and doesn't affect layout/measurement.
+      const naturalHeight = root.scrollHeight;
+      outer.style.width = Math.round(naturalWidth * scale) + 'px';
+      outer.style.height = Math.round(naturalHeight * scale) + 'px';
+    }
+
+    rescale();
+    w.rescale = rescale;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => rescale());
+      ro.observe(w.el);
+    } else {
+      // Fallback for environments without ResizeObserver: recheck on the
+      // interactions that can change window size.
+      window.addEventListener('resize', rescale);
+    }
+  }
+
+  return { register, open, close, toggle, focus, enableScaling };
 })();
