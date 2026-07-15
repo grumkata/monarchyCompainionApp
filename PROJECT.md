@@ -341,15 +341,29 @@ left panel re-themes title screen + table + dock + sheet together. The
 sheet's own dark-mode CSS (in files 01–04) was untouched; only the new
 table-level surfaces needed variants added.
 
-**No more tabs.** `showTab()` (in `03-sheet-basics.js`) still exists and
-is harmless if ever called — it's just that `.window-content .sheet` is
-forced `display:block !important` and `.window-content .tabs` is hidden in
-`05-shell.css`, so all three pages (`p1`/`p2`/`p3`) render stacked in one
-continuous scroll instead of switching. `syncCombatPage()` (which used to
-run automatically on switching to page 3) is now called manually from
-`tableCreateCharacter()`/`tableOpenCharacterConfirm()` so the combat page's
-mirrored HP/Stamina/Stress fields still populate correctly without that
-tab-click trigger.
+**Tabs restored.** The stacked-pages approach above turned out to be a
+poor fit for a small, resizable window — each of the three sheet pages
+was laid out as a full page, so stacking all three tripled the scroll
+distance inside what's normally a ~780px-tall pane. Fixed by removing the
+`05-shell.css` override that forced every `.sheet` visible and hid
+`.tabs`; `showTab()` (in `03-sheet-basics.js`) was never touched and
+needed no changes to switch pages again. Two related bugs got fixed at
+the same time: `.tabs`'s old `padding-left:52px;padding-right:180px` (in
+`01-base.css`) was vestigial compensation for `#menu-toggle`/
+`#quicksave-bar` floating over the old full-page sheet — both are now
+hidden inside the window, so the padding was just making the restored tab
+bar look off-center, and is now symmetric. `.tab-btn` was also hardcoded
+(`#1a1208`/`#6b5530`/`#2a1c0a`), which is why dark mode needed its own
+bespoke override; it now reads from three new `--tab-bg`/`--tab-border`/
+`--tab-ink` custom properties defined next to the other theme tokens at
+the top of `01-base.css`, so the separate `body.dark-mode .tab-btn`
+override could be deleted — dark mode falls out of the tokens
+automatically. Tab labels also got a small icon prefix (⚜ / 🎒 / ⚔) to
+help scanning once the window is scaled down. `syncCombatPage()` is still
+also called manually from `tableCreateCharacter()`/
+`tableOpenCharacterConfirm()` (added during the stacking-era change) —
+harmless now that tabs work again, since the function only fills in
+fields that are still empty.
 
 **Old sheet chrome hidden, not deleted.** `#menu-toggle`, `#darkmode-btn`,
 and `#quicksave-bar` are redundant now (replaced by the left panel) and
@@ -535,12 +549,7 @@ else, and so they're not mistaken for split-related bugs.
    now scoped to the scaled sheet content instead of the real viewport.
    Cosmetic today since combat/fog is an explicit future overhaul target
    (3.6); don't be surprised by it if you touch fog-of-war before then.
-7. **`showTab()` still exists but has no visible effect** — tabs were
-   removed via CSS (`05-shell.css` forces every `.sheet` visible and hides
-   `.tabs`), not by deleting the tab-switching code. If a future change
-   needs real per-page switching again, that logic is still there in
-   `03-sheet-basics.js`, just currently overridden.
-8. **NSIS Windows installer target needs Wine to cross-build from
+7. **NSIS Windows installer target needs Wine to cross-build from
    Linux/macOS** (verified: the `portable` target does NOT need Wine and
    built/ran successfully from this project's Linux dev environment; the
    `nsis` target failed with `spawn wine ENOENT` under the same
@@ -625,3 +634,4 @@ comments, minor CSS tweaks) don't need a changelog entry.
 | 2026-07-11 | **Baseline.** Split the original single 7,394-line/422KB `monarchy_8_4_2.html` into the modular `src/` structure described in Section 2, with `build.js` regenerating an equivalent single-file `dist/monarchy.html`. Pure mechanical split — verified zero behavior change (all 200 function defs, all top-level declarations, all element IDs, and all brace/paren pairs matched exactly between original and rebuilt output; every split file and every rebuilt script block passes a JS syntax check clean). This document created as the standing project reference. |
 | 2026-07-12 | **Title screen + table scene.** The character sheet stopped being "the app" — added a title screen (Open Local Table / Host Game Table / Join Game) leading into a table scene where the sheet now lives as one draggable, resizable, closeable/dockable window. New generic window manager (`14-window-manager.js`) built to support future window types (combat, rulebook) without more infrastructure work. No changes to sheet internals (files 00–13) — only wrapped, verified via a jsdom-based runtime smoke test (title screen dismissal, window open/close/drag/resize, position persistence, host/join modal server population) in addition to the usual syntax checks. See 3.10 for full details and the known limitation on multiple live sheet instances. |
 | 2026-07-13 | **Table overhaul + Electron distribution**, after first-look feedback that the table "was just the sheet's UI but worse." Table now starts empty (no auto-opened sheet); added a left control panel (Title/Create Character/Open Character/Save Table/Theme, built to grow) and a reserved-but-empty right panel for future dice/chat. Tabs removed — all sheet pages render stacked. Old sheet chrome (menu, quicksave, dark-mode button) hidden inside the window, replaced by the table-level controls. Dark/light theme is now genuinely global — new `--table-*` CSS custom properties in `05-shell.css` re-theme the title screen/table/dock together, not just the sheet. Sound-effect UI disabled (was non-functional clutter — no sounds were ever configured). Added scale-to-fit windows (`WM.enableScaling()`) so resizing the sheet scales it as a whole instead of clipping/scrolling. **Distribution model changed**: `npm run dist` (Electron + electron-builder) now produces a real `.exe` — verified end-to-end by actually building and launching the packaged app (headless, via Xvfb + Chrome DevTools Protocol) and confirming the full flow (title screen → create character → blank sheet → real computed `scale()` transform) inside the genuine packaged executable, not just in a browser or jsdom. `dist/monarchy.html` still exists as a build intermediate and a quick-test convenience, but is no longer the distributable. See 3.10, 3.11, and Known Issues 5.6–5.8. |
+| 2026-07-13 | **Tabs restored**, first item of a broader UI/UX overhaul. Reverted the "stacked pages" approach from the table overhaul above — removed the `05-shell.css` override that forced every `.sheet` visible and hid `.tabs`; `showTab()` (untouched, in `03-sheet-basics.js`) switches pages again with no JS changes needed. Fixed two related bugs found in the process: `.tabs`'s leftover asymmetric padding (dodging `#menu-toggle`/`#quicksave-bar`, which used to float over the old full-page sheet and are now hidden inside the window) is now symmetric; and `.tab-btn` colors moved from hardcoded hex to three new `--tab-bg`/`--tab-border`/`--tab-ink` custom properties, so the separate `body.dark-mode .tab-btn` override could be deleted. Tab labels got a small icon prefix (⚜ Character & Skills / 🎒 Backgrounds & Abilities / ⚔ Combat). The Known Issues item about `showTab()` having no visible effect no longer applies and was removed. Verified with a Node/jsdom smoke test (loads the real markup + CSS + JS, clicks each tab, asserts exactly one `.sheet` is visible via computed style) plus `npm run dist`/`node --check` on every JS file. See 3.10. |

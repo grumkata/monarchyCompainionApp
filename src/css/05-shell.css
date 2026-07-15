@@ -219,12 +219,11 @@ body.dark-mode{
   box-shadow:none !important;
 }
 
-/* Tabs removed: show every page stacked instead of switching between
-   them (showTab() in 03-sheet-basics.js still exists and still runs
-   harmlessly if ever called — it just has no visible effect since all
-   pages are forced visible here). */
-.window-content .tabs{ display:none !important; }
-.window-content .sheet{ display:block !important; }
+/* Tabs restored (2026-07-13): the override that used to live here forced
+   every .sheet visible and hid .tabs, so all three pages rendered
+   stacked. Removed — showTab() (03-sheet-basics.js) and the base
+   .sheet/.sheet.active rules (01-base.css) handle switching again on
+   their own, no changes needed there. See PROJECT.md 3.10. */
 
 /* Redundant now that table-level controls exist: hamburger menu,
    quick-save bar, and the sheet's own dark-mode button. Hidden, not

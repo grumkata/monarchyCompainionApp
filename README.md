@@ -97,7 +97,9 @@ a perfectly normal file to open directly.
 
 1. ~~Title screen + table scene~~ — done, then substantially reworked
    after first look (table starts empty, tabs removed, global theme,
-   scale-to-fit windows) — see `PROJECT.md` section 3.10.
+   scale-to-fit windows) — see `PROJECT.md` section 3.10. Tabs were
+   restored shortly after; see the second 2026-07-13 entry in
+   `PROJECT.md` section 7.
 2. ~~Electron distribution~~ — done, verified end-to-end (built and
    launched the actual packaged app) — see `PROJECT.md` section 3.11.
 3. **Overhaul combat**: `07-combat-tracker.js` is isolated — safe to
