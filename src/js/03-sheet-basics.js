@@ -181,6 +181,10 @@ function showTab(id,btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active'); btn.classList.add('active');
   if (id==='p3') syncCombatPage();
+  // Pages differ hugely in natural height; the scale-to-fit wrapper
+  // (WM.enableScaling, see 14-window-manager.js) only recomputes that
+  // on a manual window resize otherwise, so nudge it here too.
+  if (typeof WM !== 'undefined') WM.rescale('sheet');
 }
 function syncCombatPage() {
   ['hp-cur','st-cur','str-cur'].forEach((p1id,i) => {

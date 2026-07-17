@@ -236,5 +236,19 @@ const WM = (function () {
     }
   }
 
-  return { register, open, close, toggle, focus, enableScaling };
+  /**
+   * Force an immediate rescale for a window that already called
+   * enableScaling(). Normally rescale() only reruns when the WINDOW
+   * itself is resized (via its ResizeObserver) — that's not triggered
+   * by the window's CONTENT changing height on its own (e.g. switching
+   * tabs, or adding/removing cards), so callers that know content
+   * height just changed should call this to stay in sync. No-op if
+   * the window never called enableScaling.
+   */
+  function rescale(id) {
+    const w = windows[id];
+    if (w && w.rescale) w.rescale();
+  }
+
+  return { register, open, close, toggle, focus, enableScaling, rescale };
 })();

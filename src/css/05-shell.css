@@ -219,11 +219,17 @@ body.dark-mode{
   box-shadow:none !important;
 }
 
-/* Tabs restored (2026-07-13): the override that used to live here forced
-   every .sheet visible and hid .tabs, so all three pages rendered
-   stacked. Removed — showTab() (03-sheet-basics.js) and the base
-   .sheet/.sheet.active rules (01-base.css) handle switching again on
-   their own, no changes needed there. See PROJECT.md 3.10. */
+/* Tabs restored (2026-07-13, second pass): back to real per-page
+   switching via showTab() (03-sheet-basics.js) and its native
+   01-base.css rules (.tabs{display:flex}, .sheet{display:none},
+   .sheet.active{display:block}) — no override needed here anymore.
+   Only the tab bar's own padding needs a window-scoped correction:
+   01-base.css gives .tabs 52px/180px left/right padding to dodge
+   #menu-toggle (top-left) and #quicksave-bar (top-right), both
+   position:fixed over the OLD full-page layout. Both are hidden
+   inside the window now (below), so that asymmetric padding just
+   throws the tab row off-center here — reset to a symmetric value. */
+.window-content .tabs{ padding-left:14px; padding-right:14px; }
 
 /* Redundant now that table-level controls exist: hamburger menu,
    quick-save bar, and the sheet's own dark-mode button. Hidden, not
