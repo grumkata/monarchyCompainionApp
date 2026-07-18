@@ -1,16 +1,29 @@
 /* ══════════════════════════════════════════════════════════════
    SERVER MANAGEMENT
+   (Firebase config now lives at the top of 09-session-sync.js —
+   BASE_SCRIPT_URL used to live here, back when the backend was a
+   Google Apps Script relay.)
 ══════════════════════════════════════════════════════════════ */
-const BASE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwExxL_BfyJ5OMkJ9fOvYmzMVN6CPdcYnSPtEm76vrZXAiwf8x4p1aw5a79Q_gFs_1t/exec';
-
 function getServers() {
-  try { return JSON.parse((_ls.get('monarchy_servers'))) || [{id:'default', name:'Main Table'}]; }
-  catch(e) { return [{id:'default', name:'Main Table'}]; }
+  try {
+    const stored = JSON.parse(_ls.get('monarchy_servers'));
+    if (stored && stored.length) return stored;
+  } catch (e) {}
+  // First run on this install — generate a private table id so this
+  // install never collides with anyone else's table. (The old fallback
+  // here was the literal string 'default', shared by EVERY fresh
+  // install of the app — two unrelated tables that both just clicked
+  // "start session" without first renaming their table would land in
+  // the exact same shared room and see each other's data.)
+  const fresh = [{ id: 'srv_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: 'Main Table' }];
+  saveServers(fresh);
+  return fresh;
 }
 function saveServers(servers) { _ls.set('monarchy_servers', JSON.stringify(servers)); }
 function getActiveServer() {
   const sel = document.getElementById('session-server-sel');
-  return sel ? (sel.value || 'default') : 'default';
+  const fallback = (getServers()[0] || {}).id;
+  return sel ? (sel.value || fallback) : fallback;
 }
 
 function renderServerSelector() {

@@ -26,8 +26,18 @@
     ],
     "win": {
       "target": [
-        { "target": "portable", "arch": ["x64"] },
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -35,10 +45,17 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
-      "target": ["AppImage"]
+      "target": [
+        "AppImage"
+      ]
     },
     "mac": {
-      "target": ["dmg"]
+      "target": [
+        "dmg"
+      ]
     }
+  },
+  "dependencies": {
+    "firebase": "^12.16.0"
   }
 }

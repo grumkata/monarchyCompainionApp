@@ -1,156 +1,91 @@
 /* ══════════════════════════════════════════════════════════════
-   LIVE SYNC  ,  clean two-channel architecture
-   ┌─────────────────────────────────────────────────────────┐
-   │  GAS sheet stores two independent JSON blobs per server │
-   │  bf:{srv}  , battlefield  (GM writes, everyone reads)   │
-   │  pl:{srv}  , players dict (players write, GM reads)     │
-   │  GET ?srv=X returns { bf:{…}, pl:{…} } in one call      │
-   │  POST ?srv=X&ch=bf  writes battlefield cell only        │
-   │  POST ?srv=X&ch=pl&name=Y  merges one player into pl    │
-   └─────────────────────────────────────────────────────────┘
+   LIVE SYNC  —  Firebase Realtime Database (replaces the old
+   Google Apps Script relay — see the note left in 10-gm-tools.js
+   where BASE_SCRIPT_URL used to live)
+   ┌───────────────────────────────────────────────────────────┐
+   │  servers/{srv}/battlefield      GM writes; everyone       │
+   │                                  listens — pushed the      │
+   │                                  instant it changes, no    │
+   │                                  polling                   │
+   │  servers/{srv}/players/{name}   that player writes their   │
+   │                                  own vitals; GM listens to  │
+   │                                  the whole node             │
+   │  servers/{srv}/presence/{name}  true while connected —      │
+   │                                  Firebase itself clears it  │
+   │                                  on disconnect (tab close,  │
+   │                                  crash, lost network), so   │
+   │                                  we're never guessing who's │
+   │                                  actually still there       │
+   └───────────────────────────────────────────────────────────┘
+   SETUP: paste your own project's values below. Firebase console →
+   Project settings → your web app → SDK setup and configuration.
+   This object is NOT a secret — it's meant to ship in client code.
+   Access control lives in the Realtime Database security rules,
+   not in hiding this object.
 ══════════════════════════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAlcAPvg9pBUD6oax2u-sqGOvamCct4IYs",
+  authDomain: "monarchy-companion.firebaseapp.com",
+  databaseURL: "https://monarchy-companion-default-rtdb.firebaseio.com",
+  projectId: "monarchy-companion",
+  storageBucket: "monarchy-companion.firebasestorage.app",
+  messagingSenderId: "632244770803",
+  appId: "1:632244770803:web:a21824788754ce5729e486",
+  measurementId: "G-4KDSPRDN96"
+};
 
-let _scriptUrl   = null;   // base URL (no srv param yet)
 let _sessionRole = null;   // 'gm' | 'player' | null
-let _serverId    = null;   // active server id
+let _serverId    = null;   // active table id
+
+// Firebase handles — only live while a session is active
+let _db          = null;
+let _bfRef       = null;
+let _playersRef  = null;
+let _presenceRef = null;
 
 // Timers
-let _bfPollTimer     = null;  // player: poll battlefield
-let _plPollTimer     = null;  // gm: poll player vitals
-let _plPushTimer     = null;  // player: push own vitals
+let _pushTimer       = null;  // debounce for GM bf push — other files clear/set this directly, keep the name
+let _plPushDebounce  = null;
 let _statusTickTimer = null;
-let _pushTimer       = null;  // debounce for GM bf push
 
 // Timestamps
-let _lastPushTs  = 0;
-let _lastPollTs  = 0;
-let _lastBfTs    = 0;  // ts of last applied battlefield state
+let _lastPushTs = 0;
+let _lastPollTs = 0;  // "last update received" — kept for updateStatusText()
+// (_lastCmdTs lives right next to _applyGmCommands below, where it's used)
 
-/* ── URL builder ── */
-function _url(extra) {
-  return _scriptUrl + '?srv=' + encodeURIComponent(_serverId) + (extra || '');
-}
-
-/* ── GET state from GAS , fetch() with JSONP fallback ──────
- *
- *  GAS 302-redirects script.google.com to script.googleusercontent.com.
- *  fetch() works when CORS headers survive that redirect (they usually do
- *  for GET, but some browsers/networks block it). JSONP via <script> tags
- *  is always allowed (scripts are never CORS-restricted) so we use it as
- *  a reliable fallback.
- *
- *  Strategy:
- *   1. Try fetch() , fast, clean, works in modern browsers on most networks
- *   2. If fetch fails for any reason , fall back to JSONP automatically
- *   3. JSONP uses a 10s timeout to avoid hanging polls
- */
-function fetchState() {
-  return fetch(_url('&_t=' + Date.now()), {
-    method:      'GET',
-    cache:       'no-store',
-    credentials: 'omit'
-  })
-  .then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.text();
-  })
-  .then(txt => {
-    const trimmed = txt.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) return JSON.parse(trimmed);
-    const m = trimmed.match(/^[^(]+\((.+)\)\s*;?\s*$/s);
-    if (m) return JSON.parse(m[1]);
-    throw new Error('unparseable');
-  })
-  .catch(() => _fetchStateJsonp());
-}
-
-/* JSONP fallback , never blocked by CORS since script tags bypass it */
-function _fetchStateJsonp() {
-  return new Promise((resolve, reject) => {
-    const cb  = '_mc_' + Date.now() + '_' + Math.floor(Math.random() * 99999);
-    const el  = document.createElement('script');
-    const tid = setTimeout(() => { cleanup(); reject(new Error('jsonp timeout')); }, 10000);
-    window[cb] = d => { cleanup(); resolve(d); };
-    function cleanup() {
-      clearTimeout(tid);
-      delete window[cb];
-      if (el.parentNode) el.parentNode.removeChild(el);
-    }
-    el.onerror = () => { cleanup(); reject(new Error('jsonp error')); };
-    el.src = _url('&callback=' + cb + '&_t=' + Date.now());
-    document.head.appendChild(el);
-  });
-}
-
-/* ── fire-and-forget POST ──
- *
- *  mode:'no-cors' is required for POST to GAS. Without it the browser
- *  blocks the response due to CORS (GAS redirect chain). Since we only
- *  need the write to happen (not the response), no-cors is correct here.
- *  Content-Type: text/plain keeps it a simple request (no preflight).
- */
-function _post(extraParams, body) {
-  fetch(_url(extraParams), {
-    method:      'POST',
-    body:        JSON.stringify(body),
-    headers:     { 'Content-Type': 'text/plain' },
-    mode:        'no-cors',
-    credentials: 'omit'
-  }).catch(() => {});
+/** Bring up the Firebase connection once, defensively. If the SDK
+ *  didn't load (no internet at boot, CDN blocked, etc.) this never
+ *  throws — every sync function below checks _db/_bfRef first, so
+ *  solo/offline use of the character sheet and tracker still works
+ *  fine even with zero connectivity. */
+function _ensureFirebase() {
+  if (_db) return true;
+  if (typeof firebase === 'undefined') {
+    console.error('[monarchy sync] Firebase SDK did not load — check your internet connection.');
+    return false;
+  }
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  _db = firebase.database();
+  return true;
 }
 
 /* ────────────────────────────────────────────────
-   GM  , push battlefield
+   GM — push battlefield.
+   Real write, real error handling: unlike the old fire-and-forget
+   POST (which always reported "live" whether or not the write
+   actually landed), this only shows "live" once Firebase confirms
+   the write, and shows a real error if it didn't.
 ──────────────────────────────────────────────── */
-async function pushBattlefield() {
-  if (!_scriptUrl || _sessionRole !== 'gm') return;
+function pushBattlefield() {
+  if (!_bfRef || _sessionRole !== 'gm') return;
   setPulse('syncing');
-  try {
-    _post('&ch=bf', serializeBattlefield());
-    _lastPushTs = Date.now();
-    setPulse('live');
-  } catch(e) {
-    setPulse('err');
-  }
-}
-
-/* ────────────────────────────────────────────────
-   GM , poll for player vitals (every 3 s)
-──────────────────────────────────────────────── */
-async function _gmPollPlayers() {
-  if (!_scriptUrl || _sessionRole !== 'gm') return;
-  if (_pollsPaused) return;
-  try {
-    const env = await fetchState();
-    if (env && env.pl) _applyPlayers(env.pl);
-  } catch(e) {}
-}
-
-/* ────────────────────────────────────────────────
-   Player , poll battlefield (every 1.5 s)
-──────────────────────────────────────────────── */
-async function _playerPollBf() {
-  if (!_scriptUrl || _sessionRole !== 'player') return;
-  if (_pollsPaused) return;
-  _lastPollTs = Date.now();
-  try {
-    const env = await fetchState();
-    if (env && env.bf) {
-      const bfTs = env.bf.ts || 0;
-      if (bfTs > _lastBfTs) {
-        _lastBfTs = bfTs;
-        if (env.bf.v) restoreBattlefield(env.bf);
-        // Apply any GM damage commands directed at this player
-        _applyGmCommands(env.bf.cmds);
-      }
-    }
-    setPulse('live');
-    updateStatusText();
-  } catch(e) {
-    setPulse('err');
-    updateStatusText('⚠ ' + (e && e.message ? e.message : String(e)));
-    console.error('[monarchy sync]', e);
-  }
+  _bfRef.set(serializeBattlefield())
+    .then(() => { _lastPushTs = Date.now(); setPulse('live'); updateStatusText(); })
+    .catch(err => {
+      setPulse('err');
+      updateStatusText('⚠ push failed — ' + (err && err.message ? err.message : String(err)));
+      console.error('[monarchy sync] battlefield push failed', err);
+    });
 }
 
 /** Apply GM→player commands embedded in the battlefield blob.
@@ -211,13 +146,20 @@ function _applyGmCommands(cmds) {
 }
 
 /* ────────────────────────────────────────────────
-   Player , push own vitals (every 5 s + on join)
+   Player — push own vitals. Deliberate only: once on join, and
+   again whenever something actually changes (via _scheduleVitalsPush's
+   debounce, triggered by onVitalsChange below). There's no more blind
+   "resend every 5 seconds no matter what" heartbeat — that heartbeat
+   was quietly doing double duty as a presence signal, which is why
+   it could also race a GM's own edit; presence is Firebase's job now
+   (see _presenceRef / onDisconnect in startSession), fully decoupled
+   from resending vitals data.
 ──────────────────────────────────────────────── */
-let _plPushDebounce = null;
 function _playerPushVitals() {
-  if (!_scriptUrl || _sessionRole !== 'player') return;
+  if (!_playersRef || _sessionRole !== 'player') return;
   const vitals = serializePlayerVitals();
-  _post('&ch=pl&name=' + encodeURIComponent(vitals.name), vitals);
+  _playersRef.child(vitals.name).set(vitals)
+    .catch(err => console.error('[monarchy sync] vitals push failed', err));
 }
 /** Debounced push triggered by HP/condition input changes while in player mode. */
 function _scheduleVitalsPush() {
@@ -241,22 +183,30 @@ function onVitalsChange(e) {
   _scheduleVitalsPush();
 }
 
+
 /* ────────────────────────────────────────────────
    START / LEAVE SESSION
 ──────────────────────────────────────────────── */
 async function startSession(role) {
+  if (!_ensureFirebase()) {
+    alert('Could not reach the sync service — check your internet connection and try again.');
+    return;
+  }
+
   if (role === 'gm') {
-    if (!confirm('Host as GM on server "' + (getServers().find(s=>s.id===getActiveServer())||{name:'Main Table'}).name + '"?\n\nThis will push your current battlefield to that server.')) return;
+    if (!confirm('Host as GM on server "' + (getServers().find(s => s.id === getActiveServer()) || { name: 'Main Table' }).name + '"?\n\nThis will push your current battlefield to that server.')) return;
   }
   if (role === 'player') {
     getMyPlayerName();
     if (!_playerName) return; // cancelled prompt
   }
 
-  const serverName = (getServers().find(s=>s.id===getActiveServer())||{name:getActiveServer()}).name;
-  _scriptUrl   = BASE_SCRIPT_URL;
+  const serverName = (getServers().find(s => s.id === getActiveServer()) || { name: getActiveServer() }).name;
   _serverId    = getActiveServer();
   _sessionRole = role;
+  _bfRef       = _db.ref('servers/' + _serverId + '/battlefield');
+  _playersRef  = _db.ref('servers/' + _serverId + '/players');
+  _presenceRef = _db.ref('servers/' + _serverId + '/presence');
 
   const srvLbl = document.getElementById('session-server-name');
   if (srvLbl) srvLbl.textContent = '· ' + serverName;
@@ -264,20 +214,29 @@ async function startSession(role) {
   setSessionUI(role);
 
   if (role === 'gm') {
-    await pushBattlefield();
+    pushBattlefield();
     document.addEventListener('click', onBfChange);
     document.addEventListener('input', onBfChange);
-    _plPollTimer     = setInterval(_gmPollPlayers, 3000);
+    _playersRef.on('value', _onPlayersUpdate);
+    _presenceRef.on('value', _onPresenceUpdate);
     _statusTickTimer = setInterval(updateStatusText, 1000);
     showToast('Hosting on: ' + serverName);
   } else {
-    await _playerPollBf();                           // immediate fetch
-    _playerPushVitals();                             // immediate vitals push
+    _bfRef.on('value', snap => {
+      const bf = snap.val();
+      _lastPollTs = Date.now();
+      if (bf && bf.v) restoreBattlefield(bf);
+      _applyGmCommands(bf && bf.cmds);
+      setPulse('live');
+      updateStatusText();
+    });
+    _playerPushVitals();
+    _presenceRef.child(_playerName).set(true)
+      .then(() => _presenceRef.child(_playerName).onDisconnect().remove())
+      .catch(() => {});
     document.addEventListener('input',  onVitalsChange);
     document.addEventListener('change', onVitalsChange);
-    _bfPollTimer     = setInterval(_playerPollBf,    1500);
-    _plPushTimer     = setInterval(_playerPushVitals, 5000);
-    _statusTickTimer = setInterval(updateStatusText,  1000);
+    _statusTickTimer = setInterval(updateStatusText, 1000);
     showToast('Joined: ' + serverName);
   }
 }
@@ -289,13 +248,18 @@ function leaveSession() {
   document.removeEventListener('change', onVitalsChange);
   clearTimeout(_pushTimer);
   clearTimeout(_plPushDebounce);
-  clearInterval(_bfPollTimer);
-  clearInterval(_plPollTimer);
-  clearInterval(_plPushTimer);
   clearInterval(_statusTickTimer);
 
-  _scriptUrl = null; _sessionRole = null; _serverId = null;
-  _lastPushTs = 0; _lastPollTs = 0; _lastBfTs = 0;
+  if (_bfRef)      _bfRef.off();
+  if (_playersRef) _playersRef.off();
+  if (_presenceRef) {
+    _presenceRef.off();
+    if (_sessionRole === 'player' && _playerName) _presenceRef.child(_playerName).remove().catch(() => {});
+  }
+  _bfRef = _playersRef = _presenceRef = null;
+
+  _sessionRole = null; _serverId = null;
+  _lastPushTs = 0; _lastPollTs = 0;
   _connectedPlayers = {}; _playerLastSeen = {};
 
   // Reset UI
@@ -318,29 +282,25 @@ function leaveSession() {
   if (lbl)  { lbl.className = 'session-role-cell none'; lbl.textContent = '⚔ Live Sync'; }
   if (idle) idle.style.display = 'flex';
   if (act)  act.style.display  = 'none';
-  // Restore all tabs
   document.querySelectorAll('.tab-btn').forEach(b => b.style.display = '');
   setPulse(null);
   showToast('Sync stopped');
 }
 
-/* ── Pause polling while tab is hidden; resume + push immediately when visible ── */
-let _pollsPaused = false;
+/* ── Re-affirm presence + do one deliberate re-sync when the tab
+   comes back from being hidden (covers throttled background timers
+   and brief connectivity blips, e.g. a laptop waking from sleep).
+   There's no "paused polling" bookkeeping needed anymore — listeners
+   just keep listening in the background regardless of tab visibility. ── */
 document.addEventListener('visibilitychange', function() {
-  if (document.hidden) {
-    _pollsPaused = true;
-  } else {
-    _pollsPaused = false;
-    if (!_scriptUrl || !_sessionRole) return;
-    // Immediately re-push so player re-appears in GM list
-    if (_sessionRole === 'player') {
-      _playerPushVitals();
-      _playerPollBf();
-    } else if (_sessionRole === 'gm') {
-      _gmPollPlayers();
-    }
+  if (document.hidden || !_sessionRole) return;
+  if (_sessionRole === 'gm' && _bfRef) pushBattlefield();
+  if (_sessionRole === 'player' && _presenceRef && _playerName) {
+    _presenceRef.child(_playerName).set(true).then(() => _presenceRef.child(_playerName).onDisconnect().remove()).catch(() => {});
+    _playerPushVitals();
   }
 });
+
 function serializeBattlefield() {
   const combatants = [];
   document.querySelectorAll('.bf-lane').forEach(lane => {
@@ -459,6 +419,7 @@ function restoreBattlefield(bf) {
   }
 }
 
+
 /* ────────────────────────────────────────────────
    PLAYER VITALS , serialize / apply
 ──────────────────────────────────────────────── */
@@ -564,74 +525,61 @@ function serializePlayerVitals() {
   };
 }
 
-/* ── HP edit lock: prevent server overwrites while GM is typing ── */
-const _hpEditingSet = new Set(); // Set of cids currently being edited by GM
-const _hpGmSetTs = {};           // cid → timestamp of last GM HP override
-
+/* ── HP edit lock: while the GM has a chip's HP field focused, don't
+   let an incoming player update visually interrupt them mid-keystroke.
+   The old mechanism also assumed "my edit wins for the next 12
+   seconds" as a guess to cover slow, unreliable polling — that guess
+   is gone. Firebase pushes in well under a second, and _unlockHpEdit
+   already triggers an immediate pushBattlefield() below, so there's
+   no multi-second window of stale-but-still-arriving data left to
+   guard against — this was the main mechanism behind "players
+   overwriting GM info." ── */
+const _hpEditingSet = new Set(); // cids currently focused for HP editing by the GM
 function _lockHpEdit(cid) { _hpEditingSet.add(cid); }
 function _unlockHpEdit(cid, hpInput) {
   _hpEditingSet.delete(cid);
-  // Mark this chip as GM-overridden for 12s so player polls don't revert it
-  _hpGmSetTs[cid] = Date.now();
   if (_sessionRole === 'gm') {
     updateHpLbl(cid, hpInput ? hpInput.value : '');
     clearTimeout(_pushTimer); _pushTimer = setTimeout(pushBattlefield, 300);
   }
 }
 
-/* ── apply pl dict received from server ── */
-/* ── Player seen-timestamps: keep players in list for 45s after last push ── */
+/* ── Player seen-timestamps, for the "idle" hint in renderGmPlayersList ── */
 let _playerLastSeen = {}; // name → Date.now() timestamp
 
-function _applyPlayers(pl) {
-  if (!pl || typeof pl !== 'object') return;
-
-  // Track when we last saw each player
+/** GM: fired every time servers/{srv}/players changes (pushed, not polled). */
+function _onPlayersUpdate(snapshot) {
+  const pl = snapshot.val() || {};
   const now = Date.now();
   Object.keys(pl).forEach(name => { _playerLastSeen[name] = now; });
-
-  // ✓ FIX: Remove players that are NO LONGER in the server's list
-  // (Server removes them after 30s of inactivity)
-  Object.keys(_connectedPlayers).forEach(name => {
-    if (!(name in pl)) {
-      // Player was in our list but not in server's list - they disconnected
-      delete _connectedPlayers[name];
-      delete _playerLastSeen[name];
-    }
-  });
-
-  // Merge new/updated player data from server
   Object.assign(_connectedPlayers, pl);
-  
-  // ✓ Re-render the player list UI to reflect any disconnects
-  renderGmPlayersList();
 
-  // Update linked chip HP & conditions from player data
+  // Reflect a linked player's self-reported HP onto their chip. Same
+  // single-writer idea as the rest of the battlefield: whoever touches
+  // a field last wins, and it's pushed straight back out so it durably
+  // persists for everyone instead of only updating the GM's screen.
   document.querySelectorAll('.comb-chip').forEach(chip => {
     const linkedName = chip.dataset.linkedPlayer;
     if (!linkedName) return;
     const pdata = _connectedPlayers[linkedName];
     if (!pdata) return;
-    const cid   = chip.id;
-    // ── Don't overwrite HP if GM is currently editing OR recently set this chip's HP ──
-    const gmRecentlySet = _hpGmSetTs[cid] && (Date.now() - _hpGmSetTs[cid] < 12000);
-    if (!_hpEditingSet.has(cid) && !gmRecentlySet) {
-      const panel = document.getElementById(cid + '-exp');
-      if (panel) {
-        // ✓ FIX: Select HP inputs by class, not by type
-        const hpCurInput = panel.querySelector('.chip-hp-cur');
-        const hpMaxInput = panel.querySelector('.chip-hp-max');
-        if (hpCurInput && hpMaxInput) {
-          const hpCurStr = String(pdata.hp ?? '');
-          const hpMaxStr = String(pdata.hpMax ?? '');
-          hpCurInput.value = hpCurStr;
-          hpMaxInput.value = hpMaxStr;
-          const hpStr = (hpCurStr && hpMaxStr) ? `${hpCurStr}/${hpMaxStr}` : hpCurStr;
-          updateHpLbl(cid, hpStr);
-          updateHpBar(cid, hpStr);
-        }
-      }
-    }
+    const cid = chip.id;
+    if (_hpEditingSet.has(cid)) return; // GM is actively typing this exact field right now
+    const panel = document.getElementById(cid + '-exp');
+    if (!panel) return;
+    const hpCurInput = panel.querySelector('.chip-hp-cur');
+    const hpMaxInput = panel.querySelector('.chip-hp-max');
+    if (!hpCurInput || !hpMaxInput) return;
+    const hpCurStr = String(pdata.hp ?? '');
+    const hpMaxStr = String(pdata.hpMax ?? '');
+    if (hpCurInput.value === hpCurStr && hpMaxInput.value === hpMaxStr) return; // unchanged, nothing to do
+    hpCurInput.value = hpCurStr;
+    hpMaxInput.value = hpMaxStr;
+    const hpStr = (hpCurStr && hpMaxStr) ? `${hpCurStr}/${hpMaxStr}` : hpCurStr;
+    updateHpLbl(cid, hpStr);
+    updateHpBar(cid, hpStr);
+    clearTimeout(_pushTimer);
+    _pushTimer = setTimeout(pushBattlefield, 400);
   });
 
   updateGmPlayerLinkDropdowns();
@@ -639,10 +587,21 @@ function _applyPlayers(pl) {
   updateStatusText();
 }
 
+/** GM: fired every time servers/{srv}/presence changes. True disconnect
+ *  detection (each player registers Firebase's own onDisconnect on join)
+ *  instead of guessing someone left because their last poll went missing. */
+function _onPresenceUpdate(snapshot) {
+  const online = snapshot.val() || {};
+  Object.keys(_connectedPlayers).forEach(name => {
+    if (!online[name]) { delete _connectedPlayers[name]; delete _playerLastSeen[name]; }
+  });
+  renderGmPlayersList();
+}
+
 /* ── legacy shim so old call sites still work ── */
 function applyPlayerLinksFromState(state) {
-  if (state && state.pl)      _applyPlayers(state.pl);
-  else if (state && state.players) _applyPlayers(state.players);
+  if (state && state.pl)           _onPlayersUpdate({ val: () => state.pl });
+  else if (state && state.players) _onPlayersUpdate({ val: () => state.players });
 }
 
 /* ────────────────────────────────────────────────
@@ -1121,3 +1080,4 @@ function updateStatusText(override) {
     el.textContent = 'Live' + (ago !== null ? ' · ' + (ago < 2 ? 'just now' : ago + 's ago') : '');
   }
 }
+
