@@ -61,27 +61,6 @@ function recalcDerived() {
   ['str-max','c-str-max'].forEach(id => { const el=document.getElementById(id); if(el) el.value=strMax; });
 }
 
-/* ══ SYNC VITALS ══ */
-function syncFromCombat(p1id, p3id) {
-  const c = document.getElementById(p3id);
-  const v = document.getElementById(p1id);
-  if (c && v) v.value = c.value;
-}
-function adjBothVals(p1id, p3id, delta) {
-  const p1 = document.getElementById(p1id);
-  const p3 = document.getElementById(p3id);
-  if (!p1) return;
-  p1.value = (parseInt(p1.value) || 0) + delta;
-  if (p3) p3.value = p1.value;
-}
-function bindCurSync(p1id, p3id) {
-  const el = document.getElementById(p1id);
-  if (el) el.addEventListener('input', () => {
-    const c = document.getElementById(p3id);
-    if (c) c.value = el.value;
-  });
-}
-
 /* ══ FIX 3: ATTRIBUTE ENTER-KEY NAVIGATION ══ */
 (function setupAttrNavigation() {
   const attrOrder = ['attr-for','attr-pro','attr-dex','attr-nim','attr-wil','attr-int','attr-pre','attr-cha'];
@@ -180,19 +159,10 @@ function showTab(id,btn) {
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active'); btn.classList.add('active');
-  if (id==='p3') syncCombatPage();
   // Pages differ hugely in natural height; the scale-to-fit wrapper
   // (WM.enableScaling, see 14-window-manager.js) only recomputes that
   // on a manual window resize otherwise, so nudge it here too.
   if (typeof WM !== 'undefined') WM.rescale('sheet');
-}
-function syncCombatPage() {
-  ['hp-cur','st-cur','str-cur'].forEach((p1id,i) => {
-    const p3ids=['c-hp-cur','c-st-cur','c-str-cur'];
-    const p1=document.getElementById(p1id); const p3=document.getElementById(p3ids[i]);
-    if (p1&&p3&&p3.value==='') p3.value=p1.value;
-  });
-  recalcDerived();
 }
 function showSkillCat(cat,btn) {
   document.querySelectorAll('.skill-panel').forEach(p=>p.style.display='none');
@@ -204,10 +174,8 @@ function showSkillCat(cat,btn) {
 let _sid=0;
 function uid(prefix) { return (prefix||'n')+(++_sid)+'_'+Math.random().toString(36).slice(2,6); }
 
-/* ══ HP ADJUST ══ */
-function adjVal(id,delta) {
-  const el=document.getElementById(id); if(!el) return;
-  el.value=(parseInt(el.value)||0)+delta;
-  const mirrorMap={'hp-cur':'c-hp-cur','st-cur':'c-st-cur','str-cur':'c-str-cur'};
-  if (mirrorMap[id]) { const m=document.getElementById(mirrorMap[id]); if(m) m.value=el.value; }
-}
+/* ══ INIT ══ compute derived max stats once at load, same as every
+   reload after (formerly a top-level call at the bottom of the
+   grab-bag 13-turn-and-init.js, which also had unrelated combat and
+   multiplayer init mixed in — each now initializes itself). */
+recalcDerived();

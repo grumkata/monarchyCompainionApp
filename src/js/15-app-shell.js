@@ -90,10 +90,9 @@ function tableCreateCharacter() {
   if (typeof _activeSaveId !== 'undefined' && _activeSaveId) {
     if (!confirm('Start a new blank character? Any unsaved changes to the current one will be lost.')) return;
   }
-  restoreSheet({ v: 3 });
+  restoreSheet({ v: 4 });
   setActiveSave(null, '');
   WM.open('sheet');
-  if (typeof syncCombatPage === 'function') syncCombatPage();
 }
 
 function tableOpenCharacterModal() {
@@ -117,7 +116,6 @@ function tableOpenCharacterConfirm(id) {
   titleCloseModal('table-open-char-modal');
   loadCharacter(id); // existing: confirms, restores, sets active save, toasts
   WM.open('sheet');
-  if (typeof syncCombatPage === 'function') syncCombatPage();
 }
 
 function tableSaveAll() {
@@ -130,6 +128,10 @@ function tableSaveAll() {
 
 function tableToggleTheme() {
   toggleDarkMode(); // existing, global (document.body), see 12-app-utils.js
+}
+
+function tableToggleCombat() {
+  WM.toggle('combat');
 }
 
 /* ---- Register the character sheet as the first table window ----
@@ -145,3 +147,20 @@ WM.register('sheet', {
 });
 
 WM.enableScaling('sheet', { rootSelector: '#sheet-root', naturalWidth: 980 });
+
+/* ---- Register Combat as its own table window ----
+   Battlefield, turn counter, and personal vitals/ward/exhaustion — the
+   part of the old "Combat Tracker" sheet tab that's shared game state
+   rather than session/connection management (that part stayed on the
+   sheet, see 10-gm-tools.js). startOpen:false to match the sheet, so
+   the table still starts empty. */
+WM.register('combat', {
+  title: 'Combat',
+  icon: '\u2694\uFE0F',
+  defaultRect: { x: 120, y: 70, w: 760, h: 700 },
+  minW: 420,
+  minH: 340,
+  startOpen: false
+});
+
+WM.enableScaling('combat', { rootSelector: '#combat-root', naturalWidth: 980 });

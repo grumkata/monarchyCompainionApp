@@ -19,22 +19,24 @@ src/
     04-overrides.css      ← MUST STAY LAST of the original 4 — wins over everything above
     05-shell.css          ← title screen, table scene, window chrome, dock
   js/
-    00-storage.js         ← tiny localStorage-safe wrapper, loads first
-    01-fx-polish.js       ← canvas particle fx, header ornaments, QoL fixes
+    00-storage.js         ← tiny localStorage-safe wrapper + esc/val/selVal shared helpers, loads first
+    01-fx-polish.js       ← canvas particle fx, header ornaments, QoL fixes (incl. HP danger flash)
     02-data-prebuilt.js   ← PREBUILT_DATA (your backgrounds/items table)
     03-sheet-basics.js    ← armour equip, derived stats, attribute nav, tabs
     04-data-skills.js     ← SKILL_DATA (your skills table)
-    05-skills-backgrounds.js ← skill picker, skill trees, knacks, backgrounds
+    05-skills-backgrounds.js ← skill picker, skill trees, knacks, backgrounds, card drag-to-reorder
     06-equipment-lanes.js ← weapons, armour UI, ability slots, exhaustion
-    07-combat-tracker.js  ← ⚔ THE BATTLEFIELD/COMBAT SYSTEM — your overhaul target
-    08-saves-io.js        ← quick save, save/load, export/import, autosave
+    07-combat-window.js   ← ⚔ the standalone Combat table window — battlefield, turn counter, vitals
+    08-saves-io.js        ← quick save, save/load, export/import, autosave, serializeSheet/restoreSheet
     09-session-sync.js    ← GM/player live sync networking
     10-gm-tools.js        ← server management, saved NPCs, saved encounters
-    11-combat-extras.js   ← fog of war, global mana, chip-player linking
+    11-session-extras.js  ← fog of war, global mana, chip-player linking
     12-app-utils.js       ← dark mode, undo system
-    13-turn-and-init.js   ← turn counter + page init, MUST STAY LAST of the original 14
     14-window-manager.js  ← generic drag/resize/dock window system
-    15-app-shell.js       ← title screen logic, MUST STAY LAST
+    15-app-shell.js       ← title screen logic + registers the sheet & combat windows, MUST STAY LAST
+
+test/
+  smoke.js                ← jsdom runtime smoke test — `npm test` (builds dist/ first if missing)
 
 build.js                  ← run this to produce dist/monarchy.html (intermediate, see below)
 dist/monarchy.html        ← intermediate build artifact — fine for a quick browser test, not the distributable
@@ -67,8 +69,9 @@ Just open `src/index.html` directly in a browser (double-click it, no server
 needed — relative `<link>`/`<script src>` paths work fine over `file://`).
 Edit whichever `.css`/`.js` file actually contains the thing you're fixing,
 refresh the browser, done. This is the entire win: you can now search
-`07-combat-tracker.js` (634 lines) instead of the old 7,394-line file to find
-anything combat-related.
+`07-combat-window.js` (~550 lines) instead of the old 7,394-line file to
+find anything combat-related — or `09-session-sync.js`/`10-gm-tools.js`/
+`11-session-extras.js` for anything multiplayer-related.
 
 ## Producing the file you hand to players
 
@@ -102,8 +105,21 @@ a perfectly normal file to open directly.
    `PROJECT.md` section 7.
 2. ~~Electron distribution~~ — done, verified end-to-end (built and
    launched the actual packaged app) — see `PROJECT.md` section 3.11.
-3. **Overhaul combat**: `07-combat-tracker.js` is isolated — safe to
-   rewrite without touching anything else. Once rewritten, it can become
-   its own window on the table instead of a page inside the sheet.
-4. **Dice & chat**: `#table-right-panel` is reserved and empty, ready for
+3. ~~Split combat out of the sheet~~ — done 2026-07-18: combat
+   (battlefield/lanes/chips/turn counter/vitals) is now its own table
+   window, and multiplayer (session sync, GM tools) is its own clean tab
+   on the sheet rather than tangled together in one "Combat Tracker" tab —
+   see `PROJECT.md` sections 3.6/3.7 and the 2026-07-18 timeline entry.
+   (Turns out `07-combat-tracker.js` was never actually isolated the way
+   this file used to claim — it also held the whole-character save/load
+   functions. That's fixed now too.)
+4. **Overhaul combat mechanics/UI**: still open. `07-combat-window.js` is
+   now cleanly separated from the sheet and multiplayer, which should
+   make this safer to tackle than before — but the actual rewrite (or
+   redesign) of combat itself hasn't happened yet, just the move.
+5. **More multiplayer features beyond combat**: mentioned as a future
+   direction while planning the 2026-07-18 split — multiplayer staying
+   attached to the sheet (rather than becoming a table window like
+   combat) was a deliberate choice to leave room for this.
+6. **Dice & chat**: `#table-right-panel` is reserved and empty, ready for
    these whenever you want them.

@@ -330,3 +330,7 @@ function setupNpcDropZones() {
     lane.addEventListener('dragend', () => { _draggingNpcId = null; });
   });
 }
+
+/* ══ INIT ══ populate the server dropdown once at load, same as every
+   reload after. */
+renderServerSelector();

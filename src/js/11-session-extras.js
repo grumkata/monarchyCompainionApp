@@ -1,4 +1,8 @@
-/* ══ FOG OF WAR ══ */
+/* ══ FOG OF WAR ══
+   GM-side toggle lives in the sheet's Multiplayer tab; the actual
+   #fog-overlay it drives now lives in the Combat window, reached the
+   same way it always was — direct DOM access, since both are part of
+   the same document regardless of which table window they render in. */
 function toggleFog(enabled) {
   const statusEl = document.getElementById('gm-fog-status');
   if (statusEl) statusEl.style.display = enabled ? 'block' : 'none';
@@ -6,7 +10,10 @@ function toggleFog(enabled) {
   showToast(enabled ? '🌫 Battlefield hidden from players' : '✓ Battlefield visible to players');
 }
 
-/* ══ GLOBAL MANA ══ */
+/* ══ GLOBAL MANA ══
+   GM adjusts from the Multiplayer tab (global-mana-val); the
+   player-facing readout (global-mana-player-val) lives in the Combat
+   window — same reasoning as fog, above. */
 let _globalMana = 0;
 let _globalManaVisible = true;
 
@@ -27,28 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
     _globalManaVisible = this.checked;
     clearTimeout(_pushTimer); _pushTimer = setTimeout(pushBattlefield, 300);
   });
-  
-  // Formation checkbox listener
-  const formCheckbox = document.getElementById('nc-isform');
-  if (formCheckbox) {
-    formCheckbox.addEventListener('change', function() {
-      document.getElementById('hp-individual').style.display = this.checked ? 'none' : 'flex';
-      document.getElementById('hp-formation').style.display = this.checked ? 'flex' : 'none';
-    });
-  }
 });
-
-// Fallback for checkbox if DOM ready event fires before listener attached
-setTimeout(function() {
-  const formCheckbox = document.getElementById('nc-isform');
-  if (formCheckbox && !formCheckbox._listenerAttached) {
-    formCheckbox.addEventListener('change', function() {
-      document.getElementById('hp-individual').style.display = this.checked ? 'none' : 'flex';
-      document.getElementById('hp-formation').style.display = this.checked ? 'flex' : 'none';
-    });
-    formCheckbox._listenerAttached = true;
-  }
-}, 100);
 
 /* ══ CONNECTED PLAYERS & CHIP LINKING ══ */
 let _playerName = '';

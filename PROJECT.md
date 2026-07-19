@@ -50,22 +50,35 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     04-overrides.css        MUST STAY LAST of the original 4 — cascade-wins over everything above
     05-shell.css            title screen, table scene, window chrome, dock — see 3.10
   js/
-    00-storage.js            localStorage-safe wrapper — must load first
-    01-fx-polish.js          canvas particle fx, header ornaments, QoL fixes
+    00-storage.js            localStorage-safe wrapper + esc/val/selVal shared helpers — must load first
+    01-fx-polish.js          canvas particle fx, header ornaments, QoL fixes (incl. HP danger flash)
     02-data-prebuilt.js      PREBUILT_DATA — backgrounds/prebuilt items table
     03-sheet-basics.js       armour equip, derived stats, attribute nav, tabs
     04-data-skills.js        SKILL_DATA — the 3 skill trees
-    05-skills-backgrounds.js skill picker, skill trees, knacks, backgrounds
+    05-skills-backgrounds.js skill picker, skill trees, knacks, backgrounds, card drag-to-reorder
     06-equipment-lanes.js    weapons, armour UI, ability slots, exhaustion
-    07-combat-tracker.js     ⚔ battlefield/chips/lanes — see 3.6
-    08-saves-io.js           quick save, save/load, export/import, autosave
-    09-session-sync.js       GM/player live sync networking
+    07-combat-window.js      ⚔ the standalone Combat table window — battlefield/chips/lanes/turn
+                             counter/vitals — see 3.6. Renamed from 07-combat-tracker.js (2026-07-18).
+    08-saves-io.js           quick save, save/load, export/import, autosave, AND serializeSheet /
+                             restoreSheet / setActiveSave (moved in from 07 on 2026-07-18 — this is
+                             where whole-character (de)serialization always belonged)
+    09-session-sync.js       GM/player live sync networking — calls into 07's serializeBattlefield/
+                             restoreBattlefield rather than defining them itself (2026-07-18)
     10-gm-tools.js           server management, saved NPCs, saved encounters
-    11-combat-extras.js      fog of war, global mana, chip-player linking
+    11-session-extras.js     fog of war, global mana, chip-player linking, player identity.
+                             Renamed from 11-combat-extras.js (2026-07-18) — the one piece of pure
+                             battlefield UI it used to hold (formation checkbox) moved to 07.
     12-app-utils.js          dark mode, undo system
-    13-turn-and-init.js      turn counter + page init — MUST STAY LAST of the original 14
     14-window-manager.js     generic drag/resize/dock window system — see 3.10
-    15-app-shell.js          title screen logic + wiring into session-sync — MUST STAY LAST
+    15-app-shell.js          title screen logic + wiring into session-sync + registers BOTH the
+                             sheet and combat table windows — MUST STAY LAST
+
+  (13-turn-and-init.js removed 2026-07-18 — it was a grab-bag touching three
+  unrelated systems: turn counter (→ 07), server selector init (→ 10), and
+  derived-stats init (→ 03). Each file now initializes itself.)
+
+test/
+  smoke.js                 ← jsdom-based runtime smoke test, `npm test` — builds dist/ if missing
 
 build.js                  ← run `node build.js` to produce dist/monarchy.html (intermediate step, see 2.3)
 dist/monarchy.html        ← intermediate build artifact — valid standalone file, but not the distributable anymore
@@ -81,9 +94,20 @@ directly (edits will be silently lost on the next build).
 
 ### 2.2 Why the split is ordered the way it is
 
-- It's a **pure mechanical split** of the original monolith — code was
-  moved, not rewritten. All of it is still plain (non-module) JS/CSS sharing
-  one global scope, exactly like the original file.
+- It was originally a **pure mechanical split** of the monolith — code moved,
+  not rewritten. The 2026-07-18 combat/multiplayer split (3.6, 3.7, 3.10)
+  kept that ethos — move first, verify, only rewrite where the move itself
+  required it (e.g. folding the turn-count monkey-patch directly into
+  serializeBattlefield/restoreBattlefield once both lived in the same file)
+  — but it was NOT purely mechanical the way the original split was,
+  because the original split had left `serializeSheet()`/`restoreSheet()`
+  (whole-character save/load, used by everything) physically sitting inside
+  the combat file. That got moved to 08-saves-io.js as part of this pass;
+  see 3.6 and 3.8. All of it is still plain (non-module) JS/CSS sharing one
+  global scope, exactly like the original file — direct cross-file
+  `document.getElementById` reads and bare global function calls are the
+  normal, intentional way things talk to each other here, not a bug to
+  "fix" wherever you see one.
 - **CSS load order matters**: later files win on conflicting rules.
   `04-overrides.css` is explicitly written to load last and override
   everything above it. Don't reorder the `<link>` tags.
@@ -191,11 +215,17 @@ that feeds directly into the HP max formula. Only one armour can be
 `03-sheet-basics.js`); AV of the equipped armour recalculates derived
 stats immediately.
 
-### 3.6 Combat / Battlefield tracker — ⚠ overhaul target
+### 3.6 Combat / Battlefield — standalone table window (split from the sheet 2026-07-18)
 
-Lives in `js/07-combat-tracker.js` (634 lines) — **this is the system
-flagged for a full rewrite.** Current behavior, for reference before you
-start rewriting:
+Lives in `js/07-combat-window.js` (still ⚠ the system flagged for a full
+mechanics/UI rewrite when someone gets to it — this pass only moved and
+uncoupled it, it did not redesign combat itself). It used to be page 3 of
+the character sheet (`#p3`, tab label "Combat Tracker"); it's now its own
+table window (`data-window-id="combat"`, `#combat-root`), registered with
+the Window Manager in `15-app-shell.js` exactly like the sheet is, opened
+via the ⚔ Combat button in the left control panel or `WM.toggle('combat')`.
+The GM/session/server-management half of the old combined tab stayed on
+the sheet as its own tab (now labeled "Multiplayer") — see 3.7.
 
 - **8 lanes**: Front / Second / Support / Back, for each of Ally (`a-`) and
   Enemy (`e-`) sides. Lane note in the UI: *"Empty lines advance — if a
@@ -205,23 +235,62 @@ start rewriting:
   bar/label, a condition token-stack (name → count), a "turn used" toggle,
   notes, and support for both **individual** and **formation** (grouped
   unit) sizing.
-- Drag-and-drop implemented via native HTML5 drag events
-  (`makeDraggable`, `handleDragStart/End/Over/Enter/Leave/Drop`), plus a
-  `MutationObserver` that auto-attaches drag handlers to cards added later
-  (sheet-side cards: backgrounds, weapons, ability slots, skill primaries).
+- Drag-and-drop for battlefield chips is native HTML5 drag events
+  (`makeDraggable`, `handleDragStart/End/Over/Enter/Leave/Drop`), local to
+  this file. The *other* drag-to-reorder system — for sheet cards
+  (backgrounds, weapons, ability slots, skill primaries) — used to live
+  in this same file via a shared `MutationObserver` pattern; it had
+  nothing to do with combat and moved to `05-skills-backgrounds.js`.
+- **Personal vitals & status** (current HP/Stamina/Stress, Ward,
+  Exhaustion, Conditions, the movement/dodge readout) live here too, in
+  `#player-vitals-section` — hidden when you're acting as GM. These used
+  to be *mirrored* with page 1 of the sheet (three separate, overlapping
+  sync mechanisms: `bindCurSync`, `adjBothVals`, and a mirror map inside
+  `adjVal`); page 1 no longer has a current-HP/Stamina/Stress tracker at
+  all, so there's nothing left to mirror with — this is now the one and
+  only place current vitals live. Page 1 still shows the *max* values
+  (`hp-max`/`st-max`/`str-max`), since those come from attributes + armor
+  and are legitimate character-build reference numbers; `recalcDerived()`
+  (03-sheet-basics.js) writes both the sheet's copy and this window's copy
+  (`c-hp-max` etc.) every time, same mechanism as before, just pointed at
+  a different window.
 - Battlefield state serializes/restores as one JSON blob
-  (`serializeBattlefield` / `restoreBattlefield`) — this is also the shape
-  pushed over the network for GM/player sync (3.7).
-- Turn counter (global, adjustable, resettable) lives in
-  `13-turn-and-init.js`, not in this file — tightly coupled to combat but
-  physically split off; keep in mind if rewriting turn-based mechanics.
+  (`serializeBattlefield` / `restoreBattlefield`, both defined *here* now)
+  — this is also the shape pushed over the network for GM/player sync
+  (3.7); `09-session-sync.js` calls these two functions rather than
+  defining them, which is the cleaner half of "uncoupling" this pass was
+  asked to do.
+- Turn counter (global, adjustable, resettable) lives here now too
+  (`adjTurn`/`resetTurn`/`resetAllTurns`/`clearBattlefield`, moved from the
+  old grab-bag `13-turn-and-init.js`). Turn count folds directly into
+  `serializeBattlefield`/`restoreBattlefield` above — no more monkey-patch
+  splicing it in from a separate file.
+- **Persistence**: the battlefield used to ride along inside the
+  character's own save file, so a solo/local GM's battlefield survived a
+  reload, but was tangled to whichever specific character happened to be
+  loaded at save time. It now persists itself independently
+  (`_saveLocalBattlefield`/`_loadLocalBattlefield`, key
+  `monarchy_combat_state`, autosaved every 5s + on unload) — same idea as
+  how window position/size already persist per-window (3.10), just for
+  battlefield content. **Behavior change to be aware of:** switching which
+  character is loaded on the sheet no longer resets or reloads the
+  battlefield; the two are independent saves now.
 
-### 3.7 Live session sync (GM ↔ Player)
+### 3.7 Live session sync (GM ↔ Player) & the sheet's Multiplayer tab
 
-Lives in `js/09-session-sync.js` (largest single file, ~1,120 lines) plus
-`10-gm-tools.js` for GM-side management UI. Backend is a **Google Apps
-Script** web endpoint (`BASE_SCRIPT_URL`), used as a simple shared
-key-value relay — not a custom server.
+Lives in `js/09-session-sync.js` (largest single file, ~1,000 lines) plus
+`10-gm-tools.js` for GM-side management UI and `11-session-extras.js` for
+fog/mana/player-identity. Backend is **Firebase Realtime Database** (real-time
+listeners, no polling) — migrated from an earlier Google Apps Script relay in
+a separate pass upstream of this document's 2026-07-18 combat/multiplayer
+split; `10-gm-tools.js` still has a comment marking where `BASE_SCRIPT_URL`
+used to live, for anyone tracing history. This is the half of the old combined "Combat Tracker" tab
+that **stayed on the character sheet** (now labeled "Multiplayer") rather
+than moving to the standalone Combat window (3.6) — deliberately, since
+more multiplayer features beyond combat are planned, and connection/
+session/GM-tool management reads more naturally as part of "your sheet"
+than as a shared table window everyone looks at together (that's what the
+battlefield itself is for).
 
 - **Servers**: the GM picks/names a "server" (really just an ID scoping a
   shared table on the same backend), managed in `10-gm-tools.js`.
@@ -230,34 +299,62 @@ key-value relay — not a custom server.
   (`_gmPollPlayers`), can queue commands to players (`_queueGmCommand`),
   and can link a battlefield chip to a specific connected player's vitals
   (`setChipPlayerLink`) so the chip's HP mirrors what that player reports.
+  These functions reach directly into the Combat window's chip/lane DOM
+  (e.g. `_handleLaneDrop`, `setChipPlayerLink`) rather than through some
+  formal message-passing interface — that's an intentional, pragmatic
+  choice (see 2.2): the sheet, Multiplayer tab, and Combat window are
+  still all one document/one global scope, so a direct
+  `document.getElementById` reach-across is the normal way this app's
+  pieces talk to each other, not a shortcut that needs fixing.
 - **Player role**: polls the battlefield for changes (`_playerPollBf`),
   pushes their own HP/vitals back (`_playerPushVitals`, debounced), and can
   view/edit their own character sheet in a modal (`openPlayerSheet`).
 - Transport: fetch-based polling by default, with a JSONP fallback
   (`_fetchStateJsonp`) for networks that block cross-origin GET.
-- GM tools built on top of this channel: **NPCs** (saved locally, dragged
-  onto the battlefield), **Encounters** (saved combatant groups, loaded in
-  one action), **Fog of war** toggle, **Global mana** pool tracker
-  (`11-combat-extras.js`).
+- GM tools built on top of this channel, all in the sheet's Multiplayer
+  tab: **NPCs** (saved locally, dragged onto the battlefield),
+  **Encounters** (saved combatant groups, loaded in one action), **Fog of
+  war** toggle, **Global mana** pool tracker (`11-session-extras.js`). The
+  GM-facing controls for fog/mana live in the Multiplayer tab; the
+  player-visible readouts they drive (the mana pool number, the fog
+  overlay itself) live in the Combat window, same direct-DOM-reach pattern
+  as above.
 
 ### 3.8 Saves, export/import, autosave
 
-Lives in `js/08-saves-io.js`.
+Lives in `js/08-saves-io.js`, including `serializeSheet()` / `restoreSheet()`
+/ `setActiveSave()` — moved in from `07-combat-tracker.js` on 2026-07-18,
+where they'd been misplaced since the original split despite PROJECT.md
+claiming that file was "isolated." These three are the whole-character
+save/load backbone: quickSave, confirmSave, loadCharacter, exportMonarch,
+importMonarch, and the undo system (12-app-utils.js) all depend on them
+covering the *entire* character, not just combat.
 
 - **Local saves**: named character saves stored in `localStorage`, listed
   in the side menu, switchable via `loadCharacter(id)`.
 - **Autosave**: debounced, ticks a visible indicator dot on save.
 - **Export/Import**: character exports as a `.monarch` file — plain JSON
-  with shape `{ format: 'monarchy-character-sheet', version: 3, exported:
+  with shape `{ format: 'monarchy-character-sheet', version: 4, exported:
   <ISO date>, character: <serialized sheet> }`. Import reverses this.
-  `version: 3` — bump this if the serialized shape changes, and handle
-  older versions on import if you do.
+  `version: 4` — bump this if the serialized shape changes, and handle
+  older versions on import if you do (as of this bump, `restoreSheet`
+  accepts `v: 3` or `v: 4`; only `v: 4` is written on export).
+- **What changed at v4**: combat/session state (current HP-STA-STR, Ward,
+  Exhaustion, Conditions, battlefield combatants) no longer travels with
+  the character file at all — that's Combat's own concern now, persisted
+  independently (3.6). A character save is purely "build" data: identity,
+  attributes, skills, backgrounds, gear, abilities. Old `v: 3` files still
+  import fine; their combat-shaped fields are just ignored, not read.
 
 ### 3.9 UI polish & utilities
 
 - **Canvas particle effects** + header ornamentation + several small "QoL"
   fixes, all in `01-fx-polish.js`, wrapped in one IIFE (self-contained,
-  doesn't leak helpers globally — see Known Issues 5.1).
+  doesn't leak helpers globally — see Known Issues 5.1). Includes the HP
+  danger-flash effect, which reads the Combat window's `c-hp-cur`/
+  `c-hp-max` (updated 2026-07-18 — it used to also read a page-1 `hp-cur`
+  that no longer exists) and pulses the Combat window itself, not the
+  sheet.
 - **Undo system** (generic action-undo stack), in `12-app-utils.js`.
 - Toasts, side menu, keyboard shortcuts (small, scattered across
   `08-saves-io.js`).
@@ -318,13 +415,14 @@ control surface now, not the sheet's old hamburger menu:
 | Button | Calls |
 |---|---|
 | ⌂ Title | `returnToTitle()` |
-| ✚ Create Character | `tableCreateCharacter()` — resets the sheet via `restoreSheet({v:3})` (no `location.reload()`, so table/window state survives), opens the sheet window |
+| ✚ Create Character | `tableCreateCharacter()` — resets the sheet via `restoreSheet({v:4})` (no `location.reload()`, so table/window state survives), opens the sheet window |
 | 📂 Open Character | `tableOpenCharacterModal()` — lists `getSaves()` in a picker, loads the chosen one via the existing `loadCharacter(id)`, opens the sheet window |
 | 💾 Save Table | `tableSaveAll()` — `quickSave()` if a character is already active, otherwise `openSaveModal()` (existing "save as" flow) |
+| ⚔️ Combat | `tableToggleCombat()` — `WM.toggle('combat')`, added 2026-07-18 (3.6) |
 | 🌗 Theme | `tableToggleTheme()` — just calls the existing `toggleDarkMode()` |
 
-More buttons join this same panel later (combat, rulebook, etc.) — it's
-built to grow, not a fixed set of five.
+More buttons can still join this same panel later (rulebook, dice, etc.) —
+it's built to grow, not a fixed set.
 
 **Right panel** (`#table-right-panel`): reserved, intentionally empty.
 Structurally present (fixed, right edge, `width:0`, `pointer-events:none`)
@@ -348,10 +446,9 @@ in charge: `05-shell.css` no longer forces `.window-content .sheet` to
 their original `01-base.css` rules (`.tabs{display:flex}`,
 `.sheet{display:none}`, `.sheet.active{display:block}`), so `p1`/`p2`/`p3`
 switch again instead of all rendering stacked in one continuous scroll.
-`syncCombatPage()` is still also called manually from
-`tableCreateCharacter()`/`tableOpenCharacterConfirm()` (harmless, just
-redundant now that the tab-click trigger fires again) — left in rather than
-removed, since nothing depended on it going away.
+(`syncCombatPage()`, mentioned in an earlier revision of this doc as still
+being called here "harmlessly," was removed 2026-07-18 along with the
+page-1/Combat-window vitals mirroring it existed to support — see 3.6.)
 
 Two things needed correcting to make tabs behave properly inside a window,
 not just visually toggle back on:
@@ -413,18 +510,23 @@ a Foundry VTT app window), via `WM.enableScaling(id, opts)` in
 - Generic: any future window can opt in the same way — see the `opts`
   shape (`rootSelector`, `naturalWidth`, `minScale`, `maxScale`) in
   `14-window-manager.js`.
-- **Known side effect**: `#fog-overlay` (fog-of-war, inside page 3) is
-  `position:fixed` and now lives inside a `transform`-scaled ancestor —
-  which changes its containing block from the true viewport to the scaled
-  wrapper (a CSS rule: `transform` on an ancestor creates a new containing
-  block for `position:fixed` descendants). It'll still render, just scoped
-  to the scaled sheet content instead of covering the whole screen. Not
-  fixed — combat/fog is a separate future overhaul (3.6) and this is a
-  cosmetic side effect until then, not a functional break.
+- **Fixed 2026-07-18**: `#fog-overlay` used to live inside page 3
+  (`position:fixed`, meant to cover the whole viewport), which put it
+  inside this same `transform`-scaled ancestor — a CSS rule that a
+  `transform` on an ancestor creates a new containing block for
+  `position:fixed` descendants, so it only ever covered the scaled sheet
+  content, not the real viewport. Now that combat is its own window
+  (3.6), `#fog-overlay` moved to be a direct sibling of the table windows
+  under `#table-surface`, outside any scaled/transformed wrapper, so it
+  correctly covers the whole screen again.
 
 **Window manager** (`WM`, in `14-window-manager.js`): fully generic, knows
-nothing about character sheets specifically. To add a new window type later
-(combat, rulebook, a read-only player-sheet viewer, etc.):
+nothing about character sheets specifically. The Combat window (3.6),
+added 2026-07-18, is the second window type built on this and proves the
+pattern generalizes — sheet and combat are each ~150 lines of markup +
+one `WM.register` call, nothing WM-side changed to support a second
+window. To add another window type later (rulebook, a read-only
+player-sheet viewer, etc.):
 
 1. Give it markup shaped like the sheet's:
    ```html
@@ -535,11 +637,13 @@ else, and so they're not mistaken for split-related bugs.
    stray body-only elements found in `<head>` during parsing. Moved to its
    correct, non-hacky location during the split — purely a hygiene fix,
    no behavior change.
-3. **Turn counter lives apart from combat tracker**: `adjTurn` /
-   `resetTurn` / `resetAllTurns` / `clearBattlefield` are in
-   `13-turn-and-init.js`, not `07-combat-tracker.js`, purely because of
-   where they fell in the original file. Keep this in mind if the combat
-   overhaul touches turn logic.
+3. **~~Turn counter lives apart from combat tracker~~ — RESOLVED 2026-07-18.**
+   `adjTurn` / `resetTurn` / `resetAllTurns` / `clearBattlefield` used to be
+   in `13-turn-and-init.js`, not the combat file, purely because of where
+   they fell in the original monolith split. That file is gone now (2.1);
+   these moved into `07-combat-window.js` alongside the rest of combat, and
+   turn count folds directly into `serializeBattlefield`/`restoreBattlefield`
+   instead of being monkey-patched in from elsewhere. See 3.6.
 4. **`#server-modal` z-index bumped to 1500** (in `05-shell.css`, via ID
    selector, `!important`). It was originally 500 — fine for use inside
    the table scene, but not high enough to appear above the title screen
@@ -552,13 +656,13 @@ else, and so they're not mistaken for split-related bugs.
    isolated to `15-app-shell.js`, but not elegant. Fine to replace with a
    real callback/event if `closeServerModal()` (in `10-gm-tools.js`) ever
    grows one.
-6. **`#fog-overlay` (fog-of-war, page 3) no longer covers the true full
-   screen** once the sheet is scaled — see 3.10's scale-to-fit note. A
-   `transform` on an ancestor (the new scaling system) creates a new
-   containing block for `position:fixed` descendants, so the overlay is
-   now scoped to the scaled sheet content instead of the real viewport.
-   Cosmetic today since combat/fog is an explicit future overhaul target
-   (3.6); don't be surprised by it if you touch fog-of-war before then.
+6. **~~`#fog-overlay` no longer covers the true full screen once scaled~~
+   — RESOLVED 2026-07-18.** Combat (including `#fog-overlay`) is its own
+   table window now (3.6), and the overlay itself was deliberately placed
+   as a sibling of the table windows rather than nested inside the Combat
+   window's scaled wrapper, specifically so a `transform` on that wrapper
+   can't turn it into `#fog-overlay`'s containing block. It covers the
+   real viewport again.
 7. **NSIS Windows installer target needs Wine to cross-build from
    Linux/macOS** (verified: the `portable` target does NOT need Wine and
    built/ran successfully from this project's Linux dev environment; the
@@ -567,6 +671,22 @@ else, and so they're not mistaken for split-related bugs.
    If Wine is ever installed for full installer builds from Linux, no
    config changes are needed — `npm run dist` already requests both
    targets.
+8. **Second dead monkey-patch, same shape as #1, in the HP-danger-flash
+   code (`01-fx-polish.js`)**: `const _av = window.adjVal; if (_av)
+   window.adjVal = ...`. `01-fx-polish.js` loads before `adjVal` is
+   defined (now in `07-combat-window.js`; previously in
+   `03-sheet-basics.js` — same problem either way), so `_av` is always
+   `undefined` and this patch silently never applies, exactly like #1.
+   Pre-existing in the original monolith, **not** introduced by the
+   2026-07-18 combat/multiplayer split — that pass touched the two lines
+   right next to it (fixing references to a `hp-cur` element that no
+   longer exists) but deliberately left this dead pattern alone, matching
+   how #1 was already handled. The feature still mostly works: `checkHpDanger`
+   is also attached as a real `input`-event listener on `c-hp-cur`/
+   `c-hp-max` (unaffected by this), so typing a new value triggers it
+   correctly — only programmatic changes via `adjVal()` (i.e. the +/−
+   button clicks) skip the check, since setting `.value` in JS doesn't
+   fire a native `input` event.
 
 ---
 
@@ -593,11 +713,15 @@ else, and so they're not mistaken for split-related bugs.
 7. **Bump the `.monarch` export `version` number** if you change what
    `serializeSheet()` outputs, and handle old versions gracefully on
    import rather than breaking existing players' saves.
-8. **`07-combat-tracker.js` is the active overhaul target.** Changes here
+8. **`07-combat-window.js` (renamed from `07-combat-tracker.js` 2026-07-18)
+   is the active overhaul target for combat mechanics/UI.** Changes here
    are expected to be more invasive than elsewhere — fine to break
    internal structure as long as external contracts (serialized
    battlefield shape used by session sync, see 3.7) are either kept
-   compatible or updated on both ends together.
+   compatible or updated on both ends together. This file no longer also
+   holds whole-character serialization (that moved to `08-saves-io.js`,
+   see 3.8) — a mechanics rewrite here now only touches combat state, not
+   the entire save/load system.
 9. **This document is not optional documentation — treat it as part of
    the codebase.** See Maintenance rules below.
 10. **New table windows (combat, rulebook, etc.) register with `WM`,
@@ -644,4 +768,6 @@ comments, minor CSS tweaks) don't need a changelog entry.
 | 2026-07-11 | **Baseline.** Split the original single 7,394-line/422KB `monarchy_8_4_2.html` into the modular `src/` structure described in Section 2, with `build.js` regenerating an equivalent single-file `dist/monarchy.html`. Pure mechanical split — verified zero behavior change (all 200 function defs, all top-level declarations, all element IDs, and all brace/paren pairs matched exactly between original and rebuilt output; every split file and every rebuilt script block passes a JS syntax check clean). This document created as the standing project reference. |
 | 2026-07-12 | **Title screen + table scene.** The character sheet stopped being "the app" — added a title screen (Open Local Table / Host Game Table / Join Game) leading into a table scene where the sheet now lives as one draggable, resizable, closeable/dockable window. New generic window manager (`14-window-manager.js`) built to support future window types (combat, rulebook) without more infrastructure work. No changes to sheet internals (files 00–13) — only wrapped, verified via a jsdom-based runtime smoke test (title screen dismissal, window open/close/drag/resize, position persistence, host/join modal server population) in addition to the usual syntax checks. See 3.10 for full details and the known limitation on multiple live sheet instances. |
 | 2026-07-13 | **Table overhaul + Electron distribution**, after first-look feedback that the table "was just the sheet's UI but worse." Table now starts empty (no auto-opened sheet); added a left control panel (Title/Create Character/Open Character/Save Table/Theme, built to grow) and a reserved-but-empty right panel for future dice/chat. Tabs removed — all sheet pages render stacked. Old sheet chrome (menu, quicksave, dark-mode button) hidden inside the window, replaced by the table-level controls. Dark/light theme is now genuinely global — new `--table-*` CSS custom properties in `05-shell.css` re-theme the title screen/table/dock together, not just the sheet. Sound-effect UI disabled (was non-functional clutter — no sounds were ever configured). Added scale-to-fit windows (`WM.enableScaling()`) so resizing the sheet scales it as a whole instead of clipping/scrolling. **Distribution model changed**: `npm run dist` (Electron + electron-builder) now produces a real `.exe` — verified end-to-end by actually building and launching the packaged app (headless, via Xvfb + Chrome DevTools Protocol) and confirming the full flow (title screen → create character → blank sheet → real computed `scale()` transform) inside the genuine packaged executable, not just in a browser or jsdom. `dist/monarchy.html` still exists as a build intermediate and a quick-test convenience, but is no longer the distributable. See 3.10, 3.11, and Known Issues 5.6–5.8. |
-| 2026-07-15 | **Tabs restored** — the stacked-pages layout from the 07-13 table overhaul read worse than real tabs, so `showTab()` switching is back (no code deleted 07-13, so this was a CSS-level reversal in `05-shell.css`, not a rebuild). Fixed two things the stacked layout had been masking: the tab bar's leftover asymmetric padding (`52px`/`180px`, originally there to dodge fixed-position buttons that are hidden inside the window now) was making the tab row render visibly off-center; and `WM.enableScaling()` had no way to know a page switch — as opposed to a window resize — had just changed the sheet's natural content height, so a new `WM.rescale(id)` is now called from `showTab()`. A full UI/UX + architecture review was requested alongside this fix; findings and a proposed phased plan are in the new **`UX-AUDIT.md`** rather than folded into this document, since it's closer to a working backlog than a settled reference — expect it to shrink over time as items get done. See 3.10. |
+| 2026-07-15 | **Tabs restored** — the stacked-pages layout from the 07-13 table overhaul read worse than real tabs, so `showTab()` switching is back (no code deleted 07-13, so this was a CSS-level reversal in `05-shell.css`, not a rebuild). Fixed two things the stacked layout had been masking: the tab bar's leftover asymmetric padding (`52px`/`180px`, originally there to dodge fixed-position buttons that are hidden inside the window now) was making the tab row render visibly off-center; and `WM.enableScaling()` had no way to know a page switch — as opposed to a window resize — had just changed the sheet's natural content height, so a new `WM.rescale(id)` is now called from `showTab()`. A full UI/UX + architecture review was requested alongside this fix; findings and a proposed phased plan are in the new **`UX-AUDIT.md`** rather than folded into this document, since it's closer to a working backlog than a settled reference — expect it to shrink over time as items get done. See 3.10. *(Note added 2026-07-18: `UX-AUDIT.md` isn't actually present in this repo or anywhere in its git history — checked across all branches. Either it existed locally and was never committed, or this entry described work that didn't fully land. If you're looking for it, it isn't here; treat this table and Section 5 as the current record instead.)* |
+| 2026-07-18 | **Split combat and multiplayer out of the character sheet.** The old "Combat Tracker" sheet tab (`#p3`) was really three things wedged together: the battlefield tracker, live GM/player session sync, and GM tools. Combat (battlefield/lanes/chips/turn counter/personal vitals-ward-exhaustion-conditions) is now its own standalone table window (`data-window-id="combat"`, opened via a new ⚔ Combat button or `WM.toggle('combat')`) — the second window type built on the Window Manager, proving that pattern generalizes (3.6, 3.10). Multiplayer (session/host-join, server management, GM tools: NPCs/encounters/connected players/fog/mana) stayed on the sheet as its own tab, renamed "Multiplayer" — deliberately, since more multiplayer features beyond combat are planned and this reads more naturally as part of the sheet than as a shared table window (3.7). Along the way, fixed real coupling this split couldn't work around: `serializeSheet()`/`restoreSheet()`/`setActiveSave()` — the whole-character save/load backbone, not just combat — were physically misplaced inside the combat file since the original 07-11 split (despite this document's prior claim that file was "isolated"); moved to `08-saves-io.js` where every other save/load function already lived (3.8). Current HP/Stamina/Stress used to be mirrored between page 1 and the combat page via three overlapping mechanisms (`bindCurSync`, `adjBothVals`, a mirror map inside `adjVal`); removed all three now that current vitals live only in the Combat window, with page 1 keeping just the computed max values. Turn count used to be spliced into `serializeBattlefield`/`restoreBattlefield` via a monkey-patch sitting in a separate grab-bag file (`13-turn-and-init.js`, which also did unrelated multiplayer and sheet init) — that file is gone; turn count folds directly into those two functions, now both defined in the combat file, and each system (sheet, combat, multiplayer) initializes itself. `esc`/`val`/`selVal` (used by nearly every file) and a sheet-card drag-to-reorder feature were also relocated out of the combat file, where they'd been physically stranded despite having nothing to do with combat. The `.monarch` save format bumped to `v: 4` — combat/session state no longer travels with the character file at all, so a save is purely "build" data now; `v: 3` files still import correctly, their combat-shaped fields are just ignored. The battlefield persists itself independently now (autosave to `localStorage`, own key), rather than riding along inside whichever character happened to be loaded when you last saved — intentional behavior change, noted in 3.6. Verified via `node build.js`, a full JS syntax sweep, an HTML tag-balance check, and a new jsdom-based runtime smoke test (`test/smoke.js`, `npm test`) covering window registration, the save-format round-trip at both v3 and v4 (including a realistic old save with the removed fields actually present, to confirm they're silently ignored rather than crashing), battlefield serialize/restore with turn count, the GM remote-setHp command path, and the relocated HP-danger-flash effect — 24/24 checks pass with zero JS errors during page load. See 2.1, 2.2, 3.6, 3.7, 3.8, and Known Issues 5.3/5.6/5.8. |
+| 2026-07-19 | **Combat/multiplayer split (above) regenerated against a moved `main`.** Two commits landed upstream between the split being built and delivered: a Firebase Realtime Database migration replacing the old Google Apps Script relay (`firebasemove` — new `firebaseConfig`/`_ensureFirebase`/`_onPlayersUpdate`/`_onPresenceUpdate`/`_stripUndefined` in `09-session-sync.js`, the `BASE_SCRIPT_URL`-generation fix in `10-gm-tools.js` noted in 3.7, a `firebase` npm dependency, a temporary heartbeat debug overlay and an async Firebase-SDK loader added to `index.html`), and a `dist/monarchy.html` un-tracking (`debugging host-electron issues` — the build artifact is no longer committed to git; **not** added to `.gitignore` as part of that commit, so running `node build.js` will make it show as untracked again — decide deliberately whether to gitignore it or keep hand-committing it, this document isn't taking that decision for you). `serializeBattlefield()`/`restoreBattlefield()`/`serializePlayerVitals()` — the three functions this split relocates/depends on most — turned out to be byte-identical before and after the Firebase migration (it changed transport, not the battlefield's data shape), so the split itself needed no redesign, just re-applying against the new surrounding code. One real addition this time: `setSessionUI()` (in `09-session-sync.js`) now also calls `WM.open('combat')` for both roles — when combat/vitals lived in the same sheet tab as session controls, starting a session already put you on the right tab; now that they're a separate window, starting a session needs to explicitly open it too, or a GM/player would start a session and see no combat window at all. |

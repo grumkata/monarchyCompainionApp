@@ -356,11 +356,6 @@ function updateChipNotes(cid,v) {
 }
 document.getElementById('nc-name').addEventListener('keydown',e=>{ if(e.key==='Enter') placeCombatant(); });
 
-/* ══ HELPERS ══ */
-function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function val(id) { const el=document.getElementById(id); return el?el.value:''; }
-function selVal(el) { return el?el.value:''; }
-
 function applySizePreset(preset) {
   const sizeInput = document.getElementById('id-size');
   if (!sizeInput) return;
@@ -380,124 +375,13 @@ function applySizePreset(preset) {
 }
 
 
-/* ══ SERIALIZATION ══ */
-function serializeSheet() {
-  const data={v:3};
-  data.id={name:val('id-name'),species:val('id-species'),culture:val('id-culture'),rank:val('id-rank'),size:val('id-size'),player:val('id-player')};
-  data.attrs={}; ['for','pro','dex','nim','wil','int','pre','cha'].forEach(k=>{data.attrs[k]=val('attr-'+k);});
-  data.derived={hpCur:val('hp-cur'),hpMax:val('hp-max'),stCur:val('st-cur'),stMax:val('st-max'),strCur:val('str-cur'),strMax:val('str-max')};
-  data.passiveTraits=val('passive-traits');
-  data.knacks=[...document.querySelectorAll('#knacks-list .knack-row')].map(row=>{const ins=row.querySelectorAll('input');return{name:ins[0]?ins[0].value:'',level:ins[1]?ins[1].value:''};});
-  data.skills={body:[],mind:[],social:[]};
-  ['body','mind','social'].forEach(cat=>{
-    document.querySelectorAll('#tree-'+cat+' > .skill-primary').forEach(pEl=>{
-      const pInputs=pEl.querySelector('.skill-prim-head').querySelectorAll('input');
-      const pData={score:pInputs[0]?pInputs[0].value:'0',name:pInputs[1]?pInputs[1].value:'',secondaries:[]};
-      pEl.querySelectorAll(':scope > .skill-children > .skill-secondary').forEach(sEl=>{
-        const sInputs=sEl.querySelector('.skill-sec-head').querySelectorAll('input');
-        const sData={score:sInputs[0]?sInputs[0].value:'0',name:sInputs[1]?sInputs[1].value:'',tertiaries:[]};
-        sEl.querySelectorAll(':scope > .skill-ter-list > .skill-ter-row').forEach(tEl=>{const tInputs=tEl.querySelectorAll('input');sData.tertiaries.push({score:tInputs[0]?tInputs[0].value:'0',name:tInputs[1]?tInputs[1].value:''});});
-        pData.secondaries.push(sData);
-      });
-      data.skills[cat].push(pData);
-    });
-  });
-  data.backgrounds=[...document.querySelectorAll('#bg-container .bg-card')].map(c=>{
-    const nameEl=c.querySelector('.bg-name'); const instEl=c.querySelector('.bg-inst'); const notesEl=c.querySelector('.bg-notes textarea');
-    const profGroups=[...c.querySelectorAll('.bg-pgroup')].map(g=>bgSerializeGroup(g));
-    const investEl=c.querySelector('.bg-invest-count'); const invest=investEl?parseInt(investEl.textContent)||0:0;
-    const applied=c.querySelector('.bg-apply-toggle')?.classList.contains('active')||false;
-    return{name:nameEl?nameEl.value:'',inst:instEl?instEl.value:'',profGroups,notes:notesEl?notesEl.value:'',invest,applied};
-  });
-  data.weapons=[...document.querySelectorAll('#weapon-list .weapon-card')].map(c=>{const ins=c.querySelectorAll('input[type=text]');const ta=c.querySelector('textarea');const rangeEl=c.querySelector('.weapon-range-input');const laneCbs=[...c.querySelectorAll('.weapon-lane-cb')].map(cb=>cb.checked);return{name:ins[0]?ins[0].value:'',dmg:ins[1]?ins[1].value:'',type:ins[2]?ins[2].value:'',quality:ins[3]?ins[3].value:'',range:rangeEl?rangeEl.value:'',lanes:laneCbs,notes:ta?ta.value:''};});
-  data.armors=[...document.querySelectorAll('#armor-list .armor-card')].map(c=>{
-    const nameInput=c.querySelector('.armor-name-input'); const avInput=c.querySelector('.armor-av-input');
-    const qualInput=c.querySelectorAll('input[type=text]')[1]; const ta=c.querySelector('textarea');
-    return{name:nameInput?nameInput.value:'',av:avInput?avInput.value:'',quality:qualInput?qualInput.value:'',notes:ta?ta.value:'',equipped:c.id===_equippedArmorId};
-  });
-  data.equippedArmorId=_equippedArmorId; data.otherGear=val('other-gear'); data.generalNotes=val('general-notes');
-  data.abilSlots=[...document.querySelectorAll('#abil-container .abil-slot')].map(slot=>{
-    const headInputs=slot.querySelector('.abil-head').querySelectorAll('input[type=text]');
-    const typeEl=slot.querySelector('.abil-type-sel'); const passiveEl=slot.querySelector('.abil-passive textarea'); const favorEl=slot.querySelector('.favor-box input');
-    const entries=[...slot.querySelectorAll('.abil-entry')].map(e=>{const ins=e.querySelectorAll('input');const sel=e.querySelector('select');const ta=e.querySelector('textarea');return{name:ins[0]?ins[0].value:'',cost:ins[1]?ins[1].value:'',cd:sel?sel.value:'',effect:ta?ta.value:''};});
-    return{slotName:headInputs[0]?headInputs[0].value:'',type:typeEl?typeEl.value:'',passive:passiveEl?passiveEl.value:'',favor:favorEl?favorEl.value:'',entries};
-  });
-  data.combat={wardVal:val('ward-val'),wardType:selVal(document.getElementById('ward-type')),exhaustion:[...document.querySelectorAll('#exh-pips .exh-pip')].map(p=>p.classList.contains('lit')?1:0),cHpCur:val('c-hp-cur'),cStCur:val('c-st-cur'),cStrCur:val('c-str-cur')};
-  data.conditions=[...document.querySelectorAll('#cond-list .cond-item')].map(c=>{const nameEl=c.querySelector('.cond-name');const countEl=c.querySelector('.cond-count');return{name:nameEl?nameEl.value:'',count:parseInt(countEl?countEl.value:1)||1};}).filter(c=>c.name);
-  data.combatants=[];
-  document.querySelectorAll('.bf-lane').forEach(lane=>{
-    [...lane.querySelectorAll('.comb-chip')].forEach(chip=>{
-      const nameEl=chip.querySelector('.chip-name'); const isForm=chip.dataset.isform==='1';
-      const panelId=chip.dataset.panelId; const panel=panelId?document.getElementById(panelId):null;
-      const inputs=panel?[...panel.querySelectorAll('.chip-exp-grid input')]:[];
-      const co={name:nameEl?nameEl.textContent:'',side:chip.dataset.side,lane:chip.dataset.lane,isForm};
-      if(isForm){co.units=inputs[0]?inputs[0].value:'';co.uhp=inputs[1]?inputs[1].value:'';co.atk=inputs[2]?inputs[2].value:'';co.notes=inputs[3]?inputs[3].value:'';}
-      else{const hpCur=inputs[0]?inputs[0].value:'';const hpMax=inputs[1]?inputs[1].value:'';co.hp=(hpCur&&hpMax)?hpCur+'/'+hpMax:hpCur;co.notes=inputs[3]?inputs[3].value:'';}
-      data.combatants.push(co);
-    });
-  });
-  return data;
-}
-
-function restoreSheet(data) {
-  if (!data||data.v!==3) { showToast('Incompatible save format'); return; }
-  const id=data.id||{};
-  ['name','species','culture','rank','size','player'].forEach(k=>{const el=document.getElementById('id-'+k);if(el) el.value=id[k]||'';});
-  
-  // ✓ FIX: Also set the preset dropdown based on loaded size
-  if (id.size) {
-    const sizeText = (id.size || '').toLowerCase();
-    const preset = document.getElementById('id-size-preset');
-    if (preset) {
-      if (sizeText.includes('small')) {
-        preset.value = 'small';
-      } else if (sizeText.includes('medium')) {
-        preset.value = 'medium';
-      } else if (sizeText.includes('large')) {
-        preset.value = 'large';
-      } else {
-        preset.value = '';
-      }
-    }
-  }
-  
-  const attrs=data.attrs||{}; ['for','pro','dex','nim','wil','int','pre','cha'].forEach(k=>{const el=document.getElementById('attr-'+k);if(el) el.value=attrs[k]!==undefined?attrs[k]:5;});
-  const d=data.derived||{};
-  const el_hpCur=document.getElementById('hp-cur');if(el_hpCur) el_hpCur.value=d.hpCur||'';
-  const el_stCur=document.getElementById('st-cur');if(el_stCur) el_stCur.value=d.stCur||'';
-  const el_strCur=document.getElementById('str-cur');if(el_strCur) el_strCur.value=d.strCur||'';
-  const pt=document.getElementById('passive-traits');if(pt) pt.value=data.passiveTraits||'';
-  document.getElementById('knacks-list').innerHTML=''; (data.knacks||[]).forEach(k=>addKnack(k));
-  ['body','mind','social'].forEach(cat=>{document.getElementById('tree-'+cat).innerHTML='';const prims=data.skills&&data.skills[cat]||[];prims.forEach(p=>addPrimary(cat,p));setTimeout(()=>updateEmpty(cat),0);});
-  document.getElementById('bg-container').innerHTML=''; _bgN=0; (data.backgrounds||[]).forEach(b=>addBg(b));
-  document.getElementById('weapon-list').innerHTML=''; (data.weapons||[]).forEach(w=>addWeapon(w));
-  document.getElementById('armor-list').innerHTML=''; _armorN=0; _equippedArmorId=null; (data.armors||[]).forEach(a=>addArmor(a));
-  refreshArmorUI(); recalcDerived(); if(typeof updateCombatReadout==="function") updateCombatReadout();
-  const ogEl=document.getElementById('other-gear');if(ogEl) ogEl.value=data.otherGear||'';
-  const gnEl=document.getElementById('general-notes');if(gnEl) gnEl.value=data.generalNotes||'';
-  document.getElementById('abil-container').innerHTML=''; _abilN=0; (data.abilSlots||[]).forEach(s=>addAbilSlot(s));
-  const combat=data.combat||{};
-  const wv=document.getElementById('ward-val');if(wv) wv.value=combat.wardVal||'';
-  const wt=document.getElementById('ward-type');if(wt&&combat.wardType){for(let i=0;i<wt.options.length;i++){if(wt.options[i].value===combat.wardType){wt.selectedIndex=i;break;}}}
-  const pips=[...document.querySelectorAll('#exh-pips .exh-pip')];
-  (combat.exhaustion||[]).forEach((v,i)=>{if(pips[i]) pips[i].classList.toggle('lit',v===1);});
-  const cHpCurEl=document.getElementById('c-hp-cur');if(cHpCurEl) cHpCurEl.value=combat.cHpCur||d.hpCur||'';
-  const cStCurEl=document.getElementById('c-st-cur');if(cStCurEl) cStCurEl.value=combat.cStCur||d.stCur||'';
-  const cStrCurEl=document.getElementById('c-str-cur');if(cStrCurEl) cStrCurEl.value=combat.cStrCur||d.strCur||'';
-  document.getElementById('cond-list').innerHTML=''; _condN=0; (data.conditions||[]).forEach(c=>addCondition(c.name||'',c));
-  document.querySelectorAll('.chip-expand-overlay').forEach(p=>p.remove());
-  document.querySelectorAll('.bf-lane').forEach(l=>{[...l.querySelectorAll('.comb-chip')].forEach(c=>c.remove());});
-  (data.combatants||[]).forEach(c=>placeCombatant(c));
-}
-
-/* ══ ACTIVE SAVE TRACKING ══ */
-let _activeSaveId=null;
-function setActiveSave(id,name) {
-  _activeSaveId=id; const lbl=document.getElementById('current-save-label'); if(lbl) lbl.textContent=name?name:'';
-  document.querySelectorAll('.save-entry').forEach(e=>e.classList.remove('active-save'));
-  if(id) { const el=document.querySelector(`.save-entry[data-id="${id}"]`); if(el) el.classList.add('active-save'); }
-}
-
+/* serializeSheet() / restoreSheet() / setActiveSave() moved to
+   08-saves-io.js — they save/restore the WHOLE character (identity,
+   attributes, skills, backgrounds, gear, abilities), not just combat,
+   so they belong next to quickSave/loadCharacter/exportMonarch which
+   already lived there. Combat's own state (vitals, ward, exhaustion,
+   conditions, battlefield) now persists independently — see
+   _saveLocalBattlefield / _loadLocalBattlefield below. */
 
 /* ══ COMBAT READOUT , movement speed & dodge tokens from DEX ══ */
 function updateCombatReadout() {
@@ -538,97 +422,228 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCombatReadout();
 });
 
+/* ══ VITALS ADJUST ══
+   Moved from 03-sheet-basics.js. Used to also mirror onto a page-1
+   copy (hp-cur/st-cur/str-cur) — that copy no longer exists, current
+   HP/Stamina/Stress live only here now, so this is a plain adjuster. */
+function adjVal(id,delta) {
+  const el=document.getElementById(id); if(!el) return;
+  el.value=(parseInt(el.value)||0)+delta;
+}
 
-/* ══ DRAG-TO-REORDER , primaries, backgrounds, weapons, power groups ══ */
-(function(){
-  let _dragEl = null, _dragContainer = null;
+/* ══ FORMATION FORM TOGGLE ══
+   Moved from 11-combat-extras.js. This script tag loads at the end of
+   <body>, after #nc-isform already exists in the DOM, so — same as
+   the #nc-name listener above — it can attach directly with no
+   DOMContentLoaded/setTimeout dance. */
+(() => {
+  const formCheckbox = document.getElementById('nc-isform');
+  if (formCheckbox) {
+    formCheckbox.addEventListener('change', function() {
+      document.getElementById('hp-individual').style.display = this.checked ? 'none' : 'flex';
+      document.getElementById('hp-formation').style.display = this.checked ? 'flex' : 'none';
+    });
+  }
+})();
 
-  function handleDragStart(e) {
-    _dragEl = this.closest('[data-draggable]');
-    _dragContainer = _dragEl?.parentElement;
-    if (!_dragEl) return;
-    setTimeout(() => _dragEl.classList.add('dragging-card'), 0);
-    e.dataTransfer.effectAllowed = 'move';
-  }
-  function handleDragEnd() {
-    _dragEl?.classList.remove('dragging-card');
-    if (_dragContainer) [..._dragContainer.querySelectorAll('.drag-over-card')].forEach(el => el.classList.remove('drag-over-card'));
-    _dragEl = null; _dragContainer = null;
-  }
-  function handleDragOver(e) {
-    if (!_dragEl) return;
-    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-  }
-  function handleDragEnter(e) {
-    if (!_dragEl) return;
-    const target = e.currentTarget;
-    if (target === _dragEl || target.parentElement !== _dragContainer) return;
-    if (_dragContainer) [..._dragContainer.querySelectorAll('.drag-over-card')].forEach(el => el.classList.remove('drag-over-card'));
-    target.classList.add('drag-over-card');
-  }
-  function handleDragLeave(e) {
-    // Only remove if leaving to outside the card entirely
-    if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over-card');
-  }
-  function handleDrop(e) {
-    e.preventDefault();
-    const target = e.target.closest('[data-draggable]');
-    if (!target || target === _dragEl || !_dragContainer || target.parentElement !== _dragContainer) return;
-    target.classList.remove('drag-over-card');
-    const allItems = [..._dragContainer.querySelectorAll(':scope > [data-draggable]')];
-    const fromIdx = allItems.indexOf(_dragEl);
-    const toIdx   = allItems.indexOf(target);
-    if (fromIdx < toIdx) target.after(_dragEl); else target.before(_dragEl);
-  }
+/* ══ TURN COUNTER ══ */
+let _turnCount = 1;
+function adjTurn(delta) {
+  _turnCount = Math.max(1, _turnCount + delta);
+  const el = document.getElementById('turn-counter');
+  if (el) el.textContent = _turnCount;
+  if (_sessionRole === 'gm') { clearTimeout(_pushTimer); _pushTimer = setTimeout(pushBattlefield, 600); }
+  _scheduleLocalSave();
+}
+function resetTurn() {
+  _turnCount = 1;
+  const el = document.getElementById('turn-counter');
+  if (el) el.textContent = '1';
+  if (_sessionRole === 'gm') { clearTimeout(_pushTimer); _pushTimer = setTimeout(pushBattlefield, 600); }
+  _scheduleLocalSave();
+}
+// Reset all combatants' "acted this turn" state , GM QoL
+function resetAllTurns() {
+  document.querySelectorAll('.comb-chip.turn-used').forEach(chip => {
+    chip.classList.remove('turn-used');
+    const dot = chip.querySelector('.chip-turn-dot');
+    if (dot) dot.style.display = 'none';
+    const btns = document.querySelectorAll(`button[data-turnbtn="${chip.id}"]`);
+    btns.forEach(btn => { btn.textContent = btn.classList.contains('chip-turn-full-btn') ? '✓ Mark Acted' : '✓'; });
+  });
+  if (_sessionRole === 'gm') { clearTimeout(_pushTimer); _pushTimer = setTimeout(pushBattlefield, 400); }
+  showToast('All turns reset');
+  _scheduleLocalSave();
+}
+// Clear entire battlefield , GM QoL
+function clearBattlefield() {
+  if (!confirm('Remove ALL combatants from the battlefield?')) return;
+  document.querySelectorAll('.chip-expand-overlay').forEach(p => p.remove());
+  document.querySelectorAll('.bf-lane .comb-chip').forEach(c => c.remove());
+  if (_sessionRole === 'gm') { clearTimeout(_pushTimer); _pushTimer = setTimeout(pushBattlefield, 400); }
+  showToast('Battlefield cleared');
+  _scheduleLocalSave();
+}
 
-  // Attach handle to an element and make it draggable
-  function makeCardDraggable(el) {
-    if (el.dataset.draggable) return; // already done
-    el.dataset.draggable = '1';
-    el.setAttribute('draggable', 'true');
-    el.addEventListener('dragstart', handleDragStart);
-    el.addEventListener('dragend', handleDragEnd);
-    el.addEventListener('dragover', handleDragOver);
-    el.addEventListener('dragenter', handleDragEnter);
-    el.addEventListener('dragleave', handleDragLeave);
-    el.addEventListener('drop', handleDrop);
-    // Inject handle — for weapon-cards, place ABOVE the card-top bar; for others, inside the header
-    const weaponTop = el.classList.contains('weapon-card') ? el.querySelector('.weapon-card-top') : null;
-    if (weaponTop) {
-      if (!el.querySelector(':scope > .drag-handle')) {
-        const h = document.createElement('div');
-        h.className = 'drag-handle weapon-drag-handle'; h.textContent = '⠿'; h.title = 'Drag to reorder';
-        h.addEventListener('mousedown', e => { el.setAttribute('draggable','true'); });
-        el.insertBefore(h, weaponTop);
+/* ══ BATTLEFIELD SERIALIZE / RESTORE ══
+   Moved from 09-session-sync.js — this is Combat's own state shape
+   (chips, turn count, mana, fog); session-sync just pushes/pulls it
+   over the network by calling these two functions, same as before
+   (this file loads before 09-session-sync.js, so that still resolves
+   fine). Turn count used to be spliced in via a monkey-patch sitting
+   in a separate file (13-turn-and-init.js) — folded directly in here
+   instead now that both live in the same place. */
+function serializeBattlefield() {
+  const combatants = [];
+  document.querySelectorAll('.bf-lane').forEach(lane => {
+    [...lane.querySelectorAll('.comb-chip')].forEach(chip => {
+      const nameEl  = chip.querySelector('.chip-name');
+      const isForm  = chip.dataset.isform === '1';
+      const panel   = chip.dataset.panelId ? document.getElementById(chip.dataset.panelId) : null;
+      const inputs  = panel ? [...panel.querySelectorAll('.chip-exp-grid input')] : [];
+      const co = {
+        name:       nameEl ? nameEl.textContent : '',
+        side:       chip.dataset.side,
+        lane:       (chip.closest('.bf-lane') || {}).dataset?.lane || chip.dataset.lane,
+        isForm,
+        size:       chip.dataset.size || 'normal',
+        turnUsed:   chip.classList.contains('turn-used'),
+        conditions: Object.assign({}, chip._conditions || {}),
+        linkedPlayer: chip.dataset.linkedPlayer || ''
+      };
+      if (isForm) { co.units=inputs[0]?.value||''; co.uhp=inputs[1]?.value||''; co.atk=inputs[2]?.value||''; co.notes=inputs[3]?.value||''; }
+      else {
+        const curEl = panel?.querySelector('.chip-hp-cur'); const maxEl = panel?.querySelector('.chip-hp-max');
+        const curV = curEl?.value||''; const maxV = maxEl?.value||'';
+        co.hp = (curV && maxV) ? curV+'/'+maxV : (curV||maxV||'');
+        co.notes = panel?.querySelector('input[type=text]')?.value||'';
       }
-    } else {
-      const head = el.querySelector('.bg-head, .abil-head, .skill-prim-head');
-      if (head && !head.querySelector('.drag-handle')) {
-        const h = document.createElement('span');
-        h.className = 'drag-handle'; h.textContent = '⠿'; h.title = 'Drag to reorder';
-        h.addEventListener('mousedown', e => { el.setAttribute('draggable','true'); });
-        head.insertBefore(h, head.firstChild);
+      combatants.push(co);
+    });
+  });
+  const manaVisibleCb = document.getElementById('gm-mana-visible');
+  const fogCb = document.getElementById('gm-fog-enabled');
+  const cmds = _pendingCmds.length ? _pendingCmds.slice() : undefined;
+  _pendingCmds = [];
+  return {
+    v: 2, ts: Date.now(), combatants, turn: _turnCount,
+    globalMana: _globalMana,
+    globalManaVisible: manaVisibleCb ? manaVisibleCb.checked : _globalManaVisible,
+    fogEnabled: fogCb ? fogCb.checked : false,
+    cmds
+  };
+}
+
+function restoreBattlefield(bf) {
+  if (!bf || !bf.combatants) return;
+  document.querySelectorAll('.chip-expand-overlay').forEach(p => p.remove());
+  document.querySelectorAll('.bf-lane .comb-chip').forEach(c => c.remove());
+
+  bf.combatants.forEach(c => {
+    placeCombatant(c);
+    if (c.linkedPlayer) {
+      const chips = document.querySelectorAll('.bf-lane .comb-chip');
+      const last  = chips[chips.length - 1];
+      if (last) {
+        setChipPlayerLink(last.id, c.linkedPlayer);
+        // Render HP bar for restored combatants
+        if (!c.isForm && c.hp) updateHpBar(last.id, c.hp);
+      }
+    } else if (!c.isForm && c.hp) {
+      const chips = document.querySelectorAll('.bf-lane .comb-chip');
+      const last  = chips[chips.length - 1];
+      if (last) updateHpBar(last.id, c.hp);
+    }
+  });
+
+  if (bf.turn !== undefined) {
+    _turnCount = bf.turn;
+    const turnEl = document.getElementById('turn-counter');
+    if (turnEl) turnEl.textContent = _turnCount;
+  }
+
+  if (bf.globalMana !== undefined) {
+    _globalMana = bf.globalMana;
+    const el = document.getElementById('global-mana-val');
+    if (el) el.textContent = _globalMana;
+  }
+
+  if (_sessionRole === 'player') {
+    const visible = bf.globalManaVisible !== false;
+    const manaWrap = document.getElementById('global-mana-wrap');
+    if (manaWrap) manaWrap.style.display = visible ? 'flex' : 'none';
+    const playerVal = document.getElementById('global-mana-player-val');
+    if (playerVal) playerVal.textContent = _globalMana;
+    const fogOverlay = document.getElementById('fog-overlay');
+    const fogOn = bf.fogEnabled === true;
+    if (fogOverlay) fogOverlay.style.display = fogOn ? 'flex' : 'none';
+    document.body.classList.toggle('fog-active', fogOn);
+
+    // ── Sync GM chip conditions → player character sheet ──
+    // Find the combatant linked to this player and apply its conditions
+    const myName = getMyPlayerName();
+    if (myName) {
+      const linked = bf.combatants.find(c => c.linkedPlayer === myName);
+      if (linked && linked.conditions && typeof linked.conditions === 'object') {
+        const condList = document.getElementById('cond-list');
+        if (condList) {
+          // Remove conditions no longer on the chip
+          [...condList.querySelectorAll('.cond-item')].forEach(item => {
+            const nameEl = item.querySelector('.cond-name') || item.querySelector('input[type=text]');
+            if (!nameEl) return;
+            const n = nameEl.value.trim().toLowerCase();
+            const stillActive = Object.keys(linked.conditions).some(k => k.trim().toLowerCase() === n && linked.conditions[k] > 0);
+            if (!stillActive) item.remove();
+          });
+          // Add conditions present on chip but missing from sheet, and UPDATE token counts
+          Object.entries(linked.conditions).forEach(([condName, count]) => {
+            if (count <= 0) return;
+            const existing = [...condList.querySelectorAll('.cond-name, input[type=text]')].find(el => el.value.trim().toLowerCase() === condName.trim().toLowerCase());
+            if (existing) {
+              // UPDATE existing condition's token count
+              const item = existing.closest('.cond-item');
+              if (item) {
+                const countEl = item.querySelector('.cond-count');
+                if (countEl) countEl.value = count;
+              }
+            } else {
+              // Add new condition
+              addCondition(condName, { count });
+            }
+          });
+        }
       }
     }
   }
+  _scheduleLocalSave();
+}
 
-  // Observe containers and make new children draggable
-  function observeContainer(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    // Existing children
-    [...container.querySelectorAll(':scope > .bg-card, :scope > .weapon-card, :scope > .abil-slot, :scope > .skill-primary')]
-      .forEach(makeCardDraggable);
-    // Future children
-    new MutationObserver(muts => {
-      muts.forEach(m => m.addedNodes.forEach(n => {
-        if (n.nodeType === 1 && (n.classList.contains('bg-card') || n.classList.contains('weapon-card') || n.classList.contains('abil-slot') || n.classList.contains('skill-primary')))
-          makeCardDraggable(n);
-      }));
-    }).observe(container, { childList: true });
-  }
+/* ══ LOCAL PERSISTENCE ══
+   The battlefield used to ride along inside the character's own save
+   file (serializeSheet/restoreSheet), so it persisted for solo/local
+   play but was tangled up with a specific character. Now that Combat
+   is its own window, it persists itself, independent of which (if
+   any) character sheet is currently loaded — closer to how window
+   position/size already persist per-window (14-window-manager.js).
+   This is a deliberate behavior change from before: switching which
+   character is loaded on the sheet no longer resets or reloads the
+   battlefield, since the two are no longer the same save. */
+const _COMBAT_LOCAL_KEY = 'monarchy_combat_state';
+function _saveLocalBattlefield() {
+  try { _ls.set(_COMBAT_LOCAL_KEY, JSON.stringify(serializeBattlefield())); } catch (e) {}
+}
+let _localSaveTimer = null;
+function _scheduleLocalSave() {
+  clearTimeout(_localSaveTimer);
+  _localSaveTimer = setTimeout(_saveLocalBattlefield, 800);
+}
+function _loadLocalBattlefield() {
+  try {
+    const raw = _ls.get(_COMBAT_LOCAL_KEY);
+    if (raw) restoreBattlefield(JSON.parse(raw));
+  } catch (e) {}
+}
+document.addEventListener('DOMContentLoaded', _loadLocalBattlefield);
+window.addEventListener('beforeunload', _saveLocalBattlefield);
+setInterval(_saveLocalBattlefield, 5000);
 
-  document.addEventListener('DOMContentLoaded', () => {
-    ['bg-container','weapon-list','abil-container','tree-body','tree-mind','tree-social'].forEach(observeContainer);
-  });
-})();

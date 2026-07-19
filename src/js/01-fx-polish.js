@@ -240,27 +240,24 @@ document.addEventListener('keydown', e => {
 
 /* ══ QoL: HP DANGER FLASH ══ */
 function checkHpDanger() {
-  const cur = parseInt(document.getElementById('hp-cur')?.value) || 0;
-  const max = parseInt(document.getElementById('hp-max')?.value) || 0;
-  const p3  = document.getElementById('p3');
-  const bar = document.querySelector('.vitals-bar');
+  const cur = parseInt(document.getElementById('c-hp-cur')?.value) || 0;
+  const max = parseInt(document.getElementById('c-hp-max')?.value) || 0;
+  const combatWin = document.querySelector('[data-window-id="combat"]');
   const hpCell = document.querySelector('.vbar-cell');
   if (max > 0 && cur / max <= 0.25 && cur > 0) {
-    p3 && p3.classList.add('hp-crit');
+    combatWin && combatWin.classList.add('hp-crit');
     hpCell && hpCell.classList.add('hp-crit-cell');
     document.getElementById('c-hp-cur')?.closest('.vbar-cell')?.classList.add('hp-crit-cell');
   } else {
-    p3 && p3.classList.remove('hp-crit');
+    combatWin && combatWin.classList.remove('hp-crit');
     document.querySelectorAll('.hp-crit-cell').forEach(el => el.classList.remove('hp-crit-cell'));
   }
 }
-// Watch both synced HP fields
-['hp-cur','c-hp-cur','hp-max','c-hp-max'].forEach(id => {
+// Watch the HP fields (current HP lives only in the Combat window now)
+['c-hp-cur','c-hp-max'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', checkHpDanger);
 });
-// Also hook into adjBothVals
-const _abv = window.adjBothVals;
-if (_abv) window.adjBothVals = function() { const r = _abv.apply(this, arguments); setTimeout(checkHpDanger, 50); return r; };
+// Also hook into adjVal, since button clicks don't fire a native 'input' event
 const _av = window.adjVal;
 if (_av) window.adjVal = function() { const r = _av.apply(this, arguments); setTimeout(checkHpDanger, 50); return r; };
 checkHpDanger();

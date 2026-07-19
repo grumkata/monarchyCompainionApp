@@ -7,11 +7,13 @@
   "scripts": {
     "build:html": "node build.js",
     "start": "npm run build:html && electron .",
-    "dist": "npm run build:html && electron-builder"
+    "dist": "npm run build:html && electron-builder",
+    "test": "node test/smoke.js"
   },
   "devDependencies": {
     "electron": "^43.1.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "jsdom": "^24.0.0"
   },
   "build": {
     "appId": "com.grumkata.monarchy",

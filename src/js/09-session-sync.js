@@ -157,14 +157,10 @@ function _applyGmCommands(cmds) {
     _lastCmdTs = Math.max(_lastCmdTs, cmd.ts || 0);
 
     if (cmd.type === 'setHp') {
-      const hpEl  = document.getElementById('c-hp-cur');
-      const hpEl2 = document.getElementById('hp-cur');
-      if (hpEl  && cmd.hp !== undefined) hpEl.value  = cmd.hp;
-      if (hpEl2 && cmd.hp !== undefined) hpEl2.value = cmd.hp;
-      const stEl  = document.getElementById('c-st-cur');
-      const stEl2 = document.getElementById('st-cur');
-      if (stEl  && cmd.st !== undefined) stEl.value  = cmd.st;
-      if (stEl2 && cmd.st !== undefined) stEl2.value = cmd.st;
+      const hpEl = document.getElementById('c-hp-cur');
+      if (hpEl && cmd.hp !== undefined) hpEl.value = cmd.hp;
+      const stEl = document.getElementById('c-st-cur');
+      if (stEl && cmd.st !== undefined) stEl.value = cmd.st;
       const vb = document.getElementById('player-vitals-section');
       if (vb) { vb.style.outline = '2px solid var(--red)'; setTimeout(() => { vb.style.outline = ''; }, 800); }
       setTimeout(_playerPushVitals, 500);
@@ -370,123 +366,12 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
-function serializeBattlefield() {
-  const combatants = [];
-  document.querySelectorAll('.bf-lane').forEach(lane => {
-    [...lane.querySelectorAll('.comb-chip')].forEach(chip => {
-      const nameEl  = chip.querySelector('.chip-name');
-      const isForm  = chip.dataset.isform === '1';
-      const panel   = chip.dataset.panelId ? document.getElementById(chip.dataset.panelId) : null;
-      const inputs  = panel ? [...panel.querySelectorAll('.chip-exp-grid input')] : [];
-      const co = {
-        name:       nameEl ? nameEl.textContent : '',
-        side:       chip.dataset.side,
-        lane:       (chip.closest('.bf-lane') || {}).dataset?.lane || chip.dataset.lane,
-        isForm,
-        size:       chip.dataset.size || 'normal',
-        turnUsed:   chip.classList.contains('turn-used'),
-        conditions: Object.assign({}, chip._conditions || {}),
-        linkedPlayer: chip.dataset.linkedPlayer || ''
-      };
-      if (isForm) { co.units=inputs[0]?.value||''; co.uhp=inputs[1]?.value||''; co.atk=inputs[2]?.value||''; co.notes=inputs[3]?.value||''; }
-      else {
-        const curEl = panel?.querySelector('.chip-hp-cur'); const maxEl = panel?.querySelector('.chip-hp-max');
-        const curV = curEl?.value||''; const maxV = maxEl?.value||'';
-        co.hp = (curV && maxV) ? curV+'/'+maxV : (curV||maxV||'');
-        co.notes = panel?.querySelector('input[type=text]')?.value||'';
-      }
-      combatants.push(co);
-    });
-  });
-  const manaVisibleCb = document.getElementById('gm-mana-visible');
-  const fogCb = document.getElementById('gm-fog-enabled');
-  const cmds = _pendingCmds.length ? _pendingCmds.slice() : undefined;
-  _pendingCmds = [];
-  return {
-    v: 2, ts: Date.now(), combatants,
-    globalMana: _globalMana,
-    globalManaVisible: manaVisibleCb ? manaVisibleCb.checked : _globalManaVisible,
-    fogEnabled: fogCb ? fogCb.checked : false,
-    cmds
-  };
-}
-
-function restoreBattlefield(bf) {
-  if (!bf || !bf.combatants) return;
-  document.querySelectorAll('.chip-expand-overlay').forEach(p => p.remove());
-  document.querySelectorAll('.bf-lane .comb-chip').forEach(c => c.remove());
-
-  bf.combatants.forEach(c => {
-    placeCombatant(c);
-    if (c.linkedPlayer) {
-      const chips = document.querySelectorAll('.bf-lane .comb-chip');
-      const last  = chips[chips.length - 1];
-      if (last) {
-        setChipPlayerLink(last.id, c.linkedPlayer);
-        // Render HP bar for restored combatants
-        if (!c.isForm && c.hp) updateHpBar(last.id, c.hp);
-      }
-    } else if (!c.isForm && c.hp) {
-      const chips = document.querySelectorAll('.bf-lane .comb-chip');
-      const last  = chips[chips.length - 1];
-      if (last) updateHpBar(last.id, c.hp);
-    }
-  });
-
-  if (bf.globalMana !== undefined) {
-    _globalMana = bf.globalMana;
-    const el = document.getElementById('global-mana-val');
-    if (el) el.textContent = _globalMana;
-  }
-
-  if (_sessionRole === 'player') {
-    const visible = bf.globalManaVisible !== false;
-    const manaWrap = document.getElementById('global-mana-wrap');
-    if (manaWrap) manaWrap.style.display = visible ? 'flex' : 'none';
-    const playerVal = document.getElementById('global-mana-player-val');
-    if (playerVal) playerVal.textContent = _globalMana;
-    const fogOverlay = document.getElementById('fog-overlay');
-    const fogOn = bf.fogEnabled === true;
-    if (fogOverlay) fogOverlay.style.display = fogOn ? 'flex' : 'none';
-    document.body.classList.toggle('fog-active', fogOn);
-
-    // ── Sync GM chip conditions → player character sheet ──
-    // Find the combatant linked to this player and apply its conditions
-    const myName = getMyPlayerName();
-    if (myName) {
-      const linked = bf.combatants.find(c => c.linkedPlayer === myName);
-      if (linked && linked.conditions && typeof linked.conditions === 'object') {
-        const condList = document.getElementById('cond-list');
-        if (condList) {
-          // Remove conditions no longer on the chip
-          [...condList.querySelectorAll('.cond-item')].forEach(item => {
-            const nameEl = item.querySelector('.cond-name') || item.querySelector('input[type=text]');
-            if (!nameEl) return;
-            const n = nameEl.value.trim().toLowerCase();
-            const stillActive = Object.keys(linked.conditions).some(k => k.trim().toLowerCase() === n && linked.conditions[k] > 0);
-            if (!stillActive) item.remove();
-          });
-          // Add conditions present on chip but missing from sheet, and UPDATE token counts
-          Object.entries(linked.conditions).forEach(([condName, count]) => {
-            if (count <= 0) return;
-            const existing = [...condList.querySelectorAll('.cond-name, input[type=text]')].find(el => el.value.trim().toLowerCase() === condName.trim().toLowerCase());
-            if (existing) {
-              // UPDATE existing condition's token count
-              const item = existing.closest('.cond-item');
-              if (item) {
-                const countEl = item.querySelector('.cond-count');
-                if (countEl) countEl.value = count;
-              }
-            } else {
-              // Add new condition
-              addCondition(condName, { count });
-            }
-          });
-        }
-      }
-    }
-  }
-}
+/* serializeBattlefield() / restoreBattlefield() now live in
+   07-combat-window.js — that file loads before this one, so these
+   calls below still resolve exactly as they did when both functions
+   were defined in this file. Moved because the battlefield's own
+   shape (chips, turn count, mana, fog) is Combat's data to own; this
+   file's job is just pushing/pulling it over Firebase. */
 
 
 /* ────────────────────────────────────────────────
@@ -1118,19 +1003,21 @@ function setSessionUI(role) {
     if (gmPanel)       gmPanel.style.display       = 'block';
     if (placePanel)    placePanel.style.display     = 'block';
     if (vitalsSection) vitalsSection.style.display  = 'none';
-    // Hide tabs I and II, jump straight to Combat tab
+    // Hide tabs I and II, jump straight to Multiplayer tab
     tabBtns.forEach(b => {
       const target = b.getAttribute('onclick')?.match(/showTab\('(\w+)'/)?.[1];
       b.style.display = (target === 'p1' || target === 'p2') ? 'none' : '';
     });
     showTab('p3', document.querySelector('.tab-btn[onclick*="p3"]'));
     renderGmTools();
+    if (typeof WM !== 'undefined') WM.open('combat'); // battlefield/vitals live there now, not in this tab
   } else {
     if (gmPanel)       gmPanel.style.display       = 'none';
     if (placePanel)    placePanel.style.display     = 'none';
     if (vitalsSection) vitalsSection.style.display  = 'block';
     // Restore all tabs
     tabBtns.forEach(b => b.style.display = '');
+    if (typeof WM !== 'undefined') WM.open('combat'); // player's vitals + the shared battlefield live there now
   }
   updateStatusText();
 }

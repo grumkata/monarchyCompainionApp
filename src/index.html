@@ -115,9 +115,10 @@
     <button class="table-ctrl-btn" onclick="tableCreateCharacter()" title="Create a new blank character">✚ <span>Create Character</span></button>
     <button class="table-ctrl-btn" onclick="tableOpenCharacterModal()" title="Open a saved character">📂 <span>Open Character</span></button>
     <button class="table-ctrl-btn" onclick="tableSaveAll()" title="Save the current character">💾 <span>Save Table</span></button>
+    <button class="table-ctrl-btn" onclick="tableToggleCombat()" title="Open the shared combat tracker">⚔️ <span>Combat</span></button>
     <div class="table-ctrl-sep"></div>
     <button class="table-ctrl-btn" id="table-theme-btn" onclick="tableToggleTheme()" title="Toggle light/dark theme">🌗 <span>Theme</span></button>
-    <!-- future: dice roller, rulebook, combat, etc. join here -->
+    <!-- future: dice roller, rulebook, etc. join here -->
   </div>
 
   <!-- Reserved for future group-facing panels (dice, chat). Empty on
@@ -202,7 +203,7 @@
 <div class="tabs">
   <button class="tab-btn active" onclick="showTab('p1',this)">⚜ I , Character &amp; Skills</button>
   <button class="tab-btn" onclick="showTab('p2',this)">🎒 II , Backgrounds &amp; Abilities</button>
-  <button class="tab-btn" onclick="showTab('p3',this)">⚔ III , Combat</button>
+  <button class="tab-btn" onclick="showTab('p3',this)">⚔ III , Multiplayer</button>
 </div>
 
 <!-- PAGE 1 -->
@@ -257,45 +258,27 @@
         <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Presence</div><div class="attr-box"><input type="number" id="attr-pre" data-attr-order="6" min="1" max="15" value="5"></div><div class="attr-badge">Passive</div></div>
         <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Charisma</div><div class="attr-box"><input type="number" id="attr-cha" data-attr-order="7" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
       </div>
-      <div class="sec"><span class="so">✦</span> Derived</div>
+      <div class="sec"><span class="so">✦</span> Derived <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">current tracking lives in the Combat window</span></div>
       <div class="deriv-wrap">
         <div class="deriv-row">
           <div class="deriv-name">Hit Points</div>
           <div class="deriv-formula">FOR × AV</div>
           <div class="deriv-vals">
-            <input type="number" id="hp-cur" placeholder="0">
-            <span class="deriv-sep">/</span>
             <input type="number" id="hp-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: Fortitude × Armour Value">
-            <div class="hp-adj-btns">
-              <button class="hp-adj-btn dmg" onclick="adjVal('hp-cur',-1)" title="−1 HP">−</button>
-              <button class="hp-adj-btn" onclick="adjVal('hp-cur',1)" title="+1 HP">+</button>
-            </div>
           </div>
         </div>
         <div class="deriv-row">
           <div class="deriv-name">Stamina</div>
           <div class="deriv-formula">(FOR+WIL)÷2+4</div>
           <div class="deriv-vals">
-            <input type="number" id="st-cur" placeholder="0">
-            <span class="deriv-sep">/</span>
             <input type="number" id="st-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: (Fortitude+Willpower)/2+4">
-            <div class="hp-adj-btns">
-              <button class="hp-adj-btn dmg" onclick="adjVal('st-cur',-1)" title="−1 Stamina">−</button>
-              <button class="hp-adj-btn" onclick="adjVal('st-cur',1)" title="+1 Stamina">+</button>
-            </div>
           </div>
         </div>
         <div class="deriv-row">
           <div class="deriv-name">Stress</div>
           <div class="deriv-formula">WIL × 2</div>
           <div class="deriv-vals">
-            <input type="number" id="str-cur" placeholder="0">
-            <span class="deriv-sep">/</span>
             <input type="number" id="str-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: Willpower × 2">
-            <div class="hp-adj-btns">
-              <button class="hp-adj-btn dmg" onclick="adjVal('str-cur',-1)" title="−1 Stress">−</button>
-              <button class="hp-adj-btn" onclick="adjVal('str-cur',1)" title="+1 Stress">+</button>
-            </div>
           </div>
         </div>
       </div>
@@ -379,7 +362,7 @@
 <div class="sheet" id="p3">
 <div class="sheet-inner">
   <div class="splash" style="top:-20px;right:-20px;width:200px;height:200px;background:radial-gradient(circle,rgba(139,26,26,.1) 0%,transparent 70%);"></div>
-  <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Combat Tracker</div></div>
+  <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Multiplayer</div></div>
 
   <!-- SESSION PANEL -->
   <div class="session-wrap">
@@ -486,12 +469,6 @@
     </div>
   </div>
 
-  <!-- GLOBAL MANA PLAYER VIEW -->
-  <div id="global-mana-wrap" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:rgba(80,20,160,0.06);border:1.5px solid rgba(100,40,180,0.22);margin-bottom:8px;">
-    <span style="font-family:'Cinzel',serif;font-size:8px;letter-spacing:.22em;text-transform:uppercase;opacity:.55;">🔮 Mana Pool</span>
-    <span id="global-mana-player-val" style="font-family:'Cinzel',serif;font-size:24px;font-weight:900;color:var(--ink);">0</span>
-  </div>
-
   <!-- PLAYER SHEET VIEWER MODAL -->
   <!-- PLAYER SHEET MODAL -->
 <div id="player-sheet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto;">
@@ -549,144 +526,6 @@
     </div>
   </div>
 
-  <!-- VITALS BAR (hidden when GM mode) -->
-  <div id="player-vitals-section">
-  <div class="sec" style="margin-top:0;"><span class="so">✦</span> Vitals &amp; Status <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">synced with Page I · hover for +/−</span></div>
-  <div class="vitals-bar">
-    <div class="vbar-cell" style="background:rgba(139,26,26,.04);" title="Hit Points = Fortitude × AV">
-      <span class="vbar-lbl">♥ HP</span>
-      <div class="vbar-inputs">
-        <input type="number" id="c-hp-cur" placeholder="0" oninput="syncFromCombat('hp-cur','c-hp-cur')">
-        <span class="vbar-sep">/</span>
-        <input type="number" id="c-hp-max" placeholder="0" class="auto-calc" readonly>
-      </div>
-      <div class="vbar-adj">
-        <button class="vbar-adj-btn dmg" onclick="adjBothVals('hp-cur','c-hp-cur',-1)">−</button>
-        <button class="vbar-adj-btn" onclick="adjBothVals('hp-cur','c-hp-cur',1)">+</button>
-      </div>
-    </div>
-    <div class="vbar-cell" style="background:rgba(30,80,30,.03);" title="Stamina = (FOR+WIL)÷2+4">
-      <span class="vbar-lbl">⚡ STA</span>
-      <div class="vbar-inputs">
-        <input type="number" id="c-st-cur" placeholder="0" oninput="syncFromCombat('st-cur','c-st-cur')">
-        <span class="vbar-sep">/</span>
-        <input type="number" id="c-st-max" placeholder="0" class="auto-calc" readonly>
-      </div>
-      <div class="vbar-adj">
-        <button class="vbar-adj-btn dmg" onclick="adjBothVals('st-cur','c-st-cur',-1)">−</button>
-        <button class="vbar-adj-btn" onclick="adjBothVals('st-cur','c-st-cur',1)">+</button>
-      </div>
-    </div>
-    <div class="vbar-cell" style="background:rgba(60,30,80,.03);" title="Stress = Willpower × 2">
-      <span class="vbar-lbl">🧠 STR</span>
-      <div class="vbar-inputs">
-        <input type="number" id="c-str-cur" placeholder="0" oninput="syncFromCombat('str-cur','c-str-cur')">
-        <span class="vbar-sep">/</span>
-        <input type="number" id="c-str-max" placeholder="0" class="auto-calc" readonly>
-      </div>
-      <div class="vbar-adj">
-        <button class="vbar-adj-btn dmg" onclick="adjBothVals('str-cur','c-str-cur',-1)">−</button>
-        <button class="vbar-adj-btn" onclick="adjBothVals('str-cur','c-str-cur',1)">+</button>
-      </div>
-    </div>
-    <div class="vbar-cell" title="Ward , subtracted from damage" style="border-left:2px solid var(--heavy);">
-      <span class="vbar-lbl">WARD</span>
-      <div class="vbar-ward-val"><input type="number" id="ward-val" placeholder="0" min="0"></div>
-      <select id="ward-type" class="vbar-ward-type"><option>Ablative</option><option>Temporary</option><option>Static</option></select>
-    </div>
-  </div>
-  <!-- exhaustion bar sits on its own row below vitals -->
-  <div class="exh-bar">
-    <span class="exh-bar-lbl">EXHAUSTION</span>
-    <div class="exh-pips" id="exh-pips"></div>
-    <span class="exh-note">+1 difficulty per level</span>
-  </div>
-  <!-- COMBAT READOUT: movement speed + dodge tokens -->
-  <div class="combat-readout" id="combat-readout">
-    <div class="cro-cell">
-      <span class="cro-lbl">⚡ Move Speed</span>
-      <span class="cro-val" id="cro-move-val">,</span>
-      <span class="cro-note" id="cro-move-note">,</span>
-    </div>
-    <div class="cro-cell">
-      <span class="cro-lbl">🛡 Dodge Tokens</span>
-      <span class="cro-val" id="cro-dodge-val">,</span>
-      <span class="cro-note" id="cro-dodge-note">,</span>
-    </div>
-  </div>
-  <div class="sec"><span class="so">✦</span> Tokens</div>
-  <div style="display:grid;grid-template-columns:1fr 80px 24px;gap:7px;padding:2px 0 4px;border-bottom:2px solid var(--heavy);margin-bottom:2px;">
-    <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;">Token</span>
-    <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;text-align:center;">Count</span>
-    <span></span>
-  </div>
-  <div id="cond-list"></div>
-  <button class="add-btn" onclick="addCondition('')">+ Add Token</button>
-  </div><!-- end #player-vitals-section -->
-  <div class="div"><hr><span>✦</span><hr></div>
-
-  <div style="position:relative;">
-  <!-- FIX 2: Ally on LEFT, Enemy on RIGHT -->
-  <div class="sec" style="display:flex;align-items:center;"><span style="flex:1;"><span class="so">✦</span> Battlefield <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">drag combatants between lines</span></span><span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin-left:12px;"><button onclick="resetAllTurns()" title="Mark all combatants as not acted" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">↩ All Turns</button><button onclick="clearBattlefield()" title="Remove all combatants" style="background:none;border:1px solid rgba(139,26,26,.4);color:var(--red);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">✕ Clear</button><span style="font-family:'Cinzel',serif;font-size:7px;letter-spacing:.18em;text-transform:uppercase;opacity:.5;">Round</span><button onclick="adjTurn(-1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">−</button><span id="turn-counter" style="font-family:'Cinzel',serif;font-size:16px;font-weight:900;color:var(--ink);min-width:22px;text-align:center;line-height:1;">1</span><button onclick="adjTurn(1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">+</button><button onclick="resetTurn()" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">Reset</button></span></div>
-  <div class="bf-wrap">
-    <div class="bf-header">, Line of Battle ,</div>
-    <div class="bf-label-row">
-      <div class="bf-col-lbl a">Ally<br>Backline</div>
-      <div class="bf-col-lbl a">Ally<br>Support</div>
-      <div class="bf-col-lbl a">Ally<br>Secondary</div>
-      <div class="bf-col-lbl a center-div">Ally<br>Frontline</div>
-      <div class="bf-col-lbl e">Enemy<br>Frontline</div>
-      <div class="bf-col-lbl e">Enemy<br>Secondary</div>
-      <div class="bf-col-lbl e">Enemy<br>Support</div>
-      <div class="bf-col-lbl e">Enemy<br>Backline</div>
-    </div>
-    <div class="bf-lanes" id="bf-lanes">
-      <div class="bf-lane a-lane" id="lane-a-back" data-lane="a-back"></div>
-      <div class="bf-lane a-lane" id="lane-a-support" data-lane="a-support"></div>
-      <div class="bf-lane a-lane" id="lane-a-second" data-lane="a-second"></div>
-      <div class="bf-lane a-lane center-div" id="lane-a-front" data-lane="a-front"></div>
-      <div class="bf-lane e-lane" id="lane-e-front" data-lane="e-front"></div>
-      <div class="bf-lane e-lane" id="lane-e-second" data-lane="e-second"></div>
-      <div class="bf-lane e-lane" id="lane-e-support" data-lane="e-support"></div>
-      <div class="bf-lane e-lane" id="lane-e-back" data-lane="e-back"></div>
-    </div>
-    <div class="bf-note">Empty lines advance , if a line is empty all combatants behind it move forward.</div>
-  </div>
-  </div><!-- end relative battlefield wrapper -->
-  <div class="add-comb-form" id="place-combatant-panel">
-    <div class="sec" style="margin-top:0;"><span class="so">✦</span> Place Combatant</div>
-    <div class="add-comb-grid">
-      <div><span class="lbl">Name</span><input type="text" id="nc-name" placeholder="Name…"></div>
-      <div><span class="lbl">Side</span><select id="nc-side" style="border-bottom:2px solid var(--heavy);" onchange="syncLaneOpts()"><option value="ally">Ally</option><option value="enemy">Enemy</option></select></div>
-      <div><span class="lbl">Line</span><select id="nc-lane" style="border-bottom:2px solid var(--heavy);"></select></div>
-      <div><span class="lbl">Size</span><select id="nc-size" style="border-bottom:2px solid var(--heavy);"><option value="">Auto (from sheet)</option><option value="normal">Normal</option><option value="large">Large</option></select></div>
-    </div>
-    <div class="add-comb-grid">
-      <div><span class="lbl">Notes</span><input type="text" id="nc-notes" placeholder="role, status…"></div>
-    </div>
-    <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:10px;flex-wrap:nowrap;justify-content:space-between;">
-      <label style="display:flex;align-items:center;gap:5px;font-family:'Crimson Text',serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-        <input type="checkbox" id="nc-isform" style="width:14px;height:14px;cursor:pointer;accent-color:var(--red);"> Formation?
-      </label>
-      <div id="hp-individual" style="flex:1;min-width:140px;display:flex;gap:4px;align-items:flex-end;">
-        <div style="flex:1;"><span class="lbl">HP Cur</span><input type="number" id="nc-hp" placeholder="20"></div>
-        <div style="flex-shrink:0;padding-bottom:4px;color:var(--mid);font-weight:700;">/</div>
-        <div style="flex:1;"><span class="lbl">HP Max</span><input type="number" id="nc-hp-max" placeholder="20"></div>
-      </div>
-      <div id="hp-formation" style="display:none;flex:1;min-width:280px;gap:10px;align-items:flex-end;">
-        <div style="flex:1;"><span class="lbl">Units</span><input type="number" id="nc-units" placeholder="10"></div>
-        <div style="flex:1;"><span class="lbl">HP / Unit</span><input type="number" id="nc-uhp" placeholder="5"></div>
-        <div style="flex:1;"><span class="lbl">Attack Value</span><input type="number" id="nc-atk" placeholder=","></div>
-      </div>
-    </div>
-    <button class="add-btn" style="margin-bottom:0;" onclick="placeCombatant()">+ Place on Battlefield</button>
-  </div>
-  <!-- Fog overlay - covers entire combat page -->
-  <div id="fog-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:#050302;align-items:center;justify-content:center;flex-direction:column;gap:14px;pointer-events:none;">
-    <div style="font-family:'UnifrakturMaguntia',cursive;font-size:48px;color:rgba(200,168,90,0.55);text-shadow:0 0 40px rgba(200,120,40,0.4);">Monarchy</div>
-    <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:.35em;text-transform:uppercase;color:rgba(200,168,90,0.65);">⚔ The Battle Approaches ⚔</div>
-    <div style="font-family:'Crimson Text',serif;font-style:italic;font-size:14px;color:rgba(232,223,200,0.4);">The GM has obscured the battlefield…</div>
-  </div>
 </div>
 <div class="page-foot">Page III of III</div>
 </div>
@@ -696,6 +535,167 @@
       </div><!-- /window-content -->
       <div class="window-resize-handle"></div>
     </div><!-- /table-window sheet -->
+
+    <div class="table-window" data-window-id="combat">
+      <div class="window-titlebar">
+        <span class="window-title-icon">⚔️</span>
+        <span class="window-title-text">Combat</span>
+        <button class="window-close" onclick="WM.close('combat')" title="Close">✕</button>
+      </div>
+      <div class="window-content">
+        <div id="combat-root" style="max-width:980px;margin:0 auto;">
+          <div class="sheet-inner">
+            <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Combat</div></div>
+
+            <!-- VITALS BAR (hidden when GM mode) -->
+            <div id="player-vitals-section">
+            <div class="sec" style="margin-top:0;"><span class="so">✦</span> Vitals &amp; Status <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">hover for +/−</span></div>
+            <div class="vitals-bar">
+              <div class="vbar-cell" style="background:rgba(139,26,26,.04);" title="Hit Points = Fortitude × AV">
+                <span class="vbar-lbl">♥ HP</span>
+                <div class="vbar-inputs">
+                  <input type="number" id="c-hp-cur" placeholder="0">
+                  <span class="vbar-sep">/</span>
+                  <input type="number" id="c-hp-max" placeholder="0" class="auto-calc" readonly>
+                </div>
+                <div class="vbar-adj">
+                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-hp-cur',-1)">−</button>
+                  <button class="vbar-adj-btn" onclick="adjVal('c-hp-cur',1)">+</button>
+                </div>
+              </div>
+              <div class="vbar-cell" style="background:rgba(30,80,30,.03);" title="Stamina = (FOR+WIL)÷2+4">
+                <span class="vbar-lbl">⚡ STA</span>
+                <div class="vbar-inputs">
+                  <input type="number" id="c-st-cur" placeholder="0">
+                  <span class="vbar-sep">/</span>
+                  <input type="number" id="c-st-max" placeholder="0" class="auto-calc" readonly>
+                </div>
+                <div class="vbar-adj">
+                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-st-cur',-1)">−</button>
+                  <button class="vbar-adj-btn" onclick="adjVal('c-st-cur',1)">+</button>
+                </div>
+              </div>
+              <div class="vbar-cell" style="background:rgba(60,30,80,.03);" title="Stress = Willpower × 2">
+                <span class="vbar-lbl">🧠 STR</span>
+                <div class="vbar-inputs">
+                  <input type="number" id="c-str-cur" placeholder="0">
+                  <span class="vbar-sep">/</span>
+                  <input type="number" id="c-str-max" placeholder="0" class="auto-calc" readonly>
+                </div>
+                <div class="vbar-adj">
+                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-str-cur',-1)">−</button>
+                  <button class="vbar-adj-btn" onclick="adjVal('c-str-cur',1)">+</button>
+                </div>
+              </div>
+              <div class="vbar-cell" title="Ward , subtracted from damage" style="border-left:2px solid var(--heavy);">
+                <span class="vbar-lbl">WARD</span>
+                <div class="vbar-ward-val"><input type="number" id="ward-val" placeholder="0" min="0"></div>
+                <select id="ward-type" class="vbar-ward-type"><option>Ablative</option><option>Temporary</option><option>Static</option></select>
+              </div>
+            </div>
+            <!-- exhaustion bar sits on its own row below vitals -->
+            <div class="exh-bar">
+              <span class="exh-bar-lbl">EXHAUSTION</span>
+              <div class="exh-pips" id="exh-pips"></div>
+              <span class="exh-note">+1 difficulty per level</span>
+            </div>
+            <!-- GLOBAL MANA PLAYER VIEW -->
+            <div id="global-mana-wrap" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:rgba(80,20,160,0.06);border:1.5px solid rgba(100,40,180,0.22);margin:8px 0;">
+              <span style="font-family:'Cinzel',serif;font-size:8px;letter-spacing:.22em;text-transform:uppercase;opacity:.55;">🔮 Mana Pool</span>
+              <span id="global-mana-player-val" style="font-family:'Cinzel',serif;font-size:24px;font-weight:900;color:var(--ink);">0</span>
+            </div>
+            <!-- COMBAT READOUT: movement speed + dodge tokens -->
+            <div class="combat-readout" id="combat-readout">
+              <div class="cro-cell">
+                <span class="cro-lbl">⚡ Move Speed</span>
+                <span class="cro-val" id="cro-move-val">,</span>
+                <span class="cro-note" id="cro-move-note">,</span>
+              </div>
+              <div class="cro-cell">
+                <span class="cro-lbl">🛡 Dodge Tokens</span>
+                <span class="cro-val" id="cro-dodge-val">,</span>
+                <span class="cro-note" id="cro-dodge-note">,</span>
+              </div>
+            </div>
+            <div class="sec"><span class="so">✦</span> Tokens</div>
+            <div style="display:grid;grid-template-columns:1fr 80px 24px;gap:7px;padding:2px 0 4px;border-bottom:2px solid var(--heavy);margin-bottom:2px;">
+              <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;">Token</span>
+              <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;text-align:center;">Count</span>
+              <span></span>
+            </div>
+            <div id="cond-list"></div>
+            <button class="add-btn" onclick="addCondition('')">+ Add Token</button>
+            </div><!-- end #player-vitals-section -->
+            <div class="div"><hr><span>✦</span><hr></div>
+
+            <div style="position:relative;">
+            <!-- FIX 2: Ally on LEFT, Enemy on RIGHT -->
+            <div class="sec" style="display:flex;align-items:center;"><span style="flex:1;"><span class="so">✦</span> Battlefield <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">drag combatants between lines</span></span><span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin-left:12px;"><button onclick="resetAllTurns()" title="Mark all combatants as not acted" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">↩ All Turns</button><button onclick="clearBattlefield()" title="Remove all combatants" style="background:none;border:1px solid rgba(139,26,26,.4);color:var(--red);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">✕ Clear</button><span style="font-family:'Cinzel',serif;font-size:7px;letter-spacing:.18em;text-transform:uppercase;opacity:.5;">Round</span><button onclick="adjTurn(-1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">−</button><span id="turn-counter" style="font-family:'Cinzel',serif;font-size:16px;font-weight:900;color:var(--ink);min-width:22px;text-align:center;line-height:1;">1</span><button onclick="adjTurn(1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">+</button><button onclick="resetTurn()" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">Reset</button></span></div>
+            <div class="bf-wrap">
+              <div class="bf-header">, Line of Battle ,</div>
+              <div class="bf-label-row">
+                <div class="bf-col-lbl a">Ally<br>Backline</div>
+                <div class="bf-col-lbl a">Ally<br>Support</div>
+                <div class="bf-col-lbl a">Ally<br>Secondary</div>
+                <div class="bf-col-lbl a center-div">Ally<br>Frontline</div>
+                <div class="bf-col-lbl e">Enemy<br>Frontline</div>
+                <div class="bf-col-lbl e">Enemy<br>Secondary</div>
+                <div class="bf-col-lbl e">Enemy<br>Support</div>
+                <div class="bf-col-lbl e">Enemy<br>Backline</div>
+              </div>
+              <div class="bf-lanes" id="bf-lanes">
+                <div class="bf-lane a-lane" id="lane-a-back" data-lane="a-back"></div>
+                <div class="bf-lane a-lane" id="lane-a-support" data-lane="a-support"></div>
+                <div class="bf-lane a-lane" id="lane-a-second" data-lane="a-second"></div>
+                <div class="bf-lane a-lane center-div" id="lane-a-front" data-lane="a-front"></div>
+                <div class="bf-lane e-lane" id="lane-e-front" data-lane="e-front"></div>
+                <div class="bf-lane e-lane" id="lane-e-second" data-lane="e-second"></div>
+                <div class="bf-lane e-lane" id="lane-e-support" data-lane="e-support"></div>
+                <div class="bf-lane e-lane" id="lane-e-back" data-lane="e-back"></div>
+              </div>
+              <div class="bf-note">Empty lines advance , if a line is empty all combatants behind it move forward.</div>
+            </div>
+            </div><!-- end relative battlefield wrapper -->
+            <div class="add-comb-form" id="place-combatant-panel">
+              <div class="sec" style="margin-top:0;"><span class="so">✦</span> Place Combatant</div>
+              <div class="add-comb-grid">
+                <div><span class="lbl">Name</span><input type="text" id="nc-name" placeholder="Name…"></div>
+                <div><span class="lbl">Side</span><select id="nc-side" style="border-bottom:2px solid var(--heavy);" onchange="syncLaneOpts()"><option value="ally">Ally</option><option value="enemy">Enemy</option></select></div>
+                <div><span class="lbl">Line</span><select id="nc-lane" style="border-bottom:2px solid var(--heavy);"></select></div>
+                <div><span class="lbl">Size</span><select id="nc-size" style="border-bottom:2px solid var(--heavy);"><option value="">Auto (from sheet)</option><option value="normal">Normal</option><option value="large">Large</option></select></div>
+              </div>
+              <div class="add-comb-grid">
+                <div><span class="lbl">Notes</span><input type="text" id="nc-notes" placeholder="role, status…"></div>
+              </div>
+              <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:10px;flex-wrap:nowrap;justify-content:space-between;">
+                <label style="display:flex;align-items:center;gap:5px;font-family:'Crimson Text',serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                  <input type="checkbox" id="nc-isform" style="width:14px;height:14px;cursor:pointer;accent-color:var(--red);"> Formation?
+                </label>
+                <div id="hp-individual" style="flex:1;min-width:140px;display:flex;gap:4px;align-items:flex-end;">
+                  <div style="flex:1;"><span class="lbl">HP Cur</span><input type="number" id="nc-hp" placeholder="20"></div>
+                  <div style="flex-shrink:0;padding-bottom:4px;color:var(--mid);font-weight:700;">/</div>
+                  <div style="flex:1;"><span class="lbl">HP Max</span><input type="number" id="nc-hp-max" placeholder="20"></div>
+                </div>
+                <div id="hp-formation" style="display:none;flex:1;min-width:280px;gap:10px;align-items:flex-end;">
+                  <div style="flex:1;"><span class="lbl">Units</span><input type="number" id="nc-units" placeholder="10"></div>
+                  <div style="flex:1;"><span class="lbl">HP / Unit</span><input type="number" id="nc-uhp" placeholder="5"></div>
+                  <div style="flex:1;"><span class="lbl">Attack Value</span><input type="number" id="nc-atk" placeholder=","></div>
+                </div>
+              </div>
+              <button class="add-btn" style="margin-bottom:0;" onclick="placeCombatant()">+ Place on Battlefield</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="window-resize-handle"></div>
+    </div><!-- /table-window combat -->
+
+    <!-- Fog overlay - covers the whole viewport, not just the Combat window, since it represents the GM obscuring the battlefield entirely -->
+    <div id="fog-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:#050302;align-items:center;justify-content:center;flex-direction:column;gap:14px;pointer-events:none;">
+      <div style="font-family:'UnifrakturMaguntia',cursive;font-size:48px;color:rgba(200,168,90,0.55);text-shadow:0 0 40px rgba(200,120,40,0.4);">Monarchy</div>
+      <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:.35em;text-transform:uppercase;color:rgba(200,168,90,0.65);">⚔ The Battle Approaches ⚔</div>
+      <div style="font-family:'Crimson Text',serif;font-style:italic;font-size:14px;color:rgba(232,223,200,0.4);">The GM has obscured the battlefield…</div>
+    </div>
   </div><!-- /table-surface -->
 
   <div id="table-dock"></div>
@@ -714,7 +714,7 @@
 <script src="js/04-data-skills.js"></script>
 <script src="js/05-skills-backgrounds.js"></script>
 <script src="js/06-equipment-lanes.js"></script>
-<script src="js/07-combat-tracker.js"></script>
+<script src="js/07-combat-window.js"></script>
 <script src="js/08-saves-io.js"></script>
 <!-- Firebase (compat build). Injected dynamically, in parallel with the
      rest of the page, instead of a normal blocking tag pointing straight
@@ -744,9 +744,8 @@
 </script>
 <script src="js/09-session-sync.js"></script>
 <script src="js/10-gm-tools.js"></script>
-<script src="js/11-combat-extras.js"></script>
+<script src="js/11-session-extras.js"></script>
 <script src="js/12-app-utils.js"></script>
-<script src="js/13-turn-and-init.js"></script>
 <script src="js/14-window-manager.js"></script>
 <script src="js/15-app-shell.js"></script>
 </body>

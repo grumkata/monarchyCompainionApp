@@ -567,3 +567,100 @@ function addBg(opts) {
   bgAddGroup(id, 1, groups[0]||{options:[],chosenIdx:-1});
   bgAddGroup(id, 2, groups[1]||{options:[],chosenIdx:-1});
 }
+
+/* ══ DRAG-TO-REORDER , primaries, backgrounds, weapons, power groups ══
+   Moved from 07-combat-tracker.js, where it was physically misplaced —
+   this reorders sheet cards (skill primaries, backgrounds, weapons,
+   ability slots) and has nothing to do with combat. */
+(function(){
+  let _dragEl = null, _dragContainer = null;
+
+  function handleDragStart(e) {
+    _dragEl = this.closest('[data-draggable]');
+    _dragContainer = _dragEl?.parentElement;
+    if (!_dragEl) return;
+    setTimeout(() => _dragEl.classList.add('dragging-card'), 0);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function handleDragEnd() {
+    _dragEl?.classList.remove('dragging-card');
+    if (_dragContainer) [..._dragContainer.querySelectorAll('.drag-over-card')].forEach(el => el.classList.remove('drag-over-card'));
+    _dragEl = null; _dragContainer = null;
+  }
+  function handleDragOver(e) {
+    if (!_dragEl) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  }
+  function handleDragEnter(e) {
+    if (!_dragEl) return;
+    const target = e.currentTarget;
+    if (target === _dragEl || target.parentElement !== _dragContainer) return;
+    if (_dragContainer) [..._dragContainer.querySelectorAll('.drag-over-card')].forEach(el => el.classList.remove('drag-over-card'));
+    target.classList.add('drag-over-card');
+  }
+  function handleDragLeave(e) {
+    // Only remove if leaving to outside the card entirely
+    if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over-card');
+  }
+  function handleDrop(e) {
+    e.preventDefault();
+    const target = e.target.closest('[data-draggable]');
+    if (!target || target === _dragEl || !_dragContainer || target.parentElement !== _dragContainer) return;
+    target.classList.remove('drag-over-card');
+    const allItems = [..._dragContainer.querySelectorAll(':scope > [data-draggable]')];
+    const fromIdx = allItems.indexOf(_dragEl);
+    const toIdx   = allItems.indexOf(target);
+    if (fromIdx < toIdx) target.after(_dragEl); else target.before(_dragEl);
+  }
+
+  // Attach handle to an element and make it draggable
+  function makeCardDraggable(el) {
+    if (el.dataset.draggable) return; // already done
+    el.dataset.draggable = '1';
+    el.setAttribute('draggable', 'true');
+    el.addEventListener('dragstart', handleDragStart);
+    el.addEventListener('dragend', handleDragEnd);
+    el.addEventListener('dragover', handleDragOver);
+    el.addEventListener('dragenter', handleDragEnter);
+    el.addEventListener('dragleave', handleDragLeave);
+    el.addEventListener('drop', handleDrop);
+    // Inject handle — for weapon-cards, place ABOVE the card-top bar; for others, inside the header
+    const weaponTop = el.classList.contains('weapon-card') ? el.querySelector('.weapon-card-top') : null;
+    if (weaponTop) {
+      if (!el.querySelector(':scope > .drag-handle')) {
+        const h = document.createElement('div');
+        h.className = 'drag-handle weapon-drag-handle'; h.textContent = '⠿'; h.title = 'Drag to reorder';
+        h.addEventListener('mousedown', e => { el.setAttribute('draggable','true'); });
+        el.insertBefore(h, weaponTop);
+      }
+    } else {
+      const head = el.querySelector('.bg-head, .abil-head, .skill-prim-head');
+      if (head && !head.querySelector('.drag-handle')) {
+        const h = document.createElement('span');
+        h.className = 'drag-handle'; h.textContent = '⠿'; h.title = 'Drag to reorder';
+        h.addEventListener('mousedown', e => { el.setAttribute('draggable','true'); });
+        head.insertBefore(h, head.firstChild);
+      }
+    }
+  }
+
+  // Observe containers and make new children draggable
+  function observeContainer(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    // Existing children
+    [...container.querySelectorAll(':scope > .bg-card, :scope > .weapon-card, :scope > .abil-slot, :scope > .skill-primary')]
+      .forEach(makeCardDraggable);
+    // Future children
+    new MutationObserver(muts => {
+      muts.forEach(m => m.addedNodes.forEach(n => {
+        if (n.nodeType === 1 && (n.classList.contains('bg-card') || n.classList.contains('weapon-card') || n.classList.contains('abil-slot') || n.classList.contains('skill-primary')))
+          makeCardDraggable(n);
+      }));
+    }).observe(container, { childList: true });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ['bg-container','weapon-list','abil-container','tree-body','tree-mind','tree-social'].forEach(observeContainer);
+  });
+})();
