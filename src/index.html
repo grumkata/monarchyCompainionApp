@@ -4,7 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MONARCHY — Character Record</title>
+
+<!-- TEMPORARY heartbeat — tells us whether JS itself is still running when
+     it breaks, or whether JS is fine and something else (an overlay, a
+     focus issue) is blocking input on top of a perfectly healthy page.
+     Safe to remove once we've narrowed this down. -->
+<script>
+(function() {
+  var n = 0;
+  function tick() {
+    var el = document.getElementById('__heartbeat');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = '__heartbeat';
+      el.style.cssText = 'position:fixed;bottom:6px;right:6px;z-index:2147483647;background:#000;color:#0f0;font:11px monospace;padding:3px 7px;border-radius:3px;opacity:.85;pointer-events:none';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    n++;
+    el.textContent = 'alive: ' + n;
+  }
+  setInterval(tick, 500);
+  tick();
+})();
+</script>
+
 <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Crimson+Text:ital,wght@0,400;0,600;1,400;1,600&family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+
 
 <!-- Load order matters: 04-overrides.css must stay last, it wins over everything else. -->
 <link rel="stylesheet" href="css/01-base.css">
@@ -691,9 +716,32 @@
 <script src="js/06-equipment-lanes.js"></script>
 <script src="js/07-combat-tracker.js"></script>
 <script src="js/08-saves-io.js"></script>
-<!-- Firebase (compat build — plain globals, no bundler needed, matches how every other file here loads) -->
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<!-- Firebase (compat build). Injected dynamically, in parallel with the
+     rest of the page, instead of a normal blocking tag pointing straight
+     at the gstatic CDN: a plain blocking tag like that pauses the HTML
+     parser, and every file after it, until that request resolves. If
+     gstatic.com is ever slow, flaky, or blocked on someone's network, a
+     blocking load here would freeze the ENTIRE app (character sheet
+     included) behind a third-party CDN it doesn't otherwise depend on.
+     This loads the two files in the background and lets 09 through 15
+     (and DOMContentLoaded) proceed immediately either way. -->
+<script>
+(function() {
+  function loadScript(src) {
+    return new Promise(function(resolve) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = function() { resolve(true); };
+      s.onerror = function() { resolve(false); }; // never blocks startup, even on failure
+      document.head.appendChild(s);
+    });
+  }
+  window.__firebaseSdkReady = Promise.all([
+    loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js'),
+    loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js')
+  ]).then(function(results) { return results.every(Boolean); });
+})();
+</script>
 <script src="js/09-session-sync.js"></script>
 <script src="js/10-gm-tools.js"></script>
 <script src="js/11-combat-extras.js"></script>

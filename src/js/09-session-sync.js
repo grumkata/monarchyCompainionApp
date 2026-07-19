@@ -57,14 +57,40 @@ let _lastPollTs = 0;  // "last update received" — kept for updateStatusText()
  *  didn't load (no internet at boot, CDN blocked, etc.) this never
  *  throws — every sync function below checks _db/_bfRef first, so
  *  solo/offline use of the character sheet and tracker still works
- *  fine even with zero connectivity. */
-function _ensureFirebase() {
+ *  fine even with zero connectivity. Awaits the (non-blocking) SDK
+ *  load kicked off in index.html, so this resolves correctly even if
+ *  that request happened to still be in flight — it never blocked
+ *  page startup in the first place, so there's no downside to
+ *  checking on it here right before actually needing it. */
+async function _ensureFirebase() {
   if (_db) return true;
+  if (String(firebaseConfig.apiKey).startsWith('PASTE_YOUR') || String(firebaseConfig.databaseURL).includes('PASTE_YOUR')) {
+    // Never even attempt a connection with placeholder values — Firebase
+    // will otherwise retry a nonexistent project forever in a tight loop,
+    // which is expensive enough to make the whole app feel frozen. Fail
+    // once, clearly, instead.
+    console.error('[monarchy sync] firebaseConfig still has placeholder values — see FIREBASE_SETUP.md, then rebuild.');
+    alert('Live sync isn\'t set up yet — firebaseConfig in 09-session-sync.js still has placeholder values. Follow FIREBASE_SETUP.md, then rebuild.');
+    return false;
+  }
+  if (window.__firebaseSdkReady) await window.__firebaseSdkReady;
   if (typeof firebase === 'undefined') {
     console.error('[monarchy sync] Firebase SDK did not load — check your internet connection.');
     return false;
   }
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  // Electron's renderer exposes a `process` global even with nodeIntegration
+  // off, which is enough to trip Firebase's "is this Node?" detection —
+  // and in a Node-like environment, Realtime Database falls back to a
+  // third-party WebSocket implementation instead of the browser's native
+  // one, which is known to be unstable specifically in Electron (constant
+  // disconnect/reconnect). Forcing long-polling sidesteps that entirely —
+  // plain HTTP requests, no WebSocket involved either way. Plenty fast
+  // enough for a combat tracker that isn't pushing updates more than a
+  // few times a second.
+  if (firebase.database && firebase.database.INTERNAL && firebase.database.INTERNAL.forceLongPolling) {
+    firebase.database.INTERNAL.forceLongPolling();
+  }
   _db = firebase.database();
   return true;
 }
@@ -76,16 +102,46 @@ function _ensureFirebase() {
    actually landed), this only shows "live" once Firebase confirms
    the write, and shows a real error if it didn't.
 ──────────────────────────────────────────────── */
+/** Firebase's Realtime Database throws synchronously if the value passed
+ *  to .set() contains `undefined` anywhere in it — even nested. The old
+ *  transport didn't care, because JSON.stringify() (used to build the
+ *  old POST body) silently drops undefined keys instead of choking on
+ *  them. serializeBattlefield()/serializePlayerVitals() were written
+ *  against that old, forgiving behavior (e.g. "cmds: ... : undefined"
+ *  whenever there's nothing pending — which is the normal, common case,
+ *  including the very first push of a fresh session). Strip them
+ *  recursively right before every write so a completely ordinary state
+ *  (no pending commands, no exhaustion, no ward) never throws. */
+function _stripUndefined(obj) {
+  if (Array.isArray(obj)) return obj.map(_stripUndefined);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    Object.keys(obj).forEach(k => { if (obj[k] !== undefined) out[k] = _stripUndefined(obj[k]); });
+    return out;
+  }
+  return obj;
+}
 function pushBattlefield() {
   if (!_bfRef || _sessionRole !== 'gm') return;
   setPulse('syncing');
-  _bfRef.set(serializeBattlefield())
-    .then(() => { _lastPushTs = Date.now(); setPulse('live'); updateStatusText(); })
-    .catch(err => {
-      setPulse('err');
-      updateStatusText('⚠ push failed — ' + (err && err.message ? err.message : String(err)));
-      console.error('[monarchy sync] battlefield push failed', err);
-    });
+  try {
+    _bfRef.set(_stripUndefined(serializeBattlefield()))
+      .then(() => { _lastPushTs = Date.now(); setPulse('live'); updateStatusText(); })
+      .catch(err => {
+        setPulse('err');
+        updateStatusText('⚠ push failed — ' + (err && err.message ? err.message : String(err)));
+        console.error('[monarchy sync] battlefield push failed', err);
+      });
+  } catch (err) {
+    // A synchronous throw here must never propagate to whoever called
+    // pushBattlefield() — for startSession specifically, an uncaught
+    // throw here would skip every line after it (event listeners,
+    // Firebase listeners, the status ticker), leaving a "session" that
+    // looks like it started but never actually wired itself up.
+    setPulse('err');
+    updateStatusText('⚠ push failed — ' + (err && err.message ? err.message : String(err)));
+    console.error('[monarchy sync] battlefield push failed (sync)', err);
+  }
 }
 
 /** Apply GM→player commands embedded in the battlefield blob.
@@ -157,9 +213,16 @@ function _applyGmCommands(cmds) {
 ──────────────────────────────────────────────── */
 function _playerPushVitals() {
   if (!_playersRef || _sessionRole !== 'player') return;
-  const vitals = serializePlayerVitals();
-  _playersRef.child(vitals.name).set(vitals)
-    .catch(err => console.error('[monarchy sync] vitals push failed', err));
+  try {
+    const vitals = _stripUndefined(serializePlayerVitals());
+    _playersRef.child(vitals.name).set(vitals)
+      .catch(err => console.error('[monarchy sync] vitals push failed', err));
+  } catch (err) {
+    // Same reasoning as pushBattlefield(): must never throw out to the
+    // caller. In startSession's player branch specifically, that would
+    // skip the presence registration and listeners right after it.
+    console.error('[monarchy sync] vitals push failed (sync)', err);
+  }
 }
 /** Debounced push triggered by HP/condition input changes while in player mode. */
 function _scheduleVitalsPush() {
@@ -188,17 +251,23 @@ function onVitalsChange(e) {
    START / LEAVE SESSION
 ──────────────────────────────────────────────── */
 async function startSession(role) {
-  if (!_ensureFirebase()) {
-    alert('Could not reach the sync service — check your internet connection and try again.');
-    return;
-  }
-
+  // Both dialogs happen first, synchronously, as part of the original
+  // click — same as every other confirm()/prompt() in this app. Neither
+  // needs Firebase to be ready first (both only touch local server/name
+  // state), and putting them ahead of the only `await` in this function
+  // means neither one ever fires from inside an async continuation,
+  // several ticks removed from the click that triggered it.
   if (role === 'gm') {
     if (!confirm('Host as GM on server "' + (getServers().find(s => s.id === getActiveServer()) || { name: 'Main Table' }).name + '"?\n\nThis will push your current battlefield to that server.')) return;
   }
   if (role === 'player') {
     getMyPlayerName();
     if (!_playerName) return; // cancelled prompt
+  }
+
+  if (!(await _ensureFirebase())) {
+    alert('Could not reach the sync service — check your internet connection and try again.');
+    return;
   }
 
   const serverName = (getServers().find(s => s.id === getActiveServer()) || { name: getActiveServer() }).name;
