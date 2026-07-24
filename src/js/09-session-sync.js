@@ -246,15 +246,48 @@ function onVitalsChange(e) {
 /* ────────────────────────────────────────────────
    START / LEAVE SESSION
 ──────────────────────────────────────────────── */
+/** In-page replacement for window.confirm() — avoids a documented,
+ *  maintainer-confirmed Electron bug where showing a native alert()/
+ *  confirm()/prompt() dialog can leave text inputs looking focused but
+ *  silently refuse keyboard input afterward, until the whole window
+ *  loses and regains OS-level focus (electron/electron#40212 and
+ *  others). Resolves true/false, same as a real confirm() would. */
+function _showConfirmModal(message, confirmLabel) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1c140f;color:#e9ddc8;border:1px solid #6b5842;border-radius:6px;padding:20px 24px;max-width:420px;box-shadow:0 8px 30px rgba(0,0,0,.6);font:14px/1.5 inherit;';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'white-space:pre-wrap;margin-bottom:16px;';
+    msg.textContent = message;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
+    function mkBtn(label, val, primary) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'padding:6px 16px;border-radius:4px;border:1px solid #6b5842;cursor:pointer;font-size:13px;' + (primary ? 'background:#8a6d3b;color:#fff;' : 'background:#2a221a;color:#e9ddc8;');
+      b.onclick = () => { document.body.removeChild(backdrop); resolve(val); };
+      return b;
+    }
+    row.appendChild(mkBtn('Cancel', false, false));
+    row.appendChild(mkBtn(confirmLabel || 'OK', true, true));
+    box.appendChild(msg);
+    box.appendChild(row);
+    backdrop.appendChild(box);
+    document.body.appendChild(backdrop);
+  });
+}
+
 async function startSession(role) {
-  // Both dialogs happen first, synchronously, as part of the original
-  // click — same as every other confirm()/prompt() in this app. Neither
-  // needs Firebase to be ready first (both only touch local server/name
-  // state), and putting them ahead of the only `await` in this function
-  // means neither one ever fires from inside an async continuation,
-  // several ticks removed from the click that triggered it.
+  // Both dialogs happen first, as part of the original click. Uses
+  // _showConfirmModal() instead of window.confirm() specifically to
+  // avoid the Electron input-lock bug described above — this was the
+  // actual root cause of typing breaking after hosting, not anything
+  // about async timing (that reordering was a reasonable hygiene fix,
+  // just not the real one).
   if (role === 'gm') {
-    if (!confirm('Host as GM on server "' + (getServers().find(s => s.id === getActiveServer()) || { name: 'Main Table' }).name + '"?\n\nThis will push your current battlefield to that server.')) return;
+    if (!(await _showConfirmModal('Host as GM on server "' + (getServers().find(s => s.id === getActiveServer()) || { name: 'Main Table' }).name + '"?\n\nThis will push your current battlefield to that server.', 'Host'))) return;
   }
   if (role === 'player') {
     getMyPlayerName();
