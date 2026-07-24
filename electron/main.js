@@ -27,11 +27,11 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, '..', 'dist', 'monarchy.html'));
 
-  // TEMPORARY — Menu.setApplicationMenu(null) above also removes the
-  // Ctrl+Shift+I accelerator (it lives on the default View menu), so
-  // there's currently no way to open DevTools at all otherwise. Remove
-  // this again once we're done debugging.
-  win.webContents.openDevTools();
+  // Uncomment while debugging a packaged build (also note: no default
+  // menu means no Ctrl+Shift+I either, since that shortcut normally
+  // lives on the View menu — this openDevTools() call is the only way
+  // in until/unless a menu gets added back):
+  // win.webContents.openDevTools();
 }
 
 app.whenReady().then(() => {

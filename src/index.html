@@ -5,30 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MONARCHY — Character Record</title>
 
-<!-- TEMPORARY heartbeat — tells us whether JS itself is still running when
-     it breaks, or whether JS is fine and something else (an overlay, a
-     focus issue) is blocking input on top of a perfectly healthy page.
-     Safe to remove once we've narrowed this down. -->
-<script>
-(function() {
-  var n = 0;
-  function tick() {
-    var el = document.getElementById('__heartbeat');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = '__heartbeat';
-      el.style.cssText = 'position:fixed;bottom:6px;right:6px;z-index:2147483647;background:#000;color:#0f0;font:11px monospace;padding:3px 7px;border-radius:3px;opacity:.85;pointer-events:none';
-      (document.body || document.documentElement).appendChild(el);
-    }
-    n++;
-    el.textContent = 'alive: ' + n;
-  }
-  setInterval(tick, 500);
-  tick();
-})();
-</script>
-
 <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Crimson+Text:ital,wght@0,400;0,600;1,400;1,600&family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+
 
 
 <!-- Load order matters: 04-overrides.css must stay last, it wins over everything else. -->

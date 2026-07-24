@@ -5,30 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MONARCHY — Character Record</title>
 
-<!-- TEMPORARY heartbeat — tells us whether JS itself is still running when
-     it breaks, or whether JS is fine and something else (an overlay, a
-     focus issue) is blocking input on top of a perfectly healthy page.
-     Safe to remove once we've narrowed this down. -->
-<script>
-(function() {
-  var n = 0;
-  function tick() {
-    var el = document.getElementById('__heartbeat');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = '__heartbeat';
-      el.style.cssText = 'position:fixed;bottom:6px;right:6px;z-index:2147483647;background:#000;color:#0f0;font:11px monospace;padding:3px 7px;border-radius:3px;opacity:.85;pointer-events:none';
-      (document.body || document.documentElement).appendChild(el);
-    }
-    n++;
-    el.textContent = 'alive: ' + n;
-  }
-  setInterval(tick, 500);
-  tick();
-})();
-</script>
-
 <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Crimson+Text:ital,wght@0,400;0,600;1,400;1,600&family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+
 
 
 <!-- Load order matters: 04-overrides.css must stay last, it wins over everything else. -->
@@ -6559,6 +6537,64 @@ function _showConfirmModal(message, confirmLabel) {
   });
 }
 
+/** In-page replacement for window.prompt() — same reasoning as
+ *  _showConfirmModal above. Resolves the entered text (trimmed by the
+ *  caller), or null if cancelled, matching prompt()'s own behavior. */
+function _showPromptModal(message, defaultValue) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1c140f;color:#e9ddc8;border:1px solid #6b5842;border-radius:6px;padding:20px 24px;max-width:380px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,.6);font:14px/1.5 inherit;';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'white-space:pre-wrap;margin-bottom:10px;';
+    msg.textContent = message;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultValue || '';
+    input.style.cssText = 'width:100%;box-sizing:border-box;padding:6px 8px;margin-bottom:16px;background:#2a221a;color:#e9ddc8;border:1px solid #6b5842;border-radius:4px;font:inherit;';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
+    function finish(val) { document.body.removeChild(backdrop); resolve(val); }
+    function mkBtn(label, primary, onClick) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'padding:6px 16px;border-radius:4px;border:1px solid #6b5842;cursor:pointer;font-size:13px;' + (primary ? 'background:#8a6d3b;color:#fff;' : 'background:#2a221a;color:#e9ddc8;');
+      b.onclick = onClick;
+      return b;
+    }
+    row.appendChild(mkBtn('Cancel', false, () => finish(null)));
+    row.appendChild(mkBtn('OK', true, () => finish(input.value)));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') finish(input.value); if (e.key === 'Escape') finish(null); });
+    box.appendChild(msg);
+    box.appendChild(input);
+    box.appendChild(row);
+    backdrop.appendChild(box);
+    document.body.appendChild(backdrop);
+    input.focus();
+    input.select();
+  });
+}
+
+/** Populate _playerName once, via the modal above instead of
+ *  window.prompt() — same Electron dialog-input-lock risk as confirm().
+ *  Only ever needed the first time a player joins with no name set yet;
+ *  every other call to getMyPlayerName() elsewhere in the app
+ *  (07-combat-window.js, this file's own vitals/command code) just
+ *  reads the cached value this sets, so nothing else needs to change. */
+async function _ensurePlayerName() {
+  if (_playerName) return _playerName;
+  const sheetName = val('id-name');
+  if (sheetName && sheetName.trim()) { _playerName = sheetName.trim(); return _playerName; }
+  const name = await _showPromptModal('Enter your player name (displayed on the battlefield):');
+  if (name && name.trim()) {
+    _playerName = name.trim();
+    const nameEl = document.getElementById('id-name');
+    if (nameEl && !nameEl.value.trim()) nameEl.value = _playerName;
+  }
+  return _playerName || 'Player';
+}
+
 async function startSession(role) {
   // Both dialogs happen first, as part of the original click. Uses
   // _showConfirmModal() instead of window.confirm() specifically to
@@ -6570,7 +6606,7 @@ async function startSession(role) {
     if (!(await _showConfirmModal('Host as GM on server "' + (getServers().find(s => s.id === getActiveServer()) || { name: 'Main Table' }).name + '"?\n\nThis will push your current battlefield to that server.', 'Host'))) return;
   }
   if (role === 'player') {
-    getMyPlayerName();
+    await _ensurePlayerName();
     if (!_playerName) return; // cancelled prompt
   }
 
