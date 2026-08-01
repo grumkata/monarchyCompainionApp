@@ -87,12 +87,7 @@ function titleConfirmJoin() {
 /* ---- Table left-panel controls ---- */
 
 function tableCreateCharacter() {
-  if (typeof _activeSaveId !== 'undefined' && _activeSaveId) {
-    if (!confirm('Start a new blank character? Any unsaved changes to the current one will be lost.')) return;
-  }
-  restoreSheet({ v: 4 });
-  setActiveSave(null, '');
-  WM.open('sheet');
+  createSheetInstance({ title: 'New Character' });
 }
 
 function tableOpenCharacterModal() {
@@ -114,8 +109,10 @@ function tableOpenCharacterModal() {
 
 function tableOpenCharacterConfirm(id) {
   titleCloseModal('table-open-char-modal');
-  loadCharacter(id); // existing: confirms, restores, sets active save, toasts
-  WM.open('sheet');
+  const already = findSheetInstanceForSave(id);
+  if (already) { WM.open(already.winId); WM.focus(already.winId); return; }
+  const saves = getSaves(); const entry = saves[id];
+  createSheetInstance({ loadId: id, title: entry ? entry.name : 'Character' });
 }
 
 function tableSaveAll() {
@@ -146,7 +143,7 @@ WM.register('sheet', {
   startOpen: false
 });
 
-WM.enableScaling('sheet', { rootSelector: '#sheet-root', naturalWidth: 980 });
+WM.enableScaling('sheet', { rootSelector: '[data-sheet-root]', naturalWidth: 980 });
 
 /* ---- Register Combat as its own table window ----
    Battlefield, turn counter, and personal vitals/ward/exhaustion — the

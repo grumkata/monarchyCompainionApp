@@ -293,6 +293,8 @@ body.dark-mode .exh-bar{background:var(--paper2);border-color:var(--mid);}
 .comb-chip.enemy{background:linear-gradient(160deg,#f5e0e0 0%,#e8c8c8 100%);border:2px solid #8b1a1a;border-bottom:3px solid #6a1010;border-radius:3px 3px 6px 6px;box-shadow:0 2px 4px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.4);}
 .comb-chip.dragging{opacity:.35;transform:rotate(4deg) scale(.92);}
 .chip-banner{font-size:13px;text-align:center;line-height:1;padding:3px 4px 0;}
+.chip-banner img.chip-portrait-img{width:28px;height:28px;object-fit:cover;border-radius:4px;vertical-align:middle;}
+.comb-chip.chip-large .chip-banner img.chip-portrait-img{width:40px;height:40px;}
 .chip-name-row{padding:1px 5px 2px;display:flex;align-items:center;gap:3px;}
 .chip-name{font-family:'Crimson Text',serif;font-size:12px;font-weight:700;line-height:1.2;text-align:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .comb-chip.ally .chip-name{color:#1a3e1a;}
@@ -328,6 +330,7 @@ body.dark-mode .exh-bar{background:var(--paper2);border-color:var(--mid);}
 .chip-expand-overlay.open{display:block;}
 .chip-exp-head{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:2px solid var(--ink);}
 .chip-exp-icon{font-size:16px;flex-shrink:0;}
+.chip-exp-icon img.chip-exp-portrait-img{width:22px;height:22px;object-fit:cover;border-radius:4px;vertical-align:middle;}
 .chip-exp-name{font-family:'Cinzel',serif;font-size:11px;font-weight:700;flex:1;letter-spacing:.05em;}
 .chip-exp-close{background:none;border:1.5px solid var(--mid);color:var(--ink);cursor:pointer;font-family:'Cinzel',serif;font-size:8px;letter-spacing:.08em;padding:2px 8px;opacity:.5;transition:opacity .12s;}
 .chip-exp-close:hover{opacity:1;background:var(--ink);color:var(--paper);}

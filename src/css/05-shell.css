@@ -119,9 +119,16 @@ body.dark-mode{
 /* ---------- TABLE SCENE ---------- */
 #table-scene{
   position:fixed; inset:0; z-index:10; overflow:hidden;
+  /* Real texture is the base layer; the theme gradient multiplies its
+     color over it (so light/dark mode still re-tints the surface via the
+     --table-bg* tokens per Rule 13), and the soft radial highlight sits on
+     top unblended. Placeholder texture until real art lands — see
+     src/assets/images/textures/table-surface.svg (NEEDS ART). */
   background:
     radial-gradient(ellipse at 50% 0%, var(--table-accent-soft) 0%, transparent 60%),
-    linear-gradient(180deg, var(--table-bg1) 0%, var(--table-bg2) 100%);
+    linear-gradient(180deg, var(--table-bg1) 0%, var(--table-bg2) 100%),
+    url(../assets/images/textures/table-surface.svg) center/cover no-repeat;
+  background-blend-mode: normal, multiply, normal;
   transition:background .25s;
 }
 
@@ -189,7 +196,7 @@ body.dark-mode{
 }
 .window-close:hover{ background:var(--red); border-color:var(--red); }
 
-.window-content{ flex:1; overflow:auto; position:relative; background:var(--paper2); }
+.window-content{ flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; position:relative; background:var(--paper2); }
 
 .window-resize-handle{
   position:absolute; right:1px; bottom:1px; width:18px; height:18px; cursor:nwse-resize;

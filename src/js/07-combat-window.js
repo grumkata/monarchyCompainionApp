@@ -90,7 +90,15 @@ function placeCombatant(opts) {
     }
   }
   
-  const icon=side==='ally'?'🛡':'💀';
+  // Real portrait image, not an emoji standing in for one. opts?.portrait
+  // lets a specific combatant carry its own art later; until then this
+  // falls back to a per-side placeholder FILE (see
+  // assets/images/tokens/_default-*.svg) rather than a CSS/emoji fake, so
+  // swapping in real art is a one-file change, not a rewrite here.
+  const defaultPortrait = side==='ally'
+    ? 'assets/images/tokens/_default-ally.svg'
+    : 'assets/images/tokens/_default-enemy.svg';
+  const portraitSrc = (opts && opts.portrait) || defaultPortrait;
   const chip=document.createElement('div');
   chip.className='comb-chip '+(side==='ally'?'ally':'enemy')+(turnUsed?' turn-used':'')+(chipSize==='large'?' chip-large':'')+(isForm?' chip-formation':'');
   chip.id=cid;
@@ -111,7 +119,7 @@ function placeCombatant(opts) {
     ? `<div class="chip-btns"><button class="chip-edit-btn chip-toggle-btn" onclick="toggleChip('${cid}',event)">👁</button></div>`
     : `<div class="chip-btns"><button class="chip-edit-btn chip-toggle-btn" onclick="toggleChip('${cid}',event)">✎</button><button class="chip-turn-btn" data-turnbtn="${cid}" onclick="toggleTurnUsed('${cid}');event.stopPropagation()" title="${turnBtnTxt}">${turnUsed?'↩':'✓'}</button><button class="chip-rm-btn" onclick="removeChip('${cid}',event)">✕</button></div>`;
   const hpBarHtml = !isForm ? `<div class="chip-hp-bar-wrap" id="${cid}-hpbar"><div class="chip-hp-bar-track"><div class="chip-hp-bar-fill" id="${cid}-hpfill" style="width:0%"></div></div><div class="chip-hp-text" id="${cid}-hptxt"></div></div>` : '';
-  chip.innerHTML=`<div class="chip-turn-dot" title="Acted this turn" style="display:${turnUsed?'block':'none'}"></div><div class="chip-banner">${icon}</div><div class="chip-name-row"><span class="chip-name">${esc(name)}</span></div><div class="chip-stats">${statPillsHtml}</div>${hpBarHtml}<div class="chip-cond-bar"></div>${notes?`<div class="chip-note-line">${esc(notes)}</div>`:''}${chipBtns}`;
+  chip.innerHTML=`<div class="chip-turn-dot" title="Acted this turn" style="display:${turnUsed?'block':'none'}"></div><div class="chip-banner"><img class="chip-portrait-img" src="${esc(portraitSrc)}" alt="${esc(name)}"></div><div class="chip-name-row"><span class="chip-name">${esc(name)}</span></div><div class="chip-stats">${statPillsHtml}</div>${hpBarHtml}<div class="chip-cond-bar"></div>${notes?`<div class="chip-note-line">${esc(notes)}</div>`:''}${chipBtns}`;
 
   const condChecks = buildCondChecks(cid, chip._conditions);
   const panel=document.createElement('div'); panel.className='chip-expand-overlay'; panel.id=cid+'-exp';
@@ -120,7 +128,7 @@ function placeCombatant(opts) {
   const inputRO = _sessionRole==='player'?'readonly':'';
   if (isForm) {
     panel.innerHTML=`
-      <div class="chip-exp-head"><span class="chip-exp-icon">${icon}</span><span class="chip-exp-name">${esc(name)}</span><button class="chip-exp-close" onclick="closeAllChipPanels();event.stopPropagation()">✕ close</button></div>
+      <div class="chip-exp-head"><span class="chip-exp-icon"><img class="chip-exp-portrait-img" src="${esc(portraitSrc)}" alt=""></span><span class="chip-exp-name">${esc(name)}</span><button class="chip-exp-close" onclick="closeAllChipPanels();event.stopPropagation()">✕ close</button></div>
       <div class="chip-exp-body">
         <div class="chip-exp-grid">
           <div><span class="lbl">Units</span><input type="number" value="${esc(units)}" oninput="updateChipLabel('${cid}')" ${inputRO}></div>
@@ -137,7 +145,7 @@ function placeCombatant(opts) {
       </div>`;
   } else {
     panel.innerHTML=`
-      <div class="chip-exp-head"><span class="chip-exp-icon">${icon}</span><span class="chip-exp-name">${esc(name)}</span><button class="chip-exp-close" onclick="closeAllChipPanels();event.stopPropagation()">✕ close</button></div>
+      <div class="chip-exp-head"><span class="chip-exp-icon"><img class="chip-exp-portrait-img" src="${esc(portraitSrc)}" alt=""></span><span class="chip-exp-name">${esc(name)}</span><button class="chip-exp-close" onclick="closeAllChipPanels();event.stopPropagation()">✕ close</button></div>
       <div class="chip-exp-body">
         <div class="chip-exp-grid">
           <div><span class="lbl">HP Cur</span><input type="number" value="${esc(hpCur)}" oninput="updateHpLbl('${cid}',this.value+'/'+this.closest('.chip-exp-body').querySelector('.chip-hp-max').value);pushHpToLinkedPlayer('${cid}',this.value+'/'+this.closest('.chip-exp-body').querySelector('.chip-hp-max').value)" onfocus="_lockHpEdit('${cid}')" onblur="_unlockHpEdit('${cid}',this)" placeholder="," class="chip-hp-cur" style="font-size:18px;font-weight:700;"></div>

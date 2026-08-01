@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#3a2a1a"/>
+  <rect x="2" y="2" width="796" height="596" fill="none" stroke="#e0a030" stroke-width="3" stroke-dasharray="10 6"/>
+  <text x="50%" y="46%" fill="#e0a030" font-family="monospace" font-weight="bold" font-size="66.66666666666667"
+    text-anchor="middle" dominant-baseline="middle">NEEDS ART</text>
+  <text x="50%" y="46%" dy="66" fill="#e0a030" font-family="monospace" font-size="42.857142857142854"
+    text-anchor="middle" dominant-baseline="middle">table surface texture (wood/felt/parchment)</text>
+</svg>

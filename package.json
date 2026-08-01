@@ -8,7 +8,7 @@
     "build:html": "node build.js",
     "start": "npm run build:html && electron .",
     "dist": "npm run build:html && electron-builder",
-    "test": "node test/smoke.js"
+    "test": "node test/smoke.js && node test/multi-sheet.test.js"
   },
   "devDependencies": {
     "electron": "^43.1.0",
@@ -23,7 +23,7 @@
     },
     "files": [
       "electron/**/*",
-      "dist/monarchy.html",
+      "dist/**/*",
       "package.json"
     ],
     "win": {

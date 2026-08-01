@@ -71,7 +71,10 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     12-app-utils.js          dark mode, undo system
     14-window-manager.js     generic drag/resize/dock window system — see 3.10
     15-app-shell.js          title screen logic + wiring into session-sync + registers BOTH the
-                             sheet and combat table windows — MUST STAY LAST
+                             sheet and combat table windows
+    16-multi-sheet.js        independent, simultaneously-editable sheet instances — see 3.10's
+                             "Solved 2026-08-01" note. MUST STAY LAST: assumes every function/
+                             registration from 00-15 already exists, same reason 15 used to be last.
 
   (13-turn-and-init.js removed 2026-07-18 — it was a grab-bag touching three
   unrelated systems: turn counter (→ 07), server selector init (→ 10), and
@@ -542,18 +545,43 @@ player-sheet viewer, etc.):
 That's it — drag, resize, focus/z-order, dock button, and position/size
 persistence (`localStorage`, key `monarchy_window_<id>`) all come for free.
 
-**Known limitation, not yet solved**: the sheet's own code (files 00–13)
-reaches its elements by fixed global ids (`attr-for`, `hp-cur`, etc.). That
-means exactly **one** live/interactive sheet can exist at a time — you
-cannot open two independent, fully-interactive copies of the sheet window
-side by side without rewriting those files to be instance-scoped. Viewing
-*other* players' sheets read-only (already fetched as data via
-`openPlayerSheet` in session-sync) doesn't hit this problem, since that's
-rendered from data, not live singleton ids — a read-only viewer window is a
-reasonable future window type that sidesteps this entirely. Full multi-
-instance editing is a bigger, separate project if it's ever needed. This is
-also why "Create Character" / "Open Character" reset/reload content into
-the *same* sheet window rather than spawning a second one.
+**Solved 2026-08-01, without rewriting files 00–13**: the sheet's own code
+still reaches its elements by fixed global ids (`attr-for`, `hp-cur`,
+etc.) — that didn't change, and per 2.2 it deliberately isn't going to.
+What changed is *who currently owns those ids*. `16-multi-sheet.js` gives
+every field inside `#sheet-root` a permanent `data-field` mirror of its id
+(added once, mechanically, to the template). Only one sheet instance
+"claims" the real ids at a time — `claimSheetIds`/`releaseSheetIds` move
+that ownership on focus (`activateSheetInstance`, hooked to
+`mousedown`/`focusin` in the capture phase, before any click/input inside
+the window is handled). Every existing id-based function in 00–08 keeps
+working completely unchanged for whichever instance most recently had a
+user interact with it. Each instance's actual values live in its own DOM
+subtree at all times regardless of which one currently owns the ids —
+nothing is shared or overwritten, just wired live one at a time.
+
+The one real hazard this introduced: autosave debounces for 4s
+(`08-saves-io.js`), so switching instances mid-debounce could otherwise
+save the wrong data into the wrong slot. `flushActiveSheetWrites()` forces
+that write to complete, synchronously, against the *outgoing* instance
+before ids move to the incoming one. Verified end-to-end in
+`test/multi-sheet.test.js`, including that exact race.
+
+`"Create Character"` / `"Open Character"` now call `createSheetInstance()`
+(clones `#sheet-root`'s template into a new WM window rather than
+resetting the existing one); opening a character that's already open in
+some instance focuses it instead of duplicating it
+(`findSheetInstanceForSave`).
+
+**Known gap, not addressed by this**: combat's HP-max mirroring
+(`07-combat-window.js` reading/writing page-1 vitals directly) and
+session-sync's player identity still effectively key off whichever
+instance is currently active, not "the specific character a given combat
+chip represents." Harmless today (nothing exercises multiple *networked*
+characters simultaneously yet) but worth a real design pass — which
+character's HP a chip mirrors, and whether each open sheet gets its own
+session identity or the table has one shared one — before leaning on
+combat + multi-instance together.
 
 ### 3.11 Distribution: Electron packaging
 

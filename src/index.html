@@ -103,14 +103,12 @@
        purpose today — see PROJECT.md 3.10/3.11. -->
   <div id="table-right-panel"></div>
 
-  <div id="table-surface">
-    <div class="table-window" data-window-id="sheet">
-      <div class="window-titlebar">
-        <span>📜 Character Sheet</span>
-        <button class="window-close" title="Close (reopen from the dock)">✕</button>
-      </div>
-      <div class="window-content">
-
+  <!-- Global, singleton chrome for "whichever character sheet is
+       currently active" (see 16-multi-sheet.js). NOT per-window: with
+       multiple sheet instances open, there is still exactly one menu /
+       quicksave bar / save modal, and it always acts on the instance
+       that most recently claimed the shared field ids. -->
+  <div id="sheet-global-chrome">
 <button id="menu-toggle" onclick="openMenu()">☰ Menu</button>
 <button id="darkmode-btn" onclick="toggleDarkMode()" title="Toggle dark mode">🌙 Dark</button>
 <div id="skill-total-tip"></div>
@@ -177,7 +175,17 @@
 <div id="toast"></div>
 <div id="autosave-dot" title="Autosave status"></div>
 
-<div id="sheet-root" style="max-width:980px;margin:0 auto;">
+  </div>
+
+  <div id="table-surface">
+    <div class="table-window" data-window-id="sheet">
+      <div class="window-titlebar">
+        <span>📜 Character Sheet</span>
+        <button class="window-close" title="Close (reopen from the dock)">✕</button>
+      </div>
+      <div class="window-content">
+
+<div id="sheet-root" data-field="sheet-root" data-sheet-root style="max-width:980px;margin:0 auto;">
 <div class="tabs">
   <button class="tab-btn active" onclick="showTab('p1',this)">⚜ I , Character &amp; Skills</button>
   <button class="tab-btn" onclick="showTab('p2',this)">🎒 II , Backgrounds &amp; Abilities</button>
@@ -185,32 +193,32 @@
 </div>
 
 <!-- PAGE 1 -->
-<div class="sheet active" id="p1">
+<div class="sheet active" id="p1" data-field="p1">
 <div class="sheet-inner">
   <div class="splash" style="top:-30px;right:-30px;width:200px;height:200px;"></div>
   <div class="splash" style="bottom:60px;left:-20px;width:150px;height:150px;"></div>
   <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Character Record · Beta</div></div>
   <div class="sec"><span class="so">✦</span> Identity <span class="so">✦</span></div>
   <div class="g3" style="margin-bottom:8px;">
-    <div><span class="lbl">Name</span><input type="text" id="id-name" tabindex="1" placeholder=","></div>
-    <div><span class="lbl">Species</span><input type="text" id="id-species" tabindex="2" placeholder=","></div>
-    <div><span class="lbl">Culture</span><input type="text" id="id-culture" tabindex="3" placeholder=","></div>
+    <div><span class="lbl">Name</span><input type="text" id="id-name" data-field="id-name" tabindex="1" placeholder=","></div>
+    <div><span class="lbl">Species</span><input type="text" id="id-species" data-field="id-species" tabindex="2" placeholder=","></div>
+    <div><span class="lbl">Culture</span><input type="text" id="id-culture" data-field="id-culture" tabindex="3" placeholder=","></div>
   </div>
   <div class="g3" style="margin-bottom:16px;">
-    <div><span class="lbl">Rank / Title</span><input type="text" id="id-rank" tabindex="4" placeholder=","></div>
+    <div><span class="lbl">Rank / Title</span><input type="text" id="id-rank" data-field="id-rank" tabindex="4" placeholder=","></div>
     <div>
       <span class="lbl">Size / Height</span>
       <div style="display:flex;gap:8px;align-items:center;">
-        <select id="id-size-preset" style="flex:0 0 auto;border-bottom:2px solid var(--heavy);padding:1px 3px;" onchange="applySizePreset(this.value)">
+        <select id="id-size-preset" data-field="id-size-preset" style="flex:0 0 auto;border-bottom:2px solid var(--heavy);padding:1px 3px;" onchange="applySizePreset(this.value)">
           <option value="">Custom</option>
           <option value="small">Small</option>
           <option value="medium">Medium</option>
           <option value="large">Large</option>
         </select>
-        <input type="text" id="id-size" tabindex="5" placeholder="e.g. 5'10", 180cm" style="flex:1;" oninput="scheduleAutosave()">
+        <input type="text" id="id-size" data-field="id-size" tabindex="5" placeholder="e.g. 5'10", 180cm" style="flex:1;" oninput="scheduleAutosave()">
       </div>
     </div>
-    <div><span class="lbl">Player</span><input type="text" id="id-player" tabindex="6" placeholder=","></div>
+    <div><span class="lbl">Player</span><input type="text" id="id-player" data-field="id-player" tabindex="6" placeholder=","></div>
   </div>
   <div class="row">
     <div class="col-sm">
@@ -218,23 +226,23 @@
       <!-- ATTRIBUTES: data-attr-order added for Enter-key navigation (FIX 3) -->
       <div class="attr-group">
         <div class="attr-group-title"><span>Physicality</span><span style="opacity:.45;font-size:6px;letter-spacing:.1em;">BODY</span></div>
-        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Fortitude</div><div class="attr-box"><input type="number" id="attr-for" data-attr-order="0" min="1" max="15" value="5" oninput="recalcDerived()"></div><div class="attr-badge">Passive</div></div>
-        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Prowess</div><div class="attr-box"><input type="number" id="attr-pro" data-attr-order="1" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
+        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Fortitude</div><div class="attr-box"><input type="number" id="attr-for" data-field="attr-for" data-attr-order="0" min="1" max="15" value="5" oninput="recalcDerived()"></div><div class="attr-badge">Passive</div></div>
+        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Prowess</div><div class="attr-box"><input type="number" id="attr-pro" data-field="attr-pro" data-attr-order="1" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
       </div>
       <div class="attr-group">
         <div class="attr-group-title"><span>Agility</span><span style="opacity:.45;font-size:6px;letter-spacing:.1em;">BODY</span></div>
-        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Dexterity</div><div class="attr-box"><input type="number" id="attr-dex" data-attr-order="2" min="1" max="15" value="3"></div><div class="attr-badge">Passive</div></div>
-        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Nimble</div><div class="attr-box"><input type="number" id="attr-nim" data-attr-order="3" min="1" max="15" value="3"></div><div class="attr-badge">Active</div></div>
+        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Dexterity</div><div class="attr-box"><input type="number" id="attr-dex" data-field="attr-dex" data-attr-order="2" min="1" max="15" value="3"></div><div class="attr-badge">Passive</div></div>
+        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Nimble</div><div class="attr-box"><input type="number" id="attr-nim" data-field="attr-nim" data-attr-order="3" min="1" max="15" value="3"></div><div class="attr-badge">Active</div></div>
       </div>
       <div class="attr-group">
         <div class="attr-group-title"><span>Mind</span></div>
-        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Willpower</div><div class="attr-box"><input type="number" id="attr-wil" data-attr-order="4" min="1" max="15" value="5" oninput="recalcDerived()"></div><div class="attr-badge">Passive</div></div>
-        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Intelligence</div><div class="attr-box"><input type="number" id="attr-int" data-attr-order="5" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
+        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Willpower</div><div class="attr-box"><input type="number" id="attr-wil" data-field="attr-wil" data-attr-order="4" min="1" max="15" value="5" oninput="recalcDerived()"></div><div class="attr-badge">Passive</div></div>
+        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Intelligence</div><div class="attr-box"><input type="number" id="attr-int" data-field="attr-int" data-attr-order="5" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
       </div>
       <div class="attr-group" style="margin-bottom:14px;">
         <div class="attr-group-title"><span>Social</span></div>
-        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Presence</div><div class="attr-box"><input type="number" id="attr-pre" data-attr-order="6" min="1" max="15" value="5"></div><div class="attr-badge">Passive</div></div>
-        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Charisma</div><div class="attr-box"><input type="number" id="attr-cha" data-attr-order="7" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
+        <div class="attr-row"><div class="attr-ap">P</div><div class="attr-name">Presence</div><div class="attr-box"><input type="number" id="attr-pre" data-field="attr-pre" data-attr-order="6" min="1" max="15" value="5"></div><div class="attr-badge">Passive</div></div>
+        <div class="attr-row"><div class="attr-ap">A</div><div class="attr-name">Charisma</div><div class="attr-box"><input type="number" id="attr-cha" data-field="attr-cha" data-attr-order="7" min="1" max="15" value="5"></div><div class="attr-badge">Active</div></div>
       </div>
       <div class="sec"><span class="so">✦</span> Derived <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">current tracking lives in the Combat window</span></div>
       <div class="deriv-wrap">
@@ -242,30 +250,30 @@
           <div class="deriv-name">Hit Points</div>
           <div class="deriv-formula">FOR × AV</div>
           <div class="deriv-vals">
-            <input type="number" id="hp-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: Fortitude × Armour Value">
+            <input type="number" id="hp-max" data-field="hp-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: Fortitude × Armour Value">
           </div>
         </div>
         <div class="deriv-row">
           <div class="deriv-name">Stamina</div>
           <div class="deriv-formula">(FOR+WIL)÷2+4</div>
           <div class="deriv-vals">
-            <input type="number" id="st-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: (Fortitude+Willpower)/2+4">
+            <input type="number" id="st-max" data-field="st-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: (Fortitude+Willpower)/2+4">
           </div>
         </div>
         <div class="deriv-row">
           <div class="deriv-name">Stress</div>
           <div class="deriv-formula">WIL × 2</div>
           <div class="deriv-vals">
-            <input type="number" id="str-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: Willpower × 2">
+            <input type="number" id="str-max" data-field="str-max" placeholder="0" class="auto-calc" readonly title="Auto-calculated: Willpower × 2">
           </div>
         </div>
       </div>
       <div class="sec"><span class="so">✦</span> Knacks</div>
       <div style="font-family:'Crimson Text',serif;font-style:italic;font-size:9.5px;opacity:.4;margin-bottom:6px;">Name · Level</div>
-      <div id="knacks-list"></div>
+      <div id="knacks-list" data-field="knacks-list"></div>
       <button class="add-btn" onclick="addKnack()">+ Knack</button>
       <div class="sec" style="margin-top:14px;"><span class="so">✦</span> Passive Traits</div>
-      <div class="traits-single"><textarea id="passive-traits" placeholder="Silver Warden , Immunity to disease…&#10;&#10;Species trait , …&#10;&#10;Rank grant , …" style="min-height:80px;border:none;background:rgba(22,16,10,.02);width:100%;outline:none;line-height:1.6;padding:3px;font-size:12.5px;"></textarea></div>
+      <div class="traits-single"><textarea id="passive-traits" data-field="passive-traits" placeholder="Silver Warden , Immunity to disease…&#10;&#10;Species trait , …&#10;&#10;Rank grant , …" style="min-height:80px;border:none;background:rgba(22,16,10,.02);width:100%;outline:none;line-height:1.6;padding:3px;font-size:12.5px;"></textarea></div>
     </div>
     <div class="col" style="position:relative;">
       <div style="position:absolute;left:-10px;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,transparent 5%,var(--mid) 30%,var(--mid) 70%,transparent 95%);pointer-events:none;"></div>
@@ -275,9 +283,9 @@
         <button class="sct-btn" onclick="showSkillCat('mind',this)">Mind</button>
         <button class="sct-btn" onclick="showSkillCat('social',this)">Social</button>
       </div>
-      <div id="sp-body" class="skill-panel active"><div class="skill-panel-inner"><div id="tree-body"></div><button class="add-primary-btn" onclick="addPrimary('body')">+ Add Primary Skill</button><div class="skill-empty" id="empty-body"><div class="skill-empty-icon">⚔</div><div class="skill-empty-text">No Body Skills</div><div class="skill-empty-hint">Click above to add your first primary skill.</div></div></div></div>
-      <div id="sp-mind" class="skill-panel"><div class="skill-panel-inner"><div id="tree-mind"></div><button class="add-primary-btn" onclick="addPrimary('mind')">+ Add Primary Skill</button><div class="skill-empty" id="empty-mind"><div class="skill-empty-icon">✦</div><div class="skill-empty-text">No Mind Skills</div><div class="skill-empty-hint">Click above to add your first primary skill.</div></div></div></div>
-      <div id="sp-social" class="skill-panel"><div class="skill-panel-inner"><div id="tree-social"></div><button class="add-primary-btn" onclick="addPrimary('social')">+ Add Primary Skill</button><div class="skill-empty" id="empty-social"><div class="skill-empty-icon">👑</div><div class="skill-empty-text">No Social Skills</div><div class="skill-empty-hint">Click above to add your first primary skill.</div></div></div></div>
+      <div id="sp-body" data-field="sp-body" class="skill-panel active"><div class="skill-panel-inner"><div id="tree-body" data-field="tree-body"></div><button class="add-primary-btn" onclick="addPrimary('body')">+ Add Primary Skill</button><div class="skill-empty" id="empty-body" data-field="empty-body"><div class="skill-empty-icon">⚔</div><div class="skill-empty-text">No Body Skills</div><div class="skill-empty-hint">Click above to add your first primary skill.</div></div></div></div>
+      <div id="sp-mind" data-field="sp-mind" class="skill-panel"><div class="skill-panel-inner"><div id="tree-mind" data-field="tree-mind"></div><button class="add-primary-btn" onclick="addPrimary('mind')">+ Add Primary Skill</button><div class="skill-empty" id="empty-mind" data-field="empty-mind"><div class="skill-empty-icon">✦</div><div class="skill-empty-text">No Mind Skills</div><div class="skill-empty-hint">Click above to add your first primary skill.</div></div></div></div>
+      <div id="sp-social" data-field="sp-social" class="skill-panel"><div class="skill-panel-inner"><div id="tree-social" data-field="tree-social"></div><button class="add-primary-btn" onclick="addPrimary('social')">+ Add Primary Skill</button><div class="skill-empty" id="empty-social" data-field="empty-social"><div class="skill-empty-icon">👑</div><div class="skill-empty-text">No Social Skills</div><div class="skill-empty-hint">Click above to add your first primary skill.</div></div></div></div>
     </div>
   </div>
 </div>
@@ -285,7 +293,7 @@
 </div>
 
 <!-- PAGE 2 -->
-<div class="sheet" id="p2">
+<div class="sheet" id="p2" data-field="p2">
 <div class="sheet-inner">
   <div class="splash" style="top:-20px;right:-20px;width:180px;height:180px;"></div>
   <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Backgrounds &amp; Abilities</div></div>
@@ -294,41 +302,41 @@
       <div style="position:absolute;right:-10px;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,transparent 5%,var(--mid) 30%,var(--mid) 70%,transparent 95%);pointer-events:none;"></div>
       <div class="sec"><span class="so">✦</span> Backgrounds</div>
       <div style="font-family:'Crimson Text',serif;font-style:italic;font-size:11px;opacity:.4;margin-bottom:10px;">Each instance is its own entity. Unspent BG Points = 6 skill pts each.</div>
-      <div id="bg-container"></div>
+      <div id="bg-container" data-field="bg-container"></div>
       <button class="add-btn" onclick="openPbModal('bg')">+ Add Background</button>
       <div class="div"><hr><span>✦</span><hr></div>
       <div class="sec"><span class="so">✦</span> Weapons</div>
-      <div id="weapon-list"></div>
+      <div id="weapon-list" data-field="weapon-list"></div>
       <button class="add-btn" onclick="addWeapon()">+ Add Weapon</button>
       <div class="sec" style="margin-top:14px;"><span class="so">✦</span> Armour
         <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">select one to equip · unarmoured = AV 1</span>
       </div>
-      <div class="equipped-armour-bar" id="equipped-armour-bar">
+      <div class="equipped-armour-bar" id="equipped-armour-bar" data-field="equipped-armour-bar">
         <div class="equipped-armour-icon">🛡</div>
         <div class="equipped-armour-middle">
           <span class="equipped-armour-lbl">Currently Equipped</span>
-          <span class="equipped-armour-name" id="equipped-armour-name">Unarmoured</span>
+          <span class="equipped-armour-name" id="equipped-armour-name" data-field="equipped-armour-name">Unarmoured</span>
         </div>
         <div class="equipped-av-badge">
           <span class="equipped-av-badge-lbl">AV</span>
-          <span class="equipped-av-badge-val" id="equipped-av">1</span>
+          <span class="equipped-av-badge-val" id="equipped-av" data-field="equipped-av">1</span>
         </div>
       </div>
-      <div class="unarmoured-option selected" id="unarmoured-option" onclick="selectUnarmoured()">
-        <input type="radio" name="equipped-armor" id="unarmoured-radio" checked onchange="selectUnarmoured()">
+      <div class="unarmoured-option selected" id="unarmoured-option" data-field="unarmoured-option" onclick="selectUnarmoured()">
+        <input type="radio" name="equipped-armor" id="unarmoured-radio" data-field="unarmoured-radio" checked onchange="selectUnarmoured()">
         <label for="unarmoured-radio" class="unarmoured-option-label" style="cursor:pointer;">Unarmoured</label>
         <span class="unarmoured-option-av">AV 1</span>
       </div>
-      <div id="armor-list"></div>
+      <div id="armor-list" data-field="armor-list"></div>
       <button class="add-btn" onclick="addArmor()">+ Add Armour</button>
       <div class="sec" style="margin-top:14px;"><span class="so">✦</span> Other Gear</div>
-      <textarea id="other-gear" style="width:100%;min-height:46px;font-size:12px;line-height:1.6;border:1.5px solid var(--mid);background:rgba(22,16,10,.025);padding:6px;outline:none;resize:vertical;" placeholder="Cloak, mask, rope, supplies…"></textarea>
+      <textarea id="other-gear" data-field="other-gear" style="width:100%;min-height:46px;font-size:12px;line-height:1.6;border:1.5px solid var(--mid);background:rgba(22,16,10,.025);padding:6px;outline:none;resize:vertical;" placeholder="Cloak, mask, rope, supplies…"></textarea>
       <div class="sec" style="margin-top:14px;"><span class="so">✦</span> General Notes</div>
-      <textarea id="general-notes" style="width:100%;min-height:64px;font-size:12px;line-height:1.6;border:1.5px solid var(--mid);background:rgba(22,16,10,.025);padding:6px;outline:none;resize:vertical;" placeholder="Alliances, debts, bounties, ongoing threads…"></textarea>
+      <textarea id="general-notes" data-field="general-notes" style="width:100%;min-height:64px;font-size:12px;line-height:1.6;border:1.5px solid var(--mid);background:rgba(22,16,10,.025);padding:6px;outline:none;resize:vertical;" placeholder="Alliances, debts, bounties, ongoing threads…"></textarea>
     </div>
     <div class="col">
       <div class="sec"><span class="so">✦</span> Styles · Lores · Arts <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10.5px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">shared cost ladder</span></div>
-      <div id="abil-container"></div>
+      <div id="abil-container" data-field="abil-container"></div>
       <button class="add-slot-btn" onclick="openPbModal('sla')">+ Add Style / Lore / Art Slot</button>
     </div>
   </div>
@@ -337,20 +345,20 @@
 </div>
 
 <!-- PAGE 3 -->
-<div class="sheet" id="p3">
+<div class="sheet" id="p3" data-field="p3">
 <div class="sheet-inner">
   <div class="splash" style="top:-20px;right:-20px;width:200px;height:200px;background:radial-gradient(circle,rgba(139,26,26,.1) 0%,transparent 70%);"></div>
   <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Multiplayer</div></div>
 
   <!-- SESSION PANEL -->
   <div class="session-wrap">
-    <div class="session-bar" id="session-bar">
-      <div class="session-role-cell none" id="session-role-label">⚔ Live Sync</div>
-      <div class="session-mid" id="session-mid-idle">
+    <div class="session-bar" id="session-bar" data-field="session-bar">
+      <div class="session-role-cell none" id="session-role-label" data-field="session-role-label">⚔ Live Sync</div>
+      <div class="session-mid" id="session-mid-idle" data-field="session-mid-idle">
         <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-family:'Cinzel',serif;font-size:8px;letter-spacing:.15em;text-transform:uppercase;opacity:.5;white-space:nowrap;">Server</span>
-            <select id="session-server-sel" style="font-family:'Crimson Text',serif;font-size:12px;flex:1;border:none;border-bottom:1.5px solid var(--mid);background:transparent;color:var(--ink);outline:none;padding:2px 0;"></select>
+            <select id="session-server-sel" data-field="session-server-sel" style="font-family:'Crimson Text',serif;font-size:12px;flex:1;border:none;border-bottom:1.5px solid var(--mid);background:transparent;color:var(--ink);outline:none;padding:2px 0;"></select>
             <button onclick="openServerManageModal()" style="background:none;border:1px solid var(--mid);color:var(--ink);font-size:9px;font-family:'Cinzel',serif;padding:2px 6px;cursor:pointer;white-space:nowrap;opacity:.6;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">Manage</button>
           </div>
           <div style="display:flex;gap:5px;">
@@ -359,23 +367,23 @@
           </div>
         </div>
       </div>
-      <div class="session-mid" id="session-mid-active" style="display:none;">
-        <div class="session-pulse" id="session-pulse"></div>
-        <span class="session-status" id="session-status-text">,</span>
-        <span id="session-server-name" style="font-family:'Cinzel',serif;font-size:8px;opacity:.5;margin-left:4px;"></span>
+      <div class="session-mid" id="session-mid-active" data-field="session-mid-active" style="display:none;">
+        <div class="session-pulse" id="session-pulse" data-field="session-pulse"></div>
+        <span class="session-status" id="session-status-text" data-field="session-status-text">,</span>
+        <span id="session-server-name" data-field="session-server-name" style="font-family:'Cinzel',serif;font-size:8px;opacity:.5;margin-left:4px;"></span>
         <button class="session-btn leave-btn" style="margin-left:auto;" onclick="leaveSession()">✕ Stop</button>
       </div>
     </div>
   </div>
 
   <!-- SERVER MANAGE MODAL -->
-  <div id="server-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;">
+  <div id="server-modal" data-field="server-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;">
     <div class="gm-modal-box">
       <div class="gm-modal-title">Manage Servers</div>
       <div style="font-family:'Crimson Text',serif;font-style:italic;font-size:11px;opacity:.45;margin-bottom:10px;">Each server is a separate battlefield channel. All players on the same server see the same battlefield.</div>
-      <div id="server-list-ui" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;margin-bottom:10px;"></div>
+      <div id="server-list-ui" data-field="server-list-ui" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;margin-bottom:10px;"></div>
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;">
-        <input type="text" id="new-server-name" placeholder="New server name…" style="flex:1;font-family:'Crimson Text',serif;font-size:13px;border:none;border-bottom:2px solid var(--heavy);background:transparent;outline:none;padding:4px 0;">
+        <input type="text" id="new-server-name" data-field="new-server-name" placeholder="New server name…" style="flex:1;font-family:'Crimson Text',serif;font-size:13px;border:none;border-bottom:2px solid var(--heavy);background:transparent;outline:none;padding:4px 0;">
         <button class="gm-modal-save" onclick="addServer()" style="white-space:nowrap;">+ Add</button>
       </div>
       <div class="gm-modal-btns">
@@ -384,7 +392,7 @@
     </div>
   </div>
   <!-- GM TOOLS PANEL -->
-  <div id="gm-tools-panel" style="display:none;">
+  <div id="gm-tools-panel" data-field="gm-tools-panel" style="display:none;">
     <div class="sec" style="margin-top:6px;"><span class="so">⚔</span> GM Tools</div>
     <div class="gm-tools-wrap">
 
@@ -392,7 +400,7 @@
 
       <!-- CONNECTED PLAYERS -->
       <div class="gm-section-head"><span>👥 Connected Players</span></div>
-      <div id="gm-players-list" style="font-family:'Crimson Text',serif;font-size:13px;opacity:.85;padding:4px 0 6px;">No players connected</div>
+      <div id="gm-players-list" data-field="gm-players-list" style="font-family:'Crimson Text',serif;font-size:13px;opacity:.85;padding:4px 0 6px;">No players connected</div>
 
       <div class="gm-divider"></div>
 
@@ -401,7 +409,7 @@
         <span>Saved NPCs</span>
         <button class="gm-add-btn" onclick="openGmNpcModal()">+ New NPC</button>
       </div>
-      <div class="gm-npc-btns" id="gm-npc-btns">
+      <div class="gm-npc-btns" id="gm-npc-btns" data-field="gm-npc-btns">
         <span class="gm-empty-hint">No saved NPCs , click "New NPC" to create one</span>
       </div>
 
@@ -412,7 +420,7 @@
         <span>Saved Encounters</span>
         <button class="gm-add-btn" onclick="openGmEncounterModal()">+ New Encounter</button>
       </div>
-      <div class="gm-encounter-btns" id="gm-encounter-btns">
+      <div class="gm-encounter-btns" id="gm-encounter-btns" data-field="gm-encounter-btns">
         <span class="gm-empty-hint">No saved encounters , click "New Encounter" to create one</span>
       </div>
 
@@ -423,12 +431,12 @@
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0 6px;">
         <button class="gm-mana-adj" onclick="adjGlobalMana(-5)">−5</button>
         <button class="gm-mana-adj" onclick="adjGlobalMana(-1)">−1</button>
-        <span id="global-mana-val" style="font-family:'Cinzel',serif;font-size:24px;font-weight:900;color:var(--ink);min-width:36px;text-align:center;line-height:1;">0</span>
+        <span id="global-mana-val" data-field="global-mana-val" style="font-family:'Cinzel',serif;font-size:24px;font-weight:900;color:var(--ink);min-width:36px;text-align:center;line-height:1;">0</span>
         <button class="gm-mana-adj" onclick="adjGlobalMana(1)">+1</button>
         <button class="gm-mana-adj" onclick="adjGlobalMana(5)">+5</button>
         <button class="gm-mana-adj gm-mana-reset" onclick="adjGlobalMana(-_globalMana)" title="Reset to 0">↺</button>
         <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:6px;font-family:'Crimson Text',serif;">
-          <input type="checkbox" id="gm-mana-visible" style="cursor:pointer;accent-color:var(--red);" checked>
+          <input type="checkbox" id="gm-mana-visible" data-field="gm-mana-visible" style="cursor:pointer;accent-color:var(--red);" checked>
           Show to players
         </label>
       </div>
@@ -439,43 +447,43 @@
       <div class="gm-section-head"><span>🌫 Battlefield Visibility</span></div>
       <div style="display:flex;align-items:center;gap:10px;padding:4px 0 6px;flex-wrap:wrap;">
         <label style="display:flex;align-items:center;gap:6px;font-family:'Crimson Text',serif;font-size:14px;cursor:pointer;font-weight:600;">
-          <input type="checkbox" id="gm-fog-enabled" style="cursor:pointer;accent-color:var(--red);" onchange="toggleFog(this.checked)">
+          <input type="checkbox" id="gm-fog-enabled" data-field="gm-fog-enabled" style="cursor:pointer;accent-color:var(--red);" onchange="toggleFog(this.checked)">
           Fog of War (hide battlefield from players)
         </label>
       </div>
-      <div id="gm-fog-status" style="display:none;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--red);opacity:1;padding:2px 0;font-weight:700;">⚠ BATTLEFIELD HIDDEN FROM PLAYERS</div>
+      <div id="gm-fog-status" data-field="gm-fog-status" style="display:none;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--red);opacity:1;padding:2px 0;font-weight:700;">⚠ BATTLEFIELD HIDDEN FROM PLAYERS</div>
     </div>
   </div>
 
   <!-- PLAYER SHEET VIEWER MODAL -->
   <!-- PLAYER SHEET MODAL -->
-<div id="player-sheet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto;">
-  <div id="player-sheet-modal-box" style="background:var(--paper);border:3px solid var(--ink);max-width:640px;width:100%;box-shadow:0 12px 60px rgba(0,0,0,.9);">
-    <div id="player-sheet-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:2px solid var(--ink);background:var(--paper2);position:sticky;top:0;z-index:1;">
+<div id="player-sheet-modal" data-field="player-sheet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto;">
+  <div id="player-sheet-modal-box" data-field="player-sheet-modal-box" style="background:var(--paper);border:3px solid var(--ink);max-width:640px;width:100%;box-shadow:0 12px 60px rgba(0,0,0,.9);">
+    <div id="player-sheet-modal-header" data-field="player-sheet-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:2px solid var(--ink);background:var(--paper2);position:sticky;top:0;z-index:1;">
       <span style="font-family:'Cinzel',serif;font-size:9px;font-weight:700;letter-spacing:.25em;text-transform:uppercase;opacity:.6;">⚔ Player Character Sheet</span>
       <button onclick="closePlayerSheet()" style="background:none;border:2px solid var(--ink);color:var(--ink);font-family:'Cinzel',serif;font-size:9px;font-weight:700;letter-spacing:.12em;padding:4px 12px;cursor:pointer;" onmouseover="this.style.background='var(--ink)';this.style.color='var(--paper)'" onmouseout="this.style.background='';this.style.color='var(--ink)'">✕ Close</button>
     </div>
-    <div id="player-sheet-modal-body" style="padding:16px 18px;max-height:80vh;overflow-y:auto;"></div>
+    <div id="player-sheet-modal-body" data-field="player-sheet-modal-body" style="padding:16px 18px;max-height:80vh;overflow-y:auto;"></div>
   </div>
 </div>
 
   <!-- GM NPC MODAL -->
-  <div id="gm-npc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:center;justify-content:center;">
+  <div id="gm-npc-modal" data-field="gm-npc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:center;justify-content:center;">
     <div class="gm-modal-box">
-      <div class="gm-modal-title" id="gm-npc-modal-title">New NPC Template</div>
+      <div class="gm-modal-title" id="gm-npc-modal-title" data-field="gm-npc-modal-title">New NPC Template</div>
       <div class="gm-modal-grid">
-        <div style="grid-column:1/-1;"><span class="lbl">Name</span><input type="text" id="gmnpc-name" placeholder="Guard Captain…"></div>
-        <div><span class="lbl">HP</span><input type="text" id="gmnpc-hp" placeholder="20"></div>
-        <div style="grid-column:2/-1;"><span class="lbl">Notes / Role</span><input type="text" id="gmnpc-notes" placeholder="Sword, shield, intimidating…"></div>
+        <div style="grid-column:1/-1;"><span class="lbl">Name</span><input type="text" id="gmnpc-name" data-field="gmnpc-name" placeholder="Guard Captain…"></div>
+        <div><span class="lbl">HP</span><input type="text" id="gmnpc-hp" data-field="gmnpc-hp" placeholder="20"></div>
+        <div style="grid-column:2/-1;"><span class="lbl">Notes / Role</span><input type="text" id="gmnpc-notes" data-field="gmnpc-notes" placeholder="Sword, shield, intimidating…"></div>
         <div style="grid-column:1/-1;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'Crimson Text',serif;font-size:12px;">
-            <input type="checkbox" id="gmnpc-isform" style="accent-color:var(--red);"> Formation (group of units)?
+            <input type="checkbox" id="gmnpc-isform" data-field="gmnpc-isform" style="accent-color:var(--red);"> Formation (group of units)?
           </label>
         </div>
-        <div id="gmnpc-form-fields" style="display:none;grid-column:1/-1;gap:8px;" class="gm-form-grid">
-          <div><span class="lbl">Units</span><input type="number" id="gmnpc-units" placeholder="10"></div>
-          <div><span class="lbl">HP/Unit</span><input type="number" id="gmnpc-uhp" placeholder="5"></div>
-          <div><span class="lbl">Attack Value</span><input type="number" id="gmnpc-atk" placeholder="4"></div>
+        <div id="gmnpc-form-fields" data-field="gmnpc-form-fields" style="display:none;grid-column:1/-1;gap:8px;" class="gm-form-grid">
+          <div><span class="lbl">Units</span><input type="number" id="gmnpc-units" data-field="gmnpc-units" placeholder="10"></div>
+          <div><span class="lbl">HP/Unit</span><input type="number" id="gmnpc-uhp" data-field="gmnpc-uhp" placeholder="5"></div>
+          <div><span class="lbl">Attack Value</span><input type="number" id="gmnpc-atk" data-field="gmnpc-atk" placeholder="4"></div>
         </div>
       </div>
       <p style="font-family:'Crimson Text',serif;font-style:italic;font-size:11px;opacity:.45;margin:6px 0 12px;">Side and line are chosen when you drag the NPC onto the battlefield.</p>
@@ -487,15 +495,15 @@
   </div>
 
   <!-- GM ENCOUNTER MODAL -->
-  <div id="gm-enc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:center;justify-content:center;">
+  <div id="gm-enc-modal" data-field="gm-enc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:center;justify-content:center;">
     <div class="gm-modal-box" style="max-width:520px;">
-      <div class="gm-modal-title" id="gm-enc-modal-title">New Encounter</div>
+      <div class="gm-modal-title" id="gm-enc-modal-title" data-field="gm-enc-modal-title">New Encounter</div>
       <div style="margin-bottom:10px;">
         <span class="lbl">Encounter Name</span>
-        <input type="text" id="gmenc-name" placeholder="Road Ambush…" style="width:100%;font-family:'Crimson Text',serif;font-size:14px;border:none;border-bottom:2px solid var(--heavy);background:transparent;padding:4px 0;outline:none;">
+        <input type="text" id="gmenc-name" data-field="gmenc-name" placeholder="Road Ambush…" style="width:100%;font-family:'Crimson Text',serif;font-size:14px;border:none;border-bottom:2px solid var(--heavy);background:transparent;padding:4px 0;outline:none;">
       </div>
       <div style="margin-bottom:6px;font-family:'Cinzel',serif;font-size:8px;letter-spacing:.15em;text-transform:uppercase;opacity:.5;">Combatants in this encounter</div>
-      <div id="gmenc-combatants-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;margin-bottom:8px;"></div>
+      <div id="gmenc-combatants-list" data-field="gmenc-combatants-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;margin-bottom:8px;"></div>
       <button class="gm-add-btn" style="width:100%;margin-bottom:10px;" onclick="addGmEncCombatant()">+ Add Combatant</button>
       <div class="gm-modal-btns">
         <button class="gm-modal-cancel" onclick="closeGmEncModal()">Cancel</button>
@@ -726,5 +734,6 @@
 <script src="js/12-app-utils.js"></script>
 <script src="js/14-window-manager.js"></script>
 <script src="js/15-app-shell.js"></script>
+<script src="js/16-multi-sheet.js"></script>
 </body>
 </html>
