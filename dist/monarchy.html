@@ -133,6 +133,20 @@ body{background:#0c0906;font-family:'Crimson Text',serif;color:var(--ink);paddin
 .tab-btn:hover{color:#c8a85a;}
 .tab-btn.active{background:var(--paper);color:var(--ink);border-color:var(--ink);}
 
+/* Embedded player-identity + session panel - replaces the old "Multiplayer"
+   tab. Always visible above Page I/II, not a page you navigate to. */
+#sheet-toolbar-panel{background:var(--paper);border:3px solid var(--ink);max-width:980px;margin:0 auto 10px;box-shadow:inset 0 0 0 7px var(--paper),inset 0 0 0 9px var(--ink),0 10px 50px rgba(0,0,0,.5);padding:10px 16px;}
+.player-identity-bar{display:flex;align-items:center;gap:12px;padding-bottom:10px;margin-bottom:10px;border-bottom:2px solid var(--mid);}
+.player-avatar-wrap{position:relative;flex-shrink:0;}
+.player-avatar-img{width:44px;height:44px;object-fit:cover;border-radius:6px;border:2px solid var(--ink);display:block;}
+.player-avatar-edit{position:absolute;bottom:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--ink);color:var(--paper);border:none;font-size:10px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
+.player-username-input{flex:1;font-family:'Crimson Text',serif;font-size:14px;border:none;border-bottom:2px solid var(--heavy);background:transparent;color:var(--ink);outline:none;padding:4px 2px;}
+.player-username-input::placeholder{opacity:.5;font-style:italic;}
+.gm-tools-toggle{display:none;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--mid);font-family:'Cinzel',serif;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;padding:8px 0 4px;cursor:pointer;margin-top:6px;}
+.gm-tools-toggle:hover{opacity:1;}
+.gm-tools-panel{display:none;}
+.gm-tools-panel.expanded{display:block;}
+
 /* SHEET */
 .sheet{display:none;background:var(--paper);max-width:980px;margin:0 auto;border:3px solid var(--ink);position:relative;box-shadow:inset 0 0 0 7px var(--paper),inset 0 0 0 9px var(--ink),0 10px 50px rgba(0,0,0,.78);}
 .sheet.active{display:block;}
@@ -226,6 +240,38 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;}
 .unarmoured-option-av{font-family:'Cinzel',serif;font-size:10px;font-weight:700;color:var(--gold);opacity:.7;}
 
 .vitals-bar{display:flex;gap:0;border:2px solid var(--heavy);margin-bottom:0;overflow:hidden;align-items:stretch;}
+
+/* ══ COMBAT TRACKER: hardcoded into #table-right-panel (a ~300px column),
+   not the 980px-wide layout the rest of these classes were designed for.
+   Own header instead of borrowed .sheet-header/"Monarchy" branding, and
+   every side-by-side row below reflows to stack instead. ══ */
+#combat-tracker{padding:10px 12px 24px;}
+#combat-tracker .ct-header{
+  font-family:'Cinzel',serif;font-size:11px;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;text-align:center;color:var(--ink);
+  padding:8px 0;margin-bottom:10px;border-bottom:3px solid var(--ink);
+  position:relative;
+}
+#combat-tracker .ct-header::before,#combat-tracker .ct-header::after{content:'\2694';opacity:.35;font-size:11px;margin:0 6px;}
+#combat-tracker .vitals-bar{flex-wrap:wrap;border-width:2px;}
+#combat-tracker .vbar-cell{flex:1 1 50%;border-right:2px solid var(--mid);border-bottom:2px solid var(--mid);}
+#combat-tracker .vbar-cell:nth-child(2n){border-right:none;}
+#combat-tracker .vbar-cell:last-child,#combat-tracker .vbar-cell:nth-last-child(2):nth-child(odd){border-bottom:none;}
+#combat-tracker .combat-readout{flex-direction:column;margin-bottom:10px;}
+#combat-tracker .cro-cell{border-right:none;border-bottom:2px solid var(--mid);}
+#combat-tracker .cro-cell:last-child{border-bottom:none;}
+#combat-tracker .bf-label-row{display:none;} /* labels move inline per-lane below instead */
+#combat-tracker .bf-lanes{display:flex;flex-direction:column;grid-template-columns:none;min-height:0;}
+#combat-tracker .bf-lane{border-right:none;border-bottom:1.5px solid var(--faint);min-height:38px;padding:5px 6px 6px;}
+#combat-tracker .bf-lane:last-child{border-bottom:none;}
+#combat-tracker .bf-lane.center-div{border-bottom:3px solid var(--heavy)!important;}
+#combat-tracker .bf-lane::before{
+  content:attr(data-lane-label);display:block;font-family:'Cinzel',serif;
+  font-size:6.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  opacity:.55;margin-bottom:3px;
+}
+#combat-tracker .bf-lane.a-lane::before{color:#1a4a1a;}
+#combat-tracker .bf-lane.e-lane::before{color:var(--red);}
 .vbar-cell{display:flex;align-items:center;justify-content:center;gap:4px;padding:4px 7px;border-right:2px solid var(--mid);flex-shrink:0;}
 .vbar-cell:last-child{border-right:none;}
 .vbar-cell.vbc-grow{flex:1;}
@@ -1392,7 +1438,7 @@ body::after { display: none !important; }
   0%,100% { box-shadow: inset 0 0 0 7px var(--paper), inset 0 0 0 9px var(--ink), 0 16px 80px rgba(0,0,0,0.85); }
   50%      { box-shadow: inset 0 0 0 7px var(--paper), inset 0 0 0 9px rgba(200,30,10,0.8), 0 16px 80px rgba(0,0,0,0.85), 0 0 80px rgba(220,30,10,0.3); }
 }
-[data-window-id="combat"].hp-crit { animation: page-danger 1s ease-in-out infinite !important; }
+#combat-tracker.hp-crit { animation: page-danger 1s ease-in-out infinite !important; }
 
 /* ═══════════════════════════════════════════════
    QoL: TOOLTIP on skill totals , brighter
@@ -2205,12 +2251,18 @@ body.dark-mode{
 .table-ctrl-btn:hover{ opacity:1; background:rgba(122,92,30,.16); border-color:var(--table-line); }
 .table-ctrl-btn:hover span{ max-width:140px; opacity:1; }
 
-/* ---------- RIGHT PANEL (reserved) ---------- */
+/* ---------- RIGHT PANEL: now the hardcoded home of the Combat Tracker ---------- */
 #table-right-panel{
-  position:fixed; top:0; right:0; bottom:0; width:0; z-index:850;
-  pointer-events:none;
-  /* Intentionally empty today. Future: dice roller, chat. Widen and
-     give it a background/border once something lives here. */
+  position:fixed; top:0; right:0; bottom:0; width:300px; z-index:850;
+  pointer-events:auto; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable;
+  background:var(--paper2); border-left:3px solid var(--ink);
+  box-shadow:-8px 0 24px rgba(0,0,0,.35);
+  transition:transform .2s ease, width 0s .2s;
+}
+#table-right-panel.collapsed{
+  transform:translateX(100%);
+  width:0; pointer-events:none;
+  transition:transform .2s ease, width 0s;
 }
 
 /* ---------- WINDOW CHROME ---------- */
@@ -2403,7 +2455,152 @@ body.dark-mode{
 
   <!-- Reserved for future group-facing panels (dice, chat). Empty on
        purpose today — see PROJECT.md 3.10/3.11. -->
-  <div id="table-right-panel"></div>
+  <div id="table-right-panel">
+<!-- Combat Tracker: no longer a floating WM window you drag/resize/close -
+       hardcoded to live here, permanently. See PROJECT.md 3.6. -->
+  <div id="combat-tracker" data-field="combat-tracker">
+    <div class="ct-header">Combat Tracker</div>
+
+
+            <!-- VITALS BAR (hidden when GM mode) -->
+            <div id="player-vitals-section">
+            <div class="sec" style="margin-top:0;"><span class="so">✦</span> Vitals &amp; Status <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">hover for +/−</span></div>
+            <div class="vitals-bar">
+              <div class="vbar-cell" style="background:rgba(139,26,26,.04);" title="Hit Points = Fortitude × AV">
+                <span class="vbar-lbl">♥ HP</span>
+                <div class="vbar-inputs">
+                  <input type="number" id="c-hp-cur" placeholder="0">
+                  <span class="vbar-sep">/</span>
+                  <input type="number" id="c-hp-max" placeholder="0" class="auto-calc" readonly>
+                </div>
+                <div class="vbar-adj">
+                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-hp-cur',-1)">−</button>
+                  <button class="vbar-adj-btn" onclick="adjVal('c-hp-cur',1)">+</button>
+                </div>
+              </div>
+              <div class="vbar-cell" style="background:rgba(30,80,30,.03);" title="Stamina = (FOR+WIL)÷2+4">
+                <span class="vbar-lbl">⚡ STA</span>
+                <div class="vbar-inputs">
+                  <input type="number" id="c-st-cur" placeholder="0">
+                  <span class="vbar-sep">/</span>
+                  <input type="number" id="c-st-max" placeholder="0" class="auto-calc" readonly>
+                </div>
+                <div class="vbar-adj">
+                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-st-cur',-1)">−</button>
+                  <button class="vbar-adj-btn" onclick="adjVal('c-st-cur',1)">+</button>
+                </div>
+              </div>
+              <div class="vbar-cell" style="background:rgba(60,30,80,.03);" title="Stress = Willpower × 2">
+                <span class="vbar-lbl">🧠 STR</span>
+                <div class="vbar-inputs">
+                  <input type="number" id="c-str-cur" placeholder="0">
+                  <span class="vbar-sep">/</span>
+                  <input type="number" id="c-str-max" placeholder="0" class="auto-calc" readonly>
+                </div>
+                <div class="vbar-adj">
+                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-str-cur',-1)">−</button>
+                  <button class="vbar-adj-btn" onclick="adjVal('c-str-cur',1)">+</button>
+                </div>
+              </div>
+              <div class="vbar-cell" title="Ward , subtracted from damage" style="border-left:2px solid var(--heavy);">
+                <span class="vbar-lbl">WARD</span>
+                <div class="vbar-ward-val"><input type="number" id="ward-val" placeholder="0" min="0"></div>
+                <select id="ward-type" class="vbar-ward-type"><option>Ablative</option><option>Temporary</option><option>Static</option></select>
+              </div>
+            </div>
+            <!-- exhaustion bar sits on its own row below vitals -->
+            <div class="exh-bar">
+              <span class="exh-bar-lbl">EXHAUSTION</span>
+              <div class="exh-pips" id="exh-pips"></div>
+              <span class="exh-note">+1 difficulty per level</span>
+            </div>
+            <!-- GLOBAL MANA PLAYER VIEW -->
+            <div id="global-mana-wrap" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:rgba(80,20,160,0.06);border:1.5px solid rgba(100,40,180,0.22);margin:8px 0;">
+              <span style="font-family:'Cinzel',serif;font-size:8px;letter-spacing:.22em;text-transform:uppercase;opacity:.55;">🔮 Mana Pool</span>
+              <span id="global-mana-player-val" style="font-family:'Cinzel',serif;font-size:24px;font-weight:900;color:var(--ink);">0</span>
+            </div>
+            <!-- COMBAT READOUT: movement speed + dodge tokens -->
+            <div class="combat-readout" id="combat-readout">
+              <div class="cro-cell">
+                <span class="cro-lbl">⚡ Move Speed</span>
+                <span class="cro-val" id="cro-move-val">,</span>
+                <span class="cro-note" id="cro-move-note">,</span>
+              </div>
+              <div class="cro-cell">
+                <span class="cro-lbl">🛡 Dodge Tokens</span>
+                <span class="cro-val" id="cro-dodge-val">,</span>
+                <span class="cro-note" id="cro-dodge-note">,</span>
+              </div>
+            </div>
+            <div class="sec"><span class="so">✦</span> Tokens</div>
+            <div style="display:grid;grid-template-columns:1fr 80px 24px;gap:7px;padding:2px 0 4px;border-bottom:2px solid var(--heavy);margin-bottom:2px;">
+              <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;">Token</span>
+              <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;text-align:center;">Count</span>
+              <span></span>
+            </div>
+            <div id="cond-list"></div>
+            <button class="add-btn" onclick="addCondition('')">+ Add Token</button>
+            </div><!-- end #player-vitals-section -->
+            <div class="div"><hr><span>✦</span><hr></div>
+
+            <div style="position:relative;">
+            <!-- FIX 2: Ally on LEFT, Enemy on RIGHT -->
+            <div class="sec" style="display:flex;align-items:center;"><span style="flex:1;"><span class="so">✦</span> Battlefield <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">drag combatants between lines</span></span><span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin-left:12px;"><button onclick="resetAllTurns()" title="Mark all combatants as not acted" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">↩ All Turns</button><button onclick="clearBattlefield()" title="Remove all combatants" style="background:none;border:1px solid rgba(139,26,26,.4);color:var(--red);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">✕ Clear</button><span style="font-family:'Cinzel',serif;font-size:7px;letter-spacing:.18em;text-transform:uppercase;opacity:.5;">Round</span><button onclick="adjTurn(-1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">−</button><span id="turn-counter" style="font-family:'Cinzel',serif;font-size:16px;font-weight:900;color:var(--ink);min-width:22px;text-align:center;line-height:1;">1</span><button onclick="adjTurn(1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">+</button><button onclick="resetTurn()" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">Reset</button></span></div>
+            <div class="bf-wrap">
+              <div class="bf-header">, Line of Battle ,</div>
+              <div class="bf-label-row">
+                <div class="bf-col-lbl a">Ally<br>Backline</div>
+                <div class="bf-col-lbl a">Ally<br>Support</div>
+                <div class="bf-col-lbl a">Ally<br>Secondary</div>
+                <div class="bf-col-lbl a center-div">Ally<br>Frontline</div>
+                <div class="bf-col-lbl e">Enemy<br>Frontline</div>
+                <div class="bf-col-lbl e">Enemy<br>Secondary</div>
+                <div class="bf-col-lbl e">Enemy<br>Support</div>
+                <div class="bf-col-lbl e">Enemy<br>Backline</div>
+              </div>
+              <div class="bf-lanes" id="bf-lanes">
+                <div class="bf-lane a-lane" id="lane-a-back" data-lane="a-back" data-lane-label="Ally Backline"></div>
+                <div class="bf-lane a-lane" id="lane-a-support" data-lane="a-support" data-lane-label="Ally Support"></div>
+                <div class="bf-lane a-lane" id="lane-a-second" data-lane="a-second" data-lane-label="Ally Secondary"></div>
+                <div class="bf-lane a-lane center-div" id="lane-a-front" data-lane="a-front" data-lane-label="Ally Frontline"></div>
+                <div class="bf-lane e-lane" id="lane-e-front" data-lane="e-front" data-lane-label="Enemy Frontline"></div>
+                <div class="bf-lane e-lane" id="lane-e-second" data-lane="e-second" data-lane-label="Enemy Secondary"></div>
+                <div class="bf-lane e-lane" id="lane-e-support" data-lane="e-support" data-lane-label="Enemy Support"></div>
+                <div class="bf-lane e-lane" id="lane-e-back" data-lane="e-back" data-lane-label="Enemy Backline"></div>
+              </div>
+              <div class="bf-note">Empty lines advance , if a line is empty all combatants behind it move forward.</div>
+            </div>
+            </div><!-- end relative battlefield wrapper -->
+            <div class="add-comb-form" id="place-combatant-panel">
+              <div class="sec" style="margin-top:0;"><span class="so">✦</span> Place Combatant</div>
+              <div class="add-comb-grid">
+                <div><span class="lbl">Name</span><input type="text" id="nc-name" placeholder="Name…"></div>
+                <div><span class="lbl">Side</span><select id="nc-side" style="border-bottom:2px solid var(--heavy);" onchange="syncLaneOpts()"><option value="ally">Ally</option><option value="enemy">Enemy</option></select></div>
+                <div><span class="lbl">Line</span><select id="nc-lane" style="border-bottom:2px solid var(--heavy);"></select></div>
+                <div><span class="lbl">Size</span><select id="nc-size" style="border-bottom:2px solid var(--heavy);"><option value="">Auto (from sheet)</option><option value="normal">Normal</option><option value="large">Large</option></select></div>
+              </div>
+              <div class="add-comb-grid">
+                <div><span class="lbl">Notes</span><input type="text" id="nc-notes" placeholder="role, status…"></div>
+              </div>
+              <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:10px;flex-wrap:nowrap;justify-content:space-between;">
+                <label style="display:flex;align-items:center;gap:5px;font-family:'Crimson Text',serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                  <input type="checkbox" id="nc-isform" style="width:14px;height:14px;cursor:pointer;accent-color:var(--red);"> Formation?
+                </label>
+                <div id="hp-individual" style="flex:1;min-width:140px;display:flex;gap:4px;align-items:flex-end;">
+                  <div style="flex:1;"><span class="lbl">HP Cur</span><input type="number" id="nc-hp" placeholder="20"></div>
+                  <div style="flex-shrink:0;padding-bottom:4px;color:var(--mid);font-weight:700;">/</div>
+                  <div style="flex:1;"><span class="lbl">HP Max</span><input type="number" id="nc-hp-max" placeholder="20"></div>
+                </div>
+                <div id="hp-formation" style="display:none;flex:1;min-width:280px;gap:10px;align-items:flex-end;">
+                  <div style="flex:1;"><span class="lbl">Units</span><input type="number" id="nc-units" placeholder="10"></div>
+                  <div style="flex:1;"><span class="lbl">HP / Unit</span><input type="number" id="nc-uhp" placeholder="5"></div>
+                  <div style="flex:1;"><span class="lbl">Attack Value</span><input type="number" id="nc-atk" placeholder=","></div>
+                </div>
+              </div>
+              <button class="add-btn" style="margin-bottom:0;" onclick="placeCombatant()">+ Place on Battlefield</button>
+            </div>
+  </div>
+</div>
 
   <!-- Global, singleton chrome for "whichever character sheet is
        currently active" (see 16-multi-sheet.js). NOT per-window: with
@@ -2491,7 +2688,6 @@ body.dark-mode{
 <div class="tabs">
   <button class="tab-btn active" onclick="showTab('p1',this)">⚜ I , Character &amp; Skills</button>
   <button class="tab-btn" onclick="showTab('p2',this)">🎒 II , Backgrounds &amp; Abilities</button>
-  <button class="tab-btn" onclick="showTab('p3',this)">⚔ III , Multiplayer</button>
 </div>
 
 <!-- PAGE 1 -->
@@ -2646,13 +2842,28 @@ body.dark-mode{
 <div class="page-foot">Page II of III</div>
 </div>
 
-<!-- PAGE 3 -->
-<div class="sheet" id="p3" data-field="p3">
-<div class="sheet-inner">
-  <div class="splash" style="top:-20px;right:-20px;width:200px;height:200px;background:radial-gradient(circle,rgba(139,26,26,.1) 0%,transparent 70%);"></div>
-  <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Multiplayer</div></div>
+<!-- Embedded player-identity + session panel. Used to be a third "Multiplayer"
+     tab (#p3) you had to navigate to, replacing the character sheet entirely.
+     Now it's always visible alongside whichever of Page I/II is open. -->
+<div id="sheet-toolbar-panel" data-field="sheet-toolbar-panel">
 
-  <!-- SESSION PANEL -->
+  <!-- PLAYER IDENTITY: who's actually sitting at the table, distinct from
+       the character's in-fiction name on Page I. -->
+  <div class="player-identity-bar" id="player-identity-bar" data-field="player-identity-bar">
+    <div class="player-avatar-wrap">
+      <img id="player-avatar-img" data-field="player-avatar-img" class="player-avatar-img"
+           src="assets/images/tokens/_default-ally.svg" alt="Your portrait">
+      <button class="player-avatar-edit" onclick="document.getElementById('player-avatar-input').click()"
+              title="Choose your portrait">✎</button>
+      <input type="file" id="player-avatar-input" data-field="player-avatar-input"
+             accept="image/*" style="display:none" onchange="handleAvatarFileChosen(this)">
+    </div>
+    <input type="text" id="player-username-input" data-field="player-username-input"
+           class="player-username-input" placeholder="Your name (not your character's)"
+           oninput="setMyPlayerName(this.value)">
+  </div>
+
+<!-- SESSION PANEL -->
   <div class="session-wrap">
     <div class="session-bar" id="session-bar" data-field="session-bar">
       <div class="session-role-cell none" id="session-role-label" data-field="session-role-label">⚔ Live Sync</div>
@@ -2678,7 +2889,7 @@ body.dark-mode{
     </div>
   </div>
 
-  <!-- SERVER MANAGE MODAL -->
+<!-- SERVER MANAGE MODAL -->
   <div id="server-modal" data-field="server-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;">
     <div class="gm-modal-box">
       <div class="gm-modal-title">Manage Servers</div>
@@ -2693,8 +2904,11 @@ body.dark-mode{
       </div>
     </div>
   </div>
-  <!-- GM TOOLS PANEL -->
-  <div id="gm-tools-panel" data-field="gm-tools-panel" style="display:none;">
+
+  <button class="gm-tools-toggle" id="gm-tools-toggle" data-field="gm-tools-toggle"
+          onclick="toggleGmToolsPanel()" style="display:none;">▾ GM Tools</button>
+<!-- GM TOOLS PANEL -->
+  <div id="gm-tools-panel" data-field="gm-tools-panel" class="gm-tools-panel">
     <div class="sec" style="margin-top:6px;"><span class="so">⚔</span> GM Tools</div>
     <div class="gm-tools-wrap">
 
@@ -2757,7 +2971,9 @@ body.dark-mode{
     </div>
   </div>
 
-  <!-- PLAYER SHEET VIEWER MODAL -->
+</div>
+
+<!-- PLAYER SHEET VIEWER MODAL -->
   <!-- PLAYER SHEET MODAL -->
 <div id="player-sheet-modal" data-field="player-sheet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto;">
   <div id="player-sheet-modal-box" data-field="player-sheet-modal-box" style="background:var(--paper);border:3px solid var(--ink);max-width:640px;width:100%;box-shadow:0 12px 60px rgba(0,0,0,.9);">
@@ -2769,7 +2985,7 @@ body.dark-mode{
   </div>
 </div>
 
-  <!-- GM NPC MODAL -->
+<!-- GM NPC MODAL -->
   <div id="gm-npc-modal" data-field="gm-npc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:center;justify-content:center;">
     <div class="gm-modal-box">
       <div class="gm-modal-title" id="gm-npc-modal-title" data-field="gm-npc-modal-title">New NPC Template</div>
@@ -2796,7 +3012,7 @@ body.dark-mode{
     </div>
   </div>
 
-  <!-- GM ENCOUNTER MODAL -->
+<!-- GM ENCOUNTER MODAL -->
   <div id="gm-enc-modal" data-field="gm-enc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;align-items:center;justify-content:center;">
     <div class="gm-modal-box" style="max-width:520px;">
       <div class="gm-modal-title" id="gm-enc-modal-title" data-field="gm-enc-modal-title">New Encounter</div>
@@ -2814,169 +3030,13 @@ body.dark-mode{
     </div>
   </div>
 
-</div>
-<div class="page-foot">Page III of III</div>
-</div>
-</div>
-
+</div><!-- /sheet-root -->
 
       </div><!-- /window-content -->
       <div class="window-resize-handle"></div>
     </div><!-- /table-window sheet -->
 
-    <div class="table-window" data-window-id="combat">
-      <div class="window-titlebar">
-        <span class="window-title-icon">⚔️</span>
-        <span class="window-title-text">Combat</span>
-        <button class="window-close" onclick="WM.close('combat')" title="Close">✕</button>
-      </div>
-      <div class="window-content">
-        <div id="combat-root" style="max-width:980px;margin:0 auto;">
-          <div class="sheet-inner">
-            <div class="sheet-header"><div class="game-title">Monarchy</div><div class="sheet-sublabel">Combat</div></div>
-
-            <!-- VITALS BAR (hidden when GM mode) -->
-            <div id="player-vitals-section">
-            <div class="sec" style="margin-top:0;"><span class="so">✦</span> Vitals &amp; Status <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">hover for +/−</span></div>
-            <div class="vitals-bar">
-              <div class="vbar-cell" style="background:rgba(139,26,26,.04);" title="Hit Points = Fortitude × AV">
-                <span class="vbar-lbl">♥ HP</span>
-                <div class="vbar-inputs">
-                  <input type="number" id="c-hp-cur" placeholder="0">
-                  <span class="vbar-sep">/</span>
-                  <input type="number" id="c-hp-max" placeholder="0" class="auto-calc" readonly>
-                </div>
-                <div class="vbar-adj">
-                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-hp-cur',-1)">−</button>
-                  <button class="vbar-adj-btn" onclick="adjVal('c-hp-cur',1)">+</button>
-                </div>
-              </div>
-              <div class="vbar-cell" style="background:rgba(30,80,30,.03);" title="Stamina = (FOR+WIL)÷2+4">
-                <span class="vbar-lbl">⚡ STA</span>
-                <div class="vbar-inputs">
-                  <input type="number" id="c-st-cur" placeholder="0">
-                  <span class="vbar-sep">/</span>
-                  <input type="number" id="c-st-max" placeholder="0" class="auto-calc" readonly>
-                </div>
-                <div class="vbar-adj">
-                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-st-cur',-1)">−</button>
-                  <button class="vbar-adj-btn" onclick="adjVal('c-st-cur',1)">+</button>
-                </div>
-              </div>
-              <div class="vbar-cell" style="background:rgba(60,30,80,.03);" title="Stress = Willpower × 2">
-                <span class="vbar-lbl">🧠 STR</span>
-                <div class="vbar-inputs">
-                  <input type="number" id="c-str-cur" placeholder="0">
-                  <span class="vbar-sep">/</span>
-                  <input type="number" id="c-str-max" placeholder="0" class="auto-calc" readonly>
-                </div>
-                <div class="vbar-adj">
-                  <button class="vbar-adj-btn dmg" onclick="adjVal('c-str-cur',-1)">−</button>
-                  <button class="vbar-adj-btn" onclick="adjVal('c-str-cur',1)">+</button>
-                </div>
-              </div>
-              <div class="vbar-cell" title="Ward , subtracted from damage" style="border-left:2px solid var(--heavy);">
-                <span class="vbar-lbl">WARD</span>
-                <div class="vbar-ward-val"><input type="number" id="ward-val" placeholder="0" min="0"></div>
-                <select id="ward-type" class="vbar-ward-type"><option>Ablative</option><option>Temporary</option><option>Static</option></select>
-              </div>
-            </div>
-            <!-- exhaustion bar sits on its own row below vitals -->
-            <div class="exh-bar">
-              <span class="exh-bar-lbl">EXHAUSTION</span>
-              <div class="exh-pips" id="exh-pips"></div>
-              <span class="exh-note">+1 difficulty per level</span>
-            </div>
-            <!-- GLOBAL MANA PLAYER VIEW -->
-            <div id="global-mana-wrap" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:rgba(80,20,160,0.06);border:1.5px solid rgba(100,40,180,0.22);margin:8px 0;">
-              <span style="font-family:'Cinzel',serif;font-size:8px;letter-spacing:.22em;text-transform:uppercase;opacity:.55;">🔮 Mana Pool</span>
-              <span id="global-mana-player-val" style="font-family:'Cinzel',serif;font-size:24px;font-weight:900;color:var(--ink);">0</span>
-            </div>
-            <!-- COMBAT READOUT: movement speed + dodge tokens -->
-            <div class="combat-readout" id="combat-readout">
-              <div class="cro-cell">
-                <span class="cro-lbl">⚡ Move Speed</span>
-                <span class="cro-val" id="cro-move-val">,</span>
-                <span class="cro-note" id="cro-move-note">,</span>
-              </div>
-              <div class="cro-cell">
-                <span class="cro-lbl">🛡 Dodge Tokens</span>
-                <span class="cro-val" id="cro-dodge-val">,</span>
-                <span class="cro-note" id="cro-dodge-note">,</span>
-              </div>
-            </div>
-            <div class="sec"><span class="so">✦</span> Tokens</div>
-            <div style="display:grid;grid-template-columns:1fr 80px 24px;gap:7px;padding:2px 0 4px;border-bottom:2px solid var(--heavy);margin-bottom:2px;">
-              <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;">Token</span>
-              <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink);opacity:.7;text-align:center;">Count</span>
-              <span></span>
-            </div>
-            <div id="cond-list"></div>
-            <button class="add-btn" onclick="addCondition('')">+ Add Token</button>
-            </div><!-- end #player-vitals-section -->
-            <div class="div"><hr><span>✦</span><hr></div>
-
-            <div style="position:relative;">
-            <!-- FIX 2: Ally on LEFT, Enemy on RIGHT -->
-            <div class="sec" style="display:flex;align-items:center;"><span style="flex:1;"><span class="so">✦</span> Battlefield <span style="font-family:'Crimson Text',serif;font-style:italic;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.42;margin-left:4px;">drag combatants between lines</span></span><span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin-left:12px;"><button onclick="resetAllTurns()" title="Mark all combatants as not acted" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">↩ All Turns</button><button onclick="clearBattlefield()" title="Remove all combatants" style="background:none;border:1px solid rgba(139,26,26,.4);color:var(--red);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">✕ Clear</button><span style="font-family:'Cinzel',serif;font-size:7px;letter-spacing:.18em;text-transform:uppercase;opacity:.5;">Round</span><button onclick="adjTurn(-1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">−</button><span id="turn-counter" style="font-family:'Cinzel',serif;font-size:16px;font-weight:900;color:var(--ink);min-width:22px;text-align:center;line-height:1;">1</span><button onclick="adjTurn(1)" style="background:none;border:1.5px solid var(--heavy);color:var(--ink);font-size:12px;font-weight:900;width:20px;height:20px;cursor:pointer;opacity:.65;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.65'">+</button><button onclick="resetTurn()" style="background:none;border:1px solid var(--mid);color:var(--ink);font-family:'Cinzel',serif;font-size:6px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;cursor:pointer;opacity:.35;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.35'">Reset</button></span></div>
-            <div class="bf-wrap">
-              <div class="bf-header">, Line of Battle ,</div>
-              <div class="bf-label-row">
-                <div class="bf-col-lbl a">Ally<br>Backline</div>
-                <div class="bf-col-lbl a">Ally<br>Support</div>
-                <div class="bf-col-lbl a">Ally<br>Secondary</div>
-                <div class="bf-col-lbl a center-div">Ally<br>Frontline</div>
-                <div class="bf-col-lbl e">Enemy<br>Frontline</div>
-                <div class="bf-col-lbl e">Enemy<br>Secondary</div>
-                <div class="bf-col-lbl e">Enemy<br>Support</div>
-                <div class="bf-col-lbl e">Enemy<br>Backline</div>
-              </div>
-              <div class="bf-lanes" id="bf-lanes">
-                <div class="bf-lane a-lane" id="lane-a-back" data-lane="a-back"></div>
-                <div class="bf-lane a-lane" id="lane-a-support" data-lane="a-support"></div>
-                <div class="bf-lane a-lane" id="lane-a-second" data-lane="a-second"></div>
-                <div class="bf-lane a-lane center-div" id="lane-a-front" data-lane="a-front"></div>
-                <div class="bf-lane e-lane" id="lane-e-front" data-lane="e-front"></div>
-                <div class="bf-lane e-lane" id="lane-e-second" data-lane="e-second"></div>
-                <div class="bf-lane e-lane" id="lane-e-support" data-lane="e-support"></div>
-                <div class="bf-lane e-lane" id="lane-e-back" data-lane="e-back"></div>
-              </div>
-              <div class="bf-note">Empty lines advance , if a line is empty all combatants behind it move forward.</div>
-            </div>
-            </div><!-- end relative battlefield wrapper -->
-            <div class="add-comb-form" id="place-combatant-panel">
-              <div class="sec" style="margin-top:0;"><span class="so">✦</span> Place Combatant</div>
-              <div class="add-comb-grid">
-                <div><span class="lbl">Name</span><input type="text" id="nc-name" placeholder="Name…"></div>
-                <div><span class="lbl">Side</span><select id="nc-side" style="border-bottom:2px solid var(--heavy);" onchange="syncLaneOpts()"><option value="ally">Ally</option><option value="enemy">Enemy</option></select></div>
-                <div><span class="lbl">Line</span><select id="nc-lane" style="border-bottom:2px solid var(--heavy);"></select></div>
-                <div><span class="lbl">Size</span><select id="nc-size" style="border-bottom:2px solid var(--heavy);"><option value="">Auto (from sheet)</option><option value="normal">Normal</option><option value="large">Large</option></select></div>
-              </div>
-              <div class="add-comb-grid">
-                <div><span class="lbl">Notes</span><input type="text" id="nc-notes" placeholder="role, status…"></div>
-              </div>
-              <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:10px;flex-wrap:nowrap;justify-content:space-between;">
-                <label style="display:flex;align-items:center;gap:5px;font-family:'Crimson Text',serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-                  <input type="checkbox" id="nc-isform" style="width:14px;height:14px;cursor:pointer;accent-color:var(--red);"> Formation?
-                </label>
-                <div id="hp-individual" style="flex:1;min-width:140px;display:flex;gap:4px;align-items:flex-end;">
-                  <div style="flex:1;"><span class="lbl">HP Cur</span><input type="number" id="nc-hp" placeholder="20"></div>
-                  <div style="flex-shrink:0;padding-bottom:4px;color:var(--mid);font-weight:700;">/</div>
-                  <div style="flex:1;"><span class="lbl">HP Max</span><input type="number" id="nc-hp-max" placeholder="20"></div>
-                </div>
-                <div id="hp-formation" style="display:none;flex:1;min-width:280px;gap:10px;align-items:flex-end;">
-                  <div style="flex:1;"><span class="lbl">Units</span><input type="number" id="nc-units" placeholder="10"></div>
-                  <div style="flex:1;"><span class="lbl">HP / Unit</span><input type="number" id="nc-uhp" placeholder="5"></div>
-                  <div style="flex:1;"><span class="lbl">Attack Value</span><input type="number" id="nc-atk" placeholder=","></div>
-                </div>
-              </div>
-              <button class="add-btn" style="margin-bottom:0;" onclick="placeCombatant()">+ Place on Battlefield</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="window-resize-handle"></div>
-    </div><!-- /table-window combat -->
+    <!-- /table-window combat -->
 
     <!-- Fog overlay - covers the whole viewport, not just the Combat window, since it represents the GM obscuring the battlefield entirely -->
     <div id="fog-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:#050302;align-items:center;justify-content:center;flex-direction:column;gap:14px;pointer-events:none;">
@@ -3257,7 +3317,7 @@ document.addEventListener('keydown', e => {
 function checkHpDanger() {
   const cur = parseInt(document.getElementById('c-hp-cur')?.value) || 0;
   const max = parseInt(document.getElementById('c-hp-max')?.value) || 0;
-  const combatWin = document.querySelector('[data-window-id="combat"]');
+  const combatWin = document.getElementById('combat-tracker');
   const hpCell = document.querySelector('.vbar-cell');
   if (max > 0 && cur / max <= 0.25 && cur > 0) {
     combatWin && combatWin.classList.add('hp-crit');
@@ -6703,8 +6763,8 @@ function leaveSession() {
   _connectedPlayers = {}; _playerLastSeen = {};
 
   // Reset UI
+  setGmToolsPanelExpanded(false);
   const ids = {
-    'gm-tools-panel':        'none',
     'place-combatant-panel': 'block',
     'global-mana-wrap':      'none',
     'player-vitals-section': 'block',
@@ -6829,6 +6889,7 @@ function serializePlayerVitals() {
 
   return {
     name:       getMyPlayerName(),
+    avatar:     getMyPlayerAvatar() || '',
     hp:         parseInt(val('c-hp-cur'))  || 0,
     hpMax:      parseInt(val('hp-max'))    || 0,
     st:         parseInt(val('c-st-cur'))  || 0,
@@ -7369,30 +7430,17 @@ function setSessionUI(role) {
   const placePanel    = document.getElementById('place-combatant-panel');
   const vitalsSection = document.getElementById('player-vitals-section');
 
-  // Tab visibility
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const p1 = document.getElementById('p1');
-  const p2 = document.getElementById('p2');
-
   if (role === 'gm') {
-    if (gmPanel)       gmPanel.style.display       = 'block';
     if (placePanel)    placePanel.style.display     = 'block';
     if (vitalsSection) vitalsSection.style.display  = 'none';
-    // Hide tabs I and II, jump straight to Multiplayer tab
-    tabBtns.forEach(b => {
-      const target = b.getAttribute('onclick')?.match(/showTab\('(\w+)'/)?.[1];
-      b.style.display = (target === 'p1' || target === 'p2') ? 'none' : '';
-    });
-    showTab('p3', document.querySelector('.tab-btn[onclick*="p3"]'));
+    setGmToolsPanelExpanded(true); // starting a GM session is exactly when you want this open
     renderGmTools();
-    if (typeof WM !== 'undefined') WM.open('combat'); // battlefield/vitals live there now, not in this tab
+    document.getElementById('table-right-panel')?.classList.remove('collapsed'); // battlefield/vitals live there now, not in this tab
   } else {
-    if (gmPanel)       gmPanel.style.display       = 'none';
     if (placePanel)    placePanel.style.display     = 'none';
     if (vitalsSection) vitalsSection.style.display  = 'block';
-    // Restore all tabs
-    tabBtns.forEach(b => b.style.display = '');
-    if (typeof WM !== 'undefined') WM.open('combat'); // player's vitals + the shared battlefield live there now
+    setGmToolsPanelExpanded(false);
+    document.getElementById('table-right-panel')?.classList.remove('collapsed'); // player's vitals + the shared battlefield live there now
   }
   updateStatusText();
 }
@@ -7789,21 +7837,88 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-/* ══ CONNECTED PLAYERS & CHIP LINKING ══ */
+/* ══ CONNECTED PLAYERS & CHIP LINKING ══
+   Player identity is now a real embedded input (player-identity-bar in
+   index.html), not a prompt() popup. It is deliberately a separate concept
+   from the character's in-fiction name on Page I - "Jake" playing "Sir
+   Reginald". Persisted locally so it survives a restart; pushed out to
+   other players the same way the rest of buildPlayerVitalsPayload() is
+   (see 09-session-sync.js). */
 let _playerName = '';
+let _playerAvatar = '';
 let _connectedPlayers = {};
+const DEFAULT_PLAYER_AVATAR = 'assets/images/tokens/_default-ally.svg';
 
 function getMyPlayerName() {
   if (_playerName) return _playerName;
+  const stored = _ls.get('monarchy_player_name');
+  if (stored) { _playerName = stored; return _playerName; }
   const sheetName = val('id-name');
-  if (sheetName && sheetName.trim()) { _playerName = sheetName.trim(); return _playerName; }
-  const name = prompt('Enter your player name (displayed on the battlefield):');
-  if (name && name.trim()) {
-    _playerName = name.trim();
-    const nameEl = document.getElementById('id-name');
-    if (nameEl && !nameEl.value.trim()) nameEl.value = _playerName;
+  if (sheetName && sheetName.trim()) return sheetName.trim(); // fallback only, not persisted as _playerName
+  return 'Player';
+}
+
+function setMyPlayerName(value) {
+  _playerName = (value || '').trim();
+  _ls.set('monarchy_player_name', _playerName);
+  if (typeof scheduleAutosave === 'function') { /* no-op hook point; identity isn't sheet data */ }
+  if (typeof _pushTimer !== 'undefined') { clearTimeout(_pushTimer); _pushTimer = setTimeout(() => { if (typeof pushBattlefield === 'function') pushBattlefield(); }, 400); }
+}
+
+function getMyPlayerAvatar() {
+  if (_playerAvatar) return _playerAvatar;
+  const stored = _ls.get('monarchy_player_avatar');
+  return stored || '';
+}
+
+function handleAvatarFileChosen(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('That\u2019s not an image file'); return; }
+  const reader = new FileReader();
+  reader.onload = function () {
+    _playerAvatar = reader.result; // data: URL - self-contained, no separate asset file needed
+    _ls.set('monarchy_player_avatar', _playerAvatar);
+    const img = document.getElementById('player-avatar-img');
+    if (img) img.src = _playerAvatar;
+    if (typeof _pushTimer !== 'undefined') { clearTimeout(_pushTimer); _pushTimer = setTimeout(() => { if (typeof pushBattlefield === 'function') pushBattlefield(); }, 400); }
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Restore any previously-chosen identity on load - real files/values, no
+   CSS or emoji stand-in, per the same asset-first rule as everything
+   else touching a game-facing visual. */
+document.addEventListener('DOMContentLoaded', function () {
+  const nameEl = document.getElementById('player-username-input');
+  const storedName = _ls.get('monarchy_player_name');
+  if (nameEl && storedName) nameEl.value = storedName;
+  _playerName = storedName || '';
+
+  const img = document.getElementById('player-avatar-img');
+  const storedAvatar = _ls.get('monarchy_player_avatar');
+  if (img) img.src = storedAvatar || DEFAULT_PLAYER_AVATAR;
+  _playerAvatar = storedAvatar || '';
+});
+
+/* ══ GM TOOLS PANEL: expand/collapse ══
+   Used to be reachable only by switching to the "Multiplayer" tab, which
+   hid Page I/II entirely while looking at it. Now it's a section within
+   the always-visible embedded panel, collapsed by default so a player who
+   never GMs doesn't carry that vertical space permanently. */
+function setGmToolsPanelExpanded(expanded) {
+  const panel  = document.getElementById('gm-tools-panel');
+  const toggle = document.getElementById('gm-tools-toggle');
+  if (panel)  panel.classList.toggle('expanded', expanded);
+  if (toggle) {
+    toggle.textContent = (expanded ? '\u25be' : '\u25b8') + ' GM Tools';
+    toggle.style.display = (typeof _sessionRole !== 'undefined' && _sessionRole === 'gm') ? '' : 'none';
   }
-  return _playerName || 'Player';
+}
+
+function toggleGmToolsPanel() {
+  const panel = document.getElementById('gm-tools-panel');
+  setGmToolsPanelExpanded(panel ? !panel.classList.contains('expanded') : true);
 }
 </script>
 <script>
@@ -8341,7 +8456,8 @@ function tableToggleTheme() {
 }
 
 function tableToggleCombat() {
-  WM.toggle('combat');
+  const panel = document.getElementById('table-right-panel');
+  if (panel) panel.classList.toggle('collapsed');
 }
 
 /* ---- Register the character sheet as the first table window ----
@@ -8364,16 +8480,10 @@ WM.enableScaling('sheet', { rootSelector: '[data-sheet-root]', naturalWidth: 980
    rather than session/connection management (that part stayed on the
    sheet, see 10-gm-tools.js). startOpen:false to match the sheet, so
    the table still starts empty. */
-WM.register('combat', {
-  title: 'Combat',
-  icon: '\u2694\uFE0F',
-  defaultRect: { x: 120, y: 70, w: 760, h: 700 },
-  minW: 420,
-  minH: 340,
-  startOpen: false
-});
-
-WM.enableScaling('combat', { rootSelector: '#combat-root', naturalWidth: 980 });
+/* Combat used to register here as a second WM window (see PROJECT.md 3.6
+   and 3.10's superseded note). It's now hardcoded into #table-right-panel
+   directly in index.html - no drag/resize/close, no WM involvement, no
+   enableScaling. Nothing else in this file needed to change. */
 </script>
 <script>
 /* ══ MULTI-SHEET: independent, simultaneously-editable character sheets ══

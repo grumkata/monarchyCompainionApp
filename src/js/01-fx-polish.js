@@ -242,7 +242,7 @@ document.addEventListener('keydown', e => {
 function checkHpDanger() {
   const cur = parseInt(document.getElementById('c-hp-cur')?.value) || 0;
   const max = parseInt(document.getElementById('c-hp-max')?.value) || 0;
-  const combatWin = document.querySelector('[data-window-id="combat"]');
+  const combatWin = document.getElementById('combat-tracker');
   const hpCell = document.querySelector('.vbar-cell');
   if (max > 0 && cur / max <= 0.25 && cur > 0) {
     combatWin && combatWin.classList.add('hp-crit');

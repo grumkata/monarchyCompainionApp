@@ -419,8 +419,8 @@ function leaveSession() {
   _connectedPlayers = {}; _playerLastSeen = {};
 
   // Reset UI
+  setGmToolsPanelExpanded(false);
   const ids = {
-    'gm-tools-panel':        'none',
     'place-combatant-panel': 'block',
     'global-mana-wrap':      'none',
     'player-vitals-section': 'block',
@@ -545,6 +545,7 @@ function serializePlayerVitals() {
 
   return {
     name:       getMyPlayerName(),
+    avatar:     getMyPlayerAvatar() || '',
     hp:         parseInt(val('c-hp-cur'))  || 0,
     hpMax:      parseInt(val('hp-max'))    || 0,
     st:         parseInt(val('c-st-cur'))  || 0,
@@ -1085,30 +1086,17 @@ function setSessionUI(role) {
   const placePanel    = document.getElementById('place-combatant-panel');
   const vitalsSection = document.getElementById('player-vitals-section');
 
-  // Tab visibility
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const p1 = document.getElementById('p1');
-  const p2 = document.getElementById('p2');
-
   if (role === 'gm') {
-    if (gmPanel)       gmPanel.style.display       = 'block';
     if (placePanel)    placePanel.style.display     = 'block';
     if (vitalsSection) vitalsSection.style.display  = 'none';
-    // Hide tabs I and II, jump straight to Multiplayer tab
-    tabBtns.forEach(b => {
-      const target = b.getAttribute('onclick')?.match(/showTab\('(\w+)'/)?.[1];
-      b.style.display = (target === 'p1' || target === 'p2') ? 'none' : '';
-    });
-    showTab('p3', document.querySelector('.tab-btn[onclick*="p3"]'));
+    setGmToolsPanelExpanded(true); // starting a GM session is exactly when you want this open
     renderGmTools();
-    if (typeof WM !== 'undefined') WM.open('combat'); // battlefield/vitals live there now, not in this tab
+    document.getElementById('table-right-panel')?.classList.remove('collapsed'); // battlefield/vitals live there now, not in this tab
   } else {
-    if (gmPanel)       gmPanel.style.display       = 'none';
     if (placePanel)    placePanel.style.display     = 'none';
     if (vitalsSection) vitalsSection.style.display  = 'block';
-    // Restore all tabs
-    tabBtns.forEach(b => b.style.display = '');
-    if (typeof WM !== 'undefined') WM.open('combat'); // player's vitals + the shared battlefield live there now
+    setGmToolsPanelExpanded(false);
+    document.getElementById('table-right-panel')?.classList.remove('collapsed'); // player's vitals + the shared battlefield live there now
   }
   updateStatusText();
 }

@@ -52,7 +52,7 @@ function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   check('WM is defined as a page global (top-level const bindings are usable bare from any script on the page, but — like _ls — are not reflected as window.WM from outside; confirmed working via every other WM-dependent check below)', () => window.eval("typeof WM === 'object' && typeof WM.open === 'function'"));
   check('sheet window registered', () => !!window.document.querySelector('[data-window-id="sheet"]'));
-  check('combat window registered', () => !!window.document.querySelector('[data-window-id="combat"]'));
+  check('combat tracker embedded in the right panel (not a WM window anymore)', () => !!window.document.querySelector('#table-right-panel #combat-tracker'));
   check('tableToggleCombat exists', () => typeof window.tableToggleCombat === 'function');
   check('serializeSheet exists', () => typeof window.serializeSheet === 'function');
   check('restoreSheet exists', () => typeof window.restoreSheet === 'function');
@@ -171,14 +171,15 @@ function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
     return 'ok, old extra fields ignored without error';
   });
 
-  check('WM open/close cycle for combat window', () => {
-    window.eval("WM.open('combat')");
-    const el = window.document.querySelector('[data-window-id="combat"]');
-    const openDisplay = el.style.display;
-    window.eval("WM.close('combat')");
-    const closedDisplay = el.style.display;
-    if (openDisplay === closedDisplay) throw new Error('open/close did not change display style');
-    return { openDisplay, closedDisplay };
+  check('tableToggleCombat collapses/expands the embedded panel (no longer a WM window)', () => {
+    window.eval("document.getElementById('table-right-panel').classList.remove('collapsed')");
+    window.eval("tableToggleCombat()");
+    const collapsedAfterFirst = window.eval("document.getElementById('table-right-panel').classList.contains('collapsed')");
+    window.eval("tableToggleCombat()");
+    const collapsedAfterSecond = window.eval("document.getElementById('table-right-panel').classList.contains('collapsed')");
+    if (!collapsedAfterFirst) throw new Error('first toggle did not collapse the panel');
+    if (collapsedAfterSecond) throw new Error('second toggle did not expand it back');
+    return { collapsedAfterFirst, collapsedAfterSecond };
   });
 
   check('formation checkbox toggles individual/formation HP fields', () => {
@@ -199,23 +200,23 @@ function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
     return 'ok';
   });
 
-  check('checkHpDanger (via native input event) targets the Combat window element', () => {
+  check('checkHpDanger (via native input event) targets the embedded combat tracker', () => {
     const cur = window.document.getElementById('c-hp-cur');
     const max = window.document.getElementById('c-hp-max');
     max.value = 20; max.dispatchEvent(new window.Event('input'));
     cur.value = 1; cur.dispatchEvent(new window.Event('input'));
-    const combatWin = window.document.querySelector('[data-window-id="combat"]');
-    if (!combatWin.classList.contains('hp-crit')) throw new Error('hp-crit class not applied to combat window on low HP');
+    const combatWin = window.document.getElementById('combat-tracker');
+    if (!combatWin.classList.contains('hp-crit')) throw new Error('hp-crit class not applied to combat tracker on low HP');
     cur.value = 20; cur.dispatchEvent(new window.Event('input'));
     if (combatWin.classList.contains('hp-crit')) throw new Error('hp-crit class not cleared when healthy');
     return 'ok';
   });
 
-  check('setSessionUI(gm) auto-opens the Combat window', () => {
-    window.eval("WM.close('combat')");
+  check('setSessionUI(gm) expands the embedded combat panel', () => {
+    window.eval("document.getElementById('table-right-panel').classList.add('collapsed')");
     window.eval("setSessionUI('gm')");
-    const el = window.document.querySelector('[data-window-id="combat"]');
-    if (el.style.display !== 'flex') throw new Error('combat window did not auto-open on GM session start, display=' + el.style.display);
+    const collapsed = window.eval("document.getElementById('table-right-panel').classList.contains('collapsed')");
+    if (collapsed) throw new Error('combat panel was not expanded on GM session start');
     return 'ok';
   });
 

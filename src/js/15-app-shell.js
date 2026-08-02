@@ -128,7 +128,8 @@ function tableToggleTheme() {
 }
 
 function tableToggleCombat() {
-  WM.toggle('combat');
+  const panel = document.getElementById('table-right-panel');
+  if (panel) panel.classList.toggle('collapsed');
 }
 
 /* ---- Register the character sheet as the first table window ----
@@ -151,13 +152,7 @@ WM.enableScaling('sheet', { rootSelector: '[data-sheet-root]', naturalWidth: 980
    rather than session/connection management (that part stayed on the
    sheet, see 10-gm-tools.js). startOpen:false to match the sheet, so
    the table still starts empty. */
-WM.register('combat', {
-  title: 'Combat',
-  icon: '\u2694\uFE0F',
-  defaultRect: { x: 120, y: 70, w: 760, h: 700 },
-  minW: 420,
-  minH: 340,
-  startOpen: false
-});
-
-WM.enableScaling('combat', { rootSelector: '#combat-root', naturalWidth: 980 });
+/* Combat used to register here as a second WM window (see PROJECT.md 3.6
+   and 3.10's superseded note). It's now hardcoded into #table-right-panel
+   directly in index.html - no drag/resize/close, no WM involvement, no
+   enableScaling. Nothing else in this file needed to change. */

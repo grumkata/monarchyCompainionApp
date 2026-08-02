@@ -218,7 +218,19 @@ that feeds directly into the HP max formula. Only one armour can be
 `03-sheet-basics.js`); AV of the equipped armour recalculates derived
 stats immediately.
 
-### 3.6 Combat / Battlefield — standalone table window (split from the sheet 2026-07-18)
+### 3.6 Combat / Battlefield — hardcoded into `#table-right-panel` (2026-08-01)
+
+**Update 2026-08-01**: no longer a WM-managed floating window. It was split
+from the sheet into a standalone `table-window` on 2026-07-18 (history
+below), then on 2026-08-01 pulled out of the WM/drag/resize/close system
+entirely and hardcoded as a permanent ~300px column at `#table-right-panel`
+(`tableToggleCombat()` now collapses/expands that panel via a CSS class,
+not `WM.toggle`). The 8-lane formation (`.bf-lanes`) is unchanged in the
+DOM/JS — `07-combat-window.js` still addresses lanes by `.bf-lane`/
+`data-lane`, never by grid position — only the CSS reflows it to a vertical
+stack (`data-lane-label` on each lane drives an inline label, replacing the
+old `.bf-label-row`). Own compact header now, not borrowed
+`.sheet-header`/"Monarchy" branding.
 
 Lives in `js/07-combat-window.js` (still ⚠ the system flagged for a full
 mechanics/UI rewrite when someone gets to it — this pass only moved and
@@ -279,7 +291,17 @@ the sheet as its own tab (now labeled "Multiplayer") — see 3.7.
   character is loaded on the sheet no longer resets or reloads the
   battlefield; the two are independent saves now.
 
-### 3.7 Live session sync (GM ↔ Player) & the sheet's Multiplayer tab
+### 3.7 Live session sync (GM ↔ Player) & the embedded player/session panel
+
+**Update 2026-08-01**: the "Multiplayer" tab (`#p3`) described below is
+gone. Its content — session bar, server modal, GM tools — is now
+`#sheet-toolbar-panel`, always visible above Page I/II instead of a third
+page that hid them. GM tools specifically collapse/expand
+(`toggleGmToolsPanel()`) rather than being permanently shown. A real player-
+identity section (username input + avatar file picker, `11-session-
+extras.js`) now sits above the session bar — separate from the character's
+own name on Page I, persisted locally, pushed out in the same payload as
+vitals. `getMyPlayerName()` no longer falls back to a `prompt()` popup.
 
 Lives in `js/09-session-sync.js` (largest single file, ~1,000 lines) plus
 `10-gm-tools.js` for GM-side management UI and `11-session-extras.js` for

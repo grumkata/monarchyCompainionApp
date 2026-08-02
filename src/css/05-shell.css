@@ -160,12 +160,18 @@ body.dark-mode{
 .table-ctrl-btn:hover{ opacity:1; background:rgba(122,92,30,.16); border-color:var(--table-line); }
 .table-ctrl-btn:hover span{ max-width:140px; opacity:1; }
 
-/* ---------- RIGHT PANEL (reserved) ---------- */
+/* ---------- RIGHT PANEL: now the hardcoded home of the Combat Tracker ---------- */
 #table-right-panel{
-  position:fixed; top:0; right:0; bottom:0; width:0; z-index:850;
-  pointer-events:none;
-  /* Intentionally empty today. Future: dice roller, chat. Widen and
-     give it a background/border once something lives here. */
+  position:fixed; top:0; right:0; bottom:0; width:300px; z-index:850;
+  pointer-events:auto; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable;
+  background:var(--paper2); border-left:3px solid var(--ink);
+  box-shadow:-8px 0 24px rgba(0,0,0,.35);
+  transition:transform .2s ease, width 0s .2s;
+}
+#table-right-panel.collapsed{
+  transform:translateX(100%);
+  width:0; pointer-events:none;
+  transition:transform .2s ease, width 0s;
 }
 
 /* ---------- WINDOW CHROME ---------- */
