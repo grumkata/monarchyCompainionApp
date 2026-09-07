@@ -16,7 +16,7 @@ function createWindow() {
     height: 820,
     minWidth: 720,
     minHeight: 480,
-    backgroundColor: '#c2ac7a', // matches the light table background — avoids a white flash on load
+    backgroundColor: '#0a0705', // the dark room the hall and the table both sit in — avoids a pale flash on load
     autoHideMenuBar: true,      // extra safety net on platforms where a menu bar can reappear
     webPreferences: {
       nodeIntegration: false,   // the app is plain browser JS/HTML/CSS — no Node API surface needed

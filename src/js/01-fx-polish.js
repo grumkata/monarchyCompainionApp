@@ -257,9 +257,12 @@ function checkHpDanger() {
 ['c-hp-cur','c-hp-max'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', checkHpDanger);
 });
-// Also hook into adjVal, since button clicks don't fire a native 'input' event
-const _av = window.adjVal;
-if (_av) window.adjVal = function() { const r = _av.apply(this, arguments); setTimeout(checkHpDanger, 50); return r; };
+// NOTE: there used to be a monkey-patch of window.adjVal here, meant to
+// catch the +/- button clicks that never fire a native 'input' event. It
+// was inert from the day it was written: this file loads before adjVal is
+// defined (07-combat-window.js), so the guard was always false. Deleted
+// rather than left as a decoy. The real fix, when someone wants it, is a
+// checkHpDanger() call at the end of adjVal() itself.
 checkHpDanger();
 
 /* ══ QoL: NUMBER INPUT , click to select all ══ */
@@ -350,12 +353,11 @@ function reflowAbilHeads() {
 // Run after DOM and after dynamic additions
 setTimeout(() => { moveWardToExhBar(); reflowAbilHeads(); }, 200);
 
-// Also patch addAbilSlot to reflow new slots
-const _aas = window.addAbilSlot;
-if (_aas) window.addAbilSlot = function() {
-  const r = _aas.apply(this, arguments);
-  setTimeout(reflowAbilHeads, 50);
-  return r;
-};
+// NOTE: a monkey-patch of window.addAbilSlot used to sit here, to reflow
+// ability headers on newly added slots. Same story as the adjVal one
+// above — this file loads before addAbilSlot is defined
+// (05-skills-backgrounds.js), so it never applied. The real fix, if the
+// reflow is ever actually wanted for new slots, is to call
+// reflowAbilHeads() from addAbilSlot() itself.
 
 })();

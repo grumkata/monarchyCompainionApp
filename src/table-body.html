@@ -1,0 +1,76 @@
+<!-- proto's own table, unchanged: the slab with its four extruded edges,
+     the dice tray, the chat dock (which is also where dice.js builds the
+     roller — removing it removed the dice), and the combat sheet as a .prop
+     with a .wtitle grip.
+
+     The sheet starts hidden. It is put on the wood when a combat scene is
+     made from the toolbox, which is the only difference from table-gm.html —
+     there the fight was always already happening. -->
+<!-- THE TABLE IS A REAL ROUND TABLE NOW. Table_Round_A out of the WoodStuff
+     pack (CC0, loafbrr), drawn by 27-table-gl.js into a canvas that sits
+     UNDER the props. The .slab below is no longer what you see — it is the
+     PLANE: the coordinate space every piece is positioned in, the surface
+     shadows fall on, and the thing you grab to pan. It is round and almost
+     transparent, and the wood you can see through it is the model.
+
+     Square coordinate space (2600 x 2600) with the table inscribed in it, so
+     "the middle" is the middle and a circle has an obvious centre. -->
+<div id="vp">
+  <!-- THREE LAYERS, IN DEPTH ORDER, and they have to be three.
+       The room and the floor are BELOW the table; the table is a real model
+       drawn into a canvas; the pieces are DOM on top of it. The floor used to
+       live in #tbl with everything else, which was fine while the table was a
+       CSS slab in the same stack — put a canvas between them and the floor
+       paints straight over the table. #tblu carries the same transform as
+       #tbl so the floor still parallaxes with the wood. -->
+  <div id="tblu">
+    <div class="floorboards" style="left:-2700px;top:-1300px;width:8000px;height:5200px"></div>
+    <div class="floor" style="left:60px;top:200px;width:2480px;height:2480px"></div>
+  </div>
+  <canvas id="tglu"></canvas>
+  <div id="tbl">
+  <div class="slab round" style="width:2600px;height:2600px"></div>
+  <!-- the two ends of the horizontal diameter: the GL layer measures these to
+       put the model exactly where the plane is, at exactly its size -->
+  <div class="tmark" id="tm-l" data-x="0" data-y="1300" data-z="0"></div>
+  <div class="tmark" id="tm-r" data-x="2600" data-y="1300" data-z="0"></div>
+
+  <!-- WHERE DICE LAND, AND NOTHING MORE. grumkata: "the dice tray is
+       unneccary" — and it was: a slab of felt furniture bolted to the wood
+       that you could not move, could not put anything in, and that ate the
+       one clear quarter of a round table. Dice roll on the table at a real
+       table. The element stays because 34-gl-pieces.js spawns dice relative
+       to its rect, which is what keeps them where they landed while you pan
+       and zoom; it draws nothing at all now. -->
+  <div class="dicetray" style="left:1880px;top:1400px;width:420px;height:290px"></div>
+
+  <div class="prop" id="combat-prop" data-x="150" data-y="150" data-r="-0.5" data-z="8"
+       style="--pt:11px;display:none">
+    <div class="face cwin">
+      <div class="wtitle grip"><span><span id="combat-name">Combat</span></span></div>
+      <div class="topbar">
+        <div class="tb"><span class="tb-l">Round</span><span class="round" id="round">03</span></div>
+        <div class="phases"><div class="ph now">Players</div><div class="ph">Allies</div><div class="ph">Enemies</div></div>
+        <div class="tb" style="min-width:128px"><span class="tb-l">Battlefield</span><span style="font-family:var(--f-disp);font-size:11px;letter-spacing:.09em">6 wide</span></div>
+        <div class="tb" style="min-width:112px"><span class="tb-l">Mana in the air</span><span class="mana-n" id="mana">14</span></div>
+        <div class="mana"><span class="warn">4 casters drawing &mdash; the pool runs thin for everyone</span></div>
+        <button class="endturn" id="endturn"><span class="et">End Turn<small>SPACE</small></span></button>
+      </div>
+      <div class="field" id="field"></div>
+      <div id="sugbar"></div>
+      <div id="selbar-home"><div class="selbar none" id="selbar"></div></div>
+      <span class="side f"></span><span class="side r"></span><span class="side l"></span><span class="side b"></span>
+    </div>
+  </div>
+
+
+</div></div>
+
+<div class="hud tl">The Table<em>drag the wood to pan &middot; wheel to zoom &middot; drag a title bar to move that piece of the table</em></div>
+<div class="hud br"><span class="zl" id="zl">100%</span><button id="theme">Theme</button><button id="fit">Fit table</button></div>
+<aside class="chatdock">
+  <div class="plaque">Chat</div>
+  <div class="cb" id="chat-body"></div>
+  <div class="cin"><input id="chat-in" placeholder="Say something&hellip;"><button id="chat-go">Send</button></div>
+</aside>
+<div class="toast" id="toast"></div>

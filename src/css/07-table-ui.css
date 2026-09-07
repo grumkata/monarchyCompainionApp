@@ -1,0 +1,450 @@
+/* ══════════════════════════════════════════════════════════════
+   07-table-ui.css — WHAT SITS OVER THE TABLE.
+
+   The table itself is 06-table3d.css — proto's slab, in perspective.
+   This is the furniture and the menus on top of it: the box, the bin,
+   the drawer they open into, the make-a-scene modal, the options
+   panel, and the faces of the props standing on the wood.
+
+   Split from the table on purpose. The table is ported art and
+   should stay recognisably proto's; this layer is this app's.
+══════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════
+   THE FACE OF A PROP
+   Dark, lit from above, reading as a lacquered card lying on oak —
+   NOT as paper. The papery treatment belongs to the character sheet,
+   which is a thing you hold, not a thing on the table.
+══════════════════════════════════════════════════════════════ */
+.t3-face{
+  background:linear-gradient(176deg,#2a1f14 0%,#1b130c 100%);
+  border:1px solid #4a3418;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.16), inset 0 0 40px rgba(0,0,0,.5);
+  color:#e8dfc8;
+}
+.prop.live .t3-face{ border-color:#c9743e; box-shadow:inset 0 1px 0 rgba(255,224,172,.2),
+  inset 0 0 40px rgba(0,0,0,.5), 0 0 0 1px rgba(201,116,62,.4); }
+.t3-title{
+  display:flex; align-items:center; gap:8px; padding:8px 11px;
+  background:linear-gradient(180deg,#553d1d,#33240f);
+  border-bottom:1px solid #241708;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.22);
+}
+.t3-title b{
+  flex:1; min-width:0; font-family:'Cinzel',serif; font-size:11px; font-weight:600;
+  letter-spacing:.09em; color:#f4e8cc;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.t3-m{ font-size:12px; opacity:.75; flex:0 0 auto; color:#e8c98a }
+.t3-live{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase; font-style:normal;
+  color:#ffb9a4; border:1px solid rgba(255,140,110,.45); padding:2px 6px;
+}
+.t3-run{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; cursor:pointer;
+  color:rgba(244,232,204,.8); background:transparent;
+  border:1px solid rgba(244,232,204,.32); padding:3px 8px; transition:.13s;
+}
+.t3-run:hover{ color:#fff6e2; border-color:#d8b268 }
+.t3-body{ display:flex; flex-wrap:wrap; gap:5px; padding:10px 11px 8px }
+.t3-chip{
+  font-family:'Cinzel',serif; font-size:11px; font-weight:700; color:#f0e3c4;
+  border:1px solid rgba(232,201,138,.24); background:rgba(0,0,0,.28);
+  padding:3px 8px; display:flex; align-items:baseline; gap:5px;
+}
+.t3-chip i{
+  font-family:'Cinzel',serif; font-style:normal; font-size:7px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; color:rgba(232,201,138,.55);
+}
+.t3-chip.fixed{ opacity:.6; border-style:dashed }
+.t3-foot, .t3-piece{
+  padding:4px 11px 9px; font-family:'Crimson Text',serif; font-style:italic;
+  font-size:11.5px; color:rgba(232,223,200,.42);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE BOX
+══════════════════════════════════════════════════════════════ */
+/* The chest and the bin are props on the wood — 22-table3d.js positions
+   them by data-x/data-y like anything else on the table. The face is
+   invisible: 27-table-gl.js draws the real model over its rect. */
+.tb-box .tb-anchor-face{ background:transparent; cursor:grab; }
+.tb-box{ box-shadow:none; }
+.tb-chest-lbl, .tb-bin-lbl{
+  position:absolute; left:50%; transform:translateX(-50%); top:100%; margin-top:6px;
+  font-family:'Cinzel',serif; font-size:8px; font-weight:700;
+  letter-spacing:.24em; text-transform:uppercase;
+  color:rgba(232,206,150,.5); white-space:nowrap; pointer-events:none;
+}
+.tb-chest {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.tb-chest-art { width: 96px; height: 78px; display: block; overflow: visible; }
+.tb-chest-lbl {
+  font-family: 'Cinzel', serif; font-size: 7.5px; font-weight: 700;
+  letter-spacing: .24em; text-transform: uppercase; opacity: .55; color: var(--ink);
+}
+.tb-chest:hover .tb-chest-lbl { opacity: .9; }
+
+.tb-wood, .tb-wood-l { fill: #5a3b1e; }
+.tb-edge { fill: #6d4a27; }
+.tb-band { fill: #2f2418; }
+.tb-lock { fill: #c9a34c; stroke: #3a2208; stroke-width: 1; }
+.tb-keyhole { fill: #2f2418; }
+.tb-shadow { fill: rgba(0,0,0,.22); }
+
+/* the lid hinges on its back edge and really swings */
+.tb-lid { transform-origin: 60px 50px; transition: transform .28s cubic-bezier(.2,.9,.3,1); }
+.tb-chest:hover .tb-lid { transform: rotate(-7deg); }
+.tb-chest.open .tb-lid { transform: rotate(-104deg); }
+.tb-chest.open .tb-lock { fill: #ffd873; }
+
+/* ── the bin ──────────────────────────────────────────────── */
+.tb-bin{ box-shadow:none; }
+.tb-bin-face{ position:relative; width:96px; height:96px; cursor:grab; }
+.tb-bin-btn {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.tb-bin-art { width: 62px; height: 62px; display: block; }
+.tb-bin-lid, .tb-bin-body { fill: #4a4038; }
+.tb-bin-grip { fill: #6b5d50; }
+.tb-bin-rib { stroke: rgba(0,0,0,.28); stroke-width: 2; fill: none; }
+.tb-bin-art.full .tb-bin-lid { transform: translateY(-3px) rotate(-4deg); transform-origin: 20px 29px; }
+.tb-bin-lbl {
+  font-family: 'Cinzel', serif; font-size: 7.5px; font-weight: 700;
+  letter-spacing: .24em; text-transform: uppercase; opacity: .5; color: var(--ink);
+}
+.tb-bin-count {
+  position: absolute; right: 2px; top: 2px; min-width: 17px; height: 17px;
+  display: grid; place-items: center; padding: 0 4px;
+  font-family: 'Cinzel', serif; font-size: 10px; font-weight: 700;
+  color: var(--paper); background: var(--red); border-radius: 9px;
+}
+.tb-bin-count:empty { display: none; }
+.tb-bin.over .tb-bin-art { transform: scale(1.12); }
+.tb-bin.over .tb-bin-lid, .tb-bin.over .tb-bin-body { fill: var(--red); }
+.tb-bin-art { transition: transform .13s; }
+
+/* ── the drawer the box opens into ────────────────────────── */
+/* [hidden] is a UA rule (display:none) and ANY class rule beats it. The
+   drawer sets display:flex, so `hidden = true` left it on screen as a thin
+   line. Every element in this file that sets a display and is toggled by
+   `hidden` needs its own opt-out. */
+.tb-drawer[hidden]{ display:none !important; }
+.tb-drawer {
+  position: fixed; left: 26px; bottom: 26px; z-index: 890;
+  width: min(560px, calc(100vw - 52px));
+  max-height: min(460px, calc(100vh - 120px));
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 0 22px 50px rgba(0,0,0,.5);
+  animation: tb-rise .16s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes tb-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+.tb-head {
+  display: flex; align-items: center; gap: 9px; padding: 7px 10px;
+  background: var(--ink); color: var(--paper);
+}
+.tb-mark { color: #c8a85a; font-size: 10px; }
+.tb-tabs { display: flex; gap: 2px; flex: 0 0 auto; }
+.tb-tab {
+  font-family: 'Cinzel', serif; font-size: 8px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; cursor: pointer;
+  padding: 5px 10px; background: transparent; border: 0;
+  color: rgba(240,230,204,.55); transition: .12s;
+}
+.tb-tab:hover { color: #fff6e2; }
+.tb-tab.on { color: #2a1d0c; background: #e9dcbb; }
+.tb-tab b { color: var(--red); font-size: 9px; }
+.tb-tab.on b { color: var(--red); }
+.tb-find {
+  flex: 1; min-width: 0; margin-left: auto; padding: 4px 9px;
+  font-family: 'Crimson Text', serif; font-style: italic; font-size: 13px;
+  color: #f4e8cc; background: rgba(0,0,0,.35);
+  border: 1px solid rgba(214,170,96,.24); outline: 0; border-radius: 0;
+}
+.tb-find::placeholder { color: rgba(244,232,204,.32); }
+.tb-x {
+  width: 24px; height: 24px; display: grid; place-items: center; font-size: 11px;
+  color: rgba(240,230,204,.6); background: transparent;
+  border: 1px solid rgba(214,170,96,.22); cursor: pointer; transition: .13s;
+}
+.tb-x:hover { color: #ffd9b0; border-color: #e08a6a; }
+
+.tb-note {
+  padding: 6px 12px; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 12px; opacity: .5; border-bottom: 1px solid var(--faint);
+}
+.tb-grid {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 8px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 7px; align-content: start;
+}
+.tb-grid::-webkit-scrollbar { width: 5px; }
+.tb-grid::-webkit-scrollbar-thumb { background: var(--mid); }
+
+.tb-card {
+  display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px;
+  text-align: left; cursor: pointer; transition: .12s;
+  background: var(--paper2); border: 1.5px solid var(--faint);
+}
+.tb-card:hover { border-color: var(--ink); background: var(--paper3); }
+.tb-card-mark { font-size: 15px; opacity: .55; line-height: 1.1; }
+.tb-card-body { flex: 1; min-width: 0; }
+.tb-card-body b {
+  display: block; font-family: 'Cinzel', serif; font-size: 11px; font-weight: 600;
+  letter-spacing: .05em;
+}
+.tb-card-body i {
+  display: block; margin-top: 2px; font-family: 'Crimson Text', serif;
+  font-size: 11.5px; opacity: .55; line-height: 1.35;
+}
+.tb-card-act {
+  flex: 0 0 auto; font-family: 'Cinzel', serif; font-size: 7px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase; opacity: 0; transition: .12s;
+  color: var(--red);
+}
+.tb-card:hover .tb-card-act { opacity: 1; }
+.tb-empty {
+  grid-column: 1 / -1; padding: 22px 10px; text-align: center;
+  font-family: 'Crimson Text', serif; font-style: italic; font-size: 13px; opacity: .4;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAKING A SCENE
+══════════════════════════════════════════════════════════════ */
+.sc-modal { position: fixed; inset: 0; z-index: 900; display: flex;
+  align-items: center; justify-content: center; padding: 28px; }
+.sc-modal[hidden] { display: none; }
+.sc-scrim { position: absolute; inset: 0; background: rgba(8,5,3,.6); }
+.sc-box {
+  position: relative; width: min(520px, 94vw); max-height: 88vh; overflow-y: auto;
+  background: var(--paper); border: 2px solid var(--ink);
+  box-shadow: 0 34px 70px rgba(0,0,0,.55);
+  animation: tb-rise .18s cubic-bezier(.2,.9,.3,1);
+}
+.sc-head {
+  display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+  background: var(--ink); color: var(--paper);
+}
+.sc-head h3 {
+  margin: 0; font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+}
+.sc-mark { color: #c8a85a; font-size: 15px; }
+.sc-blurb {
+  padding: 10px 16px 0; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 13px; opacity: .6;
+}
+.sc-body { padding: 12px 16px 4px; }
+.sc-field { display: block; margin-bottom: 14px; }
+.sc-lbl {
+  display: block; font-family: 'Cinzel', serif; font-size: 8px; font-weight: 700;
+  letter-spacing: .22em; text-transform: uppercase; opacity: .7; margin-bottom: 3px;
+}
+.sc-field input, .sc-field select {
+  width: 100%; font-family: 'Crimson Text', serif; font-size: 15px; color: var(--ink);
+  background: transparent; border: 0; border-bottom: 2px solid var(--heavy);
+  outline: 0; padding: 2px 3px; border-radius: 0;
+}
+.sc-field input:focus, .sc-field select:focus {
+  border-bottom-color: var(--red); background: rgba(139,26,26,.05);
+}
+.sc-hint {
+  display: block; margin-top: 3px; font-family: 'Crimson Text', serif;
+  font-style: italic; font-size: 11.5px; opacity: .45;
+}
+.sc-fixed {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline;
+  padding: 7px 9px; margin-bottom: 12px;
+  border: 1px dashed var(--mid); background: rgba(22,16,10,.03);
+  font-family: 'Crimson Text', serif; font-style: italic; font-size: 11.5px; opacity: .6;
+}
+.sc-fixed b { font-style: normal; font-family: 'Cinzel', serif; font-size: 13px; }
+.sc-later {
+  padding: 0 16px 12px; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 11.5px; opacity: .45;
+}
+.sc-foot {
+  display: flex; justify-content: flex-end; gap: 9px; padding: 11px 16px;
+  border-top: 1px solid var(--faint); background: rgba(22,16,10,.03);
+}
+.sc-btn {
+  padding: 8px 18px; font-family: 'Cinzel', serif; font-size: 9px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; cursor: pointer; transition: .13s;
+  background: transparent; border: 1.5px solid var(--heavy); color: var(--ink);
+}
+.sc-btn:hover { border-color: var(--ink); background: var(--paper2); }
+.sc-btn.go { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.sc-btn.go:hover { background: #2f2113; }
+
+/* ══════════════════════════════════════════════════════════════
+   THE OPTIONS PANEL — the GM's own end
+══════════════════════════════════════════════════════════════ */
+/* Clear of the shell's right rail — see the note on --tb-right in
+   22-toolbox.js. It would still be reachable on top of it (the whole
+   table scene paints at z-index 10), so this is about not covering the
+   app's own chrome, not about being clickable. */
+.sc-opts {
+  position: fixed; right: 14px; top: 90px; z-index: 500; width: 286px;
+  background: var(--paper); border: 2px solid var(--ink);
+  box-shadow: 0 18px 40px rgba(0,0,0,.42);
+}
+.sc-opts[hidden] { display: none; }
+.sc-opts-head {
+  display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px;
+  background: var(--ink); color: var(--paper);
+}
+.sc-opts-head > div { flex: 1; min-width: 0; }
+.sc-opts-head b {
+  display: block; font-family: 'Cinzel', serif; font-size: 11px; font-weight: 600;
+  letter-spacing: .05em;
+}
+.sc-opts-head i {
+  display: block; margin-top: 2px; font-family: 'Crimson Text', serif;
+  font-size: 11px; color: rgba(240,230,204,.5);
+}
+.sc-opts-x {
+  width: 20px; height: 20px; display: grid; place-items: center; font-size: 10px;
+  color: rgba(240,230,204,.6); background: transparent;
+  border: 1px solid rgba(214,170,96,.22); cursor: pointer;
+}
+.sc-opts-x:hover { color: #ffd9b0; border-color: #e08a6a; }
+.sc-opts-body { padding: 4px 0; }
+.sc-opt {
+  display: flex; align-items: center; gap: 11px; padding: 9px 11px;
+  border-bottom: 1px solid var(--faint);
+}
+.sc-opt:last-child { border-bottom: 0; }
+.sc-opt-text { flex: 1; min-width: 0; }
+.sc-opt-text b {
+  display: block; font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600;
+  letter-spacing: .04em;
+}
+.sc-opt-text i {
+  display: block; margin-top: 2px; font-family: 'Crimson Text', serif;
+  font-size: 11px; opacity: .5; line-height: 1.35;
+}
+/* 01-base.css line 158 sets `input[type=number],select{width:100%}`. That is
+   an attribute selector (0,1,1) and it outranks a bare class (0,1,0), so
+   `.sc-num{width:54px}` lost and the number swallowed the whole row —
+   "Mana in the air" wrapped to one word per line beside it. Two defences:
+   a two-class selector that actually outranks it, and a flex-basis, which
+   governs a flex item's main size no matter what `width` ends up saying. */
+.sc-opt .sc-num {
+  flex: 0 0 54px; width: 54px; text-align: center; font-family: 'Cinzel', serif;
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  background: transparent; border: 0; border-bottom: 2px solid var(--heavy);
+  outline: 0; border-radius: 0;
+}
+.sc-opt .sc-pick {
+  flex: 0 0 auto; width: auto; max-width: 108px;
+  font-family: 'Crimson Text', serif; font-size: 12px;
+  color: var(--ink); background: transparent; border: 1px solid var(--mid);
+  padding: 3px 4px; border-radius: 0;
+}
+.sc-switch { flex: 0 0 auto; position: relative; width: 38px; height: 20px; cursor: pointer; }
+/* The input fills the switch instead of collapsing to 0×0. A zero-sized
+   control has no hit area of its own — every click was really landing on
+   the label and toggling it by proxy, which is one indirection away from
+   not working at all. It stays invisible; the slide below draws it. */
+.sc-switch input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; z-index: 1; cursor: pointer;
+}
+.sc-slide {
+  position: absolute; inset: 0; background: var(--paper3);
+  border: 1.5px solid var(--mid); transition: .14s; pointer-events: none;
+}
+.sc-slide::after {
+  content: ''; position: absolute; left: 2px; top: 2px; width: 13px; height: 13px;
+  background: var(--ink); transition: .14s;
+}
+.sc-switch input:checked + .sc-slide { background: rgba(139,26,26,.16); border-color: var(--red); }
+.sc-switch input:checked + .sc-slide::after { left: 20px; background: var(--red); }
+.sc-opts-none, .sc-opts-foot {
+  padding: 12px 11px; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 11.5px; opacity: .42;
+}
+.sc-opts-foot { padding: 6px 11px 8px; border-top: 1px solid var(--faint); font-size: 11px; }
+
+/* the shell's empty-table panel has no place on the 3D table */
+#table-scene.table-is-empty #table-empty{ display:none; }
+
+/* ══════════════════════════════════════════════════════════════
+   DARK DRESS FOR THE TABLE'S MENUS
+
+   The box, its drawer and the scene panels were first drawn against
+   the flat papery table, so they inherited --paper. On oak, in a dark
+   room, cream panels read as a web page pasted over the scene. These
+   override the palette only — the layout above is unchanged.
+
+   Kept as an override block rather than edited inline so the paper
+   values stay available if any of this is ever reused off the table.
+══════════════════════════════════════════════════════════════ */
+.tb-drawer{
+  background:linear-gradient(176deg,#241a10 0%,#170f08 100%);
+  border:1px solid #4a3418;
+  box-shadow:0 28px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,224,172,.14);
+  color:#e8dfc8;
+}
+.tb-head{ background:linear-gradient(180deg,#553d1d,#33240f);
+  border-bottom:1px solid #241708; box-shadow:inset 0 1px 0 rgba(255,224,172,.22); }
+.tb-mark{ color:#e8c98a }
+.tb-tab{ color:rgba(240,230,204,.62); background:transparent; border-color:transparent }
+.tb-tab:hover{ color:#fff6e2 }
+.tb-tab.on{ color:#1c1409; background:#d8b268; border-color:#d8b268 }
+.tb-find{ color:#f0e3c4; background:rgba(0,0,0,.32); border:1px solid rgba(232,201,138,.26) }
+.tb-find::placeholder{ color:rgba(232,223,200,.34) }
+.tb-x{ color:rgba(240,230,204,.6); border:1px solid rgba(214,170,96,.24); background:transparent }
+.tb-x:hover{ color:#ffd9b0; border-color:#e08a6a }
+.tb-note{ color:rgba(232,223,200,.42) }
+.tb-card{
+  background:linear-gradient(176deg,#2c2015 0%,#1d1409 100%);
+  border:1px solid rgba(232,201,138,.18); color:#e8dfc8;
+}
+.tb-card:hover{ border-color:#d8b268; background:linear-gradient(176deg,#3a2a19,#241a0e) }
+.tb-card b{ color:#f4e8cc }
+.tb-card i{ color:rgba(232,223,200,.5) }
+.tb-card-mark{ color:#e8c98a }
+.tb-card-act{ color:rgba(232,201,138,.55) }
+.tb-empty{ color:rgba(232,223,200,.36) }
+
+/* the make-a-scene modal and the options panel, same dress */
+.sc-box, .sc-opts{
+  background:linear-gradient(176deg,#241a10 0%,#170f08 100%);
+  border:1px solid #4a3418; color:#e8dfc8;
+  box-shadow:0 34px 70px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,224,172,.14);
+}
+.sc-head{ background:linear-gradient(180deg,#553d1d,#33240f); color:#f4e8cc;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.22) }
+.sc-blurb, .sc-hint, .sc-later, .sc-fixed, .sc-opt-text i,
+.sc-opts-none, .sc-opts-foot{ color:rgba(232,223,200,.46) }
+.sc-lbl, .sc-opt-text b{ color:#e8c98a }
+.sc-field input, .sc-field select, .sc-opt .sc-num, .sc-opt .sc-pick{
+  color:#f4e8cc; background:rgba(0,0,0,.3);
+  border:1px solid rgba(232,201,138,.24); border-bottom-color:rgba(232,201,138,.5);
+}
+.sc-opt{ border-bottom:1px solid rgba(232,201,138,.12) }
+.sc-btn{ color:#e8dfc8; border:1px solid rgba(232,201,138,.32); background:transparent }
+.sc-btn:hover{ border-color:#d8b268; background:rgba(232,201,138,.1) }
+.sc-btn.go{ color:#1c1409; background:#d8b268; border-color:#d8b268 }
+.sc-btn.go:hover{ background:#ecc47c }
+.sc-slide{ background:rgba(0,0,0,.35); border:1.5px solid rgba(232,201,138,.34) }
+.sc-slide::after{ background:rgba(232,223,200,.6) }
+.sc-switch input:checked + .sc-slide{ background:rgba(216,178,104,.22); border-color:#d8b268 }
+.sc-switch input:checked + .sc-slide::after{ background:#d8b268 }
+
+/* ── stacking, now that the table is full-bleed ────────────────
+   #vp is z-index 860 and the GL layer 870. Anything that has to be
+   readable OVER the table has to clear both; the options panel was
+   at 500 and vanished behind the wood the moment the table went
+   full-bleed. */
+.sc-opts{ z-index:895 !important; right:18px !important; }
+.tb-drawer{ z-index:890 !important; }
+.sc-modal{ z-index:900 !important; }

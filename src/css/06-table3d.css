@@ -1,0 +1,114 @@
+/* ══════════════════════════════════════════════════════════════
+   06-table3d.css — THE TABLE. Ported from proto/table3d.css.
+
+   This is the established base, not a new one: a real slab in
+   perspective, tilted away from you, with extruded edges you can
+   see, and everything on it a `.prop` with genuine thickness.
+
+   What was deliberately LEFT in proto for now:
+   · the `.cwin` combat-sheet rules — they style proto's own
+     battlefield sheet, which is a separate port
+   · `.ent/.tok/.plate/.pz/.shield/.hand` — those belong with the
+     WebGL piece layer (gl.js), which follows
+   · proto's `html,body{overflow:hidden;background:#0a0705}` —
+     that is a page-level rule and this app is not only a table
+
+   #vp is `absolute` here, not `fixed` as in proto, because it
+   lives inside #table-surface rather than owning the window.
+══════════════════════════════════════════════════════════════ */
+
+/* ── the room the table sits in ─────────────────────────────────
+   FIXED and full-bleed, exactly as in proto. It is deliberately not
+   inset inside the shell's rails: the table is the screen when you
+   are at the table. The old side rails, the embedded combat tracker
+   and the bottom dock are covered by it — they were the flat-app
+   chrome that made this read as a web page with a picture of a table
+   on it rather than as a table.
+
+   Full-bleed also means the WebGL layer over it can use innerWidth /
+   innerHeight and the same camera maths gl.js already uses, instead
+   of a second, subtly different mapping. */
+#vp{
+  position:fixed; inset:0; z-index:860; overflow:hidden; cursor:grab;
+  perspective:2400px; perspective-origin:50% 42%;
+  background:radial-gradient(ellipse at 50% 12%,#241a10 0%,#0a0705 74%);
+}
+/* the shell's own chrome has no place on the table */
+body.at-table #table-left-controls,
+body.at-table #table-right-panel,
+body.at-table #table-dock,
+body.at-table #table-empty{ display:none !important; }
+#vp.grabbing{cursor:grabbing}
+/* No will-change:transform. Chrome pins such a layer to one raster scale, so
+   zooming in scaled a stale bitmap instead of re-rasterising — that was why
+   every label went soft as you came in close. (proto's note, still true) */
+#tbl{position:absolute;top:0;left:0;transform-origin:50% 50%;transform-style:preserve-3d}
+
+/* ── the slab: oak, quarter-sawn, with a real edge you can see ── */
+.slab{position:absolute;inset:0;transform-style:preserve-3d;
+  background:
+    repeating-linear-gradient(90.7deg,rgba(0,0,0,.10) 0 1px,transparent 1px 5px),
+    repeating-linear-gradient(90.3deg,rgba(255,224,172,.045) 0 1px,transparent 1px 14px),
+    radial-gradient(ellipse 34% 20% at 17% 30%,rgba(52,28,8,.46),transparent 66%),
+    radial-gradient(ellipse 30% 16% at 49% 70%,rgba(52,28,8,.40),transparent 66%),
+    radial-gradient(ellipse 32% 18% at 83% 38%,rgba(52,28,8,.42),transparent 66%),
+    linear-gradient(90deg,transparent 0 33.15%,rgba(0,0,0,.42) 33.15% 33.42%,
+      rgba(255,222,170,.10) 33.42% 33.6%,transparent 33.6% 66.35%,
+      rgba(0,0,0,.42) 66.35% 66.62%,rgba(255,222,170,.10) 66.62% 66.8%,transparent 66.8%),
+    radial-gradient(ellipse 48% 40% at 28% 8%,rgba(255,228,172,.17),transparent 72%),
+    linear-gradient(172deg,#8f5e2c 0%,#6b431e 48%,#432810 100%);
+  box-shadow:inset 0 0 150px rgba(0,0,0,.55), inset 0 4px 0 rgba(255,224,170,.20);}
+/* extruded edges — this is what makes it a slab and not a picture of one */
+.edge{position:absolute;background:linear-gradient(180deg,#7a4e22 0%,#4a2d13 30%,#201307 100%);
+  transform-style:preserve-3d;backface-visibility:hidden;
+  box-shadow:inset 0 3px 0 rgba(255,214,158,.28),inset 0 -2px 0 rgba(0,0,0,.5)}
+.edge.f{left:0;right:0;top:100%;height:var(--th);transform-origin:top;transform:rotateX(-90deg)}
+.edge.b{left:0;right:0;bottom:100%;height:var(--th);transform-origin:bottom;transform:rotateX(90deg)}
+.edge.l{top:0;bottom:0;right:100%;width:var(--th);transform-origin:right;transform:rotateY(-90deg);
+  background:linear-gradient(90deg,#201307,#5c3818)}
+.edge.r{top:0;bottom:0;left:100%;width:var(--th);transform-origin:left;transform:rotateY(90deg);
+  background:linear-gradient(90deg,#5c3818,#201307)}
+/* a soft pool of shadow the slab casts on the floor */
+.floor{position:absolute;left:-8%;top:7%;width:116%;height:106%;transform:translateZ(-140px);
+  background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,.8) 0%,transparent 66%);filter:blur(30px)}
+
+/* ── props sit ON the wood, with thickness ──
+   NO filter on .prop. A filter is a grouping property: it forces the used
+   value of transform-style to flat on the whole subtree, which silently
+   kills every bit of 3D inside a prop. The shadow is a box-shadow, which
+   groups nothing. (proto's note — do not "tidy" this into a filter) */
+.prop{position:absolute;transform-style:preserve-3d;cursor:default;
+  box-shadow:0 26px 30px rgba(0,0,0,.55),0 7px 11px rgba(0,0,0,.42)}
+.prop.lift{box-shadow:0 58px 52px rgba(0,0,0,.6),0 12px 18px rgba(0,0,0,.45)}
+.prop>.face{position:relative;transform-style:preserve-3d}
+.grip{cursor:grab}
+.prop.lift .grip{cursor:grabbing}
+.prop .side{position:absolute;background:linear-gradient(180deg,#4a3418,#241708);
+  transform-style:preserve-3d}
+.prop .side.f{left:0;right:0;top:100%;height:var(--pt,9px);transform-origin:top;transform:rotateX(-90deg)}
+.prop .side.r{top:0;bottom:0;left:100%;width:var(--pt,9px);transform-origin:left;transform:rotateY(90deg)}
+.prop .side.l{top:0;bottom:0;right:100%;width:var(--pt,9px);transform-origin:right;transform:rotateY(-90deg)}
+.prop .side.b{left:0;right:0;bottom:100%;height:var(--pt,9px);transform-origin:bottom;transform:rotateX(90deg)}
+
+/* ── the table's own corner HUD ──────────────────────────────
+   Scoped under #table-scene so it cannot leak onto the hall or the
+   title screen, and shifted clear of the shell's side rails. */
+#table-scene .t3-hud{
+  position:fixed; z-index:880; pointer-events:none;
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase;
+}
+#table-scene .t3-hud > *{pointer-events:auto}
+#table-scene .t3-hud.tl{bottom:13px; left:17px; color:#d6aa60; max-width:44vw}
+#table-scene .t3-hud.tl em{display:block;font-family:'Crimson Text',serif;font-style:italic;
+  font-size:12px;letter-spacing:0;text-transform:none;color:rgba(232,223,200,.55);
+  margin-top:4px;font-weight:400}
+#table-scene .t3-hud.br{bottom:15px; right:17px; display:flex; gap:7px; align-items:center}
+#table-scene .t3-hud button{font-family:'Cinzel',serif;font-size:8.5px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;padding:9px 14px;cursor:pointer;
+  color:#f4e8cc;border:1px solid #3d2812;
+  background:linear-gradient(180deg,#8a6432,#5a4020);
+  box-shadow:inset 0 1px 0 rgba(255,240,210,.3)}
+#table-scene .t3-hud button:hover{background:linear-gradient(180deg,#a8783c,#6d4e26)}
+#table-scene .t3-zl{font-family:'Cinzel',serif;font-size:12px;letter-spacing:.1em;
+  color:rgba(232,223,200,.45);padding-right:6px}

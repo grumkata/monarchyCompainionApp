@@ -53,8 +53,13 @@ function recalcDerived() {
   const FOR = parseInt(document.getElementById('attr-for').value) || 0;
   const WIL = parseInt(document.getElementById('attr-wil').value) || 0;
   const AV = getEquippedAV();
-  const hpMax = Math.round(FOR * AV);
-  const stMax = Math.floor((FOR + WIL) / 2) + 4;
+  // Banners rounds these UP, not to-nearest / down. Health is still
+  // missing its "+ Resilience" term — Resilience is a primary skill and
+  // can't be read cleanly until skills live in the character model
+  // (plan task P1-3); the on-screen "FOR x AV" formula label in
+  // index.html stays accurate until then.
+  const hpMax = Math.ceil(FOR * AV);
+  const stMax = Math.ceil((FOR + WIL) / 2) + 4;
   const strMax = WIL * 2;
   ['hp-max','c-hp-max'].forEach(id => { const el=document.getElementById(id); if(el) el.value=hpMax; });
   ['st-max','c-st-max'].forEach(id => { const el=document.getElementById(id); if(el) el.value=stMax; });

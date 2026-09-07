@@ -71,6 +71,18 @@ const WM = (function () {
     if (dockBtn) dockBtn.classList.toggle('active', isOpen);
     if (isOpen) focus(id);
     if (!skipSave) saveRect(id);
+    _refreshTableEmptyState();
+  }
+
+  /* The table's empty state (see #table-empty in index.html) is the only
+     thing standing between "nothing is open" and "the app looks broken".
+     Toggled here rather than by a CSS :has() on inline display styles,
+     which would silently stop working the moment window hiding changes. */
+  function _refreshTableEmptyState() {
+    const scene = document.getElementById('table-scene');
+    if (!scene) return;
+    const anyOpen = Object.keys(windows).some(k => windows[k].isOpen);
+    scene.classList.toggle('table-is-empty', !anyOpen);
   }
 
   function open(id) { setOpen(id, true); }

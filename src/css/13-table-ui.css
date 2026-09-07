@@ -1,0 +1,1389 @@
+/* ══════════════════════════════════════════════════════════════
+   07-table-ui.css — WHAT SITS OVER THE TABLE.
+
+   The table itself is 06-table3d.css — proto's slab, in perspective.
+   This is the furniture and the menus on top of it: the box, the bin,
+   the drawer they open into, the make-a-scene modal, the options
+   panel, and the faces of the props standing on the wood.
+
+   Split from the table on purpose. The table is ported art and
+   should stay recognisably proto's; this layer is this app's.
+══════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════
+   THE FACE OF A PROP
+   Dark, lit from above, reading as a lacquered card lying on oak —
+   NOT as paper. The papery treatment belongs to the character sheet,
+   which is a thing you hold, not a thing on the table.
+══════════════════════════════════════════════════════════════ */
+.t3-face{
+  background:linear-gradient(176deg,#2a1f14 0%,#1b130c 100%);
+  border:1px solid #4a3418;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.16), inset 0 0 40px rgba(0,0,0,.5);
+  color:#e8dfc8;
+}
+.prop.live .t3-face{ border-color:#c9743e; box-shadow:inset 0 1px 0 rgba(255,224,172,.2),
+  inset 0 0 40px rgba(0,0,0,.5), 0 0 0 1px rgba(201,116,62,.4); }
+.t3-title{
+  display:flex; align-items:center; gap:8px; padding:8px 11px;
+  background:linear-gradient(180deg,#553d1d,#33240f);
+  border-bottom:1px solid #241708;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.22);
+}
+.t3-title b{
+  flex:1; min-width:0; font-family:'Cinzel',serif; font-size:11px; font-weight:600;
+  letter-spacing:.09em; color:#f4e8cc;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.t3-m{ font-size:12px; opacity:.75; flex:0 0 auto; color:#e8c98a }
+.t3-live{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase; font-style:normal;
+  color:#ffb9a4; border:1px solid rgba(255,140,110,.45); padding:2px 6px;
+}
+.t3-run{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; cursor:pointer;
+  color:rgba(244,232,204,.8); background:transparent;
+  border:1px solid rgba(244,232,204,.32); padding:3px 8px; transition:.13s;
+}
+.t3-run:hover{ color:#fff6e2; border-color:#d8b268 }
+.t3-body{ display:flex; flex-wrap:wrap; gap:5px; padding:10px 11px 8px }
+.t3-chip{
+  font-family:'Cinzel',serif; font-size:11px; font-weight:700; color:#f0e3c4;
+  border:1px solid rgba(232,201,138,.24); background:rgba(0,0,0,.28);
+  padding:3px 8px; display:flex; align-items:baseline; gap:5px;
+}
+.t3-chip i{
+  font-family:'Cinzel',serif; font-style:normal; font-size:7px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; color:rgba(232,201,138,.55);
+}
+.t3-chip.fixed{ opacity:.6; border-style:dashed }
+.t3-foot, .t3-piece{
+  padding:4px 11px 9px; font-family:'Crimson Text',serif; font-style:italic;
+  font-size:11.5px; color:rgba(232,223,200,.42);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE CHEST, THE BIN, AND THE BAR THAT COMES OUT OF THE CHEST
+══════════════════════════════════════════════════════════════ */
+/* The chest is a prop on the wood — 23-table3d.js positions it by
+   data-x/data-y like anything else on the table. Its face is invisible:
+   27-table-gl.js draws the real AnimatedChest over its rect. */
+.tb-box .tb-anchor-face{ background:transparent; cursor:pointer; }
+.tb-box{ box-shadow:none; }
+/* AND THE SAME FOR THE BIN, and it has to be said HERE rather than in
+   20-shell.css where the rest of the bin lives. 20-shell.css is unscoped, so
+   `.tb-bin` is one class; `body.at-table .prop` in 12-combat.css is two, and
+   two wins however late the other file is loaded. The result was the generic
+   card drop-shadow — a hard dark rectangle offset eighteen pixels — sitting
+   under a round wicker basket that casts its own real one. */
+.tb-bin{ box-shadow:none; }
+.tb-bin .face{ background:transparent; box-shadow:none; }
+/* ── AND ITS SHADOW IS A REAL ONE ────────────────────────────
+   There used to be a blurred grey oval painted here. grumkata: "shadows and
+   textures look flat" — and a painted oval is exactly that: the same soft
+   ellipse whatever the object, at the same size whatever the zoom, never
+   falling across anything, never changing shape as the thing turns. It was
+   the shape of a shadow rather than a shadow.
+
+   27-table-gl.js casts a real one now, off the same lamp the room is lit by,
+   onto the wood and across whatever else is lying there. Every painted blob
+   in this file went with it. */
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   MAKING A SCENE
+══════════════════════════════════════════════════════════════ */
+.sc-modal { position: fixed; inset: 0; z-index: 900; display: flex;
+  align-items: center; justify-content: center; padding: 28px; }
+.sc-modal[hidden] { display: none; }
+.sc-scrim { position: absolute; inset: 0; background: rgba(8,5,3,.6); }
+.sc-box {
+  position: relative; width: min(520px, 94vw); max-height: 88vh; overflow-y: auto;
+  background: var(--paper); border: 2px solid var(--ink);
+  box-shadow: 0 34px 70px rgba(0,0,0,.55);
+  animation: tb-rise .18s cubic-bezier(.2,.9,.3,1);
+}
+.sc-head {
+  display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+  background: var(--ink); color: var(--paper);
+}
+.sc-head h3 {
+  margin: 0; font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+}
+.sc-mark { color: #c8a85a; font-size: 15px; }
+.sc-blurb {
+  padding: 10px 16px 0; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 13px; opacity: .6;
+}
+.sc-body { padding: 12px 16px 4px; }
+.sc-field { display: block; margin-bottom: 14px; }
+.sc-lbl {
+  display: block; font-family: 'Cinzel', serif; font-size: 8px; font-weight: 700;
+  letter-spacing: .22em; text-transform: uppercase; opacity: .7; margin-bottom: 3px;
+}
+.sc-field input, .sc-field select {
+  width: 100%; font-family: 'Crimson Text', serif; font-size: 15px; color: var(--ink);
+  background: transparent; border: 0; border-bottom: 2px solid var(--heavy);
+  outline: 0; padding: 2px 3px; border-radius: 0;
+}
+.sc-field input:focus, .sc-field select:focus {
+  border-bottom-color: var(--red); background: rgba(139,26,26,.05);
+}
+.sc-hint {
+  display: block; margin-top: 3px; font-family: 'Crimson Text', serif;
+  font-style: italic; font-size: 11.5px; opacity: .45;
+}
+.sc-fixed {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline;
+  padding: 7px 9px; margin-bottom: 12px;
+  border: 1px dashed var(--mid); background: rgba(22,16,10,.03);
+  font-family: 'Crimson Text', serif; font-style: italic; font-size: 11.5px; opacity: .6;
+}
+.sc-fixed b { font-style: normal; font-family: 'Cinzel', serif; font-size: 13px; }
+.sc-later {
+  padding: 0 16px 12px; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 11.5px; opacity: .45;
+}
+.sc-foot {
+  display: flex; justify-content: flex-end; gap: 9px; padding: 11px 16px;
+  border-top: 1px solid var(--faint); background: rgba(22,16,10,.03);
+}
+.sc-btn {
+  padding: 8px 18px; font-family: 'Cinzel', serif; font-size: 9px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; cursor: pointer; transition: .13s;
+  background: transparent; border: 1.5px solid var(--heavy); color: var(--ink);
+}
+.sc-btn:hover { border-color: var(--ink); background: var(--paper2); }
+.sc-btn.go { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.sc-btn.go:hover { background: #2f2113; }
+
+/* ══════════════════════════════════════════════════════════════
+   THE OPTIONS PANEL — the GM's own end
+══════════════════════════════════════════════════════════════ */
+/* Clear of the shell's right rail — see the note on --tb-right in
+   22-toolbox.js. It would still be reachable on top of it (the whole
+   table scene paints at z-index 10), so this is about not covering the
+   app's own chrome, not about being clickable. */
+.sc-opts {
+  position: fixed; right: 14px; top: 90px; z-index: 500; width: 286px;
+  background: var(--paper); border: 2px solid var(--ink);
+  box-shadow: 0 18px 40px rgba(0,0,0,.42);
+}
+.sc-opts[hidden] { display: none; }
+.sc-opts-head {
+  display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px;
+  background: var(--ink); color: var(--paper);
+}
+.sc-opts-head > div { flex: 1; min-width: 0; }
+.sc-opts-head b {
+  display: block; font-family: 'Cinzel', serif; font-size: 11px; font-weight: 600;
+  letter-spacing: .05em;
+}
+.sc-opts-head i {
+  display: block; margin-top: 2px; font-family: 'Crimson Text', serif;
+  font-size: 11px; color: rgba(240,230,204,.5);
+}
+.sc-opts-x {
+  width: 20px; height: 20px; display: grid; place-items: center; font-size: 10px;
+  color: rgba(240,230,204,.6); background: transparent;
+  border: 1px solid rgba(214,170,96,.22); cursor: pointer;
+}
+.sc-opts-x:hover { color: #ffd9b0; border-color: #e08a6a; }
+.sc-opts-body { padding: 4px 0; }
+.sc-opt {
+  display: flex; align-items: center; gap: 11px; padding: 9px 11px;
+  border-bottom: 1px solid var(--faint);
+}
+.sc-opt:last-child { border-bottom: 0; }
+.sc-opt-text { flex: 1; min-width: 0; }
+.sc-opt-text b {
+  display: block; font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600;
+  letter-spacing: .04em;
+}
+.sc-opt-text i {
+  display: block; margin-top: 2px; font-family: 'Crimson Text', serif;
+  font-size: 11px; opacity: .5; line-height: 1.35;
+}
+/* 01-base.css line 158 sets `input[type=number],select{width:100%}`. That is
+   an attribute selector (0,1,1) and it outranks a bare class (0,1,0), so
+   `.sc-num{width:54px}` lost and the number swallowed the whole row —
+   "Mana in the air" wrapped to one word per line beside it. Two defences:
+   a two-class selector that actually outranks it, and a flex-basis, which
+   governs a flex item's main size no matter what `width` ends up saying. */
+.sc-opt .sc-num {
+  flex: 0 0 54px; width: 54px; text-align: center; font-family: 'Cinzel', serif;
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  background: transparent; border: 0; border-bottom: 2px solid var(--heavy);
+  outline: 0; border-radius: 0;
+}
+.sc-opt .sc-pick {
+  flex: 0 0 auto; width: auto; max-width: 108px;
+  font-family: 'Crimson Text', serif; font-size: 12px;
+  color: var(--ink); background: transparent; border: 1px solid var(--mid);
+  padding: 3px 4px; border-radius: 0;
+}
+.sc-switch { flex: 0 0 auto; position: relative; width: 38px; height: 20px; cursor: pointer; }
+/* The input fills the switch instead of collapsing to 0×0. A zero-sized
+   control has no hit area of its own — every click was really landing on
+   the label and toggling it by proxy, which is one indirection away from
+   not working at all. It stays invisible; the slide below draws it. */
+.sc-switch input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; z-index: 1; cursor: pointer;
+}
+.sc-slide {
+  position: absolute; inset: 0; background: var(--paper3);
+  border: 1.5px solid var(--mid); transition: .14s; pointer-events: none;
+}
+.sc-slide::after {
+  content: ''; position: absolute; left: 2px; top: 2px; width: 13px; height: 13px;
+  background: var(--ink); transition: .14s;
+}
+.sc-switch input:checked + .sc-slide { background: rgba(139,26,26,.16); border-color: var(--red); }
+.sc-switch input:checked + .sc-slide::after { left: 20px; background: var(--red); }
+.sc-opts-none, .sc-opts-foot {
+  padding: 12px 11px; font-family: 'Crimson Text', serif; font-style: italic;
+  font-size: 11.5px; opacity: .42;
+}
+.sc-opts-foot { padding: 6px 11px 8px; border-top: 1px solid var(--faint); font-size: 11px; }
+
+/* ══════════════════════════════════════════════════════════════
+   DARK DRESS FOR THE TABLE'S MENUS
+
+   The box, its drawer and the scene panels were first drawn against
+   the flat papery table, so they inherited --paper. On oak, in a dark
+   room, cream panels read as a web page pasted over the scene. These
+   override the palette only — the layout above is unchanged.
+
+   Kept as an override block rather than edited inline so the paper
+   values stay available if any of this is ever reused off the table.
+══════════════════════════════════════════════════════════════ */
+
+/* the make-a-scene modal and the options panel, same dress */
+.sc-box, .sc-opts{
+  background:linear-gradient(176deg,#241a10 0%,#170f08 100%);
+  border:1px solid #4a3418; color:#e8dfc8;
+  box-shadow:0 34px 70px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,224,172,.14);
+}
+.sc-head{ background:linear-gradient(180deg,#553d1d,#33240f); color:#f4e8cc;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.22) }
+.sc-blurb, .sc-hint, .sc-later, .sc-fixed, .sc-opt-text i,
+.sc-opts-none, .sc-opts-foot{ color:rgba(232,223,200,.46) }
+.sc-lbl, .sc-opt-text b{ color:#e8c98a }
+.sc-field input, .sc-field select, .sc-opt .sc-num, .sc-opt .sc-pick{
+  color:#f4e8cc; background:rgba(0,0,0,.3);
+  border:1px solid rgba(232,201,138,.24); border-bottom-color:rgba(232,201,138,.5);
+}
+.sc-opt{ border-bottom:1px solid rgba(232,201,138,.12) }
+.sc-btn{ color:#e8dfc8; border:1px solid rgba(232,201,138,.32); background:transparent }
+.sc-btn:hover{ border-color:#d8b268; background:rgba(232,201,138,.1) }
+.sc-btn.go{ color:#1c1409; background:#d8b268; border-color:#d8b268 }
+.sc-btn.go:hover{ background:#ecc47c }
+.sc-slide{ background:rgba(0,0,0,.35); border:1.5px solid rgba(232,201,138,.34) }
+.sc-slide::after{ background:rgba(232,223,200,.6) }
+.sc-switch input:checked + .sc-slide{ background:rgba(216,178,104,.22); border-color:#d8b268 }
+.sc-switch input:checked + .sc-slide::after{ background:#d8b268 }
+
+/* ── stacking, now that the table is full-bleed ────────────────
+   #vp is z-index 860 and the GL layer 870. Anything that has to be
+   readable OVER the table has to clear both; the options panel was
+   at 500 and vanished behind the wood the moment the table went
+   full-bleed. */
+/* Clear of the chat dock, which is fixed at the right edge and was sitting
+   on top of every control in here. proto offsets its own corner HUD by the
+   same 317px (.hud.br) — same dock, same number, so they stay in step. */
+.sc-opts{ z-index:895 !important; right:317px !important; }
+.sc-modal{ z-index:900 !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   EDITING THE LINES, ON THE SHEET
+   Deliberately quiet: these sit in the line's own tab and on the
+   board's edge, and only show themselves when you are near them.
+   A rank you can delete announces itself only when it is empty.
+══════════════════════════════════════════════════════════════ */
+.ln-name{ cursor:text; border-bottom:1px dashed transparent; }
+.line:hover .ln-name{ border-bottom-color:rgba(232,201,138,.4); }
+.ln-in{
+  font:inherit; color:#f4e8cc; background:rgba(0,0,0,.4);
+  border:1px solid rgba(232,201,138,.5); border-radius:0;
+  padding:0 4px; width:11ch; max-width:11ch;
+}
+.ln-x{
+  margin-left:6px; width:14px; height:14px; line-height:1; padding:0;
+  font-size:11px; cursor:pointer; opacity:0; transition:opacity .12s;
+  color:rgba(255,200,180,.9); background:transparent;
+  border:1px solid rgba(255,150,120,.4); border-radius:0;
+}
+.line:hover .ln-x{ opacity:1; }
+.ln-x:hover{ background:rgba(180,60,40,.35); border-color:#e08a6a; }
+.ln-add{
+  display:block; margin:6px auto 2px; padding:4px 12px;
+  font-family:'Cinzel',serif; font-size:8px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; cursor:pointer;
+  color:rgba(232,201,138,.55); background:transparent;
+  border:1px dashed rgba(232,201,138,.28); border-radius:0;
+  opacity:.4; transition:opacity .14s, border-color .14s;
+}
+.half:hover .ln-add{ opacity:1; }
+.ln-add:hover{ color:#f4e8cc; border-color:#d8b268; }
+
+/* ══════════════════════════════════════════════════════════════
+   A TOKEN ON THE WOOD
+   A body standing there, not a card about a body: a moulded disc
+   with its two letters, its name, and which side it is on. Its two
+   facts cost one click each, on the token itself.
+══════════════════════════════════════════════════════════════ */
+/* the placed counter: the figure IS the face, so the wrapper only has to be
+   the box it stands in */
+.tkn{ position:absolute; inset:0; cursor:grab; }
+.prop.lift .tkn{ cursor:grabbing; }
+/* a scene lying on the wood, and the ring of light round the one being run */
+.t3-sc{ position:absolute; inset:0; cursor:pointer; }
+.t3-sc-rim{ position:absolute; inset:-6px; pointer-events:none; }
+.t3-sc.on .t3-sc-rim{
+  box-shadow:0 0 0 2px rgba(240,194,116,.7), 0 0 34px rgba(216,178,104,.45);
+}
+.t3-sc:not(.on){ filter:brightness(.72) saturate(.8); }
+.t3-sc:not(.on):hover{ filter:brightness(.92); }
+.tkn-old{ display:flex; align-items:center; gap:10px; padding:9px 11px; cursor:grab; }
+.tkn-disc{
+  flex:0 0 auto; width:38px; height:38px; border-radius:50%;
+  display:grid; place-items:center;
+  font-family:'Cinzel',serif; font-size:13px; font-weight:700; letter-spacing:.02em;
+  background:radial-gradient(circle at 38% 30%,#8fb6e4,#3f6fa8 62%,#27508a);
+  color:#f2f7ff; border:2px solid #27508a;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.35), 0 3px 7px rgba(0,0,0,.5);
+}
+.tkn[data-side="en"] .tkn-disc{
+  background:radial-gradient(circle at 38% 30%,#e8846c,#c8452c 62%,#7d2314);
+  border-color:#7d2314;
+}
+.tkn-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.tkn-name{
+  font-family:'Cinzel',serif; font-size:11px; font-weight:600; letter-spacing:.05em;
+  color:#f4e8cc; cursor:text; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  border-bottom:1px dashed transparent;
+}
+.tkn:hover .tkn-name{ border-bottom-color:rgba(232,201,138,.4); }
+.tkn-body i{ font-family:'Cinzel',serif; font-size:10px; color:rgba(232,223,200,.45); }
+.tkn-in{
+  font:inherit; color:#f4e8cc; background:rgba(0,0,0,.4);
+  border:1px solid rgba(232,201,138,.5); border-radius:0; padding:0 4px; width:13ch;
+}
+.tkn-side{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; cursor:pointer; padding:3px 7px;
+  color:rgba(232,223,200,.7); background:transparent;
+  border:1px solid rgba(232,201,138,.3); border-radius:0;
+}
+.tkn-side:hover{ color:#fff6e2; border-color:#d8b268; }
+.tk-off{
+  margin-left:10px; font-family:'Cinzel',serif; font-size:8px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; cursor:pointer; padding:5px 10px;
+  color:#e8dfc8; background:transparent;
+  border:1px solid rgba(232,201,138,.35); border-radius:0;
+}
+.tk-off:hover{ color:#fff6e2; border-color:#d8b268; background:rgba(232,201,138,.1); }
+
+/* ── a note is paper, and you write on it ────────────────────
+   The one thing on this table that is deliberately pale: a note is
+   a scrap of paper lying on the wood, and it should read as one. */
+.t3-note .t3-face{
+  background:linear-gradient(176deg,#f3e7c8 0%,#e6d5ae 100%);
+  border:1px solid #b49a68; color:#241a10;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(0,0,0,.45);
+}
+.t3-note .t3-title{
+  background:linear-gradient(180deg,#d9c398,#c4ab7c);
+  border-bottom:1px solid #b49a68; box-shadow:none;
+}
+.t3-note .t3-title b, .t3-note .t3-m{ color:#3a2a14; }
+.nt-name{ cursor:text; border-bottom:1px dashed transparent; }
+.t3-note:hover .nt-name{ border-bottom-color:rgba(58,42,20,.4); }
+.nt-body{
+  padding:10px 12px 12px; min-height:120px; outline:none;
+  font-family:'Crimson Text',serif; font-size:14px; line-height:1.5;
+  color:#241a10; white-space:pre-wrap; word-break:break-word; cursor:text;
+}
+.nt-body:empty::before{
+  content:'Write on it.'; font-style:italic; color:rgba(36,26,16,.35);
+}
+.nt-body:focus{ background:rgba(255,255,255,.35); }
+
+
+/* ══════════════════════════════════════════════════════════════
+   THE BAR, AND WHAT IS IN YOUR HAND
+
+   grumkata, three times, the last time in capitals:
+
+     "the toolbox ui should not be how it is it should be like mario
+      maker or minecraft ui where you SEE the item your about to put
+      down like a physical thing ... you are giving me website ui
+      not game ui"
+
+   So the chest opens and a plank comes up out of it with the things
+   themselves standing in sunken slots. No names in the slots — the
+   name appears once, above the bar, for whatever you are pointing
+   at, which is what Minecraft does and is the only text a hotbar
+   has ever needed. 46-figures.js draws the objects; this dresses
+   the furniture they stand in.
+══════════════════════════════════════════════════════════════ */
+.hb{
+  position:fixed; left:0; right:300px; bottom:20px; z-index:1200;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  pointer-events:none;
+  transform:translateY(150%); opacity:0;
+  transition:transform .3s cubic-bezier(.16,1.1,.3,1), opacity .2s;
+}
+/* NEVER pointer-events:auto on .hb itself. It is a full-width strip across
+   the bottom of the viewport, and turning the strip on swallowed the bin,
+   which sits in the same band at the right-hand end. Only the children — all
+   of them centred and narrow — may take a pointer. */
+.hb.up{ transform:none; opacity:1; }
+.hb.up > *{ pointer-events:auto; }
+
+/* the name of the thing you are pointing at, and nothing else */
+.hb-tip{
+  font-family:'Cinzel',serif; font-size:11px; font-weight:700;
+  letter-spacing:.22em; text-transform:uppercase; color:#f6e6c0;
+  text-shadow:0 2px 6px #000, 0 0 18px rgba(0,0,0,.9);
+  opacity:0; transition:opacity .12s; height:14px; line-height:14px;
+}
+.hb-tip.on{ opacity:1; }
+
+/* ── the variants, floating over the bar ─────────────────────
+   What you may choose WHILE HOLDING IT. Same figure, drawn each way,
+   so cycling the battlefield's width makes the board wider in front
+   of you instead of asking for a number in a dialog. */
+.hb-rack{
+  display:flex; gap:6px; padding:6px;
+  background:linear-gradient(180deg,rgba(30,21,12,.94),rgba(16,11,6,.94));
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.2), 0 14px 34px rgba(0,0,0,.7),
+             0 0 0 1px #4a3418;
+}
+.hb-rack[hidden]{ display:none !important; }
+.hb-var{
+  position:relative; width:60px; height:60px; padding:0; cursor:pointer;
+  background:radial-gradient(ellipse at 50% 18%,#3b2c19,#1a1209 78%);
+  border:1px solid #4a3418; transition:.12s;
+}
+.hb-var:hover{ border-color:#d8b268; }
+.hb-var.on{
+  border-color:#f0c274;
+  box-shadow:inset 0 0 0 1px rgba(255,214,140,.5), 0 0 16px rgba(216,178,104,.35);
+}
+
+/* ── the plank ── */
+.hb-row{ display:flex; align-items:stretch; gap:0; max-width:calc(100% - 360px); }
+.hb-slots{
+  display:flex; gap:0; padding:7px;
+  background:
+    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 6px),
+    linear-gradient(178deg,#6b431e 0%,#4a2d13 58%,#2b1a0a 100%);
+  box-shadow:inset 0 2px 0 rgba(255,214,158,.26), inset 0 -3px 0 rgba(0,0,0,.5),
+             0 20px 44px rgba(0,0,0,.72), 0 0 0 1px #1a1008;
+}
+/* the brass end-caps that make it a made thing and not a div */
+.hb-page{
+  width:26px; padding:0; cursor:pointer; border:0;
+  background:linear-gradient(178deg,#8a6c33,#4a3418 62%,#241708);
+  box-shadow:inset 0 2px 0 rgba(255,224,172,.34), inset 0 -3px 0 rgba(0,0,0,.5),
+             0 20px 44px rgba(0,0,0,.6);
+  display:grid; place-items:center;
+}
+.hb-page[hidden]{ display:none !important; }
+.hb-page span{
+  display:block; width:7px; height:7px;
+  border-top:2px solid #f0d9a4; border-right:2px solid #f0d9a4;
+}
+.hb-page[data-page="-1"] span{ transform:rotate(-135deg) translate(-1px,-1px); }
+.hb-page[data-page="1"]  span{ transform:rotate(45deg) translate(-1px,-1px); }
+.hb-page:disabled{ opacity:.3; cursor:default; }
+.hb-page:not(:disabled):hover span{ border-color:#fff2d4; }
+
+/* ── a slot: sunken, with the object standing in it ── */
+.hb-slot{
+  position:relative; flex:0 0 auto; width:76px; height:76px; padding:0;
+  cursor:pointer; border:1px solid rgba(0,0,0,.55);
+  background:radial-gradient(ellipse at 50% 14%,#3b2c19,#161008 82%);
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.7), inset 0 -1px 0 rgba(255,214,158,.12);
+  transition:.11s;
+}
+.hb-slot + .hb-slot{ border-left-color:rgba(255,214,158,.12); }
+.hb-fig{
+  position:absolute; inset:0; display:block;
+  transition:transform .12s cubic-bezier(.2,.9,.3,1);
+}
+.hb-slot:hover{ background:radial-gradient(ellipse at 50% 14%,#4d3a20,#1c1409 82%); }
+.hb-slot:hover .hb-fig{ transform:translateY(-4px) scale(1.06); }
+/* the one you have selected, the way a hotbar marks it: a bezel that
+   stands PROUD of the plank, not a coloured border */
+.hb-slot.on{
+  border-color:#f0c274;
+  box-shadow:inset 0 0 0 1px rgba(255,214,140,.45), inset 0 3px 8px rgba(0,0,0,.5),
+             0 0 20px rgba(216,178,104,.4);
+}
+.hb-slot.on .hb-fig{ transform:translateY(-3px) scale(1.05); }
+.hb-key{
+  position:absolute; right:3px; bottom:1px; font-style:normal;
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700;
+  color:rgba(240,220,180,.34); pointer-events:none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   WHAT YOU ARE HOLDING
+
+   Not a cursor with a class on it. A real .prop inside #tbl, so the
+   browser's own perspective draws it — tipped into the table's plane,
+   at the size it will really be, correct through pan and zoom for
+   free. Its shadow is a SECOND object lying on the boards, because
+   height is the gap between a thing and its shadow and a box-shadow
+   on the piece is in the piece's own plane and reads as nothing.
+══════════════════════════════════════════════════════════════ */
+.hand-hold, .hand-shade{ pointer-events:none; box-shadow:none; }
+.hand-hold{ z-index:9000; }
+.hand-hold .hh-face{
+  position:relative;
+  filter:drop-shadow(0 26px 22px rgba(0,0,0,.55));
+  animation:hh-breathe 2.6s ease-in-out infinite;
+}
+@keyframes hh-breathe{
+  0%,100%{ transform:translateZ(0) }
+  50%    { transform:translateZ(14px) }
+}
+.hand-shade .hh-shade{
+  position:relative;
+  background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,.55) 0%,transparent 68%);
+  filter:blur(12px);
+}
+/* the fixed copy, for when the pointer is off the wood */
+.hand-float{
+  position:fixed; z-index:9100; pointer-events:none;
+  width:0; height:0; filter:drop-shadow(0 12px 14px rgba(0,0,0,.7));
+}
+body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
+
+
+/* ══════════════════════════════════════════════════════════════
+   THE FIGURES — what each thing LOOKS like
+
+   From design-language.md, and this block is the enforcement of it:
+
+       NOTHING ON THE TABLE MAY BE A LABEL.
+
+   Every drawing is built out of the same materials as the real
+   object, at its own natural size, and scaled into whatever box it
+   is given. One markup, three uses: standing in a slot, held over
+   the wood, and lying on the wood once it is placed. What you were
+   holding is literally what landed — the same element.
+══════════════════════════════════════════════════════════════ */
+.fgbox{
+  position:absolute; left:50%; top:50%;
+  transform-origin:50% 50%; display:block; pointer-events:none;
+}
+.fg{ position:absolute; inset:0; display:block; }
+.fg *{ box-sizing:border-box; }
+
+/* ── A COUNTER ───────────────────────────────────────────────
+   A moulded disc standing on its plinth: the piece 34-gl-pieces.js
+   stands on the board, drawn flat. Ally is cold steel, enemy is
+   rust — the board's own two colours, so a token you are holding
+   already says which side it will fall in on. */
+.fg-tok .fg-plinth{
+  position:absolute; left:7px; right:7px; bottom:0; height:26px;
+  border-radius:50%;
+  background:radial-gradient(ellipse at 50% 30%,#5a4526 0%,#2a1c0c 72%);
+  box-shadow:0 5px 10px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,214,158,.28);
+}
+.fg-tok .fg-disc{
+  position:absolute; left:6px; top:0; width:84px; height:84px;
+  border-radius:50%; display:grid; place-items:center;
+}
+.fg-tok .fg-disc b{
+  font-family:'Cinzel',serif; font-size:30px; font-weight:700; letter-spacing:.03em;
+  line-height:1; text-shadow:0 2px 3px rgba(0,0,0,.5);
+}
+.fg-tok.al .fg-disc{
+  background:radial-gradient(circle at 36% 26%,#a8ccf2 0%,#4a7ab4 46%,#25507f 78%,#16324f 100%);
+  box-shadow:inset 0 -5px 10px rgba(0,0,0,.45), inset 0 4px 8px rgba(255,255,255,.42),
+             0 0 0 3px #1d3f66, 0 8px 14px rgba(0,0,0,.55);
+}
+.fg-tok.al .fg-disc b{ color:#eef6ff; }
+.fg-tok.en .fg-disc{
+  background:radial-gradient(circle at 36% 26%,#f5b09a 0%,#c9553a 46%,#8c2c18 78%,#571a0c 100%);
+  box-shadow:inset 0 -5px 10px rgba(0,0,0,.45), inset 0 4px 8px rgba(255,255,255,.34),
+             0 0 0 3px #6b2113, 0 8px 14px rgba(0,0,0,.55);
+}
+.fg-tok.en .fg-disc b{ color:#fff0e8; }
+
+/* ── THE BASE PLATE ──────────────────────────────────────────
+   A painted miniature has its name engraved on the front of its base, and
+   that is what this is: brass, lit from above, with the letters cut INTO it.
+   It is not a caption under a circle — it is part of the piece, and it only
+   exists on the counter that stands on the wood, never on the one in a slot. */
+.fg-tok.named .fg-disc{ left:16px; top:0; }
+.fg-tok.named .fg-plinth{ left:22px; right:22px; bottom:34px; height:24px; }
+.fg-tok .fg-plate{
+  position:absolute; left:0; right:0; bottom:0; height:30px;
+  display:flex; align-items:center; justify-content:center; gap:7px; padding:0 9px;
+  background:linear-gradient(180deg,#c19a4c 0%,#8a6a2c 42%,#4e3714 100%);
+  box-shadow:inset 0 2px 0 rgba(255,240,200,.6), inset 0 -2px 0 rgba(0,0,0,.55),
+             0 4px 9px rgba(0,0,0,.6);
+}
+.fg-tok .fg-plate i{
+  font-family:'Cinzel',serif; font-style:normal; font-size:13px; font-weight:700;
+  letter-spacing:.05em; color:#241708; cursor:text;
+  text-shadow:0 1px 0 rgba(255,240,200,.45);
+  max-width:74px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.fg-tok .fg-plate u{
+  text-decoration:none; font-family:'Cinzel',serif; font-size:11px; font-weight:700;
+  color:#3f2c0e; text-shadow:0 1px 0 rgba(255,240,200,.35); flex:0 0 auto;
+}
+/* the enamel pip that turns the piece over to the other side */
+.fg-tok .fg-side{
+  position:absolute; right:4px; top:-9px; width:15px; height:15px; padding:0;
+  border-radius:50%; cursor:pointer; border:2px solid #3f2c0e;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 4px rgba(0,0,0,.6);
+}
+.fg-tok.al .fg-side{ background:radial-gradient(circle at 38% 30%,#f0a48c,#8c2c18); }
+.fg-tok.en .fg-side{ background:radial-gradient(circle at 38% 30%,#a8ccf2,#25507f); }
+.fg-tok .fg-side:hover{ border-color:#f0d9a4; }
+
+/* ── PAPER ────────────────────────────────────────────────────
+   Cream, ruled, dog-eared, and never quite square to the table. */
+.fg-note{ transform:rotate(-2.2deg); }
+.fg-note::before{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(172deg,#f6ebcd 0%,#e4d2a8 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 0 0 1px #b49a68,
+             0 7px 14px rgba(0,0,0,.5);
+}
+.fg-note.t-blue::before{ background:linear-gradient(172deg,#dce7ef 0%,#b9cbdb 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 0 0 1px #7d97ad,
+             0 7px 14px rgba(0,0,0,.5); }
+.fg-note.t-red::before{ background:linear-gradient(172deg,#f2d8ce 0%,#dcb0a0 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 0 0 1px #ad7d6d,
+             0 7px 14px rgba(0,0,0,.5); }
+.fg-note .fg-lines{
+  position:absolute; left:12px; right:26px; top:20px; bottom:16px;
+  background:repeating-linear-gradient(180deg,
+    rgba(58,42,20,.42) 0 2px, transparent 2px 13px);
+}
+.fg-note .fg-lines::after{
+  content:''; position:absolute; left:0; bottom:0; width:46%; height:2px;
+  background:rgba(58,42,20,.42);
+}
+/* the folded corner, and the shade it throws on the page under it */
+.fg-note .fg-ear{
+  position:absolute; right:0; top:0; width:22px; height:22px;
+  background:linear-gradient(225deg,#c6b183 0%,#9c8455 100%);
+  clip-path:polygon(0 0,100% 100%,100% 0);
+  box-shadow:-2px 2px 4px rgba(0,0,0,.35);
+}
+
+/* ── A PICTURE ────────────────────────────────────────────────
+   In a frame, because a picture put on a table is in a frame. When
+   one has been chosen it IS that picture — the point of choosing
+   while you hold it. */
+.fg-art{
+  background:linear-gradient(160deg,#c8a34c 0%,#7a5c26 48%,#4a3418 100%);
+  box-shadow:inset 0 2px 0 rgba(255,236,190,.55), inset 0 -2px 0 rgba(0,0,0,.5),
+             0 8px 16px rgba(0,0,0,.55);
+  padding:7px;
+}
+.fg-art .fg-mount{
+  position:absolute; inset:7px; overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.6), inset 0 3px 9px rgba(0,0,0,.5);
+  background:#1a120a;
+}
+.fg-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+.fg-art .fg-blank{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(ellipse 60% 46% at 32% 74%,rgba(120,150,120,.5),transparent 72%),
+    radial-gradient(circle at 74% 26%,rgba(255,226,170,.42),transparent 46%),
+    linear-gradient(170deg,#3a4a58 0%,#22303c 100%);
+}
+
+/* ── A PAGE OUT OF A BOOK ─────────────────────────────────────
+   Torn along the spine, a drop cap, and set text under it. */
+.fg-page{ transform:rotate(1.4deg); }
+.fg-page::before{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(176deg,#f7eed6 0%,#e8d9b4 100%);
+  box-shadow:inset 0 0 0 1px #b49a68, 0 7px 14px rgba(0,0,0,.5);
+}
+.fg-page .fg-tear{
+  position:absolute; left:0; top:0; bottom:0; width:9px;
+  background:linear-gradient(90deg,#c2ab7c,#e8d9b4);
+  clip-path:polygon(0 0,100% 0,100% 100%,0 100%,
+    60% 92%,100% 84%,55% 76%,100% 68%,58% 60%,100% 52%,
+    54% 44%,100% 36%,60% 28%,100% 20%,56% 12%,100% 4%);
+}
+.fg-page .fg-cap{
+  position:absolute; left:18px; top:14px; width:22px; height:26px;
+  background:linear-gradient(160deg,#7d2f1c,#4a1b0e);
+  box-shadow:inset 0 1px 0 rgba(255,180,150,.35);
+}
+.fg-page .fg-set{
+  position:absolute; left:46px; right:12px; top:14px; height:26px;
+  background:repeating-linear-gradient(180deg,rgba(58,42,20,.55) 0 2px,transparent 2px 7px);
+}
+.fg-page .fg-set::after{
+  content:''; position:absolute; left:-28px; right:0; top:32px; height:60px;
+  background:repeating-linear-gradient(180deg,rgba(58,42,20,.42) 0 2px,transparent 2px 9px);
+}
+.fg-page.r-ruled .fg-cap{ display:none; }
+.fg-page.r-ruled .fg-set{ left:18px; top:16px; height:88px;
+  background:repeating-linear-gradient(180deg,
+    rgba(70,100,140,.5) 0 1.5px,transparent 1.5px 12px); }
+.fg-page.r-ruled .fg-set::after{ display:none; }
+.fg-page.r-plain .fg-cap, .fg-page.r-plain .fg-set{ display:none; }
+
+/* ── A SOLID ──────────────────────────────────────────────────
+   Three faces of a block, in the same iso every game uses for an
+   object you have not made yet. */
+.fg-model .cu{ position:absolute; width:52px; height:52px; }
+.fg-model .cu.t{
+  left:26px; top:6px; transform:rotate(45deg) scale(1,.56);
+  background:linear-gradient(160deg,#a9b2bd,#7d8792);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
+}
+.fg-model .cu.l{
+  left:6px; top:32px; transform:skewY(29deg);
+  background:linear-gradient(180deg,#5c646e,#3a4048);
+}
+.fg-model .cu.r{
+  left:46px; top:32px; transform:skewY(-29deg);
+  background:linear-gradient(180deg,#79828d,#4c545d);
+}
+.fg-model::after{
+  content:''; position:absolute; left:12px; right:12px; bottom:0; height:14px;
+  border-radius:50%; background:radial-gradient(ellipse,rgba(0,0,0,.5),transparent 70%);
+  filter:blur(4px);
+}
+
+/* ── THE RECORD ───────────────────────────────────────────────
+   A sheet with a name band, a portrait block and its numbers down
+   the side. A thing you pick up and read, not a row in a list. */
+.fg-sheet::before{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(176deg,#f6ebcd 0%,#e2d0a4 100%);
+  box-shadow:inset 0 0 0 1px #b49a68, 0 7px 14px rgba(0,0,0,.5);
+}
+.fg-sheet .fg-band{
+  position:absolute; left:0; right:0; top:0; height:18px;
+  background:linear-gradient(180deg,#553d1d,#2f2110);
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.3);
+}
+.fg-sheet .fg-port{
+  position:absolute; left:10px; top:26px; width:34px; height:38px;
+  background:radial-gradient(circle at 50% 34%,#8fa4bb 0 26%,#4f5f72 27%,#33404f 100%);
+  box-shadow:inset 0 0 0 1px rgba(58,42,20,.5);
+}
+.fg-sheet .fg-pips{
+  position:absolute; left:52px; right:10px; top:26px; height:38px;
+  background:repeating-linear-gradient(180deg,rgba(58,42,20,.5) 0 3px,transparent 3px 10px);
+}
+.fg-sheet .fg-pips::after{
+  content:''; position:absolute; left:-42px; right:0; top:48px; height:44px;
+  background:repeating-linear-gradient(180deg,rgba(58,42,20,.34) 0 2px,transparent 2px 9px);
+}
+
+/* ── THE BATTLEFIELD ──────────────────────────────────────────
+   Eight ranks, as many columns as the width you are holding. Cycle
+   the width and the BOARD GETS WIDER in your hand. The setting is
+   the picture; there is no number to type. */
+.fg-board{
+  display:flex; flex-direction:column; gap:3px; padding:7px;
+  background:
+    repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 6px,transparent 6px 12px),
+    linear-gradient(176deg,#3c4a35 0%,#26301f 100%);
+  box-shadow:inset 0 0 0 1px rgba(232,201,138,.28), inset 0 0 22px rgba(0,0,0,.5),
+             0 8px 16px rgba(0,0,0,.55);
+}
+.fg-board .mb-half{ flex:1; display:flex; flex-direction:column; gap:2px; }
+.fg-board .mb-rank{
+  flex:1; display:grid; grid-template-columns:repeat(var(--cols),1fr); gap:2px;
+}
+.fg-board .mb-rank i{
+  display:block; background:rgba(0,0,0,.3);
+  box-shadow:inset 0 0 0 1px rgba(232,201,138,.12);
+}
+.fg-board .mb-rank.al i.on{
+  background:radial-gradient(circle at 40% 28%,#a8ccf2,#3f6fa8 62%,#25507f);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 1px 2px rgba(0,0,0,.5);
+}
+.fg-board .mb-rank.en i.on{
+  background:radial-gradient(circle at 40% 28%,#f0a48c,#c8452c 62%,#8c2c18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34), 0 1px 2px rgba(0,0,0,.5);
+}
+.fg-board .mb-line{
+  flex:0 0 3px;
+  background:linear-gradient(90deg,transparent,#d8b268 18%,#f0d9a4 50%,#d8b268 82%,transparent);
+  box-shadow:0 0 8px rgba(216,178,104,.5);
+}
+
+/* ── A MAP PUT DOWN ───────────────────────────────────────────── */
+.fg-map{
+  padding:0; overflow:hidden;
+  background:
+    radial-gradient(ellipse 38% 30% at 26% 34%,rgba(126,148,96,.55),transparent 70%),
+    radial-gradient(ellipse 30% 26% at 72% 62%,rgba(150,124,80,.5),transparent 70%),
+    radial-gradient(ellipse 24% 20% at 60% 22%,rgba(96,120,140,.45),transparent 72%),
+    linear-gradient(170deg,#e7d6a8 0%,#cbb37e 100%);
+  box-shadow:inset 0 0 0 1px #8a7346, inset 0 0 26px rgba(90,66,30,.5),
+             0 8px 16px rgba(0,0,0,.55);
+}
+.fg-map img{ width:100%; height:100%; object-fit:cover; display:block; }
+.fg-map .mp-land{
+  position:absolute; left:10%; top:22%; width:44%; height:34%;
+  border:2px solid rgba(84,64,32,.45); border-radius:48% 52% 40% 60%;
+}
+.fg-map .mp-land::after{
+  content:''; position:absolute; left:18%; top:22%; right:18%; bottom:22%;
+  border:2px solid rgba(84,64,32,.35); border-radius:52% 44% 58% 42%;
+}
+.fg-map .mp-path{
+  position:absolute; left:14%; right:16%; top:64%; height:0;
+  border-top:2px dashed rgba(140,54,32,.75); transform:rotate(-7deg);
+}
+.fg-map .mp-x{ position:absolute; right:16%; top:56%; width:15px; height:15px; }
+.fg-map .mp-x::before, .fg-map .mp-x::after{
+  content:''; position:absolute; left:0; top:6px; width:100%; height:3px;
+  background:#8c2c18;
+}
+.fg-map .mp-x::before{ transform:rotate(45deg); }
+.fg-map .mp-x::after{ transform:rotate(-45deg); }
+
+/* ── THE STAGE ────────────────────────────────────────────────
+   A backdrop with people standing in front of it. */
+.fg-stage{ overflow:hidden; box-shadow:inset 0 0 0 1px #4a3418, 0 8px 16px rgba(0,0,0,.55); }
+.fg-stage .st-back{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 12%,rgba(255,214,150,.42),transparent 72%),
+    linear-gradient(180deg,#4a3a5c 0%,#2a2138 62%,#1a1424 100%);
+}
+.fg-stage .st-back img{ width:100%; height:100%; object-fit:cover; display:block; }
+.fg-stage .st-floor{
+  position:absolute; left:0; right:0; bottom:0; height:26%;
+  background:linear-gradient(180deg,#5a4526,#2a1c0c);
+  box-shadow:inset 0 2px 0 rgba(255,214,158,.24);
+}
+.fg-stage .st-who{
+  position:absolute; bottom:22%; width:20px; height:38px;
+  background:linear-gradient(180deg,#e8dfc8 0%,#a89878 100%);
+  border-radius:9px 9px 3px 3px;
+  box-shadow:0 4px 8px rgba(0,0,0,.55);
+}
+.fg-stage .st-who::before{
+  content:''; position:absolute; left:50%; top:-13px; width:15px; height:15px;
+  margin-left:-7.5px; border-radius:50%;
+  background:radial-gradient(circle at 38% 30%,#fff5e0,#b8a685);
+}
+.fg-stage .st-who.a{ left:26%; }
+.fg-stage .st-who.b{ right:26%; bottom:20%; transform:scale(.88);
+  background:linear-gradient(180deg,#c8b8d8 0%,#8878a0 100%); }
+
+/* ══════════════════════════════════════════════════════════════
+   AND THE SAME DRAWINGS, ONCE THEY ARE ON THE WOOD
+   Art, a page and a model used to be three identical brown cards
+   with a word on them. They are the figure now — so what you were
+   holding a moment ago is what is lying there.
+══════════════════════════════════════════════════════════════ */
+.t3-face.t3-bare{ background:none; border:0; box-shadow:none; }
+.t3-fig, .t3-pic{ position:absolute; inset:0; cursor:grab; }
+.prop.lift .t3-fig, .prop.lift .t3-pic{ cursor:grabbing; }
+.t3-pic{
+  padding:12px;
+  background:linear-gradient(160deg,#c8a34c 0%,#7a5c26 48%,#4a3418 100%);
+  box-shadow:inset 0 2px 0 rgba(255,236,190,.55), inset 0 -2px 0 rgba(0,0,0,.5);
+}
+.t3-pic img{ width:100%; height:100%; object-fit:cover; display:block;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.6); }
+
+/* the tints a note can be, chosen while you were holding it */
+.t3-face.nt-blue{ background:linear-gradient(176deg,#e2ecf4 0%,#c4d5e3 100%);
+  border-color:#7d97ad; }
+.t3-face.nt-blue .t3-title{ background:linear-gradient(180deg,#b9cbdb,#9db1c4);
+  border-bottom-color:#7d97ad; }
+.t3-face.nt-red{ background:linear-gradient(176deg,#f6e0d6 0%,#e0b8a8 100%);
+  border-color:#ad7d6d; }
+.t3-face.nt-red .t3-title{ background:linear-gradient(180deg,#dcb0a0,#c8988a);
+  border-bottom-color:#ad7d6d; }
+
+
+/* ══════════════════════════════════════════════════════════════
+   THE GM'S OWN CONTROLS, MADE OF SOMETHING
+
+   The last thing on this screen that still looked like a settings
+   dialog: a dark rounded panel with two web toggles and a <select>,
+   floating over an oak table in a lamplit room. Everything else on
+   the table is now an object, so this has to be one too — a small
+   control board propped at the edge of the table, oak with brass
+   furniture, the switches real levers in real slots, the numbers
+   stamped into brass. Nothing about what it DOES changes; this is
+   entirely how it is made.
+
+   It stays on your own end. Only the GM sees it, which is why it is
+   at the screen edge and not on the wood.
+══════════════════════════════════════════════════════════════ */
+.sc-opts{
+  width:302px !important; top:78px !important;
+  background:
+    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 7px),
+    linear-gradient(176deg,#5e4222 0%,#3a2712 52%,#241708 100%) !important;
+  border:0 !important;
+  box-shadow:
+    inset 0 2px 0 rgba(255,224,172,.3), inset 0 -3px 0 rgba(0,0,0,.6),
+    inset 0 0 0 1px #1a1008,
+    -3px 0 0 #8a6c33, 3px 0 0 #8a6c33,          /* the brass side bands */
+    0 26px 54px rgba(0,0,0,.72) !important;
+}
+.sc-opts-head{
+  background:linear-gradient(180deg,#c19a4c 0%,#8a6a2c 44%,#4e3714 100%) !important;
+  color:#241708 !important;
+  box-shadow:inset 0 2px 0 rgba(255,240,200,.6), inset 0 -2px 0 rgba(0,0,0,.5);
+  padding:9px 12px !important;
+}
+.sc-opts-head b{ color:#1c1208; text-shadow:0 1px 0 rgba(255,240,200,.45); }
+.sc-opts-head i{ color:rgba(36,23,8,.62) !important; }
+.sc-opts-x{
+  color:#2a1c0a !important; background:rgba(0,0,0,.14) !important;
+  border:1px solid rgba(36,23,8,.4) !important;
+}
+.sc-opts-x:hover{ color:#000 !important; background:rgba(255,240,200,.35) !important; }
+
+/* an engraved score between the rows, not a 1px web rule */
+.sc-opt{
+  border-bottom:0 !important;
+  box-shadow:0 1px 0 rgba(0,0,0,.55), 0 2px 0 rgba(255,224,172,.09);
+  padding:11px 12px !important;
+}
+.sc-opt:last-child{ box-shadow:none; }
+.sc-opt-text b{ color:#f0d9a4 !important; }
+.sc-opt-text i{ color:rgba(232,223,200,.44) !important; }
+
+/* ── a real toggle: a brass lever in a sunk slot ── */
+.sc-switch{ width:44px !important; height:22px !important; }
+.sc-slide{
+  background:linear-gradient(180deg,#150e06,#2c1e0e) !important;
+  border:0 !important;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,224,172,.14),
+             0 1px 0 rgba(255,224,172,.12) !important;
+}
+.sc-slide::after{
+  left:3px !important; top:3px !important; width:16px !important; height:16px !important;
+  background:linear-gradient(180deg,#e0bd74,#8a6a2c 60%,#5c421a) !important;
+  box-shadow:inset 0 1px 0 rgba(255,244,214,.7), 0 2px 4px rgba(0,0,0,.7) !important;
+  transition:left .15s cubic-bezier(.2,.9,.3,1), background .15s !important;
+}
+.sc-switch input:checked + .sc-slide{
+  background:linear-gradient(180deg,#3a2a10,#1e1406) !important;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.8), 0 0 14px rgba(216,178,104,.35) !important;
+}
+.sc-switch input:checked + .sc-slide::after{
+  left:25px !important;
+  background:linear-gradient(180deg,#ffe9a8,#d8b268 58%,#8a6a2c) !important;
+}
+
+/* ── a number stamped into brass ── */
+.sc-opt .sc-num{
+  color:#241708 !important;
+  background:linear-gradient(180deg,#c8a45a,#8a6a2c) !important;
+  border:0 !important;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,240,200,.5),
+             0 1px 0 rgba(255,240,200,.16) !important;
+  padding:4px 0 !important; text-shadow:0 1px 0 rgba(255,240,200,.4) !important;
+}
+.sc-opt .sc-pick{
+  color:#f0d9a4 !important;
+  background:linear-gradient(180deg,#2c1e0e,#170f06) !important;
+  border:1px solid #6b5227 !important; padding:5px 6px !important;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.14) !important;
+}
+.sc-opts-none, .sc-opts-foot{
+  color:rgba(232,223,200,.4) !important; border-top:0 !important;
+  box-shadow:0 -1px 0 rgba(0,0,0,.5), 0 -2px 0 rgba(255,224,172,.08);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE TRAY — the options of whatever kind you reached for
+
+   grumkata: "you should select an object generalization then get a
+   list of options + custom option and from there you place it".
+   The plank below holds the kinds; this is what opens above it.
+   Same materials, one size down, because it is what is inside the
+   thing rather than the thing.
+══════════════════════════════════════════════════════════════ */
+/* wide, but never wide enough to reach the bin in the same bottom band */
+.hb-tray{
+  max-width:min(880px, calc(100vw - 470px));
+  padding:8px;
+  background:
+    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 6px),
+    linear-gradient(178deg,#4a2d13 0%,#301c0a 62%,#1c1006 100%);
+  box-shadow:inset 0 2px 0 rgba(255,214,158,.22), inset 0 -3px 0 rgba(0,0,0,.55),
+             0 18px 42px rgba(0,0,0,.7), 0 0 0 1px #1a1008;
+}
+.hb-tray[hidden]{ display:none !important; }
+.hb-tray-in{
+  display:flex; flex-wrap:wrap; gap:4px; justify-content:center;
+  max-height:212px; overflow-y:auto; overscroll-behavior:contain;
+}
+.hb-tray-in::-webkit-scrollbar{ width:7px }
+.hb-tray-in::-webkit-scrollbar-track{ background:rgba(0,0,0,.4) }
+.hb-tray-in::-webkit-scrollbar-thumb{ background:#6b5227 }
+.hb-opt{
+  position:relative; flex:0 0 auto; width:66px; height:66px; padding:0; cursor:pointer;
+  border:1px solid rgba(0,0,0,.55);
+  background:radial-gradient(ellipse at 50% 14%,#3b2c19,#161008 82%);
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.65), inset 0 -1px 0 rgba(255,214,158,.1);
+  transition:.11s;
+}
+.hb-opt .hb-fig{ position:absolute; inset:0; display:block;
+  transition:transform .12s cubic-bezier(.2,.9,.3,1); }
+.hb-opt:hover{ background:radial-gradient(ellipse at 50% 14%,#4d3a20,#1c1409 82%);
+  border-color:#d8b268; }
+.hb-opt:hover .hb-fig{ transform:translateY(-3px) scale(1.07); }
+/* the brass plus on a slot that makes a new one */
+.hb-plus{
+  position:absolute; right:2px; bottom:2px; width:17px; height:17px;
+  background:linear-gradient(180deg,#e0bd74,#8a6a2c);
+  box-shadow:inset 0 1px 0 rgba(255,244,214,.7), 0 2px 4px rgba(0,0,0,.65);
+  pointer-events:none;
+}
+.hb-plus::before, .hb-plus::after{
+  content:''; position:absolute; background:#241708;
+}
+.hb-plus::before{ left:3px; right:3px; top:7.5px; height:2px }
+.hb-plus::after{ top:3px; bottom:3px; left:7.5px; width:2px }
+.hb-opt.custom{ border-style:dashed; border-color:rgba(216,178,104,.5) }
+
+/* ══════════════════════════════════════════════════════════════
+   WHAT A COUNTER IS — set beside the counter, while you hold it
+══════════════════════════════════════════════════════════════ */
+.tk-make{
+  position:fixed; right:320px; bottom:200px; z-index:1300; width:266px;
+  background:
+    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 7px),
+    linear-gradient(176deg,#5e4222 0%,#3a2712 52%,#241708 100%);
+  box-shadow:inset 0 2px 0 rgba(255,224,172,.3), inset 0 -3px 0 rgba(0,0,0,.6),
+             inset 0 0 0 1px #1a1008, -3px 0 0 #8a6c33, 3px 0 0 #8a6c33,
+             0 26px 54px rgba(0,0,0,.72);
+  color:#e8dfc8;
+}
+.tk-make[hidden]{ display:none !important; }
+.tk-make-head{
+  display:flex; align-items:center; gap:9px; padding:9px 10px;
+  background:linear-gradient(180deg,#c19a4c 0%,#8a6a2c 44%,#4e3714 100%);
+  box-shadow:inset 0 2px 0 rgba(255,240,200,.6), inset 0 -2px 0 rgba(0,0,0,.5);
+}
+.tk-make-fig{ position:relative; flex:0 0 auto; width:52px; height:52px; display:block }
+.tk-make-head input{
+  flex:1; min-width:0; font-family:'Cinzel',serif; font-size:13px; font-weight:700;
+  letter-spacing:.04em; color:#1c1208; background:rgba(255,240,200,.28);
+  border:0; border-bottom:2px solid rgba(36,23,8,.5); outline:0; padding:4px 6px;
+  border-radius:0;
+}
+.tk-make-head input[readonly]{ background:transparent; border-bottom-color:transparent }
+.tk-make-x{
+  flex:0 0 auto; width:22px; height:22px; display:grid; place-items:center; font-size:11px;
+  color:#2a1c0a; background:rgba(0,0,0,.14); border:1px solid rgba(36,23,8,.4);
+  cursor:pointer;
+}
+.tk-make-x:hover{ background:rgba(255,240,200,.4) }
+.tk-make-body{ padding:4px 10px 10px }
+.tk-row{ display:flex; align-items:center; gap:9px; padding:8px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.5), 0 2px 0 rgba(255,224,172,.08) }
+.tk-row:last-child{ box-shadow:none }
+.tk-row.col{ display:block }
+.tk-lbl{ flex:0 0 74px; font-family:'Cinzel',serif; font-size:9px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; color:#e8c98a }
+.tk-row.col .tk-lbl{ display:block; margin-bottom:6px }
+.tk-note{ font-family:'Crimson Text',serif; font-style:italic; font-size:11px;
+  color:rgba(232,223,200,.42) }
+.tk-sides{ display:flex; gap:7px }
+.tk-pip{ width:22px; height:22px; border-radius:50%; cursor:pointer;
+  border:2px solid #3f2c0e; padding:0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 4px rgba(0,0,0,.6) }
+.tk-pip.al{ background:radial-gradient(circle at 38% 30%,#a8ccf2,#25507f) }
+.tk-pip.en{ background:radial-gradient(circle at 38% 30%,#f0a48c,#8c2c18) }
+.tk-pip.on{ border-color:#f0d9a4; box-shadow:inset 0 1px 0 rgba(255,255,255,.4),
+  0 0 12px rgba(216,178,104,.6) }
+.tk-make input[type=number].tk-f-max{
+  flex:0 0 62px; width:62px; text-align:center;
+  font-family:'Cinzel',serif; font-size:14px; font-weight:700; color:#241708;
+  background:linear-gradient(180deg,#c8a45a,#8a6a2c); border:0; outline:0; border-radius:0;
+  padding:4px 0; box-shadow:inset 0 2px 4px rgba(0,0,0,.45),
+    inset 0 -1px 0 rgba(255,240,200,.5);
+}
+.tk-sizes{ display:flex; gap:3px }
+.tk-size{ font-family:'Cinzel',serif; font-size:8.5px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; padding:6px 8px; cursor:pointer;
+  color:rgba(232,223,200,.7); background:rgba(0,0,0,.3);
+  border:1px solid rgba(232,201,138,.26); border-radius:0 }
+.tk-size:hover{ color:#fff6e2; border-color:#d8b268 }
+.tk-size.on{ color:#1c1409; background:#d8b268; border-color:#d8b268 }
+.tk-size:disabled{ opacity:.35; cursor:default }
+.tk-faces{ display:flex; flex-wrap:wrap; gap:3px; max-height:126px; overflow-y:auto;
+  padding:3px; background:rgba(0,0,0,.28);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6) }
+.tk-faces::-webkit-scrollbar{ width:6px }
+.tk-faces::-webkit-scrollbar-thumb{ background:#6b5227 }
+.tk-face{ position:relative; width:38px; height:38px; padding:0; cursor:pointer;
+  background:radial-gradient(ellipse at 50% 20%,#3b2c19,#161008 84%);
+  border:1px solid rgba(0,0,0,.5) }
+.tk-face:hover{ border-color:#d8b268 }
+.tk-face.on{ border-color:#f0c274; box-shadow:0 0 10px rgba(216,178,104,.5) }
+.tk-face.none::after{ content:''; position:absolute; left:8px; right:8px; top:17px;
+  height:2px; background:rgba(232,201,138,.4); transform:rotate(-38deg) }
+.tk-face.own .tk-plus{ position:absolute; inset:11px;
+  background:linear-gradient(180deg,#e0bd74,#8a6a2c) }
+.tk-face.own .tk-plus::before, .tk-face.own .tk-plus::after{
+  content:''; position:absolute; background:#241708 }
+.tk-face.own .tk-plus::before{ left:3px; right:3px; top:7px; height:2px }
+.tk-face.own .tk-plus::after{ top:3px; bottom:3px; left:7px; width:2px }
+.tk-make textarea{
+  width:100%; font-family:'Crimson Text',serif; font-size:13px; line-height:1.4;
+  color:#f0e3c4; background:rgba(0,0,0,.3); border:1px solid rgba(232,201,138,.24);
+  outline:0; padding:6px 8px; resize:vertical; border-radius:0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   A COUNTER WITH A FACE, AND A MODEL THAT IS REALLY THERE
+══════════════════════════════════════════════════════════════ */
+/* the side lives in the RIM, so a portrait never fights it (design rule 5) */
+.fg-tok.faced .fg-disc{ overflow:hidden; padding:0 }
+.fg-tok.faced .fg-disc img, .fg-tok.faced .fg-disc .fg-svg{
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+.fg-tok.faced .fg-disc .fg-svg{ padding:14%; fill:#f4ead2 }
+.fg-tok.en.faced .fg-disc .fg-svg{ fill:#ffe8dc }
+/* a body of troops stands wider than a person, and is oblong, not round */
+.fg-tok.form .fg-disc{ left:0; width:124px; height:84px; border-radius:42px }
+.fg-tok.form.named .fg-disc{ left:0; width:150px }
+.fg-tok.form .fg-plinth{ left:6px; right:6px }
+.fg-tok.form.named .fg-plinth{ left:14px; right:14px }
+.fg-tok.form .fg-disc b{ font-size:26px }
+
+/* a picture is the picture — no frame this app invented for it */
+.fg-art{ background:none; box-shadow:none; padding:0; overflow:hidden }
+/* drop-shadow, not box-shadow: most of the art in this app is a cut-out with
+   transparency, and a box shadow draws the shadow of its BOUNDING BOX — a
+   bright rectangle hanging behind a standing figure, which reads as a frame
+   nobody asked for. */
+.fg-art.has{ filter:drop-shadow(0 10px 14px rgba(0,0,0,.6)) }
+.fg-art img{ width:100%; height:100%; object-fit:cover; display:block }
+.fg-art .fg-svg{ width:100%; height:100%; display:block; fill:#e8dfc8 }
+.fg-art .fg-blank{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(ellipse 60% 46% at 32% 74%,rgba(120,150,120,.45),transparent 72%),
+    radial-gradient(circle at 74% 26%,rgba(255,226,170,.36),transparent 46%),
+    linear-gradient(170deg,#3a4a58 0%,#22303c 100%);
+  box-shadow:inset 0 0 0 1px rgba(232,201,138,.24);
+}
+/* the placed picture: no gilt frame, just the picture and the shadow it casts */
+.t3-pic{ padding:0; background:none; box-shadow:none }
+.t3-pic{ filter:drop-shadow(0 14px 20px rgba(0,0,0,.6)) }
+.t3-pic img{ width:100%; height:100%; object-fit:contain; display:block }
+
+/* a real render of the model, rather than a drawing of a block */
+.fg-model.shot{ background:none }
+.fg-model.shot img{ width:100%; height:100%; object-fit:contain; display:block }
+
+/* ── A MODEL ON THE WOOD ──────────────────────────────────────
+   The face is empty on purpose: 27-table-gl.js paints the real asset over
+   this rect every frame. All that belongs here is the shadow it throws,
+   because that lies ON the wood and the wood is a DOM element. */
+.t3-mdl-face{ background:none; box-shadow:none }
+.t3-mdl-grab{ position:absolute; inset:0; cursor:grab }
+.prop.lift .t3-mdl-grab{ cursor:grabbing }
+/* the painted oval that used to be here is gone: the model casts a real
+   shadow now, which is a different shape for every model and falls across
+   whatever it is standing next to */
+.t3-mdl-shade{ display:none }
+.prop.t3-model{ box-shadow:none }
+
+/* A PICTURE HAS NO EDGES OF ITS OWN. Every other prop is a card with four
+   extruded sides, which is right for a card and wrong for a photograph — the
+   sides drew a thin bright rectangle round the artwork, which is the "border
+   for some weird reason". A picture lying on a table is the picture and the
+   shadow it casts. */
+.prop.t3-art .side{ display:none }
+.prop.t3-art{ box-shadow:none }
+
+/* a figure sprite is a whole standing person; cropping it to a disc shows you
+   their chest. Fit the whole of them inside the rim instead. */
+.fg-tok.faced .fg-disc img{ object-fit:contain; background:rgba(0,0,0,.22) }
+
+/* a note is a thing you push about; writing on it is a deliberate second act */
+.nt-body{ cursor:grab }
+.prop.lift .nt-body{ cursor:grabbing }
+.t3-note.writing .nt-body{ cursor:text; background:rgba(255,255,255,.4) }
+.nt-body:not([contenteditable="true"]):empty::before{
+  content:'Double-click to write on it';
+}
+
+/* ── A COUNTER THAT STANDS UP ────────────────────────────────
+   grumkata: "tokens ... are flat for some weird ass reason". The disc IS the
+   flat thing, so on the wood it stops being the piece and becomes the anchor
+   the real piece is stood on: this span's rect is what 27-table-gl.js
+   measures, and its bottom edge is where the piece's feet go — level with the
+   plinth, which is the shadow it casts.
+
+   The disc is kept and only made invisible. It carries the portrait the
+   standee is printed from, and it is what you are left looking at if the
+   bits pack never loaded.
+
+   THE PIECE FILLS THE BOX. It used to be inset eight pixels a side and
+   stopped short of the top, which made a counter mostly base plate with a
+   small coloured shape balanced on it — grumkata: "tokens dont look 3d".
+   A piece is the thing; the plate is a label screwed to the bottom of it.
+   It is allowed to stand PROUD of its own box, because a standing figure
+   does. */
+.fg-tok .fg-stand{
+  position:absolute; left:0; top:-20px; width:116px; bottom:36px;
+  pointer-events:none;
+}
+.fg-tok.form .fg-stand{ left:0; width:150px; top:-16px; }
+.fg-tok:not(.named) .fg-stand{ bottom:6px; top:-8px; }
+.fg-tok.standing .fg-disc{ opacity:0; }
+/* A PIECE IS NOT A CARD. The prop's rectangular drop shadow and its four
+   cut edges were drawing a slab of board under every counter — you could see
+   the corners of it on the wood. A counter has a base plate and a shadow of
+   its own shape, and nothing else. */
+.prop.t3-token{ box-shadow:none; }
+.prop.t3-token .side{ display:none; }
+/* AND NO PAINTED PLINTH. It was a blurred oval standing in for the shadow
+   the piece could not cast; the piece casts one now, off the room's own
+   lamp, and it lands on the wood and across the board it is standing on. */
+.fg-tok.standing .fg-plinth{ display:none; }
+
+/* ══════════════════════════════════════════════════════════════
+   A PREVIEW IS THE THING, MADE SMALL   (51-preview.js)
+
+   grumkata: "for scenes and combat YOU STILL ARNT SHOWING WHAT YOUR PUTTING
+   DOWN FFS". So a scene in a slot, in your hand, or hovering over the wood is
+   the real battlefield sheet at real size, scaled down — which means it needs
+   no styling of its own at all. .cwin and everything under it is already
+   dressed by 12-combat.css; this only holds the sheet still and stops it
+   taking pointers, because it is a picture of a thing and not the thing.
+══════════════════════════════════════════════════════════════ */
+.pv{
+  position:absolute; left:50%; top:50%;
+  transform-origin:50% 50%; display:block; pointer-events:none;
+  /* it is a still: nothing in it may animate, hover or catch a click */
+  contain:layout paint;
+}
+.pv *{ pointer-events:none !important; animation:none !important;
+       transition:none !important; cursor:default !important; }
+.pv .cwin{ width:100%; height:100%; display:flex; flex-direction:column; }
+.pv .field{ flex:1; min-height:0; overflow:hidden; }
+/* the map and the backdrop fill the sheet the way they will when it lands */
+.pv-pic{ position:relative; display:grid; place-items:center;
+  background:linear-gradient(176deg,#241a10,#140d07); }
+.pv-pic img{ width:100%; height:100%; object-fit:cover; display:block; }
+.pv-none{
+  font-family:'Cinzel',serif; font-size:40px; letter-spacing:.14em;
+  text-transform:uppercase; color:rgba(240,217,164,.34);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE SHELF — when a tray holds more than a plank's worth
+
+   grumkata: "for art when selecting it some of it can be cutoff ALSO as we go
+   on art and models will get more and more so the current setup wont work",
+   and "generally using the toolbox ui is clunky to impossible most times".
+
+   The tray was a flat wrap of 66px squares under a hard 212px ceiling: no way
+   to say what you wanted, no way to say which shelf to look on, and the last
+   two rows fell off the bottom. Past fourteen things it becomes a shelf with
+   the library's own groups as tabs, a box to type in, and tiles big enough to
+   BE the picture rather than a smear of it, each with its name under it.
+══════════════════════════════════════════════════════════════ */
+.hb-shelf{
+  display:flex; align-items:center; gap:8px; padding:0 2px 8px;
+  border-bottom:1px solid rgba(255,214,158,.14); margin-bottom:8px;
+}
+.hb-shelf[hidden]{ display:none !important; }
+.hb-tabs{ display:flex; gap:4px; flex:1; min-width:0; overflow-x:auto;
+  scrollbar-width:none; }
+.hb-tabs::-webkit-scrollbar{ height:0 }
+.hb-tab{
+  flex:0 0 auto; display:flex; align-items:baseline; gap:5px; cursor:pointer;
+  font-family:'Cinzel',serif; font-size:10px; font-weight:700; letter-spacing:.11em;
+  text-transform:uppercase; color:#d8c49a; padding:5px 10px;
+  background:linear-gradient(178deg,#3b2c19,#1e1509); border:1px solid #4a3418;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.18);
+}
+.hb-tab i{ font-style:normal; font-size:9px; opacity:.55; }
+.hb-tab:hover{ border-color:#d8b268; color:#f6e6c0; }
+.hb-tab.on{ color:#1c1409; background:linear-gradient(178deg,#e0c286,#a8873f);
+  border-color:#f0d9a4; box-shadow:inset 0 1px 0 rgba(255,255,255,.45); }
+.hb-tab.on i{ opacity:.65 }
+.hb-find{ flex:0 0 auto; display:block; }
+.hb-find input{
+  width:172px; padding:6px 9px; color:#f4e8cc; font-family:'Crimson Text',serif;
+  font-size:13px; background:rgba(0,0,0,.42); border:1px solid #4a3418; outline:none;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
+}
+.hb-find input:focus{ border-color:#d8b268; }
+.hb-find input::placeholder{ color:rgba(240,217,164,.4); font-style:italic; }
+.hb-count{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:9px; letter-spacing:.13em;
+  text-transform:uppercase; color:rgba(240,217,164,.5); min-width:62px; text-align:right;
+}
+.hb-nowt{
+  margin:0; padding:26px 0; width:100%; text-align:center;
+  font-family:'Crimson Text',serif; font-style:italic; font-size:14px;
+  color:rgba(240,217,164,.45);
+}
+
+/* ── the shelf's own tray: wider, taller, and it does not crop ── */
+.hb-tray.browse{ max-width:min(1120px, calc(100vw - 380px)); }
+.hb-tray.browse .hb-tray-in{
+  /* THE OLD CEILING WAS 212px, which is three rows of the old tile and is
+     where "some of it can be cutoff" came from. Height is asked of the
+     viewport now, so a taller screen shows more and a short one still
+     scrolls rather than hiding the bottom row behind the edge. */
+  max-height:min(46vh, 420px); align-content:flex-start; gap:6px; padding:2px;
+}
+.hb-tray.browse .hb-opt{
+  width:104px; height:124px; display:flex; flex-direction:column;
+}
+.hb-tray.browse .hb-opt .hb-fig{ position:relative; inset:auto; flex:1; min-height:0; }
+.hb-nm{
+  display:block; flex:0 0 auto; padding:3px 5px 5px; font-style:normal;
+  font-family:'Crimson Text',serif; font-size:11px; line-height:1.15;
+  color:rgba(240,224,196,.82); text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.hb-tray.browse .hb-opt:hover .hb-nm{ color:#fff2d4; }
+
+/* A COUNTER IN A SLOT IS A PHOTOGRAPH OF THE PIECE — no rim, no plinth
+   colour, nothing the disc drew when it was a letter in a circle. The piece's
+   own paint says which side it is on, which is the point of using it. */
+.fg-tok .fg-disc.shot{
+  background:none !important; box-shadow:none !important;
+  left:0; width:100%; height:100%; border-radius:0; overflow:visible;
+}
+.fg-tok .fg-disc.shot img{ width:100%; height:100%; object-fit:contain; display:block; }
+.fg-tok.named .fg-disc.shot{ left:0; height:calc(100% - 34px); }
+/* the monogram tag on a record's piece — brass, under the pawn, the way a
+   painted miniature is labelled on its base */
+.fg-tok .fg-disc.shot .fg-mono{
+  position:absolute; left:50%; bottom:2%; transform:translateX(-50%);
+  padding:2px 7px; font-family:'Cinzel',serif; font-size:15px; font-weight:700;
+  letter-spacing:.06em; color:#241708 !important;
+  background:linear-gradient(180deg,#c19a4c,#8a6a2c 46%,#4e3714);
+  box-shadow:inset 0 1px 0 rgba(255,240,200,.6), 0 2px 5px rgba(0,0,0,.6);
+  text-shadow:0 1px 0 rgba(255,240,200,.4);
+}

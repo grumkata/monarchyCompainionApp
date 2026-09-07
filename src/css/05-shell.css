@@ -126,13 +126,50 @@ body.dark-mode{
      src/assets/images/textures/table-surface.svg (NEEDS ART). */
   background:
     radial-gradient(ellipse at 50% 0%, var(--table-accent-soft) 0%, transparent 60%),
-    linear-gradient(180deg, var(--table-bg1) 0%, var(--table-bg2) 100%),
-    url(../assets/images/textures/table-surface.svg) center/cover no-repeat;
-  background-blend-mode: normal, multiply, normal;
+    linear-gradient(180deg, var(--table-bg1) 0%, var(--table-bg2) 100%);
+  background-blend-mode: normal, normal;
   transition:background .25s;
 }
 
 #table-surface{ position:absolute; inset:0; }
+
+/* A flat fill reads as an unstyled div. A vignette makes the same colour
+   read as a lit surface with edges — cheap depth, no asset required. */
+#table-surface::before{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(ellipse at 50% 42%, transparent 30%, rgba(0,0,0,.30) 100%);
+}
+
+/* ---------- EMPTY TABLE STATE ---------- */
+#table-empty{ display:none; }
+#table-scene.table-is-empty #table-empty{
+  display:flex; position:absolute; inset:0; z-index:1;
+  align-items:center; justify-content:center; padding:40px;
+  pointer-events:none;
+}
+.table-empty-inner{
+  pointer-events:auto; text-align:center; max-width:420px;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.table-empty-mark{ font-size:26px; color:var(--table-accent); opacity:.5; line-height:1; }
+.table-empty-title{
+  font-family:'Cinzel',serif; font-size:17px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--table-ink); opacity:.82;
+}
+.table-empty-sub{
+  font-family:'Crimson Text',serif; font-style:italic; font-size:14px;
+  color:var(--table-ink); opacity:.5; max-width:34ch; line-height:1.5;
+}
+.table-empty-actions{ display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; justify-content:center; }
+.table-empty-btn{
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:10px 16px; cursor:pointer; border-radius:2px;
+  border:1px solid var(--table-line); background:transparent; color:var(--table-ink);
+  opacity:.72; transition:opacity .15s, background .15s, border-color .15s;
+}
+.table-empty-btn:hover{ opacity:1; background:var(--table-accent-soft); border-color:var(--table-accent); }
+.table-empty-btn:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
 
 /* The existing "Manage Servers" modal (#server-modal, lives inside the
    sheet markup) is coded at z-index:500 — enough to beat anything on
@@ -144,8 +181,11 @@ body.dark-mode{
 /* ---------- LEFT CONTROL PANEL ---------- */
 #table-left-controls{
   position:fixed; top:0; left:0; bottom:0; z-index:850;
-  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
-  padding:16px 10px; pointer-events:none; /* only real buttons capture clicks */
+  display:flex; flex-direction:column; align-items:stretch; gap:2px;
+  padding:14px 10px; width:186px;
+  background:var(--paper2); border-right:3px solid var(--ink);
+  box-shadow:8px 0 24px rgba(0,0,0,.28);
+  pointer-events:auto;
 }
 #table-left-controls .table-ctrl-btn{ pointer-events:auto; }
 .table-ctrl-sep{ width:22px; height:1px; background:var(--table-line); margin:4px 0; }
@@ -153,16 +193,21 @@ body.dark-mode{
 .table-ctrl-btn{
   font-family:'Cinzel',serif; font-size:8.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
   border:1px solid transparent; background:rgba(122,92,30,.06); color:var(--table-ink);
-  padding:7px 9px; cursor:pointer; display:flex; align-items:center; gap:6px;
-  opacity:.55; transition:all .15s; white-space:nowrap; border-radius:2px;
+  padding:8px 10px; cursor:pointer; display:flex; align-items:center; gap:9px;
+  opacity:1; transition:background .15s, border-color .15s; white-space:nowrap; border-radius:2px;
+  width:100%; text-align:left;
 }
-.table-ctrl-btn span{ max-width:0; overflow:hidden; opacity:0; transition:max-width .18s ease, opacity .15s ease; }
-.table-ctrl-btn:hover{ opacity:1; background:rgba(122,92,30,.16); border-color:var(--table-line); }
-.table-ctrl-btn:hover span{ max-width:140px; opacity:1; }
+/* Labels are permanently visible. They used to be max-width:0 and revealed
+   only on hover, which left a column of unexplained floating glyphs at rest
+   — read as broken chrome rather than as restraint (UX-AUDIT 4.2). */
+.table-ctrl-btn span{ overflow:hidden; }
+.table-ctrl-btn:hover{ background:rgba(122,92,30,.16); border-color:var(--table-line); }
+.table-ctrl-btn:focus-visible{ outline:2px solid var(--gold); outline-offset:1px; }
+.table-ctrl-sep{ width:100%; }
 
 /* ---------- RIGHT PANEL: now the hardcoded home of the Combat Tracker ---------- */
 #table-right-panel{
-  position:fixed; top:0; right:0; bottom:0; width:300px; z-index:850;
+  position:fixed; top:0; right:0; bottom:0; width:392px; z-index:850;
   pointer-events:auto; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable;
   background:var(--paper2); border-left:3px solid var(--ink);
   box-shadow:-8px 0 24px rgba(0,0,0,.35);

@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="css/03-patches.css">
 <link rel="stylesheet" href="css/04-overrides.css">
 <link rel="stylesheet" href="css/05-shell.css">
+<link rel="stylesheet" href="css/06-table3d.css">
+<link rel="stylesheet" href="css/07-table-ui.css">
 </head>
 <body>
 
@@ -323,6 +325,22 @@
   </div>
 
   <div id="table-surface">
+
+    <!-- Shown only while no window is open (toggled by WM via .table-is-empty
+         on #table-scene). An empty table with no prompt reads as a broken
+         app rather than a ready one — UX-AUDIT 4.1. -->
+    <div id="table-empty">
+      <div class="table-empty-inner">
+        <div class="table-empty-mark">&#9876;</div>
+        <div class="table-empty-title">The table is set</div>
+        <div class="table-empty-sub">Open a character sheet, or bring up the combat tracker, to begin.</div>
+        <div class="table-empty-actions">
+          <button class="table-empty-btn" onclick="tableCreateCharacter()">Create a character</button>
+          <button class="table-empty-btn" onclick="tableOpenCharacterModal()">Open a character</button>
+        </div>
+      </div>
+    </div>
+
     <div class="table-window" data-window-id="sheet">
       <div class="window-titlebar">
         <span>📜 Character Sheet</span>
@@ -730,10 +748,22 @@
       document.head.appendChild(s);
     });
   }
-  window.__firebaseSdkReady = Promise.all([
-    loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js'),
-    loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js')
-  ]).then(function(results) { return results.every(Boolean); });
+  // app-compat MUST finish before database/auth. The compat SDKs attach
+  // themselves to the `firebase` global that app-compat creates, and
+  // dynamically-inserted scripts are async by default — so loading them
+  // in parallel is a real race. If database (or auth) executes first it
+  // throws "firebase is not defined", which is a RUNTIME error, not a
+  // load error, so s.onerror never fires and loadScript still resolves
+  // true — leaving __firebaseSdkReady reporting success with a missing
+  // SDK. Sequence app first, then its two dependents in parallel.
+  window.__firebaseSdkReady = loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js')
+    .then(function(appOk) {
+      if (!appOk) return false;
+      return Promise.all([
+        loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js'),
+        loadScript('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js')
+      ]).then(function(results) { return results.every(Boolean); });
+    });
 })();
 </script>
 <script src="js/09-session-sync.js"></script>
@@ -743,5 +773,20 @@
 <script src="js/14-window-manager.js"></script>
 <script src="js/15-app-shell.js"></script>
 <script src="js/16-multi-sheet.js"></script>
+
+<!-- ══ THE TABLE ══════════════════════════════════════════════
+     20/21 are DOM-free and unit-tested by test/table.test.js.
+     22-24 are the view. Load order matters: content, then model,
+     then the three that read them. -->
+<script src="js/18-three.js"></script>
+<script src="js/19-chest-asset.js"></script>
+<script src="js/20-table-content.js"></script>
+<script src="js/21-table-model.js"></script>
+<script src="js/22-table3d.js"></script>
+<script src="js/23-table-props.js"></script>
+<script src="js/24-toolbox.js"></script>
+<script src="js/25-scene-setup.js"></script>
+<script src="js/27-table-gl.js"></script>
+<script src="js/26-table-boot.js"></script>
 </body>
 </html>

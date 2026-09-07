@@ -42,6 +42,10 @@ let _db          = null;
 let _bfRef       = null;
 let _playersRef  = null;
 let _presenceRef = null;
+let _uid         = null;   // anonymous-auth uid; stable per browser profile
+
+/** This client's Firebase uid. Null until _ensureFirebase() has run. */
+function getMyUid() { return _uid; }
 
 // Timers
 let _pushTimer       = null;  // debounce for GM bf push — other files clear/set this directly, keep the name
@@ -79,6 +83,27 @@ async function _ensureFirebase() {
     return false;
   }
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+  // Sign in BEFORE opening the database connection, so the realtime
+  // socket is established carrying a token rather than upgrading
+  // mid-flight. Anonymous auth must be enabled in the Firebase console
+  // (Authentication -> Sign-in method -> Anonymous) or every call here
+  // fails with auth/operation-not-allowed. Firebase persists the session
+  // to localStorage, so one browser profile keeps the same uid across
+  // reloads — which is what rejoining the same table will rely on.
+  if (typeof firebase.auth !== 'function') {
+    console.error('[monarchy sync] auth SDK did not load — check the loader block in index.html.');
+    return false;
+  }
+  try {
+    const cred = await firebase.auth().signInAnonymously();
+    _uid = cred.user.uid;
+  } catch (err) {
+    console.error('[monarchy sync] anonymous sign-in failed', err && err.code, err && err.message);
+    alert('Could not sign in to the sync service: ' + ((err && err.code) || (err && err.message) || 'unknown error'));
+    return false;
+  }
+
   // Electron's renderer exposes a `process` global even with nodeIntegration
   // off, which is enough to trip Firebase's "is this Node?" detection —
   // and in a Node-like environment, Realtime Database falls back to a
@@ -370,6 +395,26 @@ async function startSession(role) {
   setSessionUI(role);
 
   if (role === 'gm') {
+    // Record who owns this table. A SET of uids, not a single `owner`:
+    // anonymous uids are per-browser-profile, so hosting from a second
+    // machine gives you a different identity, and a single-value field
+    // would lock you out of your own table. First host of an unclaimed
+    // table claims it; anyone else is only warned, because the security
+    // rules aren't enforcing yet (that's P0-2) and this task must not be
+    // able to break a table that works today.
+    try {
+      const ownersRef  = _db.ref('servers/' + _serverId + '/owners');
+      const ownersSnap = await ownersRef.once('value');
+      if (!ownersSnap.exists()) {
+        await ownersRef.child(_uid).set(true);
+        console.log('[monarchy sync] claimed unowned table', _serverId, 'for uid', _uid);
+      } else if (!ownersSnap.hasChild(_uid)) {
+        console.warn('[monarchy sync] hosting a table owned by a different uid:', _serverId);
+      }
+    } catch (err) {
+      console.error('[monarchy sync] owner claim failed', err);
+    }
+
     pushBattlefield();
     document.addEventListener('click', onBfChange);
     document.addEventListener('input', onBfChange);
@@ -545,6 +590,7 @@ function serializePlayerVitals() {
 
   return {
     name:       getMyPlayerName(),
+    uid:        getMyUid() || undefined,
     avatar:     getMyPlayerAvatar() || '',
     hp:         parseInt(val('c-hp-cur'))  || 0,
     hpMax:      parseInt(val('hp-max'))    || 0,

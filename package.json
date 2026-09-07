@@ -1,19 +1,21 @@
 {
   "name": "monarchy",
   "version": "1.0.0",
-  "description": "Monarchy — TTRPG character companion & table",
+  "description": "Monarchy \u2014 TTRPG character companion & table",
   "main": "electron/main.js",
   "private": true,
   "scripts": {
     "build:html": "node build.js",
     "start": "npm run build:html && electron .",
     "dist": "npm run build:html && electron-builder",
-    "test": "node test/smoke.js && node test/multi-sheet.test.js"
+    "test": "node build.js && node test/table.test.js && node test/table-ui.test.js && node test/join.test.js && node test/handling.test.js",
+    "test:ui": "node build.js && node test/table-ui.test.js"
   },
   "devDependencies": {
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3",
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.1.3",
+    "playwright": "^1.49.0"
   },
   "build": {
     "appId": "com.grumkata.monarchy",

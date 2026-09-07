@@ -1,0 +1,124 @@
+/* ══════════════════════════════════════════════════════════════
+   20-shell.css — the only UNSCOPED stylesheet.
+
+   Everything else is confined to `body.at-hall` or `body.at-table`
+   by tools/scope-css.js. These rules have to reach across that
+   line, so they live here and are deliberately few.
+══════════════════════════════════════════════════════════════ */
+html, body { height: 100%; margin: 0; overflow: hidden; background: #0a0705; }
+
+#hall-app, #table-app { position: fixed; inset: 0; }
+body.at-table #hall-app { display: none; }
+body.at-hall  #table-app { display: none; }
+
+/* The WebGL layers append themselves to <body>, not into either wrapper —
+   gl.js (#gl), scene.js (#gl2) and 27-table-gl.js (#tgl) all do — so hiding
+   the wrapper does not hide them. They belong to the table. */
+body.at-hall #gl, body.at-hall #gl2, body.at-hall #tgl { display: none !important; }
+
+/* the way back, on the table */
+.to-hall {
+  position: fixed; left: 17px; top: 15px; z-index: 940; display: none;
+  font-family: 'Cinzel', serif; font-size: 8.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; cursor: pointer;
+  color: #f4e8cc; border: 1px solid #3d2812; padding: 9px 14px;
+  background: linear-gradient(180deg, #8a6432, #5a4020);
+  box-shadow: inset 0 1px 0 rgba(255,240,210,.3);
+}
+body.at-table .to-hall { display: block; }
+.to-hall:hover { background: linear-gradient(180deg, #a8783c, #6d4e26); }
+
+/* ══════════════════════════════════════════════════════════════
+   PAPERS — a record open at the table, on your own end.
+   Unscoped because it must sit over either half, and because the
+   record's own stylesheet is scoped INTO it (see build.js).
+   Built from the design language's own vocabulary: a plaque that
+   rides the edge, a layered frame, a patterned ground — not a
+   flat panel with a hairline border.
+══════════════════════════════════════════════════════════════ */
+.tp {
+  position: fixed; right: 316px; top: 14px; bottom: 14px; width: min(720px, 52vw);
+  z-index: 930; display: flex; flex-direction: column;
+  background:
+    repeating-linear-gradient(45deg, rgba(0,0,0,.045) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,.045) 0 2px, transparent 2px 7px),
+    linear-gradient(176deg, #e0cfa9 0%, #cdb98e 100%);
+  border: 3px solid #3d2812;
+  box-shadow: inset 0 0 0 2px #8a6432, inset 0 0 0 4px #c9a86a,
+              0 26px 70px rgba(0,0,0,.6);
+  color: #2a1c0d;
+}
+.tp[hidden] { display: none !important; }
+/* corner marks — four, at 3px inset, per the design language */
+.tp::before {
+  content: ''; position: absolute; inset: 3px; pointer-events: none; z-index: 2;
+  background:
+    linear-gradient(#3d2812,#3d2812) left top / 14px 2px no-repeat,
+    linear-gradient(#3d2812,#3d2812) left top / 2px 14px no-repeat,
+    linear-gradient(#3d2812,#3d2812) right bottom / 14px 2px no-repeat,
+    linear-gradient(#3d2812,#3d2812) right bottom / 2px 14px no-repeat;
+}
+.tp-head {
+  flex: 0 0 auto; position: relative; height: 30px; margin: 0 0 6px;
+  border-bottom: 2px solid #3d2812;
+  background: linear-gradient(180deg, #8a6432, #5a4020);
+}
+/* the title is a plaque riding ON the border, never a row inside a box */
+.tp-head .plaque {
+  position: absolute; left: 16px; top: 9px;
+  padding: 6px 20px 5px; background: linear-gradient(180deg, #a8783c, #6d4e26);
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 100%, 0 100%);
+  border-top: 1px solid #e8c98a; color: #f6ecd2;
+  font-family: 'Cinzel', serif; font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  box-shadow: 0 3px 8px rgba(0,0,0,.45);
+}
+.tp-x {
+  position: absolute; right: 8px; top: 5px; width: 20px; height: 20px;
+  display: grid; place-items: center; cursor: pointer; font-size: 10px;
+  color: #f0e0bc; background: transparent; border: 1px solid rgba(240,224,188,.3);
+}
+.tp-x:hover { color: #fff; border-color: #e8c98a; }
+.tp-leaf { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 20px; }
+
+/* choosing which record, when there is more than one */
+.tp-pickers { padding: 26px 18px; display: flex; flex-direction: column; gap: 10px; }
+.tp-pick {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; align-items: baseline;
+  padding: 12px 16px; cursor: pointer; text-align: left; color: #2a1c0d;
+  background: linear-gradient(176deg, #d8c49a, #c2ab7e);
+  border: 2px solid #3d2812;
+  box-shadow: inset 0 0 0 1px #c9a86a, 0 4px 10px rgba(0,0,0,.3);
+}
+.tp-pick:hover { background: linear-gradient(176deg, #e8d6ad, #cdb68a); }
+.tp-pick b { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 600; }
+.tp-pick i { grid-column: 1; font-family: 'Crimson Text', serif; font-size: 12px; opacity: .6; }
+.tp-pick span {
+  grid-row: 1 / span 2; font-family: 'Cinzel', serif; font-size: 11px;
+  letter-spacing: .08em; opacity: .75;
+}
+
+/* ── THE BIN: A THING ON THE TABLE ────────────────────────────
+   grumkata: "take the bin and remove it from being stuck to the screen
+   instead imbed it into the table just like the chest bottom left is
+   prefrable". So it is a prop on the wood like the chest — 23-table3d.js
+   positions it by data-x/data-y, and this element is only the invisible rect
+   that 27-table-gl.js draws the real basket over. It pans, tilts and zooms
+   with the table for free, and it cannot be lost off the edge of the screen
+   because the camera is clamped to the table.
+
+   It shows NOTHING of its own. grumkata: "from the bin there should be no
+   ui" — no count, no badge, nothing to open. The basket is the whole of it,
+   and its shadow is a real one thrown by the light in 27-table-gl.js rather
+   than a soft grey oval painted under the middle of the box. */
+.tb-bin { cursor: pointer; }
+.tb-bin, .tb-bin .face { box-shadow: none; background: transparent; }
+.tb-bin[hidden] { display: none !important; }
+.tb-bin-face { position: relative; }
+.tb-bin:hover { filter: brightness(1.16); }
+/* the one thing it does say: that letting go here will do something */
+.tb-bin.over { filter: brightness(1.34) saturate(1.5); }
+.tb-bin.over .tb-bin-face::after {
+  content: ''; position: absolute; inset: 8%;
+  border: 2px solid #b84230; border-radius: 50%;
+  box-shadow: 0 0 26px rgba(184,66,48,.6); pointer-events: none;
+}
