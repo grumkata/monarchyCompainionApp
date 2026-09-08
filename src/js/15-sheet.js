@@ -114,9 +114,27 @@ function av(r){
   const a = r.armour.list.find(x => x.id === r.armour.equipped);
   return a ? Math.max(1, parseFloat(a.av) || 1) : 1;
 }
+/* RESILIENCE, WHEREVER IT IS WRITTEN.
+   This looked only at the top row of the body tree, so putting
+   Resilience where it belongs — as a secondary under something — made
+   it count as zero and quietly took points off the character's Health
+   with nothing on screen saying so. Health is the most important
+   number on the sheet; it should not depend on which tier you happened
+   to file the skill under. Searched depth-first across all three
+   trees, and the deepest match wins so a specific one beats a
+   general one. */
 function resilience(r){
-  const p = (r.skills.body||[]).find(x => (x.n||'').trim().toLowerCase() === 'resilience');
-  return p ? (parseInt(p.v)||0) : 0;
+  const want = 'resilience';
+  let best = 0;
+  const walk = (list, depth) => (list || []).forEach(x => {
+    if ((x.n || '').trim().toLowerCase() === want) {
+      const v = parseInt(x.v) || 0;
+      if (depth >= (best.depth == null ? -1 : best.depth)) best = { v: v, depth: depth };
+    }
+    walk(x.kids, depth + 1);
+  });
+  ['body', 'mind', 'social'].forEach(c => walk((r.skills || {})[c], 0));
+  return best && best.v ? best.v : 0;
 }
 function derived(r){
   const F = +r.attr.for||0, W = +r.attr.wil||0;
@@ -612,6 +630,11 @@ function render(r){
 /* ══ WIRING ═══════════════════════════════════════════════════ */
 function setPath(r, path, v){
   const seg = path.split('.');
+  /* THE NAME IS ONE NAME. The sheet writes `who.name` and the hall's
+     roster prints `name`, and nothing joined them — so a character you
+     had just named still read "an unnamed hand" in your own list until
+     you used the separate Rename button on the row. */
+  if (path === 'who.name') { r.name = String(v == null ? '' : v); }
   if (seg[0] === 'sk'){                    /* sk.cat.pid[.sid[.tid]].(v|n) */
     const cat = seg[1], key = seg[seg.length-1], ids = seg.slice(2, -1);
     let n = null, list = r.skills[cat] || [];

@@ -53,7 +53,11 @@
         <div class="phases"><div class="ph now">Players</div><div class="ph">Allies</div><div class="ph">Enemies</div></div>
         <div class="tb" style="min-width:128px"><span class="tb-l">Battlefield</span><span style="font-family:var(--f-disp);font-size:11px;letter-spacing:.09em">6 wide</span></div>
         <div class="tb" style="min-width:112px"><span class="tb-l">Mana in the air</span><span class="mana-n" id="mana">14</span></div>
-        <div class="mana"><span class="warn">4 casters drawing &mdash; the pool runs thin for everyone</span></div>
+        <!-- This said "4 casters drawing - the pool runs thin for everyone" as
+           static text, written by no JavaScript, shown above every fight
+           forever regardless of how many casters were on the board. A status
+           readout that is always the same sentence is not a readout. -->
+        <div class="mana"><span class="warn" id="mana-warn" hidden></span></div>
         <button class="endturn" id="endturn"><span class="et">End Turn<small>SPACE</small></span></button>
       </div>
       <div class="field" id="field"></div>
@@ -64,9 +68,23 @@
   </div>
 
 
-</div></div>
+</div>
+  <!-- ══ THE GRADE ════════════════════════════════════════════════
+       Everything under here is drawn by two different engines — the wood
+       and the models by WebGL, the pieces by the browser as CSS 3D — so
+       a post-processing pass on the GL canvases alone would grade half
+       the picture and leave the other half raw. The grade has to sit
+       ABOVE the composite, which in a hybrid scene means CSS.
 
-<div class="hud tl">The Table<em>drag the wood to pan &middot; wheel to zoom &middot; drag a title bar to move that piece of the table</em></div>
+       Two layers, not five: everything that can share a blend mode is
+       stacked as background layers on one element, which the browser
+       paints in a single pass. Only the grain needs its own, because
+       overlay is a different operator from soft-light. -->
+  <div id="grade" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
+</div>
+
+<div class="hud tl">The Table<em>drag the wood to pan &middot; wheel to zoom &middot; drag a piece to move it &middot; click to select &middot; <b>Alt</b>+wheel to resize &middot; arrows nudge &middot; <b>Del</b> bins &middot; <b>Ctrl+Z</b> undoes</em></div>
 <div class="hud br"><span class="zl" id="zl">100%</span><button id="theme">Theme</button><button id="fit">Fit table</button></div>
 <aside class="chatdock">
   <div class="plaque">Chat</div>

@@ -106,16 +106,13 @@ function mount() {
       e.preventDefault(); shut(); return;
     }
     if (typing) return;
-    /* ── THE ONE STEP BACK ────────────────────────────────────
-       The bin deletes now, and a delete you cannot take back is a trap.
-       This is the whole of the bin's interface, and it is a keystroke —
-       so there is nothing on the table to look at or get in the way of
-       anything. */
-    if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
-      const back = T().undoBin();
-      if (back) { e.preventDefault(); say((back.name || 'That') + ' — back on the table'); }
-      return;
-    }
+    /* ── THE ONE STEP BACK, NOW PART OF A REAL UNDO ───────────
+       This used to be the only undo in the whole app: Ctrl+Z put back
+       the last thing binned and nothing else could be taken back at
+       all. 22-table-model.js keeps a proper history now and
+       23-table3d.js owns the key, so binning is simply one more thing
+       on that stack — and two handlers answering the same keystroke
+       would undo twice and put the piece back on the table twice. */
     if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault(); toggle();
     }

@@ -819,8 +819,19 @@ addEventListener('pointermove', mark, {passive:true});
 addEventListener('pointerdown', mark, {passive:true});
 addEventListener('pointerup', mark, {passive:true});
 addEventListener('keydown', mark);
-new MutationObserver(mark).observe(document.body,
-  {subtree:true, childList:true, attributes:true, attributeFilter:['class','style']});
+/* ── WATCH THE BOARD, NOT THE WHOLE DOCUMENT ──────────────────
+   This observed document.body with subtree:true and `style` in the
+   filter. 23-table3d.js writes style.transform on every prop on the
+   table on every frame of a drag, and restyle() touches every prop's
+   style on every change — so on the table this observer fired
+   continuously and held this renderer permanently awake, doing a full
+   pass over pieces it had nothing to draw. It only ever needed to
+   watch the combat sheet, which is the only thing it reads. */
+(function watchBoard(){
+  const target = document.getElementById('combat-prop') || document.body;
+  new MutationObserver(mark).observe(target,
+    {subtree:true, childList:true, attributes:true, attributeFilter:['class','style']});
+})();
 
 /* A player character keeps its side's colours — the plinth under the piece is
    what says "player", so allegiance never stops reading. */
@@ -862,6 +873,15 @@ function _frame(ts){
   /* the field draws its own army out of its own scene, so this layer stands
      down entirely rather than painting counters nobody can see */
   if (document.body.classList.contains('field-on')){ renderer.clear(); return; }
+  /* NOR IS THERE ANYTHING TO PAINT WITH NO BOARD ON THE TABLE. The sheet is
+     display:none until a combat scene is put down, and everything below reads
+     boxes inside it — so this was a querySelectorAll and a rect per piece,
+     every frame, to draw nothing. The dice above still run either way. */
+  const sheet = document.getElementById('combat-prop');
+  if (!sheet || sheet.style.display === 'none' || !sheet.offsetWidth){
+    if (!rolling.length) renderer.clear();
+    return;
+  }
 
   const t = window.__tilt ? window.__tilt() : TILT;
   if (Math.abs(t - TILT) > 1e-5) setTilt(t);

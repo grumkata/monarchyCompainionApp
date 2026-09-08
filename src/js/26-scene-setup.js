@@ -93,6 +93,35 @@ function paintMake() {
       draft[el.dataset.setup] = el.type === 'checkbox' ? el.checked : el.value;
     });
   });
+
+  /* the picture buttons */
+  shell().querySelectorAll('[data-pick]').forEach(b => {
+    b.addEventListener('click', () => {
+      const key = b.dataset.pick;
+      if (!root.Pictures) return;
+      root.Pictures.ask(pic => {
+        if (!pic || !pic.src) return;
+        draft[key] = pic.src;
+        draft[key + 'W'] = pic.w; draft[key + 'H'] = pic.h;
+        const wrap = b.parentNode;
+        const th = wrap.querySelector('.sc-pic-thumb');
+        if (th) th.style.backgroundImage = 'url(' + pic.src + ')';
+        const x = wrap.querySelector('.sc-drop'); if (x) x.hidden = false;
+        b.innerHTML = 'Change the picture';
+      });
+    });
+  });
+  shell().querySelectorAll('[data-drop]').forEach(b => {
+    b.addEventListener('click', () => {
+      const key = b.dataset.drop;
+      draft[key] = '';
+      const wrap = b.parentNode;
+      const th = wrap.querySelector('.sc-pic-thumb');
+      if (th) th.style.backgroundImage = '';
+      const p = wrap.querySelector('.sc-pick'); if (p) p.innerHTML = 'Choose a picture\u2026';
+      b.hidden = true;
+    });
+  });
 }
 
 function field(f, val) {
@@ -107,8 +136,20 @@ function field(f, val) {
       list.map(m => `<option value="${esc(m.id)}"${m.id === val ? ' selected' : ''}>${
         esc(m.name)}</option>`).join('')}</select>`;
   } else if (f.type === 'image') {
-    control = `<input id="${id}" data-setup="${f.key}" type="text"
-       placeholder="paste a link, or leave it and set it later" value="${esc(val)}">`;
+    /* A PICTURE COMES OFF YOUR MACHINE, NOT OFF A URL.
+       This was a text box asking you to paste a link — in an app that
+       ships as one file opened from disk, where a link will not load.
+       49-pictures.js already decodes, measures and shrinks a picture on
+       the way in and every other part of the app uses it; the two scenes
+       that most need a picture were the only two that could not get one. */
+    const has = val && String(val).slice(0, 5) === 'data:';
+    control = `<span class="sc-pic" id="${id}">
+        <button type="button" class="sc-pick" data-pick="${f.key}">${
+          has ? 'Change the picture' : 'Choose a picture&hellip;'}</button>
+        <span class="sc-pic-thumb"${has ? ` style="background-image:url(${esc(val)})"` : ''}></span>
+        <button type="button" class="sc-drop" data-drop="${f.key}"${has ? '' : ' hidden'}
+          title="Take it off">&times;</button>
+      </span>`;
   } else if (f.type === 'cast') {
     control = `<input id="${id}" data-setup="${f.key}" type="text"
        placeholder="names, separated by commas" value="${esc(val)}">`;

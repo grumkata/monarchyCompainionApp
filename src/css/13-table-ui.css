@@ -1387,3 +1387,170 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
   box-shadow:inset 0 1px 0 rgba(255,240,200,.6), 0 2px 5px rgba(0,0,0,.6);
   text-shadow:0 1px 0 rgba(255,240,200,.4);
 }
+
+
+/* ══ THE SELECTED PIECE ════════════════════════════════════════
+   The table had no selection at all, so there was never anything on
+   screen saying which piece a key would act on. A ring, drawn on the
+   face itself so it lies in the wood's own plane and tilts with it —
+   an overlay would float above the table and read as chrome.
+
+   `outline` and not `border`, because a border changes the box and
+   would nudge every piece the moment it was picked.                */
+.prop.t3-thing.sel > .face{
+  outline:2px solid rgba(240,196,116,.92);
+  outline-offset:3px;
+  box-shadow:0 0 0 1px rgba(24,16,6,.55), 0 0 22px rgba(216,178,104,.30);
+}
+.prop.t3-thing.sel > .face::after{
+  content:''; position:absolute; inset:-9px; pointer-events:none;
+  border:1px solid rgba(240,196,116,.28);
+}
+/* the piece you are actually holding does not need a ring as well */
+.prop.t3-thing.lift.sel > .face{ outline-color:rgba(240,196,116,.45); }
+
+
+/* ══ SOMEONE SAID SOMETHING ════════════════════════════════════
+   Chat could only ever roll dice: anything that was not dice
+   notation fell through to a handler that did not exist, and the
+   words vanished. Speech sits in the same dock as the rolls,
+   quieter than them, because most of a session is talking.     */
+.cl.said{
+  display:flex; gap:9px; align-items:baseline;
+  padding:5px 11px; line-height:1.45;
+}
+.cl.said > b{
+  flex:0 0 auto; font-family:'Cinzel',serif; font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; color:#c9a45e; padding-top:2px;
+}
+.cl.said .stxt{ color:#f0e3c6; font-size:13px; }
+.cl.said.emote{ font-style:italic; }
+.cl.said.emote .stxt{ color:#cbb389; }
+.cl.said.emote .stxt b{
+  font-style:normal; font-family:'Cinzel',serif; font-size:9px;
+  letter-spacing:.14em; text-transform:uppercase; color:#c9a45e;
+}
+
+
+/* ══ CHOOSING A SCENE'S PICTURE ════════════════════════════════
+   The map and the backdrop used to be a box asking for a pasted
+   URL, in an app loaded from disk. This is the picker the rest of
+   the app already uses, with the picture shown as soon as it is in. */
+.sc-pic{ display:flex; align-items:center; gap:9px; }
+.sc-pick{
+  font-family:'Cinzel',serif; font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; color:#f0dcae;
+  padding:8px 13px; cursor:pointer; border:1px solid #4a3418;
+  background:linear-gradient(180deg,#33240f,#20160a);
+}
+.sc-pick:hover{ border-color:#d8b268; color:#fff3d6; }
+.sc-pic-thumb{
+  width:52px; height:38px; flex:0 0 auto; border:1px solid #4a3418;
+  background:#150e06 center/cover no-repeat;
+}
+.sc-drop{
+  font-size:14px; line-height:1; color:#c9a45e; cursor:pointer;
+  background:none; border:none; padding:4px 6px;
+}
+.sc-drop:hover{ color:#f0c274; }
+
+
+/* ══ THE GRADE ═════════════════════════════════════════════════
+   grumkata: "it still feels a bit flat". It did, and the reason is
+   worth writing down: the two renderers already tone-map with ACES,
+   so the MODELS roll off properly — but the wood, the pieces and the
+   paper are CSS, and CSS gradients clip flat at both ends. Half the
+   picture had a filmic curve on it and half did not.
+
+   So the grade goes on top of the composite. Four things, which is
+   what a colourist would reach for first on a scene lit by one lamp
+   in a dark room:
+
+     · SEPARATION — the pool stays amber, the room goes blue-green.
+       Warm lights against cool shadows is the oldest trick there is
+       and it is most of what "cinematic" means.
+     · HALATION — the warm bloom that a real lens spills around a
+       bright source. Cheap here, and it stops the lamp reading as a
+       flat painted circle.
+     · FALLOFF — a real vignette that also DESATURATES, because a
+       lens loses colour at the edges as well as light.
+     · GRAIN — the one that does the most work. These are big smooth
+       dark gradients and eight-bit banding across them is what makes
+       a scene look like a screenshot. Noise breaks the bands up and
+       reads as film.
+
+   Cost was the constraint, since the table is already asking a lot:
+   two composited layers, both static rasters. The grain moves by
+   `transform` alone, which the compositor does without repainting.  */
+#grade, #grain{
+  position:absolute; inset:0; pointer-events:none;
+  contain:strict;
+}
+#grade{
+  z-index:42;
+  mix-blend-mode:soft-light;
+  background:
+    /* halation — the spill a real lens throws around a bright source */
+    radial-gradient(ellipse 42% 31% at 50% 26%,
+      rgba(255,212,150,.52) 0%, rgba(255,180,106,.20) 44%, transparent 72%),
+    /* the cool room, everywhere the lamp is not. This is the one doing most
+       of the work: warm light against cool shadow is what stops a scene
+       reading as one flat colour with the brightness turned down at the edges. */
+    radial-gradient(ellipse 74% 64% at 50% 32%,
+      transparent 30%, rgba(52,102,146,.42) 72%, rgba(30,64,108,.66) 100%),
+    /* falloff */
+    radial-gradient(ellipse 94% 86% at 50% 40%,
+      transparent 52%, rgba(3,7,14,.52) 100%);
+}
+/* THE CURVE. Everything above shifts colour; this is the one that shifts
+   TONE — lows down, the lit middle up — which is what a flat picture is
+   actually missing. Overlay against mid grey is a no-op, so the deviation
+   from 50% grey IS the curve. */
+#grade::before{
+  content:''; position:absolute; inset:0;
+  mix-blend-mode:overlay;
+  background:
+    radial-gradient(ellipse 52% 42% at 50% 30%,
+      rgba(255,255,255,.16) 0%, rgba(128,128,128,0) 62%),
+    radial-gradient(ellipse 92% 84% at 50% 38%,
+      rgba(128,128,128,0) 46%, rgba(0,0,0,.30) 100%);
+}
+/* the desaturating half of the falloff: a lens loses colour at the edge as
+   well as light. Very low alpha — this is a suggestion, not a filter. */
+#grade::after{
+  content:''; position:absolute; inset:0;
+  mix-blend-mode:saturation;
+  background:radial-gradient(ellipse 68% 60% at 50% 34%,
+    rgba(128,128,128,0) 48%, rgba(128,128,128,.72) 100%);
+}
+
+#grain{
+  z-index:43;
+  mix-blend-mode:overlay;
+  opacity:.075;
+  /* the tile is drawn over a box larger than the screen so the layer can be
+     moved by transform without ever showing an edge */
+  inset:-120px;
+  background-image:url(data:image/png;base64,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);
+  background-repeat:repeat;
+  background-size:96px 96px;
+  animation:grain-drift 1.05s steps(1,end) infinite;
+  will-change:transform;
+}
+/* eight steps is enough to read as moving grain and not as a pattern */
+@keyframes grain-drift{
+  0%  { transform:translate3d(0,0,0) }
+  12% { transform:translate3d(-14px,7px,0) }
+  25% { transform:translate3d(9px,-12px,0) }
+  37% { transform:translate3d(-6px,-9px,0) }
+  50% { transform:translate3d(13px,4px,0) }
+  62% { transform:translate3d(-11px,11px,0) }
+  75% { transform:translate3d(5px,-6px,0) }
+  87% { transform:translate3d(-9px,-3px,0) }
+  100%{ transform:translate3d(0,0,0) }
+}
+/* a still grain is worse than none: it reads as dirt on the screen */
+@media (prefers-reduced-motion:reduce){ #grain{ animation:none } }
+
+/* one switch for the whole thing, for when you want to see it raw */
+body.nograde #grade, body.nograde #grain{ display:none }

@@ -59,10 +59,15 @@ function line(l, deep, w) {
    is a single element in the page and cannot be cloned before a scene
    exists, so this is the one duplication in the file and it is here
    rather than anywhere else so there is exactly one of it. */
-function sheet(name, body, extra) {
+/* `fight` decides whether the sheet carries the combat top bar. It used
+   to be unconditional, so an EXPLORATION scene — a map you walk — and a
+   STAGE — a backdrop to roleplay against — were both drawn with a round
+   counter, Players/Allies/Enemies phases, a "Battlefield" label and an
+   End Turn button. A scene about walking a map does not have rounds. */
+function sheet(name, body, extra, fight) {
   return `<div class="face cwin"${extra || ''}>
     <div class="wtitle"><span><span>${esc(name)}</span></span></div>
-    <div class="topbar">
+    ${fight === false ? '' : `<div class="topbar">
       <div class="tb"><span class="tb-l">Round</span><span class="round">01</span></div>
       <div class="phases"><div class="ph now">Players</div><div class="ph">Allies</div><div class="ph">Enemies</div></div>
       <div class="tb" style="min-width:128px"><span class="tb-l">Battlefield</span>
@@ -73,7 +78,7 @@ function sheet(name, body, extra) {
            plank across half the screen. Nothing in a preview may be an
            interactive element: it is a picture of the thing. -->
       <div class="endturn"><span class="et">End Turn<small>SPACE</small></span></div>
-    </div>
+    </div>`}
     ${body}
   </div>`;
 }
@@ -96,7 +101,7 @@ function combat(v) {
       ${half('al', 'Ally', al)}
     </div></div>
     <div class="selbar none"></div>`;
-  return sheet('Combat', body);
+  return sheet('Combat', body, '', true);
 }
 
 /* ── EXPLORATION AND STAGE ────────────────────────────────────
@@ -107,7 +112,7 @@ function picture(name, src, cls, empty) {
   const body = `<div class="field pv-pic ${cls}">${
     src ? `<img alt="" src="${esc(src)}">`
         : `<span class="pv-none">${esc(empty)}</span>`}</div>`;
-  return sheet(name, body);
+  return sheet(name, body, '', false);
 }
 
 /* ══ THE ONE ENTRY POINT ═══════════════════════════════════════

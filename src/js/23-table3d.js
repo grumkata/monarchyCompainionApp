@@ -37,7 +37,8 @@ const CX = TW / 2, CY = TH / 2, RAD = TW / 2;
 /* #vp's own perspective, mirrored here because screenToTable has to invert it.
    These two numbers are also in the stylesheet and in the piece layer; all
    three have to agree or pieces land where the pointer is not. */
-const PERSP = 2400, ORIGIN_Y = 0.42;
+let PERSP = 2400;
+const ORIGIN_Y = 0.42;
 
 let vp = null, tbl = null, zl = null;
 let TILT = TILT3D;
@@ -50,17 +51,47 @@ root.__tilt = () => TILT * Math.PI / 180;
 
 function apply() {
   if (!tbl) return;
-  const m = `translate(${T.x}px,${T.y}px) scale(${T.k}) rotateX(${TILT}deg)`;
+  /* ── scale3d, NOT scale ──────────────────────────────────
+     CSS `scale()` is TWO-DIMENSIONAL. It multiplies x and y and leaves z
+     alone — and this is a 3D scene, so for years the table has been
+     zoomed across and down while keeping its full, unzoomed DEPTH. The
+     browser's own matrix said so:
+
+         translate(...) scale(0.2358) rotateX(22deg)
+         -> Y axis = (0, 0.21867, 0.37461)
+
+     0.21867 is cos22 x 0.2358: scaled. 0.37461 is sin22: NOT scaled. So
+     at 24% zoom the wood's far and near edges sat 487px apart in depth
+     instead of 115 — four times too deep, and the factor is exactly 1/k,
+     so it changed every time the zoom did.
+
+     Everything followed from that. The GL layer builds a real table and
+     scales it evenly, the way an object actually behaves, so the two
+     halves of the picture drew different tables: pieces crept off the
+     wood, and how far off depended on the zoom, which is why panning and
+     resizing seemed to make them wander. The z-lifts went with it — a
+     piece nominally 8px off the surface was really 34 table units up at
+     this zoom, and the chest and bin at 60 were a quarter of the table
+     in the air, which is why furniture never sat where its own dot was.
+
+     scale3d scales the depth too, which is what "further away" means. */
+  const m = `translate(${T.x}px,${T.y}px) scale3d(${T.k},${T.k},${T.k}) rotateX(${TILT}deg)`;
   tbl.style.transform = m;
   /* the floor rides with the wood, from its own layer under the table */
   const under = doc.getElementById('tblu');
   if (under) under.style.transform = m;
   if (zl) zl.textContent = Math.round(T.k * 100) + '%';
+  /* the camera moved, so every model painted over the wood has to be
+     redrawn — the GL layer rests when nothing has changed */
+  if (root.TableGL && root.TableGL.invalidate) root.TableGL.invalidate(3);
   if (root.__onView) root.__onView();
 }
 
 /* where a prop sits on the wood: its own units, its own lift off the surface */
 function placeProp(p) {
+  /* the GL layer paints models over these anchors, so moving one is a
+     reason for it to draw a frame — see the note on idling in 27-table-gl */
+  if (root.TableGL && root.TableGL.invalidate) root.TableGL.invalidate(3);
   p.style.transform =
     `translate3d(${p.dataset.x || 0}px,${p.dataset.y || 0}px,${p.dataset.z || 8}px) ` +
     `rotate(${p.dataset.r || 0}deg)`;
@@ -88,6 +119,10 @@ function fitTable() {
      is a table; a table that reaches every edge of the screen is a texture. */
   const ROOM = 0.86;
   T = { k: Math.min(VW / (TW + 120), VH / (TH * c + 190)) * ROOM, x: 0, y: 0 };
+  /* Fit table is also how you stand back up: it lands well above the
+     seated range, so this puts the tilt and the room back where they
+     belong rather than leaving you fitted to a table at eye level. */
+  seatCam();
   apply();
   const slab = doc.querySelector('#tbl .slab');
   if (!slab) return;
@@ -188,6 +223,58 @@ function glideTilt(to) {
   })(t0);
 }
 
+/* ══ SITTING DOWN ═════════════════════════════════════════════
+   grumkata: "like combat view you see the table top down BUT if you zoom
+   out you see the seat from your seat where you can look around at other
+   players".
+
+   So this is not a second camera and not a mode. Zoomed in, nothing here
+   fires at all and the table behaves exactly as it always has. Keep
+   zooming out past the point where the wood stops being a work surface
+   and the tilt rolls up from 22 degrees to sixty-odd — which, because the
+   room is bolted to the table plane (see 27-table-gl.js), is the same
+   picture as standing the room up around you. The wall goes behind the
+   far seats, the near seats come up out of the bottom of the frame, and
+   you are sitting at it.
+
+   Continuous, not a snap. A threshold would make the room appear from
+   nowhere on one notch of the wheel; rolling it in over half a turn of
+   the wheel reads as leaning back. */
+const SEAT_FROM = 0.155;   /* still a table you could work on */
+const SEAT_TO   = 0.058;   /* fully seated, room all around */
+const SEAT_TILT = 59;      /* eye height, near enough, for a 22-degree table */
+const ZOOM_MIN  = 0.045;
+
+function seatMix() {
+  if (T.k >= SEAT_FROM) return 0;
+  if (T.k <= SEAT_TO) return 1;
+  return (SEAT_FROM - T.k) / (SEAT_FROM - SEAT_TO);
+}
+/* Sets TILT for the current zoom. The caller applies, because apply() is
+   also what the lock and field glides drive and this must never fight
+   them for the same variable mid-animation. */
+const LENS_TABLE = 2400;   /* long lens: the wood stays square and readable */
+const LENS_SEAT  = 720;    /* short lens: the room wraps round you */
+function seatCam() {
+  if (lock || anim) return false;
+  const u = seatMix();
+  const e = u * u * (3 - 2 * u);          /* smoothstep: no kink at either end */
+  TILT = TILT3D + (SEAT_TILT - TILT3D) * e;
+  /* THE LENS TRAVELS WITH THE TILT, and it has to, or leaning back just
+     shrinks the room instead of putting you in it — see lens() in
+     27-table-gl.js for the twenty-two-metre dollhouse this fixes. Both
+     halves of the picture are told the same number in the same breath:
+     CSS projects the pieces, the GL camera projects the room, and a
+     disagreement between them is the bug this project has already paid
+     for twice. */
+  PERSP = Math.round(LENS_TABLE + (LENS_SEAT - LENS_TABLE) * e);
+  if (vp) vp.style.perspective = PERSP + 'px';
+  if (root.TableGL && root.TableGL.lens) root.TableGL.lens(PERSP);
+  if (root.TableGL && root.TableGL.showRoom) root.TableGL.showRoom(u > 0.002);
+  doc.body.classList.toggle('seated', u > 0.35);
+  return true;
+}
+
 function lockIn(prop) {
   if (lock === prop) return;
   before = { x: T.x, y: T.y, k: T.k, tilt: TILT };
@@ -257,6 +344,15 @@ function inBounds() {
 }
 function checkBounds() { if (lock && !anim && !inBounds()) unlock(true); }
 
+/* is any part of the wood still on screen? */
+function slabVisible() {
+  const s = doc.querySelector('#tbl .slab');
+  if (!s || !vp) return true;
+  const r = s.getBoundingClientRect(), v = vp.getBoundingClientRect();
+  return r.right > v.left + 40 && r.left < v.right - 40 &&
+         r.bottom > v.top + 40 && r.top < v.bottom - 40;
+}
+
 /* Furniture and anything the model says is locked stays put. `.fixed` is the
    chest and the bin — part of the table — and `data-locked` is a scene that has
    been fitted to the slab and not yet deliberately unpinned. */
@@ -274,7 +370,12 @@ function grabProp(p, e) {
      jump to centre itself under the pointer the moment you move */
   const g = screenToTable(e.clientX, e.clientY);
   dg = { p, sx: e.clientX, sy: e.clientY, ox: +p.dataset.x, oy: +p.dataset.y,
-         gx: g.x - (+p.dataset.x || 0), gy: g.y - (+p.dataset.y || 0) };
+         gx: g.x - (+p.dataset.x || 0), gy: g.y - (+p.dataset.y || 0), moved: 0 };
+  /* the whole drag is ONE undo, not one per pointermove */
+  if (root.TableModel) root.TableModel.begin();
+  dg.grouped = true;
+  /* picking a piece up is also how you say which one you mean */
+  if (root.TableModel && p.dataset.id) root.TableModel.select(p.dataset.id);
   e.preventDefault();
 }
 function startPan(e) {
@@ -321,7 +422,38 @@ function mount() {
 
   wire();
   fitTable();
-  root.addEventListener('resize', fitTable);
+  /* ── RESIZING MUST NOT THROW YOUR VIEW AWAY ───────────────────
+     This was `resize -> fitTable`, so every time the window changed size
+     — including every step of a drag-resize, and every maximise — the
+     camera was re-framed onto the whole table and whatever you had
+     panned and zoomed to was gone. Nothing on the table ever moved; the
+     camera jumped, which looks exactly like everything sliding off the
+     wood at once.
+
+     #tbl is anchored to the viewport's top-left, so growing the window
+     leaves the wood where it is and moves the CENTRE of the view away
+     from it. Shifting the table by half the change keeps whatever you
+     were looking at under the middle of the screen, at the zoom you
+     chose. `Fit table` is still there for when you want a re-frame. */
+  let lastVW = 0, lastVH = 0, rzT = 0;
+  const noteSize = () => { if (vp) { lastVW = vp.clientWidth; lastVH = vp.clientHeight; } };
+  noteSize();
+  root.addEventListener('resize', () => {
+    if (!vp) return;
+    const w = vp.clientWidth, h = vp.clientHeight;
+    if (lastVW && lastVH && (w !== lastVW || h !== lastVH)) {
+      T.x += (w - lastVW) / 2;
+      T.y += (h - lastVH) / 2;
+    }
+    lastVW = w; lastVH = h;
+    apply();
+    /* if the wood has ended up entirely off screen — a window shrunk to a
+       sliver, a monitor swapped — fall back to a fit rather than leaving
+       someone staring at the floor. Debounced, so a drag-resize settles
+       once instead of fighting the pointer. */
+    clearTimeout(rzT);
+    rzT = setTimeout(() => { if (!slabVisible()) fitTable(); }, 220);
+  });
 }
 
 /* Everything but the lock gesture works with the LEFT button alone, because a
@@ -412,6 +544,8 @@ function wire() {
        screenToTable inverts the real matrix, so the answer is exact
        everywhere: hold the grab offset, and the piece is always under the
        point of it you picked up. */
+    dg.moved = Math.max(dg.moved || 0, Math.hypot(e.clientX - dg.sx, e.clientY - dg.sy));
+    dg.free = e.shiftKey;              /* Shift places off the grid */
     const at = screenToTable(e.clientX, e.clientY);
     dg.p.dataset.x = Math.round(at.x - dg.gx);
     dg.p.dataset.y = Math.round(at.y - dg.gy);
@@ -437,16 +571,65 @@ function wire() {
       dg.p.classList.remove('lift');
       dg.p.dataset.z = (+dg.p.dataset.rest || 8);
       placeProp(dg.p);
-      if (root.TableProps) root.TableProps.dropped(dg.p, e);
+      /* A PRESS THAT DID NOT TRAVEL IS A CLICK. It used to be a move of
+         zero distance, which is why simply touching a piece to look at it
+         counted as an edit. Under four pixels it only selects. */
+      dg.free = dg.free || e.shiftKey;
+      if ((dg.moved || 0) < 4) {
+        dg.p.dataset.x = dg.ox; dg.p.dataset.y = dg.oy;
+        placeProp(dg.p);
+      } else if (root.TableProps) {
+        root.TableProps.dropped(dg.p, e);
+      }
+      if (dg.grouped && root.TableModel) root.TableModel.end();
     }
     vp.classList.remove('grabbing'); dg = null;
   });
 
   root.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
-    /* one step at a time: out of the field, then out of the lock */
-    if (inField()) { leaveField(); return; }
-    if (lock) unlock(false);
+    /* never steal a key from something being written in */
+    const a = e.target;
+    if (a && (a.matches && a.matches('input,textarea,select,[contenteditable="true"]'))) return;
+
+    const M = root.TableModel;
+
+    /* UNDO. There was none: the only thing the table could take back was
+       the last item binned, so an accidental nudge or resize was for ever.
+       That, more than anything else, is what made the table feel like
+       something to be careful around. */
+    const meta = e.ctrlKey || e.metaKey;
+    if (meta && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (M) (e.shiftKey ? M.redo() : M.undo());
+      return;
+    }
+    if (meta && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); if (M) M.redo(); return; }
+
+    if (e.key === 'Escape') {
+      /* one step at a time: out of the field, then the lock, then the selection */
+      if (inField()) { leaveField(); return; }
+      if (lock) { unlock(false); return; }
+      if (M && M.state.sel) M.select(null);
+      return;
+    }
+
+    /* everything below acts on the selected piece */
+    if (!M || !M.state.sel) return;
+    const t = M.get(M.state.sel); if (!t) return;
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault(); M.bin(t.id); return;
+    }
+    const ARROW = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (ARROW[e.key]) {
+      e.preventDefault();
+      const [dx, dy] = ARROW[e.key];
+      M.nudge(t.id, dx, dy, e.shiftKey);   /* Shift = one unit instead of one grid step */
+      return;
+    }
+    /* depth, both ways — it only ever went up before */
+    if (e.key === ']') { e.preventDefault(); M.raise(t.id); return; }
+    if (e.key === '[') { e.preventDefault(); M.lower(t.id); return; }
   });
 
   vp.addEventListener('wheel', e => {
@@ -467,13 +650,25 @@ function wire() {
        little bigger does not want a dialog with a number in it. Over the
        bare wood it still zooms the table, which is the same gesture meaning
        the same thing one level out. */
-    if (scaleUnder(e)) return;
+    /* RESIZE IS OPT-IN NOW. It used to take the wheel whenever the pointer
+       happened to be over a piece, with no modifier and no undo — so the
+       ordinary act of zooming out from something you were reading shrank
+       the thing you were reading instead, permanently. Hold Alt to size a
+       piece; the wheel on its own always means zoom, everywhere. */
+    if (e.altKey && scaleUnder(e)) return;
     /* the ceiling leaves room ABOVE the field threshold, or the gesture that
        enters the field is also the gesture that hits the stop */
-    const k = Math.min(lock ? 5.2 : 1.8, Math.max(.18, T.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    /* THE FLOOR OF THE ZOOM USED TO BE THE END OF THE ROAD. At 0.18 the
+       wheel simply stopped and the table sat there small and pointless.
+       That last stretch is now where you push your chair back, so it goes
+       down to 0.045 — but only out of a lock, because a locked scene is a
+       board being read and has no seat to sit in. */
+    const floor = lock ? .18 : ZOOM_MIN;
+    const k = Math.min(lock ? 5.2 : 1.8, Math.max(floor, T.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
     const vr = vp.getBoundingClientRect();
     const px = e.clientX - vr.left, py = e.clientY - vr.top;
     T.x = px - (px - T.x) * (k / T.k); T.y = py - (py - T.y) * (k / T.k); T.k = k;
+    seatCam();
     apply();
     if (lock && k >= lockK * FIELD_IN) { enterField(); return; }
     checkBounds();

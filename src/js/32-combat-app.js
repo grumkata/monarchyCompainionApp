@@ -21,7 +21,11 @@ const tokClass = n => TOKEN_CLASS[((window.RULES && RULES.TOKENS[n]) || {}).sign
 const tokNames = () => Object.keys((window.RULES && RULES.TOKENS) || {});
 
 let S = {
-  round: 3, phase: 0, sug: null, intent: null, width: 6, mana: 14, sel: null, drag: null,
+  /* Round ONE. This said 3 — the round the demo fixture happened to be on
+     when it was written — and CombatScene.show() resets the lines, the
+     selection and the intent but never the round, so every fight anyone
+     made opened on round three. */
+  round: 1, phase: 0, sug: null, intent: null, width: 6, mana: 14, sel: null, drag: null,
   lines: [
     { key:'e-back',  side:'en', label:'Backline',  depth:0, ents:[
       { id:'cr1', kind:'unit', mono:'CR', name:'Crow Archer',   hp:18, max:18, acted:true },
@@ -84,6 +88,14 @@ let S = {
 S.lines.forEach(l => l.ents.forEach(e => { if (!e.side) e.side = l.side;
   if (e.move===undefined) e.move = e.kind==='form' ? 1 : 2;
   if (e.q===undefined) { e.q = !e.acted; e.f = !e.acted; } }));
+
+/* HOW MUCH DAMAGE. This was hardcoded to five in both directions —
+   `e.hp - 5` — with no number field anywhere in the interface, so eleven
+   damage was two presses and a shrug and every wound in the game was a
+   multiple of five. It lives out here because render() rebuilds the whole
+   bar and a value inside it would be thrown away between presses. */
+let AMOUNT = 5;
+const amount = () => Math.max(1, Math.min(999, parseInt(AMOUNT, 10) || 1));
 
 /* ── rules helpers ── */
 const slotsOf = e => e.kind==='unit' ? 1 : e.kind==='large' ? 2 : (e.wide ? 3 : 2);
@@ -397,8 +409,10 @@ function renderSel(){
     <div class="acts">
       <button class="act ${e.q?'':'on'}" id="act-q" ${canControl(e)?'':'disabled'}>Quick ${e.q?'':'&#10007;'}</button>
       <button class="act ${e.f?'':'on'}" id="act-f" ${canControl(e)?'':'disabled'}>Full ${e.f?'':'&#10007;'}</button>
-      <button class="act" id="act-hurt" ${canControl(e)||ROLE==='gm'?'':'disabled'}>Take 5</button>
-      <button class="act" id="act-heal" ${canControl(e)||ROLE==='gm'?'':'disabled'}>Heal 5</button>
+      <label class="act amt" title="how much"><input id="act-n" type="number"
+        min="1" max="999" value="${AMOUNT}" ${canControl(e)||ROLE==='gm'?'':'disabled'}></label>
+      <button class="act" id="act-hurt" ${canControl(e)||ROLE==='gm'?'':'disabled'}>Take</button>
+      <button class="act" id="act-heal" ${canControl(e)||ROLE==='gm'?'':'disabled'}>Heal</button>
     </div>
     <div class="role">View <b>${ROLE==='gm'?'Game Master':'Player'}</b></div>`;
 }
@@ -521,10 +535,51 @@ function resolveSug(accept){
   S.sug=null; render();
 }
 
+/* ── WHAT HAPPENS AT THE END OF A ROUND ───────────────────────
+   This advanced the phase, bumped the round and refreshed the action
+   pips, and did nothing else — no Bleed, no Blight, no Fire, nothing
+   wearing off, no two Daze becoming a Stun. The rules engine has
+   always known all of it (RULES.tickTokens returns exactly the right
+   changes for one unit) and nothing ever asked it, so a GM tracked
+   twenty-six token types by hand beside an app built to do it.
+
+   The engine RETURNS changes rather than making them, which is what
+   lets the answer be inspected before it lands — so applying them is
+   this file's job, and it is done here, once, for every unit. */
+function tick(){
+  const R = window.RULES;
+  if (!R || typeof R.tickTokens !== 'function') return [];
+  const said = [];
+  S.lines.forEach(l => l.ents.forEach(e => {
+    if (e.kind === 'form') return;               /* bodies, not hit points */
+    let out; try { out = R.tickTokens(e); } catch (err) { return; }
+    if (!out || !out.changes || !out.changes.length) return;
+    out.changes.forEach(c => {
+      if (c.op === 'hp') {
+        e.hp = Math.max(0, Math.min(e.max, (e.hp|0) + (c.delta|0)));
+      } else if (c.op === 'token') {
+        e.cond = e.cond || [];
+        const t = e.cond.find(x => x.n === c.token);
+        if (t) { t.c += (c.delta|0); if (t.c <= 0) e.cond.splice(e.cond.indexOf(t), 1); }
+        else if ((c.delta|0) > 0) e.cond.push({ n: c.token, c: c.delta|0 });
+      }
+    });
+    (out.notes||[]).forEach(nt => said.push(e.name + ': ' + nt));
+  }));
+  return said;
+}
+
 function endTurn(){
   S.phase = (S.phase+1) % PHASES.length;
-  if (S.phase===0){ S.round++; S.lines.forEach(l=>l.ents.forEach(e=>{e.q=true;e.f=true;}));
-    toast('Round '+S.round+' — GM declares mana, all units refreshed'); }
+  if (S.phase===0){
+    const said = tick();                          /* the books, kept */
+    S.round++;
+    S.lines.forEach(l=>l.ents.forEach(e=>{e.q=true;e.f=true;}));
+    toast(said.length
+      ? 'Round '+S.round+' — '+said.slice(0,2).join(' · ')+(said.length>2?' …':'')
+      : 'Round '+S.round+' — all units refreshed');
+    said.forEach(t=>log(t));
+  }
   else toast(PHASES[S.phase]+' act');
   render();
 }
@@ -865,13 +920,24 @@ document.addEventListener('click', ev => {
   if (ev.target.id==='sug-no'){ resolveSug(false); return; }
   if (ev.target.id==='act-q'){ e.q=!e.q; log(`${e.name} ${e.q?'regained':'spent'} a quick action`); render(); }
   if (ev.target.id==='act-f'){ e.f=!e.f; log(`${e.name} ${e.f?'regained':'spent'} a full action`); render(); }
-  if (ev.target.id==='act-hurt'){ if(e.kind==='form'){ e.alive=Math.max(0,e.alive-1); } else { e.hp=Math.max(0,e.hp-5); } render(); }
+  if (ev.target.id==='act-hurt'){
+    const n = amount();
+    if(e.kind==='form'){ e.alive=Math.max(0,(e.alive|0)-n); }
+    else { e.hp=Math.max(0,e.hp-n); }
+    log(e.name+' takes '+n); render(); }
   const tb = ev.target.closest('.tkbtn');
   if (tb){ const i=+tb.dataset.tk, d=+tb.dataset.d;
     e.cond[i].c += d;
     if (e.cond[i].c<=0) e.cond.splice(i,1);
     render(); return; }
-  if (ev.target.id==='act-heal'){ if(e.kind==='form'){ e.alive=Math.min(e.total,e.alive+1); } else { e.hp=Math.min(e.max,e.hp+5); } render(); }
+  if (ev.target.id==='act-heal'){
+    const n = amount();
+    if(e.kind==='form'){ e.alive=Math.min(e.total|0,(e.alive|0)+n); }
+    else { e.hp=Math.min(e.max,e.hp+n); }
+    log(e.name+' heals '+n); render(); }
+});
+document.addEventListener('input', ev => {
+  if (ev.target.id === 'act-n') AMOUNT = ev.target.value;
 });
 document.addEventListener('change', ev => {
   if (ev.target.id!=='tk-add' || !S.sel) return;

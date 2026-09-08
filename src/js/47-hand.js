@@ -329,6 +329,7 @@ function take(o) {
 
 function grab(o) {
   const def = F().variantsFor(o);
+  startFollow();               /* the loop only lives while your hand is full */
   held = { offer: o, variant: startVariant(o),
            vi: def && def.list ? (def.start || 0) : -1 };
   doc.body.classList.add('holding');
@@ -504,11 +505,22 @@ function mount() {
 }
 
 /* the table pans and zooms without telling anyone; re-place each frame */
+/* THIS RAN FOR EVER TO DO NOTHING. A requestAnimationFrame loop sixty
+   times a second whose whole body is a test that is false unless you are
+   holding something — so the browser was kept awake, and every other
+   loop on the page was kept in step with it, for the entire session.
+   It runs while something is in your hand and stops when it is not. */
+let following = false;
 function follow() {
+  if (!(held && ghost)) { following = false; return; }
   requestAnimationFrame(follow);
-  if (held && ghost && last.x >= 0) at(last.x, last.y);
+  if (last.x >= 0) at(last.x, last.y);
 }
-requestAnimationFrame(follow);
+function startFollow() {
+  if (following) return;
+  following = true;
+  requestAnimationFrame(follow);
+}
 
 root.Hand = { mount, show, hide, isUp, take, grab, drop, put, refresh, say,
               repaint: () => { paintHeld(); paintRack(); },

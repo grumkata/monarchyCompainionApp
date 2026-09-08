@@ -44,6 +44,8 @@ const JS = [
   'src/js/33-dice-assets.js',
   'src/js/35-kit-assets.js',     // Nature MegaKit, baked
   'src/js/36-sprite-assets.js',
+  'src/js/52-room-assets.js',    // Medieval Village MegaKit — the tavern shell
+  'src/js/53-tavern-assets.js',  // soiTavern — what makes it a tavern
 
   'src/js/10-sheet-data.js',     // ── the hall ──
   'src/js/11-prebuilt-data.js',
@@ -94,8 +96,80 @@ const body =
   `<div id="hall-app">\n${R('src/menu-body.html')}\n</div>\n` +
   `<div id="table-app">\n${R('src/table-body.html')}\n</div>`;
 
-const tail = JS.map(f =>
-  `<script>\n/* ${path.basename(f)} */\n${R(f)}\n</script>`).join('\n');
+/* ── THE LOADING SCREEN, AND WHY IT CAN TELL THE TRUTH ────────
+   Every model, texture and line of code in this app is inlined into one
+   document — that is the whole point of it, and it is also why opening it
+   went from instant to a long white pause once the tavern arrived: the
+   browser is parsing about twelve megabytes of script before it has
+   anything to show.
+
+   A spinner would be a lie invented to fill that pause. This is not one.
+   The scripts are stitched in one at a time and a one-line marker between
+   each of them ticks a counter, so the bar is a genuine report of how far
+   through the parse the browser actually is — it moves in the same jerky
+   way the work does, pausing on the big asset files, because that is what
+   is happening. */
+const tail = JS.map((f, i) =>
+  `<script>\n/* ${path.basename(f)} */\n${R(f)}\n</script>\n` +
+  `<script>window.__boot&&__boot(${i + 1},${JS.length})</script>`).join('\n');
+
+const LOADING = `
+<div id="boot">
+  <div class="boot-mark">&#9876;</div>
+  <div class="boot-name">Monarchy</div>
+  <div class="boot-bar"><i></i></div>
+  <div class="boot-say">setting the table&hellip;</div>
+</div>
+<style>
+#boot{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(ellipse at 50% 38%,#241a10 0%,#0a0705 76%);
+  transition:opacity .55s ease;font-family:Georgia,'Times New Roman',serif}
+#boot.gone{opacity:0;pointer-events:none}
+.boot-mark{font-size:40px;color:#c9a227;opacity:.72;
+  text-shadow:0 0 26px rgba(201,162,39,.35);animation:bootpulse 2.6s ease-in-out infinite}
+.boot-name{font-family:'UnifrakturMaguntia',Georgia,serif;font-size:52px;
+  color:#e8dfc8;letter-spacing:.02em;text-shadow:0 0 40px rgba(201,120,40,.35)}
+.boot-bar{width:236px;height:2px;background:rgba(232,223,200,.14);overflow:hidden}
+.boot-bar i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,#8a6a20,#e0c169);transition:width .25s ease}
+.boot-say{font-size:12px;font-style:italic;color:rgba(232,223,200,.42);
+  letter-spacing:.04em}
+@keyframes bootpulse{0%,100%{opacity:.5}50%{opacity:.95}}
+@media (prefers-reduced-motion:reduce){.boot-mark{animation:none}}
+</style>
+<script>
+(function(){
+  /* The words change as the work does, because "Loading..." for eight
+     seconds tells you nothing and reads as a hang. */
+  var SAY = [[0,'setting the table\\u2026'],[.34,'lighting the hearth\\u2026'],
+             [.62,'pouring the drink\\u2026'],[.85,'laying out the pieces\\u2026']];
+  var bar, say, seen = 0;
+  window.__boot = function(n, of){
+    bar = bar || document.querySelector('#boot .boot-bar i');
+    say = say || document.querySelector('#boot .boot-say');
+    var u = n / of; seen = u;
+    if (bar) bar.style.width = (u * 100).toFixed(1) + '%';
+    if (say) for (var i = SAY.length - 1; i >= 0; i--)
+      if (u >= SAY[i][0]) { say.innerHTML = SAY[i][1]; break; }
+  };
+  /* Gone when the page is actually usable, not when the bar looks full:
+     the last script still has to run, styles resolve and the first frame
+     paint. Two animation frames after load is that moment. */
+  function done(){
+    var b = document.getElementById('boot');
+    if (!b) return;
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      b.classList.add('gone');
+      setTimeout(function(){ b.remove(); }, 700);
+    }); });
+  }
+  if (document.readyState === 'complete') done();
+  else window.addEventListener('load', done);
+  /* and never, ever a permanent cover if something above throws */
+  setTimeout(done, 25000);
+})();
+</script>`;
 
 const html = `<!doctype html>
 <html lang="en">
@@ -106,6 +180,7 @@ const html = `<!doctype html>
 ${head}
 </head>
 <body class="at-hall">
+${LOADING}
 ${body}
 ${tail}
 </body>

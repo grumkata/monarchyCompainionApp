@@ -325,6 +325,17 @@ body{background:var(--page);color:var(--ink);font-family:var(--f-disp);
   box-shadow:inset 0 1px 0 rgba(255,240,210,.28),inset 0 0 0 1px rgba(0,0,0,.35)}
 .act:hover{background:linear-gradient(180deg,rgba(255,240,210,.3),rgba(0,0,0,.15))}
 .act.used{opacity:.4;text-decoration:line-through}
+/* HOW MUCH. Damage was hardcoded to five with no field anywhere, so
+   eleven damage was two presses and a shrug. Same plate as the buttons
+   beside it so it reads as part of the same control, not a form. */
+.act.amt{padding:4px 5px;display:flex;align-items:center}
+.act.amt input{width:44px;background:rgba(0,0,0,.34);border:none;color:#ffeec6;
+  font-family:var(--f-disp);font-size:12px;font-weight:700;letter-spacing:.04em;
+  text-align:center;padding:4px 2px;outline:none;
+  box-shadow:inset 0 0 0 1px rgba(255,240,210,.22)}
+.act.amt input:focus{box-shadow:inset 0 0 0 1px rgba(240,196,116,.85)}
+.act.amt input::-webkit-outer-spin-button,
+.act.amt input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 body.dark .pc .nm{color:#f0d79a;border-bottom-color:#c19a45}
 /* players need a taller art row so the banner's tail clears the name */
 .ent.pc{grid-template-rows:58px auto auto auto auto}

@@ -32,6 +32,9 @@ let tap = { id: null, t: 0, x: 0, y: 0 };
 
 function mount() {
   T().on(paint);
+  /* the seats live in the same table and change with it — a seat added,
+     renamed or given a face is a reason for the room to be rebuilt */
+  T().on(() => { if (root.TableGL && root.TableGL.syncSeats) root.TableGL.syncSeats(); });
   paint();
 }
 
@@ -39,9 +42,11 @@ function mount() {
    for them detached the very element the pointer was pressing on — `raise`
    fires on pointerdown, so grabbing anything threw InvalidStateError from
    setPointerCapture and no prop could be dragged at all. */
-const CHEAP = { raise: 1, move: 1, scale: 1 };
+const CHEAP = { raise: 1, move: 1, scale: 1, select: 1 };
 
 function paint(state, why) {
+  /* whatever changed, the models drawn over these props have to follow */
+  if (root.TableGL && root.TableGL.invalidate) root.TableGL.invalidate(6);
   if (why && CHEAP[why] && restyle()) return;
   repaint();
 }
@@ -59,6 +64,7 @@ function restyle() {
     if (live && t.id === live.id && t.scene === 'combat') return;
     const el = tbl.querySelector(`.prop.t3-thing[data-id="${t.id}"]`);
     if (!el) { all = false; return; }
+    el.classList.toggle('sel', st.sel === t.id);
     el.style.zIndex = 10 + t.z;
     el.dataset.x = t.x; el.dataset.y = t.y;
     /* resize the face where it stands, rather than rebuilding it — see the
@@ -107,7 +113,9 @@ function repaint() {
        that scene's board, drawn there. One object, one place. */
     if (t.kind === 'token' && t.in) return;
     const el = doc.createElement('div');
-    el.className = 'prop t3-thing t3-' + t.kind + (st.active === t.id ? ' live' : '');
+    el.className = 'prop t3-thing t3-' + t.kind +
+      (st.active === t.id ? ' live' : '') +
+      (st.sel === t.id ? ' sel' : '');
     el.dataset.id = t.id;
     el.dataset.x = t.x; el.dataset.y = t.y;
     el.dataset.r = t.rot || 0;
@@ -364,7 +372,8 @@ function dropped(el, ev) {
 
   if (overBin(ev)) { T().bin(id); return; }
 
-  T().move(id, parseFloat(el.dataset.x), parseFloat(el.dataset.y));
+  T().move(id, parseFloat(el.dataset.x), parseFloat(el.dataset.y),
+           { free: !!(ev && ev.shiftKey) });
 
   /* DROPPED ON A LINE. This is how a token becomes a combatant: the line you
      let go over is its home and its side, because the board is the statement.

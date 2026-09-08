@@ -725,15 +725,84 @@ function exportOne(item, isC){
         : { format:'monarchy.table', version:3, table:item });
   toast('Exported ' + item.name);
 }
+/* ── AN OLD .monarch CHARACTER ────────────────────────────────
+   The file picker offers .monarch and the importer rejected every
+   single one, because a v3/v4 character keeps its name at `id.name`
+   and the check below wanted one at the top level. Every character
+   made in the previous app was stranded, and the message blamed the
+   file. This turns the old shape into the current one.
+
+   Only the fields that map cleanly are carried across; anything the
+   old format kept that the new one has no home for is dropped rather
+   than guessed at, and the note says so on the record.            */
+function fromMonarch(old){
+  if (!old || typeof old !== 'object' || !old.id || typeof old.id !== 'object') return null;
+  const S = window.Sheet; if (!S) return null;
+  const rec = S.blank();
+  const id = old.id || {};
+  rec.name = id.name || '';
+  rec.note = 'imported from .monarch';
+  Object.assign(rec.who, {
+    name: id.name || '', species: id.species || '', culture: id.culture || '',
+    rank: id.rank || '', size: id.size || '', player: id.player || ''
+  });
+  const A = old.attrs || {};
+  ['for','pro','dex','nim','wil','int','pre','cha'].forEach(k => {
+    const v = parseInt(A[k], 10); if (Number.isFinite(v)) rec.attr[k] = v;
+  });
+  /* the old skill tree was score+name with `secondaries` and `tertiaries`;
+     the current one is {n,v,kids} all the way down */
+  const node = (x, kidsKey) => ({
+    id: uid('s'), n: x.name || '', v: parseInt(x.score, 10) || 0,
+    kids: (x[kidsKey] || []).map(y => node(y, 'tertiaries'))
+  });
+  ['body','mind','social'].forEach(c => {
+    rec.skills[c] = ((old.skills || {})[c] || []).map(p => node(p, 'secondaries'));
+  });
+  rec.weapons = (old.weapons || []).map(w => ({
+    id: uid('w'), name: w.name || '', dmg: w.dmg || '', type: w.type || '',
+    quality: w.quality || '', range: w.range || '', note: w.notes || '' }));
+  rec.armour.list = (old.armors || []).map(a => ({
+    id: uid('a'), name: a.name || '', av: parseFloat(a.av) || 1,
+    quality: a.quality || '', note: a.notes || '' }));
+  const worn = (old.armors || []).findIndex(a => a.equipped);
+  if (worn >= 0 && rec.armour.list[worn]) rec.armour.equipped = rec.armour.list[worn].id;
+  rec.bgs = (old.backgrounds || []).map(b => ({
+    id: uid('b'), name: b.name || '', inst: b.inst || '', text: b.notes || '' }));
+  rec.knacks = (old.knacks || []).map(k => ({
+    id: uid('k'), name: k.name || '', level: parseInt(k.level, 10) || 0 }));
+  rec.sla = (old.abilSlots || []).map(sl => ({
+    id: uid('sl'), name: sl.slotName || '', type: sl.type || '',
+    passive: sl.passive || '', favor: parseInt(sl.favor, 10) || 0, text: '',
+    entries: (sl.entries || []).map(e => ({
+      name: e.name || '', cost: e.cost || '', cd: e.cd || '', effect: e.effect || '' })) }));
+  rec.notes = [old.generalNotes, old.otherGear && ('Gear: ' + old.otherGear),
+               old.passiveTraits && ('Traits: ' + old.passiveTraits)]
+              .filter(Boolean).join('\n\n');
+  return rec;
+}
+
 function readFile(f, isC){
   const r = new FileReader();
   r.onerror = () => toast('Could not read that file');
   r.onload = () => {
     let d; try { d = JSON.parse(r.result); } catch(e){ return toast('That file will not read'); }
+
+    /* an old export announces itself; take it at its word */
+    if (isC && d && d.format === 'monarchy-character-sheet') {
+      const rec = fromMonarch(d.character);
+      if (!rec) return toast('That .monarch file will not read');
+      rec.id = uid('c'); chars.unshift(rec); saveC();
+      const el0 = $('#rollc'); if (el0) el0.innerHTML = rollC();
+      return toast('Brought in ' + (rec.name || 'a sheet') + ' from .monarch');
+    }
+
     const one = isC ? (d.character || d) : (d.table || d);
     const many = isC ? d.characters : d.tables;
     const list = Array.isArray(many) ? many : (one && one.name ? [one] : null);
-    if (!list) return toast(isC ? 'That is not a character sheet' : 'That is not a table');
+    if (!list) return toast(isC
+      ? 'That is not a character sheet — a .monarch file needs its "format" line'
+      : 'That is not a table');
     let n = 0;
     list.forEach(raw => {
       if (!raw || !raw.name) return;

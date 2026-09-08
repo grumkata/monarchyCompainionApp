@@ -86,8 +86,20 @@ function tableDice(res){
 }
 
 /* ── chat ── */
+/* WHO. This was hardcoded to 'GM' or the string 'Sir Aldric' — the demo
+   fixture's character — so every roll anyone ever made in chat was signed
+   by a person who is not at the table. The hall knows your name; use it. */
+function speaker(){
+  if (typeof ROLE !== 'undefined' && ROLE === 'gm') return 'GM';
+  try {
+    const me = JSON.parse(localStorage.getItem('monarchy.me.v1') || '{}');
+    if (me && me.name && String(me.name).trim()) return String(me.name).trim();
+  } catch (e) {}
+  return 'You';
+}
+
 function say(res){
-  const who = (typeof ROLE !== 'undefined' && ROLE === 'gm') ? 'GM' : 'Sir Aldric';
+  const who = speaker();
   const spec = res.map(label).join(' · ');
   const anyNum = res.some(t => t.kind !== 'coin');
   const chips = res.map(t => t.rolls.map(r => {
@@ -186,6 +198,25 @@ function build(){
   paint();
 }
 
+/* ── SAYING SOMETHING ─────────────────────────────────────────
+   A line of speech, in the same dock the rolls land in, so the two
+   read as one conversation. Emotes with a leading /me, because that
+   is the one bit of chat grammar everyone already knows.        */
+function talk(text){
+  const cb = document.getElementById('chat-body');
+  if (!cb) return false;
+  const t = String(text || '').trim(); if (!t) return false;
+  const emote = /^\/me\s+/i.test(t);
+  const body = emote ? t.replace(/^\/me\s+/i, '') : t;
+  const d = document.createElement('div');
+  d.className = 'cl said' + (emote ? ' emote' : '');
+  d.innerHTML = emote
+    ? `<span class="stxt"><b>${esc(speaker())}</b> ${esc(body)}</span>`
+    : `<b>${esc(speaker())}</b><span class="stxt">${esc(body)}</span>`;
+  cb.appendChild(d); cb.scrollTop = cb.scrollHeight;
+  return true;
+}
+
 /* ── chat as a roll box ──
    Anything that parses as dice is a roll; anything else is just talk. */
 function hookChat(){
@@ -201,7 +232,14 @@ function hookChat(){
         && (document.getElementById('dtable') || {checked:true}).checked;
       if (roll(v.replace(/\bquiet\b/ig,''), onTable)){ inp.value = ''; return false; }
     }
-    return true;   // not dice — let the normal chat handler have it
+    /* NOT DICE — SO IT IS SPEECH, AND IT HAS TO GO SOMEWHERE.
+       This used to `return true` to "let the normal chat handler have
+       it", and there was no normal chat handler: nothing else in the
+       app listens on this box. Words were not sent, not shown, and the
+       input was not even cleared. A table has to be able to talk. */
+    talk(v);
+    inp.value = '';
+    return false;
   };
   inp.addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
@@ -216,5 +254,5 @@ if (document.readyState === 'loading')
   document.addEventListener('DOMContentLoaded', () => { build(); hookChat(); });
 else { build(); hookChat(); }
 
-window.Dice = { roll, parse };
+window.Dice = { roll, parse, talk, speaker };
 })();

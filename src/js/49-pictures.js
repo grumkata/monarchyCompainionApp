@@ -23,6 +23,12 @@
 'use strict';
 
 const CAP = 1600;
+/* AND A CAP IN BYTES. The pixel cap alone let anything already under
+   1600 on its long edge through completely untouched — a 1500x1500 PNG
+   screenshot went in at twelve megabytes and localStorage is five for
+   the whole origin, so one picture could stop a table saving for ever.
+   Re-encode anything over this, and keep stepping down until it fits. */
+const BYTE_CAP = 900 * 1024;
 
 /* does this file need its transparency kept? */
 const keepsAlpha = f => /png|gif|webp|svg/i.test(f.type || f.name || '');
@@ -43,16 +49,25 @@ function shrink(src, alpha, name, done) {
     const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
     if (!w || !h) { done(null); return; }
     const k = Math.min(1, CAP / Math.max(w, h));
-    if (k >= 1) { done({ src: src, w: w, h: h, name: name || 'Picture' }); return; }
-    const cw = Math.round(w * k), ch = Math.round(h * k);
-    const cv = doc.createElement('canvas');
-    cv.width = cw; cv.height = ch;
-    const g = cv.getContext('2d');
-    g.imageSmoothingQuality = 'high';
-    g.drawImage(im, 0, 0, cw, ch);
-    let out;
-    try { out = cv.toDataURL(alpha ? 'image/png' : 'image/jpeg', 0.88); }
-    catch (e) { out = src; }
+    if (k >= 1 && src.length <= BYTE_CAP) {
+      done({ src: src, w: w, h: h, name: name || 'Picture' }); return;
+    }
+    /* shrink by pixels first, then by quality, then by pixels again until
+       it is small enough to live in a five-megabyte store beside others */
+    let cw = Math.round(w * Math.min(1, k)), ch = Math.round(h * Math.min(1, k));
+    let out = src, q = 0.88;
+    for (let pass = 0; pass < 6; pass++) {
+      const cv = doc.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      const g = cv.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(im, 0, 0, cw, ch);
+      try { out = cv.toDataURL(alpha && pass === 0 ? 'image/png' : 'image/jpeg', q); }
+      catch (e) { out = src; break; }
+      if (out.length <= BYTE_CAP) break;
+      if (q > 0.6) q -= 0.14;
+      else { cw = Math.round(cw * 0.75); ch = Math.round(ch * 0.75); }
+    }
     done({ src: out, w: cw, h: ch, name: name || 'Picture' });
   };
   im.src = src;
