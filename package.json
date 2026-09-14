@@ -1,7 +1,7 @@
 {
   "name": "monarchy",
   "version": "1.0.0",
-  "description": "Monarchy \u2014 TTRPG character companion & table",
+  "description": "Monarchy — TTRPG character companion & table",
   "main": "electron/main.js",
   "private": true,
   "scripts": {
@@ -58,8 +58,5 @@
         "dmg"
       ]
     }
-  },
-  "dependencies": {
-    "firebase": "^12.16.0"
   }
 }

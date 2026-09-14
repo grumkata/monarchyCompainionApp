@@ -27,14 +27,28 @@
 ══════════════════════════════════════════════════════════════ */
 const { chromium } = require('playwright');
 const path = require('path');
+const { serve } = require('./serve.js');
 const ok = [], bad = [];
 const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL  ') + n); };
 
 (async () => {
-  const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox','--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+  /* NO executablePath. It used to name a browser inside one Linux
+     container by absolute path, which meant `npm test` could not pass
+     anywhere else — not on Windows, not on a Mac, not on a different CI
+     image — and because this file runs third in the `test` script, the two
+     after it never ran either. Letting Playwright resolve its own install
+     is what makes the suite portable; `npx playwright install chromium`
+     puts it wherever that machine keeps them.
+
+     The flags stay. --no-sandbox is needed in a container, and swiftshader
+     is what gives a headless box a GL context at all. */
+  const b = await chromium.launch({
+    args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader']
+  });
   const pg = await b.newPage({ viewport: { width: 1500, height: 950 } });
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
-  const file = 'file://' + path.join(__dirname, '../dist/monarchy.html');
+  const site = await serve();
+  const file = site.url + '/monarchy.html';
   const st = () => pg.evaluate(() => JSON.parse(JSON.stringify(window.TableModel.state)));
   const wait = ms => pg.waitForTimeout(ms);
   /* ── CLICK WITH THE MOUSE, NOT WITH page.click ─────────────
@@ -392,10 +406,28 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
      grumkata: "art should be able to pull from art inside the program ...
      and external art". Both live in the same tray, so which picture is
      settled before you are carrying anything, never after you place it. */
+  /* ── OFFERED AS A PICTURE, NOT AS A PARTICULAR KIND OF STRING ──
+     This used to assert /^data:image/ on the src, which was the same thing
+     as the picture right up until the pictures moved out of the script and
+     into src/assets/tex/ — after which a perfectly good sprite, that loads
+     and places and measures correctly, failed a test about how its URL is
+     spelled.
+
+     What the test is actually for is that art is offered AS ITSELF and not
+     as a name to look up later. So ask the only question that means: does
+     the src load, and does it have pixels. That holds for a data URI, for
+     a file beside the page, and for whatever it is next. */
   T('the art inside the app is offered as itself, not as a name',
-    await pg.evaluate(() => {
+    await pg.evaluate(async () => {
       const o = window.Toolbox.options('art').find(x => /^art:sprite:/.test(x.id));
-      return !!o && /^data:image/.test(o.v.src || '');
+      const src = o && o.v && o.v.src;
+      if (!src) return false;
+      return await new Promise(r => {
+        const im = new Image();
+        im.onload = () => r(im.naturalWidth > 0 && im.naturalHeight > 0);
+        im.onerror = () => r(false);
+        im.src = src;
+      });
     }));
 
   /* ── AND IT LANDS AT ITS OWN PROPORTIONS ──────────────────
@@ -468,11 +500,26 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       return t.w === m.foot && t.h === m.foot;
     }));
 
-  /* a preview that is a render of the thing, cached only once its textures
-     have actually arrived — see the note in 27-table-gl.js */
+  /* ── ASK, WAIT, ASK AGAIN — IN THAT ORDER ─────────────────
+     A preview is a render of the thing, kept only once its textures have
+     actually arrived (see the note on thumb() in 27-table-gl.js).
+
+     The wait used to come FIRST, which only ever worked by luck: nothing
+     has requested the tree's texture until something asks for the tree, so
+     `waiting` is 0 at that point, the wait returns immediately, and the
+     single thumb() that follows is necessarily cold. It passed while the
+     textures were data URIs inside the script and stopped passing when
+     they became files beside it — not because previews broke, but because
+     a file takes longer to arrive than a string that is already in memory.
+
+     So do what the app does. 47-hand.js asks, subscribes to onTextures,
+     and repaints when they land; thumb() is built for exactly this, which
+     is why it refuses to CACHE a preview taken while anything is in
+     flight. The first ask is what puts the texture in flight. */
+  await pg.evaluate(() => { window.TableGL.thumb('kit:tree', 96); });
   await pg.evaluate(() => new Promise(r => {
     if (!window.TableGL.waiting) return r();
-    window.TableGL.onTextures(r); setTimeout(r, 6000);
+    window.TableGL.onTextures(r); setTimeout(r, 8000);
   }));
   T('and its preview in the box is a render of it, not an impression of one',
     await pg.evaluate(() => {

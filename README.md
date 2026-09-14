@@ -1,125 +1,94 @@
 # Monarchy — project structure
 
-Your 7,394-line single file, split into workable pieces. This was a **pure
-mechanical split** — every line of code was moved, not rewritten, so it
-behaves identically to your original file. (Verified: all 200 function
-definitions, every top-level variable, every element ID, and every brace/
-paren pair were checked to match exactly between the original and the
-rebuilt output.)
+A TTRPG companion: a **hall** where the roster and the character sheets live,
+and a **table** you raise and walk into. Both halves are one document —
+moving between them is a class on `<body>`, not a navigation.
+
+> **Full reference:** `PROJECT.md` has the feature list, the game content,
+> known issues, and the rules for working on this project. This file is just
+> the day-to-day mechanics.
+
+## Building
+
+```
+npm install          # once
+npm start            # build, then open it in Electron
+npm run dist         # build, then package release/Monarchy <version>.exe
+npm test             # build, then the whole suite
+```
+
+`node build.js` stitches every CSS and JS file into `dist/monarchy.html` and
+copies the textures next to it. **`src/` is where all editing happens** —
+`dist/` is a build artifact, regenerate it, never edit it.
 
 ## How it's organized
 
 ```
 src/
-  index.html              ← page skeleton + all markup (edit this for HTML)
+  menu-body.html          ← the hall's markup
+  table-body.html         ← the table's markup
   css/
-    01-base.css           ← core theme, colors, layout
-    02-components.css     ← sheet UI components
-    03-patches.css        ← later fixes + GM tool modals
-    04-overrides.css      ← MUST STAY LAST of the original 4 — wins over everything above
-    05-shell.css          ← title screen, table scene, window chrome, dock
+    20-shell.css          ← unscoped: reaches across both halves
+    00-hall.css           ← scoped to body.at-hall at build time
+    01-sheet.css          ← the record — needed in the hall AND at the table
+    12-combat.css         ← scoped to body.at-table
+    13-table-ui.css       ← scoped to body.at-table
   js/
-    00-storage.js         ← tiny localStorage-safe wrapper + esc/val/selVal shared helpers, loads first
-    01-fx-polish.js       ← canvas particle fx, header ornaments, QoL fixes (incl. HP danger flash)
-    02-data-prebuilt.js   ← PREBUILT_DATA (your backgrounds/items table)
-    03-sheet-basics.js    ← armour equip, derived stats, attribute nav, tabs
-    04-data-skills.js     ← SKILL_DATA (your skills table)
-    05-skills-backgrounds.js ← skill picker, skill trees, knacks, backgrounds, card drag-to-reorder
-    06-equipment-lanes.js ← weapons, armour UI, ability slots, exhaustion
-    07-combat-window.js   ← ⚔ the standalone Combat table window — battlefield, turn counter, vitals
-    08-saves-io.js        ← quick save, save/load, export/import, autosave, serializeSheet/restoreSheet
-    09-session-sync.js    ← GM/player live sync networking
-    10-gm-tools.js        ← server management, saved NPCs, saved encounters
-    11-session-extras.js  ← fog of war, global mana, chip-player linking
-    12-app-utils.js       ← dark mode, undo system
-    14-window-manager.js  ← generic drag/resize/dock window system
-    15-app-shell.js       ← title screen logic + registers the sheet & combat windows, MUST STAY LAST
+    00-three.js           ← vendor (three.js r128)
+    00-geo-runtime.js     ← reads the packed vertex blobs; must precede every pack
+    01,02,17-20,33,35,36,52,53-*assets.js
+                          ← baked model packs, written by tools/bake*.py
+    10-16-*.js            ← the hall: sheet data, heraldry, hall 3D, codex, menu
+    30-34,37-39-*.js      ← the fight: rules, content, combat app, field, dice
+    21-28,40-51,54-*.js   ← the table: model, viewport, props, toolbox,
+                            tokens, papers, library, the room editor
+    29-role.js            ← which side of the table you are
+    42-shell.js           ← which half you are looking at
+  assets/tex/             ← the textures, as real files (see below)
+
+tools/
+  build inputs:  scope-css.js, pack-geometry.js   ← used by build.js
+  asset baking:  bake*.py                          ← re-bake a model pack
+  bake-textures.py                                 ← pull textures out to files
+  shot.js                                          ← photograph the built app
 
 test/
-  smoke.js                ← jsdom runtime smoke test — `npm test` (builds dist/ first if missing)
-
-build.js                  ← run this to produce dist/monarchy.html (intermediate, see below)
-dist/monarchy.html        ← intermediate build artifact — fine for a quick browser test, not the distributable
-package.json               ← Electron + electron-builder config
-electron/main.js           ← Electron main process (loads dist/monarchy.html, no browser chrome)
-release/                   ← OUTPUT of `npm run dist` — the actual .exe you hand to players
+  serve.js            ← serves dist/ over http for the browser tests
+  geometry.test.js    ← the packed vertices still say what the bake said
+  table.test.js       ← the table model, in node
+  table-ui.test.js    ← the chest, the bar, and what is in your hand
+  join.test.js        ← a character joining a table
+  handling.test.js    ← picking things up and putting them down
 ```
 
-> **Full reference:** see `PROJECT.md` for the complete feature list, game
-> content summary, known issues, and every rule to follow when working on
-> this project. This README just covers the day-to-day mechanics.
+**Load order is load-bearing** and is written down in `build.js` rather than
+globbed, so adding a file is a decision rather than an accident. Function
+declarations hoist, so most order problems do not bite — but the asset packs
+must follow `00-geo-runtime.js`, and `16-menu.js` is last because it boots
+the hall.
 
-## Why it's split this way
+## The assets are not in the JavaScript
 
-The CSS files are numbered because **order matters for CSS** — later rules
-win when they conflict, and `04-overrides.css` was explicitly written to load
-last and override everything else. Don't reorder the `<link>` tags in
-`index.html`.
+Since 2026-09-14 the textures are real image files in `src/assets/tex/`,
+copied to `dist/assets/tex/` at build time, and the vertices are binary blobs
+rather than decimal number literals. That took the page from 15.28 MB to
+4.24 MB plus 2.25 MB of images.
 
-The JS files are numbered for the same reason: this is all still plain
-(non-module) JavaScript sharing one global scope, exactly like your original
-single file. Later files use functions/variables declared in earlier ones,
-so load order must stay as listed in `index.html`. Function declarations are
-fairly forgiving about order, but a few top-level `const`/`let` values are
-relied on by later files, so just don't reshuffle the `<script>` tags.
+Two consequences worth knowing:
 
-## Editing day-to-day
+- **Re-baked a model pack?** Run `python tools/bake-textures.py` afterwards.
+  The bake scripts write textures back in as data URIs; that tool pulls them
+  out again. Forgetting is not fatal — `build.js` reports every picture it
+  could not find and leaves it inline — but the build gets fat again. The
+  vertex packing needs no such step; `build.js` does it on every build.
+- **`dist/monarchy.html` is no longer standalone**, and double-clicking it
+  into a browser does not work even from inside `dist/` — three.js requests
+  textures with `crossOrigin="anonymous"`, which over `file://` is a CORS
+  request against a response with no CORS headers, so every model comes up
+  blank grey with nothing in the console. Electron does not enforce this, so
+  the app and the `.exe` are fine. To look at the built page in a browser,
+  serve it:
 
-Just open `src/index.html` directly in a browser (double-click it, no server
-needed — relative `<link>`/`<script src>` paths work fine over `file://`).
-Edit whichever `.css`/`.js` file actually contains the thing you're fixing,
-refresh the browser, done. This is the entire win: you can now search
-`07-combat-window.js` (~550 lines) instead of the old 7,394-line file to
-find anything combat-related — or `09-session-sync.js`/`10-gm-tools.js`/
-`11-session-extras.js` for anything multiplayer-related.
-
-## Producing the file you hand to players
-
-```
-npm install     (one-time)
-npm run dist
-```
-
-This runs `node build.js` (inlines everything into `dist/monarchy.html`,
-same as before) and then packages that into a real native `.exe` at
-`release/Monarchy <version>.exe` — no browser, no webpage tell, works by
-double-clicking. The **portable** target needs no installer and no admin
-rights; a traditional installer (`nsis` target) is also configured but
-needs Wine if you're building it from Linux/macOS (native Windows builds
-need neither).
-
-Requires Node.js installed once. `npm install` pulls down Electron itself
-(~100MB+), so it needs internet access the first time; after that,
-`npm run dist` works offline.
-
-If you just want to quickly check a change in a browser without producing
-a full exe, `node build.js` alone still works and `dist/monarchy.html` is
-a perfectly normal file to open directly.
-
-## Next steps
-
-1. ~~Title screen + table scene~~ — done, then substantially reworked
-   after first look (table starts empty, tabs removed, global theme,
-   scale-to-fit windows) — see `PROJECT.md` section 3.10. Tabs were
-   restored shortly after; see the second 2026-07-13 entry in
-   `PROJECT.md` section 7.
-2. ~~Electron distribution~~ — done, verified end-to-end (built and
-   launched the actual packaged app) — see `PROJECT.md` section 3.11.
-3. ~~Split combat out of the sheet~~ — done 2026-07-18: combat
-   (battlefield/lanes/chips/turn counter/vitals) is now its own table
-   window, and multiplayer (session sync, GM tools) is its own clean tab
-   on the sheet rather than tangled together in one "Combat Tracker" tab —
-   see `PROJECT.md` sections 3.6/3.7 and the 2026-07-18 timeline entry.
-   (Turns out `07-combat-tracker.js` was never actually isolated the way
-   this file used to claim — it also held the whole-character save/load
-   functions. That's fixed now too.)
-4. **Overhaul combat mechanics/UI**: still open. `07-combat-window.js` is
-   now cleanly separated from the sheet and multiplayer, which should
-   make this safer to tackle than before — but the actual rewrite (or
-   redesign) of combat itself hasn't happened yet, just the move.
-5. **More multiplayer features beyond combat**: mentioned as a future
-   direction while planning the 2026-07-18 split — multiplayer staying
-   attached to the sheet (rather than becoming a table window like
-   combat) was a deliberate choice to leave room for this.
-6. **Dice & chat**: `#table-right-panel` is reserved and empty, ready for
-   these whenever you want them.
+  ```
+  node -e "require('./test/serve.js').serve().then(s=>console.log(s.url+'/monarchy.html'))"
+  ```

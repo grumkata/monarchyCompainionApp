@@ -1,27 +1,3 @@
-/* ── ONE RENDER, NOT FOUR ─────────────────────────────────────
-   Measured, because I had been guessing: with the GL canvases hidden a
-   look-around frame cost 14ms; with them on, 3001ms. The GL layer was
-   the entire frame, and inside it the cost was not the room — it was
-   this pass. A half-resolution render into a target, two blur passes,
-   and then a full-screen grade shader doing ACES, split-toning, radial
-   chromatic aberration, a vignette and grain across 1.4 million pixels.
-   Every frame. For a picture that already HAS a grade.
-
-   Because it does: #grade in table-body.html lays the same tone curve,
-   the same warmth and the same vignette over the whole composite — DOM
-   pieces included, which this pass could never reach — and it costs
-   nothing because the compositor was going to draw that frame anyway.
-   Doing it twice bought a little bloom on the fire and cost the ability
-   to look around.
-
-   So the bloom comes from the additive glow sprites instead, which were
-   already there and are two triangles each, and the room renders once,
-   straight to the canvas. */
-function drawUnder(t) {
-  uRen.setRenderTarget(null);
-  uRen.render(uScene, camera);
-}
-
 /* ══════════════════════════════════════════════════════════════
    27-table-gl.js — THE THINGS ON THE TABLE THAT ARE REAL OBJECTS.
 
@@ -813,14 +789,32 @@ function layRoom() {
   const R = ROOM, RB = ROOM_TEX;
   const T = (typeof TAVERN !== 'undefined') ? TAVERN : null;
   const TB = (typeof TAVERN_TEX !== 'undefined') ? TAVERN_TEX : null;
-  /* clear whatever the last plan built */
+  /* ── CLEAR WHATEVER THE LAST PLAN BUILT, ALL OF IT ────────
+     The geometry was always disposed here and the MATERIAL never was,
+     which is a leak with a pedal on it: flushRoom mints a fresh
+     MeshLambertMaterial for every bucket — twenty or thirty of them — and
+     54-room-editor.js re-lays the whole room from `oninput`, so a single
+     drag through a number field runs this dozens of times. A material the
+     renderer has drawn holds a reference to its compiled program, and
+     WebGLRenderer only lets that reference go on dispose(), so without
+     this the page accumulates them until it is closed.
+
+     The TEXTURE is deliberately left alone. It belongs to texCache, it is
+     shared by every bucket that uses it and by the next lay of the room,
+     and material.dispose() does not touch it — which is the behaviour
+     wanted here, not an oversight. */
+  const scrap = c => {
+    c.geometry && c.geometry.dispose();
+    const m = c.material;
+    if (m) (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose && x.dispose());
+  };
   for (let i = roomGroup.children.length - 1; i >= 0; i--) {
     const c = roomGroup.children[i];
-    if (c.userData.plan) { roomGroup.remove(c); c.geometry && c.geometry.dispose(); }
+    if (c.userData.plan) { roomGroup.remove(c); scrap(c); }
   }
   for (let i = overGroup.children.length - 1; i >= 0; i--) {
     const c = overGroup.children[i];
-    overGroup.remove(c); c.geometry && c.geometry.dispose();
+    overGroup.remove(c); scrap(c);
   }
 
   const plan = roomPlan();
@@ -908,17 +902,6 @@ function layRoom() {
 let seatRoot = null, seatSig = '';
 const SEAT_R = 1.34;          /* a person sits BACK from a table, not against it */
 const SEAT_CHAIR = 0.78;      /* the pack's chair is 1.2m tall; a chair is 0.94 */
-/* ── HOW FAR BACK THE WALL IS, AT THAT BEARING ────────────────
-   BANNER_R was one number, 3.55, and the room is a SQUARE 2.90 to the
-   face. So a banner behind the far seat was half a metre outside the
-   building and a banner behind a corner seat was nowhere near the wall it
-   was supposed to be on. The wall is where the ray from the middle of the
-   table meets the square, which is this. */
-function wallAt(a) {
-  const c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
-  return 2.84 / Math.max(c, sn, 1e-3);
-}
-
 function banner(seat) {
   /* the seat's own image if it has one; the character's arms if not,
      drawn by the hall's heraldry so a seat is never a blank rectangle */
@@ -1266,212 +1249,34 @@ const FOG_M = 0.062;   /* per metre: about 15% haze at six metres */
    fov = 2·atan(H / 2·PERSP), so shortening the lens widens the view — and
    because both halves of the picture read the same number, the CSS pieces
    and the GL room widen together. */
-/* ══ THE GRADE, IN A SHADER ════════════════════════════════════
-   The CSS grade over the whole app (see #grade in table-body.html) is the
-   right tool for the composite, because the picture is half DOM. It is
-   the wrong tool for FIRE. A blend mode cannot know that the hearth is
-   ten times brighter than the wall behind it — by the time CSS sees the
-   frame, both are just pixels somewhere under 1.0, and a flame that
-   cannot blow out is a painting of a flame.
+/* ── ONE RENDER, NOT FOUR ─────────────────────────
+   This used to be the front of a post chain: the room into a half-float
+   target, a bright-pass and two blurs for bloom, then a fullscreen grade
+   doing ACES, split-toning, chromatic aberration, a vignette and grain.
+   It is all gone, and it is worth saying why so nobody rebuilds it.
 
-   So the room gets its own pass, in GL, where the values are still
-   linear and still allowed above 1. Three draws:
+   It cost the whole frame. Measured rather than guessed: with the GL
+   canvases hidden a look-around frame was 14ms; with them on, 3001ms —
+   the pass, not the room. And it bought a grade the picture already had.
+   #grade in table-body.html lays the same tone curve, the same warmth
+   and the same vignette over the WHOLE composite, DOM pieces included,
+   which a pass over the GL canvases alone could never reach, and it
+   costs nothing because the compositor was going to draw that frame
+   anyway. The bloom on the fire comes from the additive glow sprites
+   instead: they were already there and they are two triangles each.
 
-     1. the room, into a half-float target with tone mapping OFF, so a
-        hot ember stays at 3.0 instead of being crushed to 0.78
-     2. a bright-pass and blur at quarter resolution, twice (H then V) —
-        this is the bloom, and it is cheap because it is small
-     3. one fullscreen shader that adds the bloom in LINEAR light, runs
-        ACES, split-tones, vignettes and grains, and writes sRGB
-
-   Adding bloom BEFORE the curve rather than after is the whole
-   difference between light spilling and a grey wash laid over the image.
-
-   Only while the room is up. Zoomed in on the wood there is nothing to
-   bloom and the table wants the plain, honest path. */
-let rtScene = null, rtA = null, rtB = null, quadCam = null, quadScene = null,
-    quadMesh = null, blurMat = null, gradeMat = null, postReady = false;
-
-const QUAD_VS = `varying vec2 vUv;
-void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`;
-
-/* bright-pass and separable blur in one shader; uPre switches the
-   threshold on for the first (horizontal) pass only. GLSL ES 1.00 — no
-   array constructors, no dynamic indexing, so it runs on WebGL1 too. */
-const BLUR_FS = `
-uniform sampler2D tSrc; uniform vec2 uDir; uniform float uPre;
-uniform float uThresh; uniform float uKnee;
-varying vec2 vUv;
-vec3 tap( vec2 uv ){
-  vec3 c = texture2D( tSrc, uv ).rgb;
-  if ( uPre < 0.5 ) return c;
-  float l = max( c.r, max( c.g, c.b ) );
-  float s = clamp( l - uThresh + uKnee, 0.0, 2.0 * uKnee );
-  s = s * s / ( 4.0 * uKnee + 0.0001 );
-  return c * max( s, l - uThresh ) / max( l, 0.0001 );
-}
-void main(){
-  vec3 s  = tap( vUv ) * 0.227027;
-  s += ( tap( vUv + uDir ) + tap( vUv - uDir ) ) * 0.194595;
-  s += ( tap( vUv + uDir * 2.0 ) + tap( vUv - uDir * 2.0 ) ) * 0.121622;
-  s += ( tap( vUv + uDir * 3.0 ) + tap( vUv - uDir * 3.0 ) ) * 0.054054;
-  s += ( tap( vUv + uDir * 4.0 ) + tap( vUv - uDir * 4.0 ) ) * 0.016216;
-  gl_FragColor = vec4( s, 1.0 );
-}`;
-
-const GRADE_FS = `
-uniform sampler2D tScene; uniform sampler2D tBloom;
-uniform float uTime, uExposure, uBloom, uSplit, uContrast, uPivot, uSat;
-uniform float uVigIn, uVigOut, uVigDark, uGrain, uCA;
-uniform vec3 uWarm, uCool;
-varying vec2 vUv;
-const vec3 LUMA = vec3( 0.2126, 0.7152, 0.0722 );
-
-float hash12( vec2 p ){
-  vec3 p3 = fract( vec3( p.xyx ) * 0.1031 );
-  p3 += dot( p3, p3.yzx + 33.33 );
-  return fract( ( p3.x + p3.y ) * p3.z );
-}
-/* Narkowicz's ACES fit. The SHOULDER is the point: it is what stops a
-   flame being a flat white blob with a hard edge. */
-vec3 aces( vec3 x ){
-  return clamp( ( x * ( 2.51 * x + 0.03 ) ) / ( x * ( 2.43 * x + 0.59 ) + 0.14 ), 0.0, 1.0 );
-}
-void main(){
-  vec2 d = vUv - 0.5;
-  float r = length( d ) * 1.41421;
-
-  /* radial chromatic aberration — the centre stays clean and only the
-     corners fringe, which is what a real lens does. A uniform shift
-     across the whole frame reads as a broken one. */
-  float ca = uCA * r * r;
-  vec3 col;
-  col.r = texture2D( tScene, vUv - d * ca ).r;
-  col.g = texture2D( tScene, vUv ).g;
-  col.b = texture2D( tScene, vUv + d * ca ).b;
-
-  col += texture2D( tBloom, vUv ).rgb * uBloom;   /* linear, before the curve */
-  col = aces( col * uExposure );
-
-  /* SPLIT TONE: shadows cool, highlights warm. Without this an
-     orange-lit room is a sepia photograph; blue shadows are what make
-     firelight read as hot. */
-  float l = dot( col, LUMA );
-  col *= mix( uCool, uWarm, smoothstep( uSplit - 0.30, uSplit + 0.30, l ) );
-
-  col = clamp( ( col - uPivot ) * uContrast + uPivot + 0.004, 0.0, 1.0 );
-  float g = dot( col, LUMA );
-  col = mix( vec3( g ), col, uSat );
-
-  col *= mix( 1.0 - uVigDark, 1.0, smoothstep( uVigOut, uVigIn, r ) );
-
-  /* grain weighted away from the highlights, so the fire stays clean and
-     the dark corners get the tooth. Even grain looks like a dirty screen. */
-  float n = hash12( gl_FragCoord.xy + fract( uTime * 0.61 ) * vec2( 137.31, 91.77 ) );
-  col += ( n - 0.5 ) * uGrain * ( 1.0 - abs( l * 2.0 - 1.0 ) );
-
-  /* sRGB BY HAND. Three prepends its encoding helpers to a ShaderMaterial
-     and LinearTosRGB() is nominally there, but relying on it means the
-     whole picture silently comes out dark and over-saturated the day that
-     changes — which is exactly what it looked like the first time. The
-     transfer function is four lines; own it. */
-  vec3 lo = col * 12.92;
-  vec3 hi = 1.055 * pow( max( col, vec3( 0.0031308 ) ), vec3( 1.0 / 2.4 ) ) - 0.055;
-  col = mix( lo, hi, step( vec3( 0.0031308 ), col ) );
-  gl_FragColor = vec4( col, 1.0 );
-}`;
-
-function buildPost() {
-  if (postReady || !uRen) return;
-  postReady = true;
-  quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  quadScene = new THREE.Scene();
-  quadMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
-  quadMesh.frustumCulled = false;
-  quadScene.add(quadMesh);
-
-  blurMat = new THREE.ShaderMaterial({
-    uniforms: { tSrc: { value: null }, uDir: { value: new THREE.Vector2() },
-                uPre: { value: 1 }, uThresh: { value: 0.75 }, uKnee: { value: 0.35 } },
-    vertexShader: QUAD_VS, fragmentShader: BLUR_FS,
-    depthTest: false, depthWrite: false });
-
-  gradeMat = new THREE.ShaderMaterial({
-    uniforms: {
-      tScene: { value: null }, tBloom: { value: null }, uTime: { value: 0 },
-      uExposure: { value: 0.96 }, uBloom: { value: 0.52 },
-      uWarm: { value: new THREE.Vector3(1.035, 0.995, 0.945) },
-      uCool: { value: new THREE.Vector3(0.930, 0.965, 1.055) },
-      uSplit: { value: 0.45 }, uContrast: { value: 1.08 }, uPivot: { value: 0.38 },
-      uSat: { value: 1.02 }, uVigIn: { value: 0.30 }, uVigOut: { value: 0.98 },
-      uVigDark: { value: 0.72 }, uGrain: { value: 0.013 }, uCA: { value: 0.0009 } },
-    vertexShader: QUAD_VS, fragmentShader: GRADE_FS,
-    depthTest: false, depthWrite: false });
-  sizePost();
-}
-
-function sizePost() {
-  if (!postReady) return;
-  /* half float where we can get it, because the whole point is values
-     above 1.0 surviving as far as the bloom */
-  const hdr = uRen.capabilities.isWebGL2 ||
-              !!uRen.extensions.get('OES_texture_half_float_linear');
-  const opt = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat,
-                type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
-                encoding: THREE.LinearEncoding, stencilBuffer: false };
-  /* HALF RESOLUTION for the room, quarter for the bloom. A firelit
-     interior behind a grain and a vignette does not need four times the
-     pixels, and this is the single biggest saving in the frame. */
-  const sq = 2, q = 4;
-  const sw = Math.max(1, (W / sq) | 0), sh = Math.max(1, (H / sq) | 0);
-  const bw = Math.max(1, (W / q) | 0), bh = Math.max(1, (H / q) | 0);
-  if (rtScene) { rtScene.dispose(); rtA.dispose(); rtB.dispose(); }
-  rtScene = new THREE.WebGLRenderTarget(sw, sh, Object.assign({ depthBuffer: true }, opt));
-  rtA = new THREE.WebGLRenderTarget(bw, bh, Object.assign({ depthBuffer: false }, opt));
-  rtB = new THREE.WebGLRenderTarget(bw, bh, Object.assign({ depthBuffer: false }, opt));
-}
-
-function blit(mat, target) {
-  quadMesh.material = mat;
-  uRen.setRenderTarget(target || null);
-  uRen.clear();
-  uRen.render(quadScene, quadCam);
-}
-
-/* the whole pass, or the plain render when there is no room to grade */
+   The machinery outlived the decision. buildPost() stopped being called,
+   so postReady was never true and this function had been taking the
+   plain branch ever since — about a hundred and ninety lines of shader
+   source and render targets sitting behind a condition that could not
+   fire. That went, and so did a second copy of this function stranded
+   above the file's own header, outside the IIFE, where its uRen and
+   uScene did not even resolve. */
 function drawUnder(t) {
-  if (!roomGroup || !postReady) {
-    uRen.toneMapping = THREE.ACESFilmicToneMapping;
-    uRen.outputEncoding = THREE.sRGBEncoding;
-    uRen.setRenderTarget(null);
-    uRen.render(uScene, camera);
-    return;
-  }
-  /* tone mapping and encoding are OURS from here: three would otherwise
-     crush the highlights before the bloom ever sees them, and silently
-     drop outputEncoding the moment we render into a target anyway. */
-  uRen.toneMapping = THREE.NoToneMapping;
-  uRen.outputEncoding = THREE.LinearEncoding;
-  uRen.setRenderTarget(rtScene);
-  uRen.clear();
+  uRen.toneMapping = THREE.ACESFilmicToneMapping;
+  uRen.outputEncoding = THREE.sRGBEncoding;
+  uRen.setRenderTarget(null);
   uRen.render(uScene, camera);
-
-  const tw = 1 / rtA.width, th = 1 / rtA.height;
-  blurMat.uniforms.tSrc.value = rtScene.texture;
-  blurMat.uniforms.uPre.value = 1;
-  blurMat.uniforms.uDir.value.set(tw * 1.4, 0);
-  blit(blurMat, rtA);
-
-  blurMat.uniforms.tSrc.value = rtA.texture;
-  blurMat.uniforms.uPre.value = 0;
-  blurMat.uniforms.uDir.value.set(0, th * 1.4);
-  blit(blurMat, rtB);
-
-  gradeMat.uniforms.tScene.value = rtScene.texture;
-  gradeMat.uniforms.tBloom.value = rtB.texture;
-  gradeMat.uniforms.uTime.value = t;
-  blit(gradeMat, null);
 }
 
 function lens(p) {
@@ -1851,15 +1656,55 @@ function landed() {
 }
 function onTextures(fn) { if (settled.indexOf(fn) < 0) settled.push(fn); }
 
+/* ── AND THE COUNTER ALONE IS NOT ENOUGH ──────────────────────
+   `waiting` counts REQUESTS, and a request is only made on a cache miss —
+   so the second asker for a picture that is still in the air gets it
+   straight back off texCache without the counter ever moving. If that
+   asker is a preview, it sees waiting at nought, decides every texture has
+   arrived, and caches a blank square for good: the very fault the note
+   above says was fixed, through a hole in the fix.
+
+   It was unreachable while the pictures were data URIs in the script,
+   because the gap between the first ask and the picture landing was a
+   microtask. They are files beside the page now and that gap is a disk
+   read, which is wide enough to fall into every time.
+
+   So readiness stops being a global count and becomes a fact about each
+   texture. The counter stays — the render loop and onTextures still want
+   to know whether anything at all is outstanding — but nothing decides
+   what to KEEP by reading it any more. */
+/* A set rather than a flag on the texture: THREE.Texture in r128 has no
+   userData to hang one on, and absence-means-not-ready needs no initialiser
+   and so cannot be raced by a load that finishes early. The callback is
+   handed the texture itself, so nothing closes over a binding that may not
+   be assigned yet either. */
+const texDone = new WeakSet();
+function texReady(t) { return !!t && texDone.has(t); }
+
 function tex(k, book) {
   const src = (book || CHEST_TEX)[k];
   if (!src) return null;
   if (texCache[src]) return texCache[src];
   waiting++;
-  const t = new THREE.TextureLoader().load(src, landed, undefined, landed);
+  const done = who => { if (who) texDone.add(who); landed(); };
+  const t = new THREE.TextureLoader().load(src, done, undefined, () => done(texCache[src]));
   t.encoding = THREE.sRGBEncoding;
   t.flipY = false;                       /* glTF UVs, not canvas UVs */
   return (texCache[src] = t);
+}
+
+/* Every texture this group actually hangs on, arrived or not. A preview is
+   only worth keeping when all of them have. */
+function allTexReady(g) {
+  let ok = true;
+  g.traverse(o => {
+    const m = o.material;
+    if (!m) return;
+    (Array.isArray(m) ? m : [m]).forEach(x => {
+      if (x && x.map && !texReady(x.map)) ok = false;
+    });
+  });
+  return ok;
 }
 function mesh(prims, book, dress) {
   dress = dress || DRESS.chest;
@@ -2451,9 +2296,12 @@ function shotOf(prims, book, dress, key, px) {
   let out = null;
   try { shot.render(shotScene, shotCam); out = shot.domElement.toDataURL('image/png'); }
   catch (e) { out = null; }
+  /* only KEEP it if every texture THIS MODEL hangs on has arrived — asked
+     of the group itself rather than of the global counter, which cannot
+     see a picture that was already on its way when this asked for it */
+  const keep = allTexReady(g);
   shotScene.remove(g);
-  /* only KEEP it if every texture it needs had already arrived */
-  if (waiting > 0) return out;
+  if (!keep) return out;
   return (thumbs[key] = out);
 }
 

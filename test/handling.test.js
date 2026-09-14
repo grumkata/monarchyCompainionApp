@@ -17,6 +17,7 @@
 ══════════════════════════════════════════════════════════════ */
 const { chromium } = require('playwright');
 const path = require('path');
+const { serve } = require('./serve.js');
 const ok = [], bad = [];
 const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL  ') + n); };
 
@@ -25,7 +26,8 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   const pg = await b.newPage({ viewport: { width: 1500, height: 950 } });
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
   const W = ms => pg.waitForTimeout(ms);
-  await pg.goto('file://' + path.join(__dirname, '../dist/monarchy.html'));
+  const site = await serve();
+  await pg.goto(site.url + '/monarchy.html');
   await W(900);
   await pg.evaluate(() => localStorage.setItem('monarchy.chars.v2', JSON.stringify([
     { id: 'c1', who: { name: 'Aldric Vane' } }])));

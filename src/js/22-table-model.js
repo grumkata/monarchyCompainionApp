@@ -25,7 +25,6 @@ const Content = root.TableContent ||
   (typeof require !== 'undefined' ? require('./21-table-content.js') : null);
 
 const KEY = id => 'monarchy.table.' + id + '.v1';
-const BIN_KEEPS = 12;
 
 let uidn = 0;
 const uid = p => p + Date.now().toString(36) + (++uidn).toString(36) +

@@ -62,36 +62,6 @@ let T = { x: 0, y: 0, k: 0.6 };
 let zTop = 200, dg = null, fdrag = null;
 let lock = null, before = null, anim = null, lockK = 1;
 
-/* ══ HOW FAR AWAY THE MIDDLE OF THE WOOD IS ════════════════════
-   The GL layer finds the table by measuring two markers on its rim, and
-   that measurement is a good one: it is the browser's own answer, it
-   survives every transform in the chain, and it has been right through
-   three rewrites of this file. What it cannot report is DEPTH — a screen
-   rect is two numbers — and depth used to be zero, always, because the
-   table sat on the optical axis.
-
-   Turning your head about your own head moves it off that axis and, with
-   it, along the axis: the middle of the table swings from in front of you
-   to beside you, which in a flat perspective is nearer to the film. GL was
-   still drawing the room at the screen plane and scaling it to the
-   measured width, so the width came out half again too big at fifty
-   degrees and the whole tavern swelled as you looked across it. That is
-   the rest of "if i turn too much i start moving in a weird way".
-
-   This is the missing number. The measured midpoint and width are then
-   unprojected through it, which is arithmetic GL can do, and the room goes
-   where it actually is. */
-function stageZ() {
-  const a = yawNow() * Math.PI / 180;
-  if (!a) return 0;
-  const E = eyeLocal();
-  /* the slide that a turn about your head puts into the table's own plane */
-  const dy = E.y * (1 - Math.cos(a)) - E.x * Math.sin(a);
-  return T.k * dy * Math.sin(TILT * Math.PI / 180);
-}
-root.__stageZ = stageZ;
-root.__persp = () => PERSP;
-
 /* the piece layer mirrors this angle, so it has to be readable live */
 root.__tilt = () => TILT * Math.PI / 180;
 root.__yaw  = () => yawNow() * Math.PI / 180;
@@ -164,16 +134,29 @@ function holdEye(E, deg) {
 
 /* ── HOW FAR AWAY THE MIDDLE OF THE WOOD IS ───────────────────
    The GL layer finds the table by measuring two markers on its rim, which
-   is a good measurement: it is the browser's own answer and it survives
-   every transform in the chain. What a screen rect cannot report is
-   DEPTH, and GL assumed nought — so it drew the room at the screen plane
-   and scaled it to the measured width.
+   is a good measurement: it is the browser's own answer, it survives every
+   transform in the chain, and it has been right through three rewrites of
+   this file. What a screen rect cannot report is DEPTH, and GL assumed
+   nought — so it drew the room at the screen plane and scaled it to the
+   measured width.
 
-   The middle of the wood is never at nought. Tilted back it is a third of
-   the lens in front of the film before you turn at all, and turning your
-   head about your own head swings it further forward still. This is that
-   number, and the measured midpoint and width get unprojected through it
-   so the room ends up where it is rather than where it looked. */
+   Turning your head about your own head moves the table off the optical
+   axis and, with it, along the axis: the middle of the wood swings from in
+   front of you to beside you, which in a flat perspective is nearer to the
+   film. Scaled to the measured width from the screen plane, that came out
+   half again too big at fifty degrees and the whole tavern swelled as you
+   looked across it — the rest of "if i turn too much i start moving in a
+   weird way".
+
+   And the middle of the wood is never at nought even before you turn:
+   tilted back it is already a third of the lens in front of the film,
+   which is why this is `CY + dy` and not `dy`. (There were two of these
+   functions for a while, an earlier one returning 0 at yaw nought and this
+   one; they were declared in the same scope, so hoisting silently made
+   this the only one that ever ran. The other is gone.)
+
+   This is that number, and the measured midpoint and width get unprojected
+   through it so the room ends up where it is rather than where it looked. */
 function stageZ() {
   const a = yawNow() * Math.PI / 180;
   const t = TILT * Math.PI / 180;

@@ -14,12 +14,15 @@
 
 ## 1. What this project is
 
-Monarchy is a browser-based character sheet + combat tracker companion app
-for a custom TTRPG. One person plays GM and can host a live session; players
-can join from their own device and see a synced battlefield and push their
-own HP/vitals back to the GM in real time. It also works completely
-standalone for a single person building/viewing a character sheet with no
-network involved.
+Monarchy is a character sheet + table companion app for a custom TTRPG. It
+runs entirely on one machine: a hall where the roster and the sheets live,
+and a table you raise and walk into, with the tavern around it.
+
+**There is no live session today.** An earlier generation had GM/player sync
+over Firebase; it went with that generation (see 2.1) and has not been
+rebuilt. The hall still offers "Join a Game" and says as much on the screen
+— *"the sync layer is not built — the word is remembered"*. Everything else
+works with no network at all.
 
 The app opens to a **title screen**, which leads into a **table scene** — a
 shared surface where windows (the character sheet today; combat, a rulebook,
@@ -37,58 +40,63 @@ tech-illiterate players: they double-click it and it opens.
 
 ### 2.1 The two-layer structure
 
-As of the baseline split (2026-07-11), the project is no longer one 7,394-line
-file. It's now:
+The tree below is the CURRENT one. It is not the one the 2026-07-11 split
+produced: that generation — `src/index.html`, `css/01-base` through
+`05-shell`, and `js/00-storage` through `16-multi-sheet` — was superseded by
+the hall/table architecture and finally deleted on 2026-09-14, having sat
+unbuilt for months. `git show f444ae8` still has every line of it if you ever
+want to read one. **Features that went with it and have not been rebuilt:**
+live GM/player sync, GM tools (saved NPCs and encounters), fog of war, the
+drag/resize/dock window manager, and simultaneous multi-sheet editing. The
+hall's "Join a Game" screen says so in as many words — *"the sync layer is
+not built"* — and the `firebase` dependency that used to serve it was dropped
+on the same day, since it was 45 MB riding into every installer for code
+nothing loaded.
 
 ```
 src/                       ← EDIT THIS. Multi-file source, never distributed as-is.
-  index.html               ← page skeleton + all HTML markup
-  css/
-    01-base.css             core theme, colors, layout
-    02-components.css       sheet UI components
-    03-patches.css          later fixes + GM tool modals
-    04-overrides.css        MUST STAY LAST of the original 4 — cascade-wins over everything above
-    05-shell.css            title screen, table scene, window chrome, dock — see 3.10
+  menu-body.html           ← the hall's markup
+  table-body.html          ← the table's markup
+  css/                     ← scoped to one half or the other at build time
+    20-shell.css            unscoped: reaches across both
+    00-hall.css             body.at-hall
+    01-sheet.css            the record — needed in the hall AND at the table
+    12-combat.css           body.at-table
+    13-table-ui.css         body.at-table
   js/
-    00-storage.js            localStorage-safe wrapper + esc/val/selVal shared helpers — must load first
-    01-fx-polish.js          canvas particle fx, header ornaments, QoL fixes (incl. HP danger flash)
-    02-data-prebuilt.js      PREBUILT_DATA — backgrounds/prebuilt items table
-    03-sheet-basics.js       armour equip, derived stats, attribute nav, tabs
-    04-data-skills.js        SKILL_DATA — the 3 skill trees
-    05-skills-backgrounds.js skill picker, skill trees, knacks, backgrounds, card drag-to-reorder
-    06-equipment-lanes.js    weapons, armour UI, ability slots, exhaustion
-    07-combat-window.js      ⚔ the standalone Combat table window — battlefield/chips/lanes/turn
-                             counter/vitals — see 3.6. Renamed from 07-combat-tracker.js (2026-07-18).
-    08-saves-io.js           quick save, save/load, export/import, autosave, AND serializeSheet /
-                             restoreSheet / setActiveSave (moved in from 07 on 2026-07-18 — this is
-                             where whole-character (de)serialization always belonged)
-    09-session-sync.js       GM/player live sync networking — calls into 07's serializeBattlefield/
-                             restoreBattlefield rather than defining them itself (2026-07-18)
-    10-gm-tools.js           server management, saved NPCs, saved encounters
-    11-session-extras.js     fog of war, global mana, chip-player linking, player identity.
-                             Renamed from 11-combat-extras.js (2026-07-18) — the one piece of pure
-                             battlefield UI it used to hold (formation checkbox) moved to 07.
-    12-app-utils.js          dark mode, undo system
-    14-window-manager.js     generic drag/resize/dock window system — see 3.10
-    15-app-shell.js          title screen logic + wiring into session-sync + registers BOTH the
-                             sheet and combat table windows
-    16-multi-sheet.js        independent, simultaneously-editable sheet instances — see 3.10's
-                             "Solved 2026-08-01" note. MUST STAY LAST: assumes every function/
-                             registration from 00-15 already exists, same reason 15 used to be last.
+    00-three.js             vendor (three.js r128)
+    00-geo-runtime.js       reads the packed vertex blobs; MUST precede every pack
+    *-assets.js             baked model packs (castle, wood, bits, kit, room, tavern, dice,
+                            sprites, charges, chest, bin), written by tools/bake*.py
+    10-16                   the hall: sheet data, heraldry, hall 3D, codex, sheet, menu
+    21-28, 40-51, 54        the table: content, model, viewport, props, toolbox, scene setup,
+                            GL, boot, tokens, characters, papers, figures, hand, library,
+                            pictures, token maker, preview, lines, combat scene, room editor
+    30-34, 37-39            the fight: rules, content, combat app, GL pieces, field, bar, dice
+    29-role.js              which side of the table you are
+    42-shell.js             which half you are looking at
+  assets/tex/              ← the textures, as real files (see 2.3)
 
-  (13-turn-and-init.js removed 2026-07-18 — it was a grab-bag touching three
-  unrelated systems: turn counter (→ 07), server selector init (→ 10), and
-  derived-stats init (→ 03). Each file now initializes itself.)
+tools/
+  scope-css.js, pack-geometry.js   ← build inputs, used by build.js
+  bake*.py                         ← re-bake a model pack from its glTF/FBX
+  bake-textures.py                 ← pull the textures back out to files
+  shot.js                          ← photograph the built app (Electron, not Playwright — see its header)
 
 test/
-  smoke.js                 ← jsdom-based runtime smoke test, `npm test` — builds dist/ if missing
+  serve.js                 ← serves dist/ over http for the browser tests
+  geometry.test.js         ← the packed vertices still say what the bake said
+  table.test.js            ← the table model, in node
+  table-ui.test.js         ← the chest, the bar, and what is in your hand
+  join.test.js             ← a character joining a table
+  handling.test.js         ← picking things up and putting them down
 
-build.js                  ← run `node build.js` to produce dist/monarchy.html (intermediate step, see 2.3)
-dist/monarchy.html        ← intermediate build artifact — valid standalone file, but not the distributable anymore
-package.json               ← Electron + electron-builder config; `npm run dist` is the real distributable step
-electron/
-  main.js                  ← Electron main process: loads dist/monarchy.html in a plain native window, no menu bar
-release/                   ← OUTPUT of `npm run dist` — the actual .exe lands here (gitignore this)
+build.js                  ← `node build.js` produces dist/monarchy.html (see 2.3)
+dist/monarchy.html        ← build artifact. NOT standalone any more — needs dist/assets/tex
+                            beside it, and will not load textures over file:// at all (see 2.3)
+package.json               ← Electron + electron-builder config; `npm run dist` is the distributable
+electron/main.js           ← Electron main: loads dist/monarchy.html, no menu bar
+release/                   ← OUTPUT of `npm run dist` (gitignored)
 ```
 
 **Golden rule:** `src/` is where all editing happens. `dist/monarchy.html`
@@ -111,17 +119,23 @@ directly (edits will be silently lost on the next build).
   `document.getElementById` reads and bare global function calls are the
   normal, intentional way things talk to each other here, not a bug to
   "fix" wherever you see one.
-- **CSS load order matters**: later files win on conflicting rules.
-  `04-overrides.css` is explicitly written to load last and override
-  everything above it. Don't reorder the `<link>` tags.
+- **CSS load order matters**: later files win on conflicting rules, and the
+  order lives in the `CSS` array in `build.js`. There is no `04-overrides`
+  any more — each sheet is instead SCOPED at build time to `body.at-hall` or
+  `body.at-table` by `tools/scope-css.js`, because the hall and the table
+  were written as separate documents and share 27 class names (`.plate`,
+  `.shield`, `.face`, `.cap`, `.row`, `.on`, `.warn` and the rest). Without
+  that scoping they quietly restyle each other; `.plate` has broken this
+  project once already.
 - **JS load order matters**: later files call functions and read variables
-  declared in earlier files. Don't reorder the `<script src>` tags. If you
-  add a new file, insert it where it logically depends on what's above and
-  is depended on by what's below it — or when in doubt, append near the end
-  and test.
-- Dev version (`src/index.html`) can be opened directly via double-click —
-  relative `<link>`/`<script src>` paths work fine over `file://`, no local
-  server required.
+  declared in earlier files. The order lives in the `JS` array in `build.js`
+  and is written out by hand rather than globbed, so adding a file is a
+  decision. Two hard constraints: `00-geo-runtime.js` must precede every
+  asset pack, and `16-menu.js` is last because it boots the hall.
+- **The built page is not standalone and will not run from `file://`.** See
+  2.3 — the textures are real files now, and three.js asks for them with
+  `crossOrigin="anonymous"`, which a `file://` response cannot satisfy. Use
+  `test/serve.js`, or just run it in Electron with `npm start`.
 
 ### 2.3 Distribution
 
@@ -144,13 +158,29 @@ limitation (Wine) when cross-building the installer target from Linux/Mac.
 `dist/monarchy.html` still gets built as an intermediate, and it is still
 **no longer the thing you hand to players** — the `.exe` is.
 
-It is also no longer standalone. Since 2026-09-14 the textures live beside
+It is also no longer standalone, and the way it is not is worth knowing
+before it costs you an afternoon. Since 2026-09-14 the textures live beside
 it as real image files in `dist/assets/tex/`, because 7.6 MB of base64 in a
 script was most of the reason opening the app took a second. So the page
-needs that folder next to it: open `dist/monarchy.html` from `dist/` and it
-works, move the .html somewhere on its own and every model comes up
-untextured. `electron-builder` ships the whole of `dist/`, so the `.exe` is
-unaffected.
+needs that folder next to it, and `electron-builder` ships the whole of
+`dist/`, so the `.exe` is unaffected.
+
+**Double-clicking `dist/monarchy.html` into a browser no longer works** —
+not even from inside `dist/`, where the files plainly are. three.js sets
+`crossOrigin="anonymous"` on every texture it loads, which over `file://`
+makes each one a CORS request against a response that has no CORS headers,
+so Chrome fails all of them (`net::ERR_FAILED`) and every model renders as
+a blank grey shape with nothing in the console to say why. Electron does
+not enforce this, which is the trap: the app is fine, screenshots look
+right, and only a browser sees the fault.
+
+To look at the built page in a browser, serve it:
+
+```
+node -e "require('./test/serve.js').serve().then(s=>console.log(s.url+'/monarchy.html'))"
+```
+
+That is what the Playwright tests do — see `test/serve.js`.
 
 **Re-baking a pack?** Run `python tools/bake-textures.py` afterwards. The
 bake scripts write textures back in as data URIs; that tool pulls them out
@@ -764,20 +794,30 @@ else, and so they're not mistaken for split-related bugs.
 3. **Run `npm run dist` before handing a new version to players** — not
    `node build.js` alone. `build.js` only produces the intermediate
    `dist/monarchy.html`; the actual distributable is the packaged `.exe`
-   in `release/`. (`node build.js` alone is still fine for a quick
-   browser-based test of your changes.)
+   in `release/`. (`node build.js` then `npm start` is fine for a quick
+   check — but NOT double-clicking the html, which cannot load its
+   textures over `file://`; see 2.3.)
 4. **When splitting or moving code, do it mechanically first.** Cut/paste
    before rewrite. If reorganizing something, land it in its new location
    unchanged, verify it still works, then rewrite — don't do both at once.
-5. **Keep `04-overrides.css` last, always.** If new CSS needs to win over
-   existing rules, it goes here, not by fighting specificity elsewhere.
+5. **Do not fight the CSS scoping.** Each sheet is confined at build time
+   to `body.at-hall` or `body.at-table` (2.2). If a rule needs to reach
+   both halves it belongs in `20-shell.css`, which is the only unscoped
+   one — not in a more specific selector somewhere else.
 6. **New JS files**: decide where they sit by what they depend on (goes
    after) and what depends on them (goes before). Update the load-order
    list in this doc (2.1) when you add one.
 7. **Bump the `.monarch` export `version` number** if you change what
    `serializeSheet()` outputs, and handle old versions gracefully on
    import rather than breaking existing players' saves.
-8. **`07-combat-window.js` (renamed from `07-combat-tracker.js` 2026-07-18)
+8. **Re-baked a model pack? Run `python tools/bake-textures.py`.** The bake
+   scripts write textures back into the JavaScript as data URIs; that tool
+   pulls them out to `src/assets/tex/` again. Forgetting is not fatal —
+   `build.js` reports every picture it could not find in the manifest and
+   leaves it inline — but the build quietly gets megabytes fatter. The
+   vertex packing needs no such step; `build.js` does it every time.
+
+   [superseded] **`07-combat-window.js`
    is the active overhaul target for combat mechanics/UI.** Changes here
    are expected to be more invasive than elsewhere — fine to break
    internal structure as long as external contracts (serialized
@@ -829,6 +869,7 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-14 | **Deleted the previous generation.** `src/index.html` and the 32 CSS/JS files only it loaded had been unbuilt for months — `build.js` names every file it stitches, and none of them were on the list, so the shipped app had not contained a line of them in a long time. Removing them changed `dist/monarchy.html` by zero bytes, which is the proof they were dead. Gone with them: `test/smoke.js` and `test/multi-sheet.test.js` (both asserted on `WM`, both already failing, neither in `npm test`), `extract.py` (a one-time migration that reads an `original.html` no longer in the repo), `_canary.txt`, and `src/assets/images` (3 SVGs referenced only by the old entry point). **Features that went with that generation and are NOT rebuilt:** live GM/player sync, GM tools, fog of war, the window manager, multi-sheet editing — recorded in 2.1 rather than left to be discovered. **`firebase` dropped from `dependencies`**: nothing in the current source imports it, and electron-builder was bundling 45 MB of it into every installer (979 entries in the 129 MB `app.asar`) for the sync layer the hall's own Join screen says is not built. **Dead code inside the live files:** `27-table-gl.js` carried a whole post-processing chain — bright-pass, two blur passes, an ACES/split-tone/vignette/grain grade, three render targets, ~190 lines — behind `postReady`, and `buildPost()` was never called, so the condition could not fire and `drawUnder` had been taking the plain branch the whole time. The author's own note on it (measured: 14ms with the GL canvases hidden, 3001ms with them on, and `#grade` in table-body.html already grading the whole composite) had been pasted ABOVE the file's header, outside the IIFE, as a second `drawUnder` whose `uRen`/`uScene` did not even resolve — dead and unreachable. Both removed, the reasoning kept. Also `wallAt()` and `BIN_KEEPS`, the only two genuinely unreferenced symbols in the whole live source: a sweep of every top-level function found 14 candidates and 13 were false positives, called from template literals. **`tools/` cut from 20 files to 9**: the eleven `shot-*`/`dbg-*`/`diag` scripts all required playwright from `/home/claude/.npm-global/...` and opened `file:///tmp/mon/dist/monarchy.html`, paths inside a container that no longer exists, so not one could run. Replaced by `tools/shot.js`, which is Electron rather than Playwright because three.js does not set `preserveDrawingBuffer` — a Playwright screenshot reads an already-cleared buffer and produces a black page with the DOM chrome drawn on top, which looks like a broken app rather than a broken camera. **CSS was left alone on purpose:** 34 class names are never mentioned anywhere, but they are worth 1.9 KB of 290 KB and zero removable rules in the two largest sheets, and the `t3-*` family among them is built by concatenation in `24-table-props.js` (`'prop t3-thing t3-' + t.kind`), so the analysis that flagged them is exactly wrong about those. Not worth the risk. Verified: `dist/monarchy.html` unchanged at 4.24 MB through every step, 119 tests green, hall and table screenshots unchanged. |
 | 2026-09-14 | **The assets came out of the JavaScript.** `dist/monarchy.html` was 15.28 MB and every byte of it was parsed on the main thread before the page could show anything — the long white pause `build.js` has been apologising for since the tavern arrived. Two things were in there that had no business being in a script. **The pictures:** every pack baked its textures in as `data:image/jpeg;base64,...`, 7.60 MB of it, of which 5.42 MB was the tavern's twenty-seven 1024×1024 albedos. base64 costs a third on top of the bytes, the bytes go through the *JavaScript* parser before the browser knows they are a picture, and nothing can start decoding until the whole script has been read. New `tools/bake-textures.py` writes them to `src/assets/tex/` as real files at 512 on the longest edge, named by content hash so a picture shared by two packs is stored once; `build.js` swaps the URIs for paths as it stitches and copies the folder into `dist/`. Textures are now also *lazy for free* — `TextureLoader` only fires when a mesh is built, so opening the hall fetches none of them. **The vertices:** 5.61 MB of decimal number literals, each read by the parser into a double and immediately truncated into a `Float32Array`. New `tools/pack-geometry.js` replaces each geometry literal with one base64 blob plus a JSON skeleton of descriptors — positions 16-bit over each prim's own bounding box, normals 8-bit, UVs 16-bit, indices bit-exact — and new `src/js/00-geo-runtime.js` reads them back as typed-array views (one `atob` per pack instead of the parser walking five megabytes). **Neither tool edits a pack file**: both transform in memory inside `build.js`, so re-baking with the Python tools stays safe — just re-run `bake-textures.py` afterwards. Result: **15.28 MB → 4.24 MB page + 2.25 MB of images**, DOMContentLoaded 835 → 559 ms, texture decode 27.2 → 6.9 megapixels, textures settled 499 → 262 ms. Two judgement calls worth keeping: a PNG stays a PNG (`CASTLE.tex.Walls` is tiled 12×22 by `13-hall3d.js`, and JPEG's 8×8 blocks would print 264 copies of the same seam), and `32-combat-app.js`'s 1×1 drag-ghost GIF stays inline because fetching it would make dragging worse. Also: `setIndex` is widened once in `00-geo-runtime.js` to accept a typed array — it previously assigned one straight to `.index`, producing a geometry that silently drew nothing. New `test/geometry.test.js` decodes all 210 prims with the *browser's own* decoder and fails the build if any array drifts past tolerance (worst seen: positions 7.6e-6 of prim extent, normals 0.22°, indices exact); wired into `npm test`, which also had three test files unblocked — they hardcoded `/home/claude/.npm-global/lib/node_modules/playwright`. Still on the table: `WOOD` carries 46% duplicate vertex positions and `CASTLE` 63%, so welding on the full (p,n,u) tuple would cut geometry again — not done here because it can change shading and wanted its own verification pass. Verified: 74-file syntax sweep, `geometry.test.js` 210/210, `table.test.js` 23/23, hall and table screenshots pixel-identical to the 15 MB build. |
 | 2026-08-21 | **Phase 0 of the completion plan** (see `claude/completion-plan.md` in the Claude project, or https://claude.ai/code/artifact/766e657a-1c35-4352-bb22-aa0c6acfacae). **P0-1:** every client now signs in anonymously before the database connection opens — new `_uid`/`getMyUid()` in `09-session-sync.js`, `signInAnonymously()` inside `_ensureFirebase()` (returns `false` and reports loudly if it fails, since everything downstream needs an identity), an `owners` **set** of uids claimed by the first host of an unclaimed table (a set, not a single `owner` field: anonymous uids are per-browser-profile, so a single value would lock you out of your own table from a second machine), and a `uid` field on `serializePlayerVitals()`. Player/presence nodes are still keyed by display name on purpose — the name is load-bearing in five places (node keys, `chip.dataset.linkedPlayer`, `_connectedPlayers`, `cmd.target` matching in `_applyGmCommands`, and the `updateGmPlayerLinkDropdowns()` option values), so the uid rides *inside* the node instead. Also fixed a real latent bug in `index.html`'s SDK loader: app/database compat were loaded in parallel via `Promise.all`, but dynamically-inserted scripts are async, and database-compat needs the `firebase` global app-compat creates — if database won the race it threw `ReferenceError`, which `onerror` does *not* catch, so `__firebaseSdkReady` resolved `true` with a missing SDK. Now app loads first, then database + auth in parallel. **P0-3:** Health and Stamina round up (`Math.ceil`) per the rules instead of `Math.round`/`Math.floor`; Health's missing `+ Resilience` term is deliberately deferred to plan task P1-3. **P0-4:** both dead monkey-patches deleted (Known Issues 1 and 8). **P0-5:** `dist/` gitignored, settling the open question left by the 07-19 entry. Requires **Anonymous sign-in enabled** in the Firebase console; sync refuses to start without it. Still open: security rules are `.read`/`.write: true` on `servers/$serverId` — anyone with a table ID has full access. That's plan task P0-2. Verified: full JS syntax sweep, `node build.js`, `npm test` 30/30 smoke + 18/18 multi-sheet, exit 0. |
 | 2026-07-11 | **Baseline.** Split the original single 7,394-line/422KB `monarchy_8_4_2.html` into the modular `src/` structure described in Section 2, with `build.js` regenerating an equivalent single-file `dist/monarchy.html`. Pure mechanical split — verified zero behavior change (all 200 function defs, all top-level declarations, all element IDs, and all brace/paren pairs matched exactly between original and rebuilt output; every split file and every rebuilt script block passes a JS syntax check clean). This document created as the standing project reference. |

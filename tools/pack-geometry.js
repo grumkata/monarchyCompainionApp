@@ -215,6 +215,50 @@ function literalSpan(src, name) {
   return null;
 }
 
+/* Run the emitted file the way the browser will — with the REAL decoder,
+   src/js/00-geo-runtime.js, not a copy of it — and count how many prims
+   came back as typed arrays. Anything still a plain Array is a prim the
+   splice missed. */
+let RUNTIME = null;
+function probe(js, name) {
+  if (RUNTIME === null) {
+    try {
+      RUNTIME = require('fs').readFileSync(
+        require('path').join(__dirname, '..', 'src/js/00-geo-runtime.js'), 'utf8');
+    } catch (e) { RUNTIME = ''; }
+  }
+  if (!RUNTIME) return { error: 'could not be checked: 00-geo-runtime.js is missing' };
+
+  const sandbox = {
+    atob: s => Buffer.from(s, 'base64').toString('binary'),
+    ArrayBuffer, Uint8Array, Uint16Array, Uint32Array, Int8Array, Float32Array,
+    /* enough THREE for the decoder's setIndex widening to install itself */
+    THREE: { BufferAttribute: function (a, n) { this.array = a; this.itemSize = n; },
+             BufferGeometry: function () {} },
+    __out: {}
+  };
+  sandbox.THREE.BufferGeometry.prototype.setIndex = function (i) { this.index = i; return this; };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  try {
+    new vm.Script(RUNTIME + '\n' + js +
+      '\n;__out.v=(typeof ' + name + '!=="undefined")?' + name + ':window.' + name + ';',
+      { filename: 'packed:' + name }).runInContext(sandbox);
+  } catch (e) { return { error: 'would not run (' + e.message + ')' }; }
+
+  let packed = 0, plain = 0;
+  (function walk(o) {
+    if (!o || typeof o !== 'object') return;
+    if (!Array.isArray(o) && o.p && o.p.length && typeof o.p[0] === 'number') {
+      if (ArrayBuffer.isView(o.p)) packed++; else plain++;
+      return;
+    }
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    for (const k in o) walk(o[k]);
+  })(sandbox.__out.v);
+  return { packed, plain };
+}
+
 /*
  * pack(source, name) -> { js, stats } | { error } | null
  *
@@ -246,9 +290,10 @@ function pack(source, name) {
 
   const blob = new Blob();
   const checks = [];                       /* verified after the blob is whole */
-  const stats = { arrays: 0, numbers: 0, wasText: 0 };
+  const stats = { arrays: 0, numbers: 0, wasText: 0, prims: 0 };
 
   function doPrim(pr, where) {
+    stats.prims++;
     /* The yardstick for this prim's own error, measured before anything is
        replaced. */
     const posScale = Array.isArray(pr.p) && pr.p.length ? extent(pr.p, 3) : 1;
@@ -320,6 +365,36 @@ function pack(source, name) {
   const js = source.slice(0, span[0]) +
              '__geo(' + JSON.stringify(obj) + ',__geoBlob("' + b64 + '"))' +
              source.slice(span[1]);
+
+  /* ── AND THE EMITTED FILE HAS TO ACTUALLY BE THE PACKED ONE ──
+     Everything above checks the NUMBERS, in memory. Nothing above checks
+     the TEXT, and the text is spliced: literalSpan finds the literal with
+     a regex over the whole file and takes the first match, so prose in a
+     header comment reading `TAVERN = {`, or a future baker emitting a
+     second assignment, cuts the wrong span.
+
+     Parsing the result is not enough, and it is worth saying why, because
+     parsing it was the first fix and it did not work. Splice into the
+     middle of a COMMENT and the output parses perfectly — the blob lands
+     in the comment, the real literal below it is untouched, and you get a
+     file that behaves correctly, is bigger than it started, and reports a
+     saving. Silent, and invisible to every other net: the element-wise
+     check is testing the in-memory object, build.js's try/catch only sees
+     throws from in here, and build.js writes dist/monarchy.html regardless.
+
+     So run the emitted file and look at what it actually defines. If the
+     splice landed, every prim's `p` comes back a Float32Array from the
+     decoder; if it landed anywhere else, the original literal is still in
+     force and `p` is a plain Array. That distinction catches both the
+     broken splice and the silent one. */
+  const seen = probe(js, name);
+  if (seen.error) return { error: 'packed output ' + seen.error };
+  if (seen.packed !== stats.prims) {
+    return { error: `splice did not take — ${seen.packed} of ${stats.prims} prims ` +
+                    `came back packed; literalSpan cut the wrong span ` +
+                    `(prose reading "${name} = {" in a comment will do this)` };
+  }
+
   return { js, stats };
 }
 

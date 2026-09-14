@@ -5,6 +5,7 @@
    this checks that the parts are connected, which is what the app was missing. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { serve } = require('./serve.js');
 const ok = [], bad = [];
 const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL  ') + n); };
 
@@ -12,7 +13,8 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const pg = await b.newPage({ viewport: { width: 1500, height: 940 } });
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
-  const file = 'file://' + path.join(__dirname, '../dist/monarchy.html');
+  const site = await serve();
+  const file = site.url + '/monarchy.html';
 
   await pg.goto(file); await pg.waitForTimeout(3200);
   /* a character, made the way the hall makes one */
@@ -113,9 +115,16 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     const rec = Characters.get('c-join');
     return !!rec && rec.who.pic === a.src && rec.who.picArt === a.id;
   }));
+  /* The offer carries HIS PICTURE, not merely a note that he has one. That
+     used to be tested as /^data:image/ on the src, which was the same thing
+     as "a picture" only for as long as the pictures lived inside the script;
+     since they became files beside the page it fails a sprite that loads and
+     places perfectly. Comparing against the art's own src says what was
+     meant, and says it whatever the src is spelled like next. */
   T('so the chest offers him wearing it', await pg.evaluate(() => {
     const o = Toolbox.options('people').find(x => x.name === 'Sir Aldric');
-    return !!o && /^data:image/.test(o.v.src || '') && o.v.art === 'sprite:spearman';
+    const a = Library.art.get('sprite:spearman');
+    return !!o && !!o.v.src && o.v.src === a.src && o.v.art === 'sprite:spearman';
   }));
   T('and a new counter of him arrives wearing it too', await pg.evaluate(() => {
     const o = Toolbox.options('people').find(x => x.name === 'Sir Aldric');

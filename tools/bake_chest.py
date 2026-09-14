@@ -21,7 +21,7 @@ of three hundred.
 Output matches KIT's shape exactly (p/n/u/i arrays + a texture key), so the
 same propParts() reader in scene.js can consume it.
 
-    python3 tools/bake_chest.py <chest.glb> src/js/19-chest-asset.js
+    python3 tools/bake_chest.py <chest.glb> src/js/20-chest-asset.js
 """
 import json, struct, sys, os, base64, io
 import numpy as np
