@@ -37,9 +37,16 @@ input{font:inherit;color:inherit;background:none;border:0;outline:0}
   letter-spacing:.18em;text-transform:uppercase;font-size:10px;
   clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 100%,0 100%);
   box-shadow:inset 0 1px 0 rgba(255,240,206,.45),0 5px 14px rgba(0,0,0,.7);
-  opacity:.82;transition:opacity .18s,filter .18s,transform .18s;
+  opacity:.82;transition:opacity var(--t-hover) var(--settle),
+    filter var(--t-hover) var(--settle),transform var(--t-hover) var(--pop);
   filter:saturate(.62) brightness(.82);cursor:pointer}
+/* --pop on the transform only: the plate should spring forward under the
+   pointer while its colour merely fades up. Overshooting a COLOUR reads as
+   a flicker, so the two properties get different curves. */
 .plate.on{opacity:1;filter:none;transform:translate(-50%,3px) scale(1.05)}
+/* pressed: it goes back down into the wall it is nailed to */
+.plate:active:not(.dead){transform:translate(-50%,5px) scale(1.01);
+  transition-duration:var(--t-press);transition-timing-function:var(--snap)}
 .plate.dead{background:linear-gradient(180deg,#4d453b,#252019);
   color:rgba(240,226,196,.55);cursor:not-allowed}
 .plate .tag{display:block;margin-top:3px;font-size:8.5px;letter-spacing:.18em;
@@ -99,7 +106,10 @@ h2{font-size:clamp(32px,4.6vw,54px);font-weight:900;letter-spacing:.11em;
   padding:11px 18px 11px 14px;background:rgba(18,10,5,.5);
   border:1px solid rgba(255,214,150,.35);color:#f6e9ca;font-size:10px;font-weight:700;
   letter-spacing:.22em;text-transform:uppercase;backdrop-filter:blur(3px)}
+.back{transition:background var(--t-hover) var(--settle),
+  border-color var(--t-hover) var(--settle),transform var(--t-press) var(--snap)}
 .back:hover{background:rgba(18,10,5,.8);border-color:#e5bb70}
+.back:active{transform:translateY(1px)}
 
 /* ── the seal: every commitment is stamped ── */
 .seal{position:relative;width:104px;height:104px;display:grid;place-items:center;
@@ -111,6 +121,10 @@ h2{font-size:clamp(32px,4.6vw,54px);font-weight:900;letter-spacing:.11em;
     0% 51%,7% 38%,4% 24%,16% 14%,25% 4%,37% 7%);
   box-shadow:0 7px 15px rgba(0,0,0,.6);transition:transform .16s cubic-bezier(.3,1.6,.5,1)}
 .seal:hover .wax{transform:scale(1.06) rotate(-3deg)}
+/* a seal is pressed DOWN into the wax — the one control in the app where
+   the press is the literal gesture the object is for */
+.seal:active .wax{transform:scale(.96) rotate(-1deg);
+  transition-duration:var(--t-press);transition-timing-function:var(--snap)}
 .seal.stamped .wax{animation:stamp .42s cubic-bezier(.2,1.5,.4,1)}
 @keyframes stamp{0%{transform:scale(1.6) rotate(-12deg)}55%{transform:scale(.92) rotate(2deg)}
   100%{transform:scale(1) rotate(0)}}
@@ -133,7 +147,11 @@ h2{font-size:clamp(32px,4.6vw,54px);font-weight:900;letter-spacing:.11em;
 .lk{display:inline-flex;align-items:center;gap:9px;padding:11px 19px;
   border:1px solid rgba(255,214,150,.42);font-size:10px;font-weight:700;
   letter-spacing:.2em;text-transform:uppercase;color:#fff2d8}
+/* this had no transition whatever, so every hover was a hard cut */
+.lk{transition:background var(--t-hover) var(--settle),
+  border-color var(--t-hover) var(--settle),transform var(--t-press) var(--snap)}
 .lk:hover{background:rgba(0,0,0,.28);border-color:#f0cf87}
+.lk:active{transform:translateY(1px)}
 .lk.bad:hover{background:rgba(80,10,4,.5);border-color:#e6836f;color:#ffd9cd}
 .row2{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 
@@ -141,8 +159,13 @@ h2{font-size:clamp(32px,4.6vw,54px);font-weight:900;letter-spacing:.11em;
 .roll{display:flex;flex-direction:column;gap:2px}
 .entry{display:flex;align-items:center;gap:18px;padding:18px 22px;
   background:rgba(18,9,3,.30);border-left:4px solid rgba(255,214,150,.55);
-  transition:background .14s,transform .14s}
+  transition:background var(--t-hover) var(--settle),
+    transform var(--t-hover) var(--pop)}
+/* the row slides out from under the pointer with a little overshoot, like a
+   card being pulled half out of a box */
 .entry:hover{background:rgba(18,9,3,.52);transform:translateX(6px)}
+.entry:active{transform:translateX(3px);
+  transition-duration:var(--t-press);transition-timing-function:var(--snap)}
 .entry .n{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:700;
   color:rgba(255,232,190,.5);min-width:32px;font-variant-numeric:tabular-nums}
 .entry .t{flex:1;min-width:0;cursor:pointer}
@@ -155,7 +178,10 @@ h2{font-size:clamp(32px,4.6vw,54px);font-weight:900;letter-spacing:.11em;
 .entry .sm{padding:6px 11px;font-size:9px;font-weight:700;letter-spacing:.16em;
   text-transform:uppercase;border:1px solid rgba(255,214,150,.32);
   color:rgba(255,246,226,.72)}
+.entry .sm{transition:border-color var(--t-hover) var(--settle),
+  color var(--t-hover) var(--settle),transform var(--t-press) var(--snap)}
 .entry .sm:hover{border-color:#f0cf87;color:#fff7e4}
+.entry .sm:active{transform:translateY(1px)}
 .entry .sm.bad:hover{border-color:#e6836f;color:#ffd0c4;background:rgba(80,10,4,.45)}
 .entry input{width:100%;font-size:21px;font-weight:700;letter-spacing:.08em;
   text-transform:uppercase;color:#fff7e4;border-bottom:2px solid #f0cf87;padding-bottom:2px}

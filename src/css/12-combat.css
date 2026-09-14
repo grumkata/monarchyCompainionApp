@@ -529,6 +529,49 @@ body{display:block;padding:0}
 .prop{position:absolute;transform-style:preserve-3d;cursor:default;
   box-shadow:0 3px 4px rgba(0,0,0,.62), 18px 30px 34px rgba(0,0,0,.5)}
 .prop.lift{box-shadow:0 6px 8px rgba(0,0,0,.5), 34px 62px 58px rgba(0,0,0,.62)}
+
+/* ══ PICKING A THING UP, AND PUTTING IT DOWN ═══════════════════
+   The two shadows above already say the right thing — tight and dark on
+   the wood, wide and soft in the air — and they were CUTTING between the
+   two states instantly, so a piece teleported from resting to held. The
+   shadow is the only thing on the table that reports height, and a height
+   that changes in one frame reads as a layer popping rather than as an
+   object being lifted.
+
+   ── WHAT MAY BE TRANSITIONED HERE, AND WHAT MAY NOT ─────────
+   `.prop`'s own `transform` is written by placeProp() on EVERY pointermove
+   of a drag, and again for every piece whenever the camera angle changes.
+   Putting a transition on it would make the piece lag behind the pointer
+   and rubber-band — the drag would feel worse, not better, which is the
+   exact opposite of the point. So: transform is off limits on `.prop`,
+   forever. Only the shadow is animated here.
+
+   The squash lives on `.face` instead, whose transform nothing in the
+   JS writes (24-table-props.js sets its width/height, not its transform),
+   so it is free to be used for this and cannot fight placement. */
+.prop{ transition: box-shadow var(--t-move) var(--settle) }
+.prop.lift{ transition: box-shadow .12s var(--settle) }
+
+/* held: the face swells very slightly, the way a thing does when it comes
+   toward your eye. --pop, so it arrives with a little life in it. */
+.prop > .face{ transition: transform var(--t-hover) var(--pop) }
+.prop.lift > .face{ transform: scale(1.035) }
+
+/* ── AND THE SETTLE ────────────────────────────────────
+   Volume-conserving: wider as it flattens, then back. This is the one
+   piece of real squash-and-stretch in the app and it is kept to 4% and
+   180ms, because a token on a table is a small heavy object — a big
+   rubbery squash would say the pieces are made of foam.
+
+   Driven by a class the drop handler adds and removes on animationend,
+   rather than by :active, because the settle has to fire when the piece
+   LANDS, which is when the pointer is already up. */
+.prop.settling > .face{ animation: prop-settle .18s var(--settle) }
+@keyframes prop-settle{
+  0%   { transform: scale(1.035) }
+  45%  { transform: scale(1.04, .965) }
+  100% { transform: scale(1) }
+}
 .prop>.face{position:relative;transform-style:preserve-3d}
 .grip{cursor:grab}
 .prop.lift .grip{cursor:grabbing}
@@ -1204,6 +1247,35 @@ body.aiming .fname.legal{background:linear-gradient(180deg,#ffe066,#e0a52c);
   box-shadow:0 0 0 2px rgba(255,255,255,.85),0 4px 12px rgba(20,30,18,.5)}
 body.aiming .fname.legal b,body.aiming .fname.legal i{color:#2a2007;text-shadow:none}
 body.hud-on .hud.br{bottom:106px}
+
+/* ══ PRESSES, AT THE TABLE ════════════════════════════════
+   The same rule 20-shell.css states for the hall, applied to the table's
+   own controls. The selector list is not invented here — it is the one
+   the CURSORS block below already maintains as "everything you can click",
+   kept deliberately identical so the two cannot drift apart. If a control
+   is added to one list it belongs in the other.
+
+   Curves and durations come from 20-shell.css's :root, which is unscoped
+   and therefore reaches this sheet. */
+.ent.can, .free, .hud button, .act, .tkbtn, .endturn, .cin button, .wlock,
+[data-jump], .dicebar button.droll, .dicebar button.dclear, .dtypes button,
+.dtog, .cap, .selbar .act, .sugacts .act, .sc-pick, .sc-drop{
+  transition: background var(--t-hover) var(--settle),
+              border-color var(--t-hover) var(--settle),
+              color var(--t-hover) var(--settle),
+              transform var(--t-press) var(--snap);
+}
+.ent.can:active, .free:active, .hud button:active, .act:active, .tkbtn:active,
+.endturn:active, .cin button:active, .wlock:active, [data-jump]:active,
+.dicebar button.droll:active, .dicebar button.dclear:active,
+.dtypes button:active, .dtog:active, .cap:active, .selbar .act:active,
+.sugacts .act:active, .sc-pick:active, .sc-drop:active{
+  transform: translateY(1px);
+}
+/* ROLL is the one button on this table anybody presses in anger, so it gets
+   the only press with any weight to it — down AND in, the way a key on a
+   real thing gives. Still under a tenth of a second. */
+.dicebar button.droll:active{ transform: translateY(2px) scale(.985) }
 
 /* ══ CURSORS ══ from the Free Basic Cursor Pack in Assets/. Cropped to their
    own alpha bounds and hotspot-measured, because the source art is padded. */

@@ -7,6 +7,68 @@
 ══════════════════════════════════════════════════════════════ */
 html, body { height: 100%; margin: 0; overflow: hidden; background: #0a0705; }
 
+/* ══ THE MOTION VOCABULARY ═════════════════════════════════
+   Three curves and three durations, named, and used everywhere — so the
+   hall and the table agree about what a press feels like instead of each
+   sheet picking a number.
+
+   THESE ARE NOT NEW. `--pop` is the curve already on `.seal .wax` in
+   00-hall.css and `--settle` is the one already on the cloth fall; this
+   block only gives them names and puts them where both halves can reach
+   them, which per rule 5 is this file. The wax seal was the only control
+   in the app that already had real feel, and the point of the pass is to
+   spread what it was doing rather than invent a second dialect.
+
+   WHICH CURVE WHEN, because getting this backwards is most of what makes
+   motion feel wrong:
+
+     --pop     overshoots past its target and comes back. For something
+               ARRIVING or being GRABBED — it reads as life. Never for
+               something leaving: an element that overshoots on its way
+               out looks like it was flung.
+     --settle  decelerates into its target and stops. For something
+               COMING TO REST, and for every hover.
+     --snap    fast, slightly eased, no overshoot. For a PRESS, which has
+               to feel immediate above all else — a press that eases in
+               reads as lag, and the whole value of a press state is that
+               it happens the instant the finger lands. */
+:root{
+  --pop:    cubic-bezier(.3, 1.6, .5, 1);
+  --settle: cubic-bezier(.16, .84, .24, 1);
+  --snap:   cubic-bezier(.2, .9, .35, 1);
+  --t-press: .07s;     /* a press must beat the eye, not animate for it */
+  --t-hover: .16s;
+  --t-move:  .26s;
+}
+
+/* ══ PRESSES ═════════════════════════════════════════════
+   There was ONE `:active` rule in the entire application before this — a
+   count worth recording, because it is the single biggest reason the UI
+   felt dead to the hand. A control that does not move when you push it
+   gives you no confirmation that the push registered, so every click is
+   followed by a half-beat of waiting to see whether anything happened.
+   Hover states cannot do this job: a touch or a fast click never shows
+   one, and a hover tells you where the pointer is, not that you acted.
+
+   It is deliberately tiny — one pixel down and a whisker of scale. The
+   press is felt, not watched, and anything big enough to admire is big
+   enough to get in the way of the fiftieth click. */
+button:active:not(:disabled), [role="button"]:active { transform: translateY(1px); }
+button, [role="button"] { transition: transform var(--t-press) var(--snap); }
+
+/* ══ AND SOMEONE WHO ASKED FOR NONE OF IT ═════════════════════
+   Unscoped on purpose so it reaches both halves at once. Transitions are
+   cut to almost nothing rather than to zero: `transition:none` makes
+   state changes snap hard enough to be their own kind of jarring, and a
+   1ms transition still fires transitionend for anything listening. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 #hall-app, #table-app { position: fixed; inset: 0; }
 body.at-table #hall-app { display: none; }
 body.at-hall  #table-app { display: none; }

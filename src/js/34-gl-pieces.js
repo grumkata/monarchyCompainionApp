@@ -647,6 +647,11 @@ function simStep(dt){
       /* Only a real impact costs speed and spin. Resting contact must not, or
          the felt bills the die 120 times a second and it stops dead. */
       if (d.vh < -IMPACT){
+        /* THE ONE MOMENT THIS TABLE HAS THAT IS AN IMPACT. Reported before
+           the bounce is resolved, so `vh` is still the speed it arrived at
+           rather than the speed it leaves at — how hard it hit is the whole
+           of what the feedback is scaled by. */
+        impact(d, -d.vh);
         d.vh = -d.vh * BOUNCE;
         d.vx *= SLIDE; d.vy *= SLIDE;
         d.w.multiplyScalar(0.86);
@@ -730,8 +735,166 @@ function simStep(dt){
   });
 }
 
+/* ══ WHAT A DIE KICKS UP WHEN IT LANDS ═══════════════════════
+   Two implementations of the same event, switchable at runtime, because
+   choosing between them is an art-direction call and not a technical one.
+
+     'points'  particles built here, out of the same kind of additive point
+               sprites 27-table-gl.js already uses for the room's dust and
+               the hearth's sparks — same material language as the rest of
+               the table.
+     'sheet'   a billboarded frame-animated spritesheet out of the pixel
+               effects pack in Assets/.
+
+   'points' is the default. The sheet path exists so the two can be
+   photographed side by side and judged rather than argued about; if the
+   points win, the sheet half of this file goes.
+
+   ── SCALED BY HOW HARD IT HIT, AND FLOORED ──────────═───────
+   A die's first landing is a real fall; its fourth is a tap. Emitting the
+   same puff for both is the "over-juicing routine actions" failure, and
+   the tap-puffs would drown the one that mattered. Under MIN_HIT nothing
+   is emitted at all, which is most of what keeps this quiet. */
+const MIN_HIT = 260;        /* under this it is a tap, and taps raise no dust */
+const REF_HIT = 1100;       /* a hit this hard is a full puff */
+let dustMode = 'points';
+let puffs = [];
+
+function impact(d, speed) {
+  if (speed < MIN_HIT) return;
+  const k = Math.min(1, (speed - MIN_HIT) / (REF_HIT - MIN_HIT));
+  if (dustMode === 'sheet') return sheetPuff(d, k);
+  pointPuff(d, k);
+}
+
+let dustTex = null;
+function dustSprite() {
+  if (dustTex) return dustTex;
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 16, 0, 16, 16, 15);
+  g.addColorStop(0, 'rgba(255,255,255,.9)');
+  g.addColorStop(0.45, 'rgba(255,255,255,.34)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 32, 32);
+  dustTex = new THREE.CanvasTexture(c);
+  return dustTex;
+}
+
+function pointPuff(d, k) {
+  const N = 5 + Math.round(9 * k);
+  const st = [];
+  for (let i = 0; i < N; i++) {
+    /* thrown OUTWARD along the board, low and flat. Dust off a flat surface
+       travels sideways; a puff that rises reads as smoke, not as impact. */
+    const a = Math.random() * Math.PI * 2;
+    const sp = (28 + Math.random() * 46) * (0.5 + k);
+    st.push({ vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+              vh: (10 + Math.random() * 26) * k,
+              span: 0.34 + Math.random() * 0.26 });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  const m = new THREE.PointsMaterial({
+    map: dustSprite(),
+    /* ── LIGHTER THAN THE WOOD, NOT THE SAME AS IT ─────────────
+       The first pass used the table's own colour on the reasoning that
+       dust off a table is made of the table. True, and invisible: tan at
+       a third opacity over tan is nothing at all, and the effect may as
+       well not have been written.
+
+       What makes real dust visible is not its pigment, it is that it
+       SCATTERS — a cloud of fine particles bounces the lamp back at you
+       and reads far lighter than the surface it came off. So it is a pale
+       warm grey, which is the wood's hue with the value lifted, and it
+       shows up without ever looking like smoke. */
+    color: 0xe6d3b4, size: 10 + 7 * k, sizeAttenuation: true,
+    transparent: true, opacity: 0.44 + 0.26 * k, depthWrite: false,
+    blending: THREE.NormalBlending, toneMapped: false });
+  const pts = new THREE.Points(g, m);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  puffs.push({ pts, st, x: d.x, y: d.y, h: d.rad * 0.35, t: 0,
+               span: 0.62, k, a0: m.opacity });
+}
+
+/* ── THE OTHER ONE ──────────────────────────────────────
+   A frame-animated billboard off the pixel pack. Deliberately thin: it
+   exists to be looked at next to the other one, not to be maintained. */
+let sheetTex = null, sheetCells = 0;
+function sheetPuff(d, k) {
+  if (!window.DUST_SHEET) return;
+  if (!sheetTex) {
+    sheetTex = new THREE.TextureLoader().load(window.DUST_SHEET.url);
+    sheetTex.magFilter = THREE.NearestFilter;   /* pixel art: never smooth it */
+    sheetTex.minFilter = THREE.NearestFilter;
+    sheetCells = window.DUST_SHEET.cells;
+  }
+  const map = sheetTex.clone();
+  map.needsUpdate = true;
+  map.repeat.set(1 / sheetCells, 1);
+  const m = new THREE.SpriteMaterial({ map, transparent: true,
+    depthWrite: false, toneMapped: false, opacity: 0.95 });
+  const sp = new THREE.Sprite(m);
+  scene.add(sp);
+  puffs.push({ sprite: sp, cells: sheetCells, x: d.x, y: d.y, h: d.rad * 0.6,
+               t: 0, span: 0.55, k });
+}
+
+/* Moved on the same clock the dice are and placed in the SAME basis —
+   BX/BY/BN — so a puff sits on the board wherever the board is, and pans,
+   tilts and zooms with it for nothing. */
+function stepPuffs(dt, k, cx, cy) {
+  for (let i = puffs.length - 1; i >= 0; i--) {
+    const P = puffs[i];
+    P.t += dt;
+    if (P.t >= P.span) {
+      scene.remove(P.pts || P.sprite);
+      if (P.pts) { P.pts.geometry.dispose(); P.pts.material.dispose(); }
+      else { P.sprite.material.map.dispose(); P.sprite.material.dispose(); }
+      puffs.splice(i, 1); continue;
+    }
+    if (P.sprite) {
+      const f = Math.min(P.cells - 1, Math.floor(P.t / P.span * P.cells));
+      P.sprite.material.map.offset.x = f / P.cells;
+      _v.set(0,0,0).addScaledVector(BX, P.x).addScaledVector(BY, P.y)
+                   .addScaledVector(BN, P.h);
+      P.sprite.position.set(cx + _v.x * k, cy + _v.y * k, _v.z * k);
+      P.sprite.scale.setScalar((70 + 50 * P.k) * k);
+      continue;
+    }
+    const arr = P.pts.geometry.attributes.position.array;
+    for (let j = 0; j < P.st.length; j++) {
+      const e = P.st[j], u = Math.min(1, P.t / e.span);
+      /* fast out of the impact, then it hangs and stops — air drag, not
+         a straight line, or the puff reads as a firework */
+      const s = 1 - Math.pow(1 - u, 2.2);
+      _v.set(0,0,0)
+        .addScaledVector(BX, P.x + e.vx * s * e.span)
+        .addScaledVector(BY, P.y + e.vy * s * e.span)
+        .addScaledVector(BN, P.h + e.vh * s * e.span);
+      arr[j*3] = cx + _v.x * k; arr[j*3+1] = cy + _v.y * k; arr[j*3+2] = _v.z * k;
+    }
+    P.pts.geometry.attributes.position.needsUpdate = true;
+    P.pts.material.size = (10 + 7 * P.k) * k * (1 + P.t * 1.4);
+    P.pts.material.opacity = P.a0 * Math.max(0, 1 - P.t / P.span);
+  }
+}
+
 function stepDice(dt, anchor){
-  if (!rolling.length) return;
+  /* a puff outlives the die that raised it — the last die can be gone from
+     `rolling` while its dust is still in the air, so the early-out has to
+     let the puffs finish rather than freezing them mid-fade */
+  if (!rolling.length) {
+    if (puffs.length) {
+      const TW0 = (diceAnchor && diceAnchor.offsetWidth) || 620;
+      stepPuffs(dt, anchor ? anchor.width / TW0 : 0.55,
+                anchor ? anchor.left + anchor.width/2 - W/2 : 0,
+                anchor ? (H/2 - (anchor.top + anchor.height/2)) + OY : OY);
+      mark();
+    }
+    return;
+  }
   const TWu = (diceAnchor && diceAnchor.offsetWidth) || 620;
   const k  = anchor ? anchor.width / TWu : 0.55;
   const cx = anchor ? anchor.left + anchor.width/2 - W/2 : 0;
@@ -742,6 +905,8 @@ function stepDice(dt, anchor){
      behaves differently on every machine */
   simAcc = Math.min(simAcc + dt, 0.1);
   while (simAcc >= 1/120){ simStep(1/120); simAcc -= 1/120; }
+
+  stepPuffs(dt, k, cx, cy);
 
   const allAsleep = rolling.every(d => d.asleep);
   restClock = allAsleep ? restClock + dt : 0;
@@ -768,6 +933,9 @@ function stepDice(dt, anchor){
 }
 
 window.GLDice = {
+  /* which dust. 'points' ships; 'sheet' is here to be compared against it. */
+  get dust(){ return dustMode; },
+  set dust(v){ dustMode = (v === 'sheet') ? 'sheet' : 'points'; },
   spawn(list){ list.forEach((d,i) => spawnDie(d.kind, d.result, i, list.length)); mark(); },
   busy(){ return rolling.length > 0; },
   /* every settled die reports how squarely its declared face is pointing at the
@@ -775,9 +943,20 @@ window.GLDice = {
   /* runs the sim in fixed slices with the clock held, so a throw can be
      filmed or traced at exact times instead of at whatever rate rAF managed */
   _advance(sec){
+    /* THE DUST IS PART OF THE SIM AND HAS TO BE ADVANCED WITH IT. Without
+       this the dice move in the fixed slices below while their puffs age on
+       real wall-clock time in stepDice — two clocks for one event, so a
+       throw filmed here lands with its dust either unborn or already spent,
+       and never at the moment it was raised. */
+    const a = diceAnchor && diceAnchor.getBoundingClientRect();
+    const TWu = (diceAnchor && diceAnchor.offsetWidth) || 620;
+    const pk = a ? a.width / TWu : 0.55;
+    const pcx = a ? a.left + a.width / 2 - W / 2 : 0;
+    const pcy = a ? (H / 2 - (a.top + a.height / 2)) + OY : OY;
     for (let n = Math.round(sec * 120); n > 0; n--){
       rolling.forEach(d => d.t += 1/120);
       simStep(1/120);
+      stepPuffs(1/120, pk, pcx, pcy);
     }
     if (rolling.every(d => d.asleep)) restClock += sec;
     mark();
@@ -879,7 +1058,30 @@ function _frame(ts){
      every frame, to draw nothing. The dice above still run either way. */
   const sheet = document.getElementById('combat-prop');
   if (!sheet || sheet.style.display === 'none' || !sheet.offsetWidth){
-    if (!rolling.length) renderer.clear();
+    /* ── THE DICE STILL HAVE TO BE PAINTED ──────────────────
+       This used to `return` outright, and that is why a roll made with no
+       combat scene on the table — which is nearly every roll — produced a
+       result in chat and NOTHING on the wood. The dice simulated perfectly:
+       stepDice() is called above this line, so they fell, bounced, collided
+       and settled, and `GLDice._trace()` reported all of it. They were never
+       drawn, because `renderer.render()` is at the BOTTOM of this function
+       and this return jumped over it.
+
+       The half-measure that hid it was the old `if (!rolling.length)
+       renderer.clear()` — written to avoid wiping dice mid-roll, which
+       means the author knew dice could be live here. It kept the canvas
+       from being cleared and then returned without drawing into it, so the
+       canvas simply stayed empty.
+
+       The pool has to be hidden by hand first: the loop that does that is
+       ALSO below this return, so a scene taken off the table would
+       otherwise leave its last counters painted over the bare wood forever. */
+    for (let i = 0; i < pool.length; i++){
+      const q = pool[i];
+      q.disc.visible = q.shl.visible = q.plinth.visible = q.sh.visible = false;
+    }
+    if (rolling.length || puffs.length) renderer.render(scene, camera);
+    else renderer.clear();
     return;
   }
 

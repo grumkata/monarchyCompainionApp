@@ -280,6 +280,27 @@ function aimMarks() {
    board's normal, it is already the right way up, and tipping its anchor
    would drag the model with it. */
 const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b/;
+/* ── A PIECE THAT HAS JUST LANDED ─────────────────────────
+   The squash itself is in 12-combat.css; this only fires it, because CSS
+   has no selector for "stopped being dragged a moment ago" — :active is
+   already gone by the time the piece is down.
+
+   The class is removed on animationend rather than on a timer, so the two
+   can never disagree about how long the animation is, and `once` means the
+   listener cannot pile up over a long session of moving pieces around.
+   Re-added after a forced reflow so that dropping the same piece twice in
+   quick succession restarts the animation instead of being ignored — a
+   class that is already present is not a change, and the browser will not
+   replay an animation it thinks is still running. */
+function settle(p) {
+  if (!p) return;
+  p.classList.remove('settling');
+  void p.offsetWidth;                     /* reflow: makes the re-add count */
+  p.classList.add('settling');
+  p.addEventListener('animationend', () => p.classList.remove('settling'),
+                     { once: true });
+}
+
 function placeProp(p) {
   /* the GL layer paints models over these anchors, so moving one is a
      reason for it to draw a frame — see the note on idling in 27-table-gl */
@@ -974,6 +995,7 @@ function wire() {
       dg.p.classList.remove('lift');
       dg.p.dataset.z = (+dg.p.dataset.rest || 8);
       placeProp(dg.p);
+      settle(dg.p);
       /* A PRESS THAT DID NOT TRAVEL IS A CLICK. It used to be a move of
          zero distance, which is why simply touching a piece to look at it
          counted as an edit. Under four pixels it only selects. */
