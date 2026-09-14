@@ -337,7 +337,7 @@ const T = {
        shoulder, so you saw them edge-on and the table looked surrounded
        rather than sat at. Everyone goes on the far arc; the near third
        of the table is yours. */
-    const span = 220;
+    const span = 108;
     for (let i = 0; i < n; i++)
       list[i].at = n === 1 ? 0 : -span / 2 + span * (i / (n - 1));
   },

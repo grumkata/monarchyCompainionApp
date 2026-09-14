@@ -1,3 +1,27 @@
+/* ── ONE RENDER, NOT FOUR ─────────────────────────────────────
+   Measured, because I had been guessing: with the GL canvases hidden a
+   look-around frame cost 14ms; with them on, 3001ms. The GL layer was
+   the entire frame, and inside it the cost was not the room — it was
+   this pass. A half-resolution render into a target, two blur passes,
+   and then a full-screen grade shader doing ACES, split-toning, radial
+   chromatic aberration, a vignette and grain across 1.4 million pixels.
+   Every frame. For a picture that already HAS a grade.
+
+   Because it does: #grade in table-body.html lays the same tone curve,
+   the same warmth and the same vignette over the whole composite — DOM
+   pieces included, which this pass could never reach — and it costs
+   nothing because the compositor was going to draw that frame anyway.
+   Doing it twice bought a little bloom on the fire and cost the ability
+   to look around.
+
+   So the bloom comes from the additive glow sprites instead, which were
+   already there and are two triangles each, and the room renders once,
+   straight to the canvas. */
+function drawUnder(t) {
+  uRen.setRenderTarget(null);
+  uRen.render(uScene, camera);
+}
+
 /* ══════════════════════════════════════════════════════════════
    27-table-gl.js — THE THINGS ON THE TABLE THAT ARE REAL OBJECTS.
 
@@ -26,6 +50,9 @@ if (typeof THREE === 'undefined' || typeof CHEST === 'undefined') return;
 let PERSP = 2400;
 const ORIGIN = 0.42;
 const tilt = () => (root.__tilt ? root.__tilt() : 22 * Math.PI / 180);
+/* which way your head is turned — not to be confused with YAW below, which
+   is the fixed quarter-turn a standing model needs to face the camera */
+const headYaw = () => (root.__yaw ? root.__yaw() : 0);
 
 /* The camera looks DOWN on this table, so a chest standing true on the board
    normal is seen from directly above — geometrically right and completely
@@ -204,7 +231,6 @@ function buildTable() {
   tableObj = casts(normalise(body, true));
   uScene.add(tableObj);
   buildRoom();
-  buildPost();
 }
 
 /* ══ THE ROOM ══════════════════════════════════════════════════
@@ -228,68 +254,222 @@ function buildTable() {
    wall is thousands of pixels behind the camera. That is not a limitation
    to design around; it IS the design — you see the room when you have
    pulled back far enough to be sitting in it. */
-let roomGroup = null, roomBuilt = false;
+let roomGroup = null, overGroup = null, roomBuilt = false, seatedNow = false;
 const TABLE_M = 1.2;      /* the round table is about four feet across */
 const FLOOR_Y = -0.75;    /* table top to floor, in metres */
 const WALL_H = 3.12;      /* the village kit's own wall height */
-const RX = 5, RZ = 4;     /* half-width and half-depth of the room */
+/* ── HOW BIG THE ROOM CAN BE AND STILL BE SEEN ────────────────
+   It was 10m by 8m, and grumkata's "it goes table floor tavern" was the
+   direct result: the table sits in the middle, so four metres of bare
+   floorboards ran between it and the far wall with nothing on them — a
+   band of empty floor across the middle of every shot.
 
-/* one model out of a baked pack, placed in metres. `s` scales the model
-   itself, for kits that were authored at a different size to this one. */
+   Worse, at this lens only about two metres either side of the table is
+   ever IN frame, so a bar built down a wall five metres out was invisible
+   no matter how well it was made. The room has to be the size of the view,
+   not the size of a real tavern. Six by six: the hearth is two and a half
+   metres away, close enough to fill the space behind the wood, and the
+   side walls are near enough to be seen. */
+const RX = 3, RZ = 3;
+
+/* ══ ONE DRAW CALL PER MATERIAL, NOT PER PROP ══════════════════
+   grumkata: "MAJOR Lag like i can barley look around type lag".
+
+   Mine, and the cause is structural rather than a slow shader. Every
+   `put()` used to build its own THREE.Group with its own Mesh and its own
+   MeshStandardMaterial — so a room of sixty props was sixty draw calls
+   and sixty material instances, each compiling its own shader against
+   eight lights, every single frame. The GPU was not the problem; the
+   number of times it was asked to start over was.
+
+   The room is furniture. It never moves relative to itself. So it is
+   COLLECTED first and MERGED second: every prim is transformed into room
+   space at build time and concatenated into one geometry per texture, and
+   the whole tavern goes out in about five draws instead of sixty.
+
+   That is the difference between "barely look around" and moving. */
+let hearth = null, fireCore = null, fireBath = null, fireSpill = null;
+let chandelier = null, flamePool = null;
+
+/* ══ A FLAME BELONGS TO THE THING THAT HOLDS IT ════════════════
+   The chandelier taught this once already: its candle flames were nailed
+   to the coordinates the chandelier happened to be at, so deleting it in
+   the editor would have left six flames burning in clear air. The candles
+   and candelabras had exactly the same fault waiting — grumkata moved the
+   dresser candelabra down sixty centimetres and its flame would have
+   stayed where the old one was.
+
+   So the flames are found from the plan, every time the plan is built.
+   A pool of sprites is made once (each one costs a canvas, a texture and
+   a material, so rebuilding them per edit would leak the lot); laying the
+   room out just places the ones it needs and hides the rest. */
+const FLAME_TOP = {};          /* model -> how far up its own flame sits */
+function topOf(p, m) {
+  const k = p + '|' + m;
+  if (FLAME_TOP[k] != null) return FLAME_TOP[k];
+  const lib = p === 'T' ? (typeof TAVERN !== 'undefined' ? TAVERN : null)
+                        : (typeof ROOM   !== 'undefined' ? ROOM   : null);
+  const mm = lib && lib[m];
+  let hi = 0;
+  if (mm) for (const pr of mm.prims)
+    for (let i = 1; i < pr.p.length; i += 3) if (pr.p[i] > hi) hi = pr.p[i];
+  return (FLAME_TOP[k] = hi);
+}
+/* the models that are candles, and how many flames each one carries */
+const WICKS = { Candle: 1, Candelabra: 3 };
+function lightCandles(plan) {
+  if (!flamePool) return;
+  let n = 0;
+  for (const row of plan) {
+    const w = row.m && WICKS[row.m];
+    if (!w) continue;
+    const sc = row.sx != null ? row.sy : (row.s == null ? 1 : row.s);
+    const y = FLOOR_Y + (row.y || 0) + topOf(row.p, row.m) * sc;
+    /* one flame in the middle is enough for a candle; a candelabra reads
+       better with its arms lit, spread across its own width */
+    const th = (row.r || 0) * Math.PI / 180, C = Math.cos(th), S = Math.sin(th);
+    for (let i = 0; i < w && n < flamePool.length; i++) {
+      const off = w === 1 ? 0 : (i - (w - 1) / 2) * 0.26 * sc;
+      const f = flamePool[n++];
+      f.visible = true;
+      f.position.set(row.x + off * C, y, row.z - off * S);
+    }
+  }
+  for (let i = n; i < flamePool.length; i++) flamePool[i].visible = false;
+}
+/* the flames hang 1.03 below the model's own origin, which is where its
+   candle cups are; everything else about them is the plan's business */
+function aimChandelier(plan) {
+  if (!chandelier) return;
+  const row = plan && plan.find(r => r.m === 'Chandelier');
+  chandelier.visible = !!row;
+  if (row) chandelier.position.set(row.x, FLOOR_Y + (row.y || 0) - 1.03, row.z);
+}
+let candleLights = [], moteField = null;
+const emberMats = [];
+const lit = [];   /* every light whose `distance` is really written in metres */
+/* A light's reach is written in metres here and pushed to world units in
+   placeRoom(), because `distance` is read in world space and does not
+   inherit the room group's scale the way a position does. */
+function lamp(L, metres) { L.userData.m = metres; lit.push(L); return L; }
+
+const BATCH = [];
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _v3 = new THREE.Vector3(), _n3 = new THREE.Matrix3();
+
+/* Collect a model. Nothing is built until flushRoom(). */
+/* ══ WHERE A MODEL THINKS ITS MIDDLE IS ════════════════════════
+   Two models in these packs are not built about their own centre, and
+   both of them look broken because of it.
+
+   The chair's geometry runs from -0.07 to +0.81 along its own x, so a
+   chair placed at a spot stands 37cm to the side of that spot and turns
+   about its own arm — which is why every chair in the old layout was
+   inside the table it was supposed to be pulled up to, and why a player's
+   chair sat a third of a metre off from their face and their banner.
+   The door leaf is worse: it hangs entirely to one side of its origin,
+   so a door placed in the middle of a doorway stands half a metre into
+   the wall beside it.
+
+   Fixed once, here, rather than by writing a correction into every row
+   that uses them — a row says where a thing stands, and "where it
+   stands" should mean the same thing for every model in the room. */
+const PIVOT = { 'T|Chair': [-0.37, 0, 0], 'R|Door_2_Round': [-0.52, 0, 0] };
+const _piv = new THREE.Matrix4();
+function pivot(key, mat) {
+  const v = PIVOT[key];
+  if (v) mat.multiply(_piv.makeTranslation(v[0], v[1], v[2]));
+  return mat;
+}
+
 function put(lib, book, name, dressing, x, y, z, ry, s) {
   const m = lib && lib[name];
   if (!m) return null;
-  const g = mesh(m.prims, book, dressing);
-  g.position.set(x, y, z);
-  if (ry) g.rotation.y = ry;
-  if (s) g.scale.setScalar(s);
-  /* NO SHADOWS IN THE ROOM. Thirty objects casting into one shadow map
-     buys a slightly darker corner and costs a frame; the room reads off
-     its own baked textures and the lamp above the table. */
-  g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-  roomGroup.add(g);
-  return g;
+  const sc = (s == null ? 1 : s);
+  const mat = new THREE.Matrix4().compose(
+    _v3.set(x, y, z),
+    _q.setFromEuler(_e.set(0, ry || 0, 0)),
+    new THREE.Vector3(sc, sc, sc));
+  const rec = { prims: m.prims, book: book, dress: dressing,
+                mat: mat, key: null };
+  BATCH.push(rec);
+  return rec;                      /* callers may still set rec.mat themselves */
+}
+/* the same, with a non-uniform scale — beams and banners need it */
+function putS(lib, book, name, dressing, x, y, z, ry, sx, sy, sz) {
+  const r = put(lib, book, name, dressing, x, y, z, ry, 1);
+  if (r) r.mat.compose(_v3.set(x, y, z),
+                       _q.setFromEuler(_e.set(0, ry || 0, 0)),
+                       new THREE.Vector3(sx, sy, sz));
+  return r;
 }
 
-/* ══ LIGHTING A ROOM, WHICH IS NOT LIGHTING A TABLE ════════════
-   The table is lit by three directionals and a little ambient, which is
-   correct for a board seen from above: you want every square as legible
-   as every other square. Point that same rig at a room and you get the
-   thing grumkata called lackluster — a lit box, every corner as bright as
-   the hearth, nothing anywhere to look at.
+function flushRoom(target, tag) {
+  target = target || roomGroup;
+  /* group by what they are made of: one bucket per texture per dressing */
+  const buckets = new Map();
+  for (const rec of BATCH) {
+    for (const pr of rec.prims) {
+      const key = (pr.t || '~') + '|' + rec.dress.wood.rough + '|' + rec.dress.wood.mul[0] +
+                  '|' + (rec.dress.wood.emis ? 'e' : '');
+      let bk = buckets.get(key);
+      if (!bk) buckets.set(key, bk = { p: [], n: [], u: [], i: [], n0: 0,
+                                       t: pr.t, book: rec.book, dress: rec.dress });
+      const M = rec.mat;
+      _n3.setFromMatrix4(M).invert().transpose();
+      const P = pr.p, N = pr.n, U = pr.u;
+      const base = bk.n0;
+      for (let k = 0; k < P.length; k += 3) {
+        _v3.set(P[k], P[k + 1], P[k + 2]).applyMatrix4(M);
+        bk.p.push(_v3.x, _v3.y, _v3.z);
+        if (N) { _v3.set(N[k], N[k + 1], N[k + 2]).applyMatrix3(_n3).normalize();
+                 bk.n.push(_v3.x, _v3.y, _v3.z); }
+        else bk.n.push(0, 1, 0);
+      }
+      const count = P.length / 3;
+      if (U) for (let k = 0; k < U.length; k++) bk.u.push(U[k]);
+      else for (let k = 0; k < count * 2; k++) bk.u.push(0);
+      if (pr.i) for (let k = 0; k < pr.i.length; k++) bk.i.push(base + pr.i[k]);
+      else for (let k = 0; k < count; k++) bk.i.push(base + k);
+      bk.n0 += count;
+    }
+  }
+  BATCH.length = 0;
+  buckets.forEach(bk => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(bk.p, 3));
+    g.setAttribute('normal',   new THREE.Float32BufferAttribute(bk.n, 3));
+    g.setAttribute('uv',       new THREE.Float32BufferAttribute(bk.u, 2));
+    g.setIndex(bk.n0 > 65535 ? new THREE.Uint32BufferAttribute(bk.i, 1)
+                             : new THREE.Uint16BufferAttribute(bk.i, 1));
+    g.computeBoundingSphere();
+    const d = bk.t ? bk.dress.wood : bk.dress.metal;
+    /* ── LAMBERT, NOT STANDARD ────────────────────────────
+       This is the other half of the lag. MeshStandardMaterial runs a
+       full physically-based BRDF and samples the environment map for
+       EVERY FRAGMENT of every wall, times the number of lights in the
+       scene. The room is matte plaster and old timber lit by a fire —
+       there is no glossy highlight and no reflection to see, so all of
+       that arithmetic was being paid for something invisible.
 
-   THE SINGLE BIGGEST CAUSE, and it is a one-line bug in disguise. This is
-   three r128, whose punctual falloff reads:
-
-       if ( cutoffDistance > 0.0 && decayExponent > 0.0 )
-         return pow( saturate( -lightDistance / cutoffDistance + 1.0 ), decayExponent );
-       return 1.0;                    // <- PointLight's default distance is 0
-
-   A light with no `distance` returns 1.0 at EVERY distance. Not a steep
-   falloff, not a subtle one: none at all. So every lamp in a naive rig
-   floods the whole room evenly and no amount of fiddling with intensity
-   will ever make a dark corner. Every light in here carries an explicit
-   reach, and every reach is SHORTER THAN THE ROOM, which is what leaves
-   the corners to the hearth and the moon.
-
-   The hearth is three lights, not one, and that split is most of the
-   warmth: a small bright core that casts the shadows, a wide dim bath at
-   low decay that makes the room feel warm without making it feel lit, and
-   a spot out of the fireplace mouth so the light has somewhere it is
-   coming FROM. Only the spot casts — one 2D shadow map instead of a point
-   light's six cube faces.
-
-   And one cold source. Without it an orange room is a sepia photograph;
-   blue shadows are what make firelight read as hot.
-
-   Distances are in metres and pushed to world units in placeRoom(), since
-   this layer measures in pixels and a metre is however many pixels a 1.2m
-   table happens to be right now. */
-let hearth = null, fireCore = null, fireBath = null, fireSpill = null;
-let candleLights = [], moteField = null, emberMats = [];
-const lit = [];   /* everything whose `distance` is really metres */
-
-function lamp(L, metres) { L.userData.m = metres; lit.push(L); return L; }
+       Lambert is diffuse only. On a dark interior it is very nearly the
+       same picture for a fraction of the fragment cost. The table, the
+       chest and the counters keep Standard, because they are close to
+       the eye and their sheen is the thing that makes them read as
+       objects. */
+    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
+      map: bk.t ? tex(bk.t, bk.book) : null,
+      emissive: d.emis ? new THREE.Color().setRGB(d.emis[0], d.emis[1], d.emis[2])
+                       : new THREE.Color(0, 0, 0),
+      color: new THREE.Color().setRGB(d.mul[0], d.mul[1], d.mul[2]) }));
+    /* nothing in the room casts or receives: it is scenery, and one
+       shadow map over sixty thousand triangles was a second cost as big
+       as the draw calls */
+    mesh.castShadow = mesh.receiveShadow = false;
+    mesh.userData[tag || 'plan'] = 1;
+    target.add(mesh);
+  });
+}
 
 function lightRoom() {
   /* the floor of the exposure. Hemisphere rather than ambient, because it
@@ -306,25 +486,38 @@ function lightRoom() {
 
   fireBath = lamp(new THREE.PointLight(0xff6f26, 1.15, 11.0, 1.35), 11.0);
 
-  fireSpill = lamp(new THREE.SpotLight(0xff8f38, 2.1, 8.0, 1.15, 0.75, 1.6), 8.0);
-  fireSpill.position.set(0, 0.1, 0.2);
-  fireSpill.target.position.set(0.4, -0.9, 3.4);
-  fireSpill.castShadow = true;
-  fireSpill.shadow.mapSize.set(1024, 1024);
-  fireSpill.shadow.bias = -0.0012;
-  fireSpill.shadow.radius = 3;
-  hearth.add(fireCore, fireBath, fireSpill, fireSpill.target);
+  /* The spot out of the fireplace mouth is gone too — with no shadow to
+     carry it was a third light doing what the core already did. Four
+     lights in the room now: sky, hearth core, hearth bath, moon. */
+  fireSpill = fireCore;
+  hearth.add(fireCore, fireBath);
 
   /* candles: small reach, no shadows, and each one gets its own phase in
      tickFire — two candles guttering in step is instantly fake */
-  candleLights = [[0, 0.42, 0], [-RX + 1.0, FLOOR_Y + 1.15, -2.8],
-                  [RX - 1.5, FLOOR_Y + 1.05, -2.9], [-RX + 0.5, FLOOR_Y + 1.9, 1.2]]
+  /* ONE candle light, not four. Each one multiplies the per-fragment
+     cost of every surface in the room, and three of the four were doing
+     no visible work that the glow sprites were not already doing for
+     free. The sprites stay — you see the flames; you do not see which
+     of them is a real light. */
+  candleLights = [[0, 0.42, 0]]
     .map(p => {
       const l = lamp(new THREE.PointLight(0xffb46b, 0.62, 2.9, 2.0), 2.9);
       l.position.set(p[0], p[1], p[2]);
       roomGroup.add(l);
       return l;
     });
+
+  /* ── AND ONE LAMP THAT IS ACTUALLY A LIGHT ───────────────
+     The hearth is on the far wall, so everything on the near half of the
+     room was lit by the moon and the sky term alone and read as an unlit
+     corner of a different scene. One warm point at the right-hand lantern,
+     with a short reach so it lights that wall and nothing else — cheap,
+     and it is the difference between a room and a stage with one lamp
+     pointed at it. */
+  /* on the dresser, where there is now a candelabra for it to come from */
+  const wall = lamp(new THREE.PointLight(0xffa14e, 1.35, 4.6, 2.0), 4.6);
+  wall.position.set(2.45, FLOOR_Y + 2.40, -1.24);
+  roomGroup.add(wall);
 
   /* THE ONE COLD SOURCE, through the windows on the back wall */
   const moon = new THREE.DirectionalLight(0x5d7cb4, 0.17);
@@ -360,7 +553,7 @@ function flick(name, t, hz) {
 }
 const HOT = new THREE.Color(0xffb066), EMB = new THREE.Color(0xff4f18);
 const I_CORE = 3.4, I_BATH = 1.15, I_SPILL = 2.1;
-let fseed = Math.random() * 97;
+let fseed = Math.random() * 97, fireT = 0;
 
 function tickFire(t) {
   if (!fireCore) return;
@@ -383,124 +576,315 @@ function tickFire(t) {
     const c = flick(i % 2 ? 'candle' : 'candleB', t * (0.9 + i * 0.07) + i * 3.7, 10);
     candleLights[i].intensity = 0.62 * (0.72 + 0.42 * c) * (c < 0.12 ? 0.55 : 1);
   }
-  for (const m of emberMats) m.emissiveIntensity = 1.6 + 1.1 * n;
+  /* the coals breathe with the flicker, between a dull red and a bright
+     orange — a value, not an intensity, so it cannot run away */
+  const ek = 0.40 + 0.36 * n;
+  for (const m of emberMats) m.color.setRGB(1.0 * ek, 0.38 * ek, 0.13 * ek);
   if (moteField) { moteField.position.y = Math.sin(t * 0.11) * 0.06;
                    moteField.rotation.y = t * 0.008; }
+}
+
+/* ══ THE ROOM IS DATA ══════════════════════════════════════════
+   It used to be a hundred lines of put() calls, which meant only I could
+   change it and only by editing source. grumkata, reasonably: "give me
+   the 3d model made of individual parts, then give me a way to add the
+   finishing touches".
+
+   So the tavern is a LIST now. Every piece is one row — what it is, where
+   it stands, which way it faces, how big — and the builder just reads the
+   list. That single change is what makes the editor possible at all: the
+   panel edits rows, the room rebuilds from rows, and a layout can be
+   saved, shipped, or thrown away without touching a line of code.
+
+   `over` marks anything that hangs ABOVE the table plane. This matters
+   more than it sounds: looking down at the wood the eye is ON the table's
+   normal, so a chandelier, a rafter or a banner overhead sits directly
+   between you and the table. That is the "board looking thing covers my
+   view" — hanging banners at two and a bit metres, seen from above, are
+   a plank across the screen. Everything marked `over` fades out as you
+   come down over the wood and returns as you sit back. */
+const TAVERN_PLAN = [
+  /* ── the shell ───────────────────────────────────────────────
+     A wall module is 2m wide and 3.12 tall and its slab sits from -0.31
+     to +0.10 of its own row, so a wall placed at 3 has its INNER FACE at
+     2.90. That is the number everything else is measured against: the
+     room you can actually stand in is 5.8 by 5.8. */
+  { k:'floor' },
+  { k:'ceil'  },
+  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x:-2, y:0, z:-3, r:0 },
+  /* plain plaster, because the firebox is open at the back and this is the
+     wall you look at through the flames — a timber grid there reads as the
+     outside of the building seen through a hole in it */
+  { p:'R', m:'Wall_Plaster_Straight',          x: 0, y:0, z:-3, r:0 },
+  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x: 2, y:0, z:-3, r:0 },
+  { p:'R', m:'Wall_Plaster_WoodGrid',   x:-2, y:0, z:3, r:180 },
+  { p:'R', m:'Wall_Plaster_Door_Round', x: 0, y:0, z:3, r:180 },
+  { p:'R', m:'Wall_Plaster_WoodGrid',   x: 2, y:0, z:3, r:180 },
+  { p:'R', m:'Wall_Plaster_WoodGrid', x:-3, y:0, z:-2, r:90 },
+  { p:'R', m:'Wall_Plaster_Straight', x:-3, y:0, z: 0, r:90 },
+  { p:'R', m:'Wall_Plaster_WoodGrid', x:-3, y:0, z: 2, r:90 },
+  { p:'R', m:'Wall_Plaster_WoodGrid',          x: 3, y:0, z:-2, r:-90 },
+  { p:'R', m:'Wall_Plaster_Straight',          x: 3, y:0, z: 0, r:-90 },
+  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x: 3, y:0, z: 2, r:-90 },
+  { p:'R', m:'Corner_Interior_Big', x:-3, y:0, z:-3, r:0 },
+  { p:'R', m:'Corner_Interior_Big', x: 3, y:0, z:-3, r:-90 },
+  { p:'R', m:'Corner_Interior_Big', x: 3, y:0, z: 3, r:180 },
+  { p:'R', m:'Corner_Interior_Big', x:-3, y:0, z: 3, r:90 },
+
+  /* A WINDOW FRAME GOES IN A WINDOW. There were three frames and four
+     holes, one of the frames was screwed to a solid wall, and all three
+     sat at y:1.15 — which is on top of the sill height the model already
+     carries, so they stood three quarters of a metre proud of the roof.
+     One frame per hole, at y:0, where the model puts itself. */
+  { p:'R', m:'Window_Wide_Round1', x:-2, y:0, z:-3, r:0 },
+  { p:'R', m:'Window_Wide_Round1', x: 2, y:0, z:-3, r:0 },
+  { p:'R', m:'Window_Wide_Round1', x: 3, y:0, z: 2, r:-90 },
+  { p:'R', m:'Door_2_Round', x:0, y:0, z:2.95, r:180 },
+
+  /* ── the roof you sit under ──────────────────────────────────
+     Roof_Log is a ten-metre beam whose geometry starts 3.85 up its own
+     axis, so at y:2.92 the "rafters" were sitting at 2.90 to 3.16 — above
+     a ceiling at 2.37, in the dark outside the room, drawn every frame and
+     visible never. Dropped to where a rafter goes, thinned, turned to run
+     ACROSS the room, and braced into the side walls the way one is. */
+  { p:'R', m:'Roof_Log', x:0, y:2.18, z:-2.2, r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
+  { p:'R', m:'Roof_Log', x:0, y:2.18, z: 0,   r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
+  { p:'R', m:'Roof_Log', x:0, y:2.18, z: 2.2, r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
+  /* a brace goes UNDER the rafter it holds up, so these share the rafters'
+     depths and stand off the ends of the wall furniture rather than through it */
+  { p:'R', m:'Prop_Support', x:-2.9, y:0.20, z:-2.2, r: 90, sx:1, sy:1, sz:0.5, over:1 },
+  { p:'R', m:'Prop_Support', x: 2.9, y:0.20, z:-2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
+  { p:'R', m:'Prop_Support', x:-2.9, y:0.20, z: 2.2, r: 90, sx:1, sy:1, sz:0.5, over:1 },
+  { p:'R', m:'Prop_Support', x: 2.9, y:0.20, z: 2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
+
+  /* ── the hearth, dead ahead, the only bright thing ───────────
+     Set INTO the wall rather than standing in front of it. The model is
+     1.78 deep and the strip of floor between the far wall and the players'
+     chairs is 1.15, so a fireplace that stands proud of the wall stands in
+     somebody's lap. Its back goes through a solid wall, which nobody can
+     see, and what is left in the room is a chimney breast. */
+  { p:'T', m:'Fireplace', x:0, y:0, z:-2.62, r:0 },
+  /* Over the middle of the fire and small enough to be a pot rather than a
+     bath — it stood off to one side at 0.6 scale with its rim inside the
+     masonry, which is the one place a cauldron must not be. */
+  { p:'T', m:'Cauldron',  x:0, y:0.02, z:-2.24, r:0, s:0.45 },
+  /* THE FIREWOOD WAS TWO LOOSE STICKS lying on the hearth floor, which
+     reads as litter rather than as fuel. Firewood by a hearth is a STACK:
+     six split lengths crossed in pairs the way you actually pile them,
+     clear of the chimney breast and against the wall. */
+  { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.70, r:90, s:1 },
+  { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.58, r:90, s:1 },
+  { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.46, r:90, s:1 },
+  { p:'T', m:'FireLog', x:-2.01, y:0.125, z:-2.64, r:90, s:1 },
+  { p:'T', m:'FireLog', x:-2.01, y:0.125, z:-2.52, r:90, s:1 },
+  { p:'T', m:'FireLog', x:-1.97, y:0.205, z:-2.58, r:90, s:1 },
+  { p:'T', m:'CandleStand', x:-1.38, y:0,    z:-2.55, r:0 },
+  { p:'T', m:'Candle',      x:-1.38, y:0.61, z:-2.55, r:0 },
+  { p:'T', m:'CandleStand', x: 1.45, y:0,    z:-2.62, r:0 },
+  { p:'T', m:'Candle',      x: 1.45, y:0.61, z:-2.62, r:0 },
+
+  /* ── the bar, down the left wall ─────────────────────────────
+     The counter is 1.0 deep, which is the whole of the strip, so its front
+     edge lands at -1.90 and the stools have to stand off the ends where
+     the room is wider — a stool at the middle of the counter would be
+     1.35 from the middle of the table, i.e. inside the chairs. */
+  { p:'T', m:'TableLong', x:-2.40, y:0, z:-1.24, r:90 },
+  { p:'T', m:'TableLong', x:-2.40, y:0, z: 1.24, r:90 },
+  /* DOWN, onto the bar they belong to. A Rack is a plank on two corbels,
+     and at 1.90 it hung near enough to the roof that from a chair, looking
+     up, its silhouette was a seat on two legs — grumkata: "it looks like
+     there is a chair in the ceiling". Brought down to just clear of the
+     bottles on the counter, where it reads as the shelf behind a bar. */
+  { p:'T', m:'Rack', x:-2.88, y:1.62, z:-1.05, r:90 },
+  { p:'T', m:'Rack', x:-2.88, y:1.62, z: 1.05, r:90 },
+  { p:'T', m:'BarStool', x:-1.62, y:0, z:-2.08, r:16 },
+  { p:'T', m:'BarStool', x:-1.62, y:0, z:-1.32, r:4 },
+  { p:'T', m:'BarStool', x:-1.62, y:0, z: 1.32, r:-9 },
+  { p:'T', m:'BarStool', x:-1.62, y:0, z: 2.08, r:-21 },
+  /* on the counter — top is 0.85 up, so everything that stands on it is y:0.85 */
+  { p:'T', m:'Jug',        x:-2.30, y:0.85, z:-1.72, r:34, s:0.7 },
+  { p:'T', m:'BottleLong', x:-2.62, y:0.85, z:-1.42, r:0, s:0.8 },
+  { p:'T', m:'BottleLong', x:-2.60, y:0.85, z:-1.22, r:40, s:0.8 },
+  { p:'T', m:'BottleShort',x:-2.63, y:0.85, z:-0.98, r:0, s:0.8 },
+  { p:'T', m:'CupMetal',   x:-2.22, y:0.85, z:-0.70, r:61, s:0.65 },
+  { p:'T', m:'CupMetal',   x:-2.34, y:0.85, z:-0.44, r:-30, s:0.65 },
+  { p:'T', m:'Candelabra', x:-2.52, y:0.85, z: 0.05, r:0, s:0.6 },
+  { p:'T', m:'Plate',      x:-2.26, y:0.85, z: 0.62, r:0, s:0.8 },
+  { p:'T', m:'Cheese',     x:-2.30, y:0.88, z: 0.62, r:17, s:0.45 },
+  { p:'T', m:'Bowl',       x:-2.34, y:0.85, z: 1.42, r:0, s:0.8 },
+  { p:'T', m:'Apple',      x:-2.34, y:0.93, z: 1.42, r:0, s:1 },
+  { p:'T', m:'Apple',      x:-2.28, y:0.92, z: 1.48, r:40, s:1 },
+  { p:'T', m:'CupCeramic', x:-2.20, y:0.85, z: 1.86, r:-52, s:0.8 },
+
+  /* ── the right side is NOT the left side ─────────────────────
+     grumkata: "it still has symmetry but it's still kinda mid". A tavern
+     is not laid out in pairs, so this wall gets the things a bar does not
+     have: the dresser, a bench with a stool pulled up to it, a barrel
+     waiting to be tapped. */
+  { p:'T', m:'Pantry', x:2.62, y:0, z:-1.24, r:-90 },
+  { p:'T', m:'Bench',  x:2.74, y:0, z: 0.92, r:-90, s:0.8 },
+  { p:'T', m:'Stool',  x:2.12, y:0, z: 0.66, r:-64, s:0.75 },
+  { p:'T', m:'CupMetal', x:2.12, y:0.42, z:0.66, r:24, s:0.65 },
+  { p:'T', m:'BarrelStand', x:2.42, y:0,    z:-2.44, r:0, s:0.8 },
+  { p:'T', m:'Barrel',      x:2.42, y:0.16, z:-2.44, r:0, s:0.8 },
+
+  /* ── the near wall: the way out, and what gets dumped by it ── */
+  { p:'T', m:'Bench',     x:-1.55, y:0, z: 2.72, r:180, s:0.8 },
+  { p:'T', m:'Barrel',    x: 1.42, y:0, z: 2.44, r:0, s:0.8 },
+  { p:'T', m:'FlourSack', x: 2.34, y:0,    z: 2.44, r:24, s:1 },
+  { p:'T', m:'FlourSack', x: 2.30, y:0.20, z: 2.36, r:-38, s:1 },
+
+  /* No rug. It was the one prop in here trying to be a feature, it is
+     almost entirely hidden by the table anyway, and grumkata is right that
+     a bear skin in a common room is a bit much. Bare boards. */
+
+  /* ── light you can see ───────────────────────────────────────
+     Every one of these is a thing the lighting rig is coming FROM. They
+     sit at 1.5 to 1.9 above the floor, which is eye height standing and
+     above the head of anyone sitting — a wall lamp at table height is a
+     lamp you knock over. */
+  /* NO WALL SCONCES. The Lamp model is a two-armed bracket that reads as a
+     small candelabra, and hung at head-and-a-half on bare plaster, glowing,
+     with its fixing plate edge-on and invisible, every one of them looked
+     like a candelabra stuck to the wall in mid-air — grumkata: "get rid of
+     the candelbras floating on the shelves". They are gone. Light in this
+     room now always comes off something that is standing on something. */
+  { p:'T', m:'Candelabra', d:'glow', x: 2.55, y:1.50, z:-1.24, r:-90, s:0.6 },
+  /* NO CHANDELIER. It hung over the middle of the table and it is the one
+     thing grumkata took out when he was given the layout to edit — "a
+     floating chair or something above the table", which a wheel of candle
+     arms seen from underneath is a fair description of. This row is his
+     answer, not a guess of mine: the shipped layout is now the one he sent
+     back, and the only line it differs by is this one being gone. */
+];
+
+
+/* ── THE PLAN YOU ARE ACTUALLY LOOKING AT ─────────────────────
+   The shipped layout unless a saved one exists, which is what lets the
+   editor's work survive a reload without touching the build. */
+/* ── AND THE KEY MOVES WHEN THE ROOM DOES ─────────────────────
+   A saved layout overrides the shipped one completely, which is what makes
+   the editor worth having and also a trap: fix a prop in the source and
+   anyone holding a save from before the fix never sees it, and reports the
+   same fault again. The key carries the layout's generation, so shipping a
+   change to the room retires the saves that predate it. */
+const PLAN_KEY = 'monarchy.tavern.v3';
+let planCache = null;
+function roomPlan() {
+  if (planCache) return planCache;
+  try {
+    const raw = root.localStorage && root.localStorage.getItem(PLAN_KEY);
+    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return (planCache = p); }
+  } catch (e) {}
+  return (planCache = TAVERN_PLAN.map(r => Object.assign({}, r)));
+}
+function setPlan(rows, save) {
+  planCache = rows;
+  if (save !== false) {
+    try { root.localStorage.setItem(PLAN_KEY, JSON.stringify(rows)); } catch (e) {}
+  }
+  if (roomBuilt) { layRoom(); invalidate(10); }
+}
+function resetPlan() {
+  planCache = null;
+  try { root.localStorage.removeItem(PLAN_KEY); } catch (e) {}
+  if (roomBuilt) { layRoom(); invalidate(10); }
 }
 
 function buildRoom() {
   if (roomBuilt || typeof ROOM === 'undefined') return;
   roomBuilt = true;
   roomGroup = new THREE.Group();
-  roomGroup.visible = false;
+  roomGroup.visible = true;
   uScene.add(roomGroup);
-
-  const R = ROOM, RB = ROOM_TEX;
-  const T = (typeof TAVERN !== 'undefined') ? TAVERN : null;
-  const TB = (typeof TAVERN_TEX !== 'undefined') ? TAVERN_TEX : null;
-  const dr = DRESS.room, dt = DRESS.tavern;
-  const HALF = Math.PI / 2;
-
-  /* ── FLOOR AND CEILING ────────────────────────────────────
-     The kit's floor tile is 2m square, so the room is a whole number of
-     them: five across, four deep. The ceiling is the same tile turned
-     over — a plank ceiling is what a plank floor looks like from below,
-     and the beams under it are what sell the height. */
-  for (let i = -2; i <= 2; i++) {
-    for (let j = -2; j <= 1; j++) {
-      const x = i * 2, z = j * 2 + 1;
-      /* NOT a checkerboard. Alternating the two floor tiles reads as a
-         chess board the moment you can see more than four of them —
-         which is exactly what a tavern floor must not look like. The
-         light boards are scattered thinly instead, and every tile gets a
-         quarter turn, so the planking runs different ways like real
-         boards laid by someone in a hurry. */
-      const hash = ((i * 7 + j * 13) * 2654435761) >>> 0;
-      put(R, RB, (hash % 5 === 0) ? 'Floor_WoodLight' : 'Floor_WoodDark',
-          dr, x, FLOOR_Y, z, (hash % 2) * Math.PI / 2);
-      /* NO CEILING OVER YOUR OWN HEAD. The nearest rows are behind and
-         above the eye in a real room — you do not see your own ceiling,
-         you see the far one. Drawing them put a featureless brown band
-         across the top third of the frame and hid everything the room
-         had to offer. */
-      if (j <= 0) put(R, RB, 'Floor_WoodDark', dr, x, FLOOR_Y + WALL_H, z, Math.PI);
-    }
-  }
-  /* beams, running the depth of the room under the boards */
-  for (let i = -2; i <= 2; i++) {
-    const b = put(R, RB, 'Roof_Log', dr, i * 2, FLOOR_Y + WALL_H - 0.20, -1.4, 0);
-    if (b) b.scale.set(0.19, 0.19, 0.78);
-  }
-
-  /* ── THE FOUR WALLS ───────────────────────────────────────
-     Wall pieces are 2m wide and stand from y = 0 up, so they sit on the
-     floor and reach the ceiling exactly. The variety is deliberate: a
-     tavern with five identical wall panels behind it reads as a corridor.
-     Windows go on the long walls, the door on the short one. */
-  const back = ['Wall_Plaster_WoodGrid', 'Wall_Plaster_Window_Wide_Round',
-                'Wall_Plaster_WoodGrid', 'Wall_Plaster_Window_Wide_Round',
-                'Wall_Plaster_WoodGrid'];
-  const front = ['Wall_Plaster_Straight', 'Wall_Plaster_WoodGrid',
-                 'Wall_Plaster_Door_Round', 'Wall_Plaster_WoodGrid',
-                 'Wall_Plaster_Straight'];
-  for (let i = 0; i < 5; i++) {
-    const x = (i - 2) * 2;
-    put(R, RB, back[i], dr, x, FLOOR_Y, -RZ, 0);
-    put(R, RB, front[i], dr, x, FLOOR_Y, RZ, Math.PI);
-    put(R, RB, 'Wall_BottomCover', dr, x, FLOOR_Y, -RZ + 0.22, 0);
-  }
-  const side = ['Wall_Plaster_WoodGrid', 'Wall_Plaster_Window_Wide_Round',
-                'Wall_Plaster_WoodGrid', 'Wall_Plaster_Straight'];
-  for (let j = 0; j < 4; j++) {
-    const z = (j - 2) * 2 + 1;
-    put(R, RB, side[j], dr, -RX, FLOOR_Y, z, HALF);
-    put(R, RB, side[3 - j], dr, RX, FLOOR_Y, z, -HALF);
-  }
-  /* the corners, which are what stop four flat walls reading as a box */
-  [[-RX, -RZ, 0], [RX, -RZ, -HALF], [RX, RZ, Math.PI], [-RX, RZ, HALF]]
-    .forEach(c => put(R, RB, 'Corner_Interior_Big', dr, c[0], FLOOR_Y, c[1], c[2]));
-  /* window frames and shutters, in the holes the wall pieces left */
-  [[-2, -RZ, 0], [2, -RZ, 0], [-RX, 1, HALF], [RX, -1, -HALF]].forEach(w => {
-    put(R, RB, 'Window_Wide_Round1', dr, w[0], FLOOR_Y + 1.15, w[1], w[2]);
-    put(R, RB, 'WindowShutters_Wide_Round_Open', dr, w[0], FLOOR_Y + 1.15, w[1], w[2]);
-  });
-  put(R, RB, 'Door_2_Round', dr, 0, FLOOR_Y, RZ - 0.12, Math.PI);
-
-  if (!T) return;
-
-  /* ── WHAT MAKES IT A TAVERN AND NOT A ROOM ────────────────
-     A hearth you can see the fire in, drink where drink is kept, and
-     something overhead. Everything else is dressing, and dressing is
-     what stops the corners looking swept. */
-  put(T, TB, 'Fireplace',   dt,  0,     FLOOR_Y, -RZ + 0.45, 0);
-  put(T, TB, 'FireLog',     dt,  0,     FLOOR_Y + 0.05, -RZ + 0.75, 0.4);
-  put(T, TB, 'Cauldron',    dt,  0.85,  FLOOR_Y, -RZ + 0.7, -0.5);
-  put(T, TB, 'Chandelier',  dt,  0,     FLOOR_Y + WALL_H - 0.55, 0, 0);
-
-  put(T, TB, 'Rack',        dt, -RX + 0.35, FLOOR_Y, -1.4, HALF);
-  put(T, TB, 'Pantry',      dt, -RX + 0.35, FLOOR_Y,  1.2, HALF);
-  put(T, TB, 'Barrel',      dt,  RX - 0.6,  FLOOR_Y,  2.6, -0.4);
-  put(T, TB, 'BarrelStand', dt,  RX - 0.6,  FLOOR_Y,  1.5, -0.2);
-  put(T, TB, 'FlourSack',   dt, -RX + 0.7,  FLOOR_Y,  2.9, 0.8);
-
-  put(T, TB, 'TableLong',   dt,  RX - 1.5,  FLOOR_Y, -2.2, HALF);
-  put(T, TB, 'Bench',       dt,  RX - 2.4,  FLOOR_Y, -2.2, HALF);
-  put(T, TB, 'BarStool',    dt,  RX - 2.3,  FLOOR_Y,  0.3, 0);
-  put(T, TB, 'Stool',       dt, -RX + 1.5,  FLOOR_Y,  2.4, 0.6);
-
-  put(T, TB, 'Jug',         dt,  RX - 1.5,  FLOOR_Y + 0.78, -2.6, 0.3);
-  put(T, TB, 'CupMetal',    dt,  RX - 1.35, FLOOR_Y + 0.78, -2.1, 0);
-  put(T, TB, 'BottleLong',  dt,  RX - 1.65, FLOOR_Y + 0.78, -1.7, 0);
-  put(T, TB, 'Plate',       dt,  RX - 1.4,  FLOOR_Y + 0.78, -1.3, 0);
-  put(T, TB, 'Rug',         dt,  0,         FLOOR_Y + 0.01, 0.6, 0.2);
-  put(T, TB, 'CandleStand', dt, -RX + 1.0,  FLOOR_Y, -2.8, 0);
-  put(T, TB, 'Candelabra',  dt,  RX - 1.5,  FLOOR_Y + 0.78, -2.9, 0);
-
+  overGroup = new THREE.Group();
+  roomGroup.add(overGroup);
+  layRoom();
   fire();
   lightRoom();
   seatRoot = new THREE.Group();
   roomGroup.add(seatRoot);
   syncSeats();
+}
+
+/* Read the plan and build it. Called again whenever the plan changes,
+   which is what the editor leans on. */
+function layRoom() {
+  const R = ROOM, RB = ROOM_TEX;
+  const T = (typeof TAVERN !== 'undefined') ? TAVERN : null;
+  const TB = (typeof TAVERN_TEX !== 'undefined') ? TAVERN_TEX : null;
+  /* clear whatever the last plan built */
+  for (let i = roomGroup.children.length - 1; i >= 0; i--) {
+    const c = roomGroup.children[i];
+    if (c.userData.plan) { roomGroup.remove(c); c.geometry && c.geometry.dispose(); }
+  }
+  for (let i = overGroup.children.length - 1; i >= 0; i--) {
+    const c = overGroup.children[i];
+    overGroup.remove(c); c.geometry && c.geometry.dispose();
+  }
+
+  const plan = roomPlan();
+  const over = [];
+  for (const row of plan) {
+    if (row.k === 'floor') {
+      /* ── ONE WOOD, AND THAT IS THE WHOLE IDEA ─────────────
+         This used to scatter Floor_WoodLight among the dark boards, on
+         the theory that a real floor is not all one plank. The theory is
+         fine and the scale is wrong: a tile here is TWO METRES square, so
+         "a light board here and there" came out as a two-by-four-metre
+         patch of paler wood lying down the middle of the room, directly
+         under the table. grumkata has now reported it twice as "a
+         different kinda board underneath the table compared to the rest
+         of the room", and he is describing exactly what is there.
+
+         The variety that survives at this scale is the GRAIN DIRECTION,
+         which the quarter turn already gives for nothing. */
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+        const h = ((i * 7 + j * 13) * 2654435761) >>> 0;
+        put(R, RB, 'Floor_WoodDark',
+            DRESS.room, i * 2, FLOOR_Y, j * 2, (h % 2) * Math.PI / 2);
+      }
+      continue;
+    }
+    if (row.k === 'ceil') {
+      /* THE ROOM NEEDS A LID. There was none, so above the wall tops was
+         open black: from a seat you looked across the room and the tavern
+         simply stopped at head height with void over it, which is most of
+         why the far wall never read as being indoors. It is the floor
+         planking turned over — nine tiles, folded into the same merged
+         geometry as everything else, so it costs one more bucket and no
+         extra draw. */
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+        const h = ((i * 11 + j * 5) * 2654435761) >>> 0;
+        /* mirrored in y, which flips the normals down AND reverses the
+           winding, so a floor tile becomes a ceiling seen from under it */
+        if (putS(R, RB, 'Floor_WoodDark', DRESS.room,
+                 i * 2, FLOOR_Y + WALL_H, j * 2, (h % 2) * Math.PI / 2, 1, -1, 1))
+          over.push(BATCH.pop());     /* it is the most overhead thing there is */
+      }
+      continue;
+    }
+    const lib  = row.p === 'T' ? T : R;
+    const book = row.p === 'T' ? TB : RB;
+    if (!lib) continue;
+    const dress = DRESS[row.d || (row.p === 'T' ? 'tavern' : 'room')] || DRESS.room;
+    const ry = (row.r || 0) * Math.PI / 180;
+    const rec = row.sx != null
+      ? putS(lib, book, row.m, dress, row.x, FLOOR_Y + (row.y || 0), row.z, ry,
+             row.sx, row.sy, row.sz)
+      : put(lib, book, row.m, dress, row.x, FLOOR_Y + (row.y || 0), row.z, ry, row.s);
+    if (rec) pivot(row.p + '|' + row.m, rec.mat);
+    if (rec && row.over) over.push(BATCH.pop());
+  }
+  /* whatever the plan says about a chandelier is where its flames go, and
+     no chandelier means no flames */
+  aimChandelier(plan);
+  lightCandles(plan);
+  flushRoom(roomGroup, 'plan');
+  /* the overhead pieces are batched separately so they can be faded out
+     when you are looking straight down through where they hang */
+  for (const rec of over) BATCH.push(rec);
+  flushRoom(overGroup, 'over');
 }
 
 /* ══ THE PEOPLE AT THE TABLE ═══════════════════════════════════
@@ -522,8 +906,18 @@ function buildRoom() {
 
    They face the middle of the table, always — which is where you are.  */
 let seatRoot = null, seatSig = '';
-const SEAT_R = 1.02;          /* how far out the chairs sit, in metres */
-const BANNER_R = 3.55;        /* the banners are on the WALL, not on the chair */
+const SEAT_R = 1.34;          /* a person sits BACK from a table, not against it */
+const SEAT_CHAIR = 0.78;      /* the pack's chair is 1.2m tall; a chair is 0.94 */
+/* ── HOW FAR BACK THE WALL IS, AT THAT BEARING ────────────────
+   BANNER_R was one number, 3.55, and the room is a SQUARE 2.90 to the
+   face. So a banner behind the far seat was half a metre outside the
+   building and a banner behind a corner seat was nowhere near the wall it
+   was supposed to be on. The wall is where the ray from the middle of the
+   table meets the square, which is this. */
+function wallAt(a) {
+  const c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+  return 2.84 / Math.max(c, sn, 1e-3);
+}
 
 function banner(seat) {
   /* the seat's own image if it has one; the character's arms if not,
@@ -541,13 +935,25 @@ function banner(seat) {
      like a sticker pasted onto a dark photograph — brighter than the
      fire it was supposed to be lit by. Cloth in a firelit room is cloth:
      it takes the light, it is rough, and the corner it hangs in is dim. */
+  /* and a shade under full, because heraldry is painted on cloth in a dark
+     room — at full albedo three sheets of flat colour are the brightest
+     thing in the picture and the fire stops being the subject */
   const mat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, transparent: true,
                                                alphaTest: 0.02, roughness: 0.96,
+                                               color: new THREE.Color(0.72, 0.70, 0.66),
                                                metalness: 0, envMapIntensity: 0.3 });
   waiting++;
-  mat.map = new THREE.TextureLoader().load(src, landed, undefined, landed);
+  let plane = null;
+  mat.map = new THREE.TextureLoader().load(src,
+    t => { if (plane) plane.visible = true; landed(); },
+    undefined, landed);
   mat.map.encoding = THREE.sRGBEncoding;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 1.15), mat);
+  /* NOTHING UNTIL THERE IS SOMETHING. An unmapped MeshStandardMaterial is
+     WHITE, so between the seat being built and the heraldry decoding there
+     was a blank white sheet hanging in the room — and if the decode ever
+     failed it stayed there. A banner with no picture yet is not a banner. */
+  const m = plane = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.68), mat);
+  m.visible = false;
   return m;
 }
 
@@ -557,8 +963,31 @@ function buildSeat(seat) {
 
   if (T && T.Chair) {
     const ch = mesh(T.Chair.prims, TAVERN_TEX, DRESS.tavern);
-    ch.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
-    ch.position.set(0, FLOOR_Y, 0.16);
+    /* ── AND LIT THE WAY THE ROOM IS LIT ──────────────────
+       This chair kept coming out cream in a room of brown oak, and no
+       amount of pulling its albedo down fixed it, because the albedo was
+       never the problem: the room is merged into Lambert batches and a
+       seat is built one at a time in Standard, which SAMPLES THE
+       ENVIRONMENT MAP. That environment is a lit room, so every seat's
+       chair was carrying an extra stop and a half of ambient that the
+       identical chairs at the bar were not.
+
+       Same material as the room, so the same chair looks like the same
+       chair — and one less Standard shader to compile per seat. */
+    ch.traverse(o => {
+      if (!o.isMesh) return;
+      const was = o.material;
+      o.material = new THREE.MeshLambertMaterial({ map: was.map, color: was.color });
+      was.dispose();
+      o.castShadow = false; o.receiveShadow = true;
+    });
+    /* 1.2m tall out of the pack, which next to a 1.2m-wide table is a
+       throne; and built 37cm off its own centre, which put every player's
+       chair a third of a metre to the left of their face. Both fixed here
+       so a seat is a person in a chair rather than three things near
+       each other. */
+    ch.scale.setScalar(SEAT_CHAIR);
+    ch.position.set(PIVOT['T|Chair'][0] * SEAT_CHAIR, FLOOR_Y, 0.16);
     g.add(ch);
   }
 
@@ -569,19 +998,21 @@ function buildSeat(seat) {
                                                  alphaTest: 0.02, roughness: 0.92,
                                                  metalness: 0, envMapIntensity: 0.3 });
     waiting++;
-    const card = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.12), mat);
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.78), mat);
+    card.visible = false;            /* same rule: a face with no picture is not a face */
     mat.map = new THREE.TextureLoader().load(seat.face, t => {
+      card.visible = true;
       /* THE PICTURE DECIDES THE SHAPE, not the other way round — the same
          rule the counters follow. Known the moment it decodes. */
       const im = t.image, ar = im && im.width ? im.height / im.width : 1.4;
-      const w = 0.82;
+      const w = 0.56;
       card.geometry.dispose();
       card.geometry = new THREE.PlaneGeometry(w, w * ar);
-      card.position.y = FLOOR_Y + 0.34 + w * ar / 2;
+      card.position.y = FLOOR_Y + 0.40 + w * ar / 2;
       landed();
     }, undefined, landed);
     mat.map.encoding = THREE.sRGBEncoding;
-    card.position.set(0, FLOOR_Y + 0.92, 0.02);
+    card.position.set(0, FLOOR_Y + 0.80, 0.02);
     g.add(card);
   }
 
@@ -591,9 +1022,28 @@ function buildSeat(seat) {
      over their place. It belongs on the wall at the same bearing, high
      enough to be over their head — the chair is furniture, the banner is
      the room saying whose table this is. */
+  /* BEHIND them, not in front of them. The offset was positive, and the
+     seat faces the middle, so every banner was hung between its owner and
+     you — a sheet of heraldry floating over the table, which is both the
+     "no banner to be seen" and one of the things across the view. High
+     enough to clear the chimney breast, low enough to clear the rafters. */
   const b = banner(seat);
   if (b) {
-    b.position.set(0, FLOOR_Y + 2.05, BANNER_R - SEAT_R);
+    /* Just behind their chair, not out on the wall. The wall was the tidier
+       idea and it does not survive contact with the room: the bearing
+       straight ahead is the chimney breast, so the far player's colours hung
+       INSIDE the fireplace and could not be seen from anywhere. A banner a
+       hand's breadth behind the person it belongs to is what the request
+       actually asked for, and it works from every seat. */
+    /* and low enough to be IN the picture. Seated, the eye is barely above
+       the wood and a banner two metres up goes off the top of the frame —
+       which is the same "no banner to be seen" by a different route. It
+       hangs just over its owner's head, where you can read it. */
+    /* and only just behind the chair, not out in the room: at 0.92 the far
+       player's banner was inside the chimney breast, which is the wall
+       problem again in miniature. Against the chair back it is visible from
+       every seat and it is unambiguously THEIRS. */
+    b.position.set(0, FLOOR_Y + 1.38, -0.48);
     g.add(b);
   }
 
@@ -611,6 +1061,7 @@ function syncSeats() {
   seatSig = sig;
   while (seatRoot.children.length) seatRoot.remove(seatRoot.children[0]);
   for (const s of seats) {
+    s.__a = (s.at || 0) * Math.PI / 180;        /* buildSeat needs the bearing */
     const g = buildSeat(s);
     /* 0 is the far side of the table, clockwise from there. The near
        side is yours and is left empty by spaceSeats(). */
@@ -658,9 +1109,18 @@ function fire() {
       g.traverse(o => {
         if (!o.isMesh) return;
         o.castShadow = o.receiveShadow = false;
-        o.material = new THREE.MeshStandardMaterial({
-          map: o.material.map, color: 0x3a1c0c, roughness: 0.95, metalness: 0,
-          emissive: 0xff4a12, emissiveIntensity: 2.2 });
+        /* ── A COAL IS NOT LIT, IT IS THE LIGHT ───────────
+           These were Standard with an emissive on top, sitting twenty
+           centimetres from a point light of intensity 3.4 with inverse
+           square falloff — so their diffuse term alone came out around
+           eighty, the emissive added three more, and every channel
+           clipped. The fire had a flat WHITE CARD lying in it.
+
+           Basic takes no light at all, which is the honest description
+           of a coal: its brightness is its own and tickFire sets it
+           directly, so it glows and breathes and never clips. */
+        o.material = new THREE.MeshBasicMaterial({
+          map: o.material.map, color: 0xff6a22, toneMapped: false });
         emberMats.push(o.material);
       });
       g.position.set(p[0], FLOOR_Y + 0.05 + p[1], -RZ + 0.62 + p[2]);
@@ -678,13 +1138,54 @@ function fire() {
   f2.position.set(0, FLOOR_Y + 0.22, -RZ + 0.58);
   roomGroup.add(f2);
 
-  /* a candle flame over each of the small lights */
-  [[0, 0.46, 0], [-RX + 1.0, FLOOR_Y + 1.19, -2.8],
-   [RX - 1.5, FLOOR_Y + 1.09, -2.9]].forEach(p => {
+  /* ── A CHANDELIER IS LIT, IF THERE IS ONE ────────────────
+     Six flames round the rim and a small warm light in the middle of
+     them, because a dark wooden wheel in a dark roof is not a chandelier,
+     it is a wheel.
+
+     BUILT ONCE AND AIMED BY THE LAYOUT, not nailed to a coordinate. The
+     first version hard-coded the position, so deleting the chandelier in
+     the editor would have left six flames and a light burning in clear
+     air over the table — the exact class of fault the flames were added
+     to fix, reintroduced one layer down. layRoom() points this at
+     whatever the plan says, or hides it when the plan has no chandelier
+     in it at all, which is what it says now. */
+  if (overGroup) {
+    chandelier = new THREE.Group();
+    chandelier.visible = false;
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      const c = glow(0xffc078, 0.13);
+      c.position.set(Math.cos(a) * 0.26, 0.07, Math.sin(a) * 0.26);
+      chandelier.add(c);
+    }
+    const ch = lamp(new THREE.PointLight(0xffb066, 0.5, 3.2, 2.0), 3.2);
+    ch.position.set(0, 0, 0);
+    chandelier.add(ch);
+    overGroup.add(chandelier);
+    aimChandelier(roomPlan());        /* and once now, since layRoom ran first */
+  }
+
+  /* the pool the plan draws its flames from — made once, placed by
+     lightCandles() whenever the layout is built */
+  flamePool = [];
+  for (let i = 0; i < 16; i++) {
+    const c = glow(0xffc078, 0.13);
+    c.visible = false; c.userData.flame = 1;
+    roomGroup.add(c); flamePool.push(c);
+  }
+  lightCandles(roomPlan());
+
+  /* The one flame that isn't a room fitting: the candle standing on the
+     table itself. Everything else that burns is a row in the layout, so
+     lightCandles() puts its flame wherever the row moved to — hard-coded
+     heights are exactly how you end up with a light hanging in clear air
+     after someone edits the room. */
+  {
     const c = glow(0xffc078, 0.14);
-    c.position.set(p[0], p[1], p[2]);
+    c.position.set(0, 0.46, 0);
     roomGroup.add(c);
-  });
+  }
 
   /* ── DUST ─────────────────────────────────────────────────
      Two hundred points, and the best atmosphere-per-byte in the whole
@@ -699,7 +1200,7 @@ function fire() {
   const dg = new THREE.BufferGeometry();
   dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   moteField = new THREE.Points(dg, new THREE.PointsMaterial({
-    color: 0xffc890, size: 0.016, sizeAttenuation: true, transparent: true,
+    color: 0xffc890, size: 0.008, sizeAttenuation: true, transparent: true,
     opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending,
     fog: false, toneMapped: false }));
   moteField.frustumCulled = false;
@@ -708,11 +1209,28 @@ function fire() {
 
 /* Bolt the room to the table: same tilt, same centre, and one metre is
    however many pixels a 1.2m table is wide right now. */
-function placeRoom(wx, wy, dia) {
+function placeRoom(wx, wy, wz, PX) {
   if (!roomGroup) return;
-  roomGroup.rotation.copy(tableObj.rotation);
-  roomGroup.position.set(wx, wy, 0);
-  const PX = dia / TABLE_M;
+  /* ── THE ROOM TURNS WITH YOUR HEAD, AND THE OTHER WAY ─────
+     Euler order XYZ means the Y rotation is applied first, in the room's
+     OWN frame — a spin about the room's vertical, then the tilt, which is
+     what the CSS side does with rotateX(TILT) rotateZ(YAW).
+
+     NEGATED, and this was the bug underneath "if i turn too much i start
+     moving in a weird way". CSS +z points OUT of the screen and GL +y
+     points up it, and that handedness flips the sense of a turn between
+     the two: the wood was rotating one way and the walls the other. It
+     survived for as long as it did because the room is roughly symmetric
+     and the table used to spin about its own middle, so a reversed room
+     just looked like a room going past.
+
+     It is not arguable now, because it is measurable: hold the camera and
+     ask the ROOM where the camera is. Turn ninety degrees and the answer
+     must not change by so much as a centimetre. With the sign the wrong
+     way round the eye walked twice the angle through the furniture, which
+     is precisely the feeling of being dragged sideways. */
+  roomGroup.rotation.set(tableObj.rotation.x, -headYaw(), 0);
+  roomGroup.position.set(wx, wy, wz);
   roomGroup.scale.setScalar(PX);
   /* A light's `distance` is read in WORLD units and does not inherit the
      group's scale the way its position does — so every reach written in
@@ -722,12 +1240,7 @@ function placeRoom(wx, wy, dia) {
   if (PX !== litPX) {
     litPX = PX;
     for (const L of lit) L.distance = L.userData.m * PX;
-    if (fireSpill) {
-      const c = fireSpill.shadow.camera;
-      c.near = 0.25 * PX; c.far = 9 * PX; c.updateProjectionMatrix();
-      fireSpill.shadow.normalBias = 0.02 * PX;
-    }
-    if (moteField) moteField.material.size = 0.016 * PX;
+    if (moteField) moteField.material.size = 0.008 * PX;
     if (uScene.fog) uScene.fog.density = FOG_M / PX;
   }
 }
@@ -886,12 +1399,12 @@ function buildPost() {
   gradeMat = new THREE.ShaderMaterial({
     uniforms: {
       tScene: { value: null }, tBloom: { value: null }, uTime: { value: 0 },
-      uExposure: { value: 1.25 }, uBloom: { value: 0.42 },
+      uExposure: { value: 0.96 }, uBloom: { value: 0.52 },
       uWarm: { value: new THREE.Vector3(1.035, 0.995, 0.945) },
       uCool: { value: new THREE.Vector3(0.930, 0.965, 1.055) },
-      uSplit: { value: 0.45 }, uContrast: { value: 1.045 }, uPivot: { value: 0.38 },
+      uSplit: { value: 0.45 }, uContrast: { value: 1.08 }, uPivot: { value: 0.38 },
       uSat: { value: 1.02 }, uVigIn: { value: 0.30 }, uVigOut: { value: 0.98 },
-      uVigDark: { value: 0.52 }, uGrain: { value: 0.013 }, uCA: { value: 0.0009 } },
+      uVigDark: { value: 0.72 }, uGrain: { value: 0.013 }, uCA: { value: 0.0009 } },
     vertexShader: QUAD_VS, fragmentShader: GRADE_FS,
     depthTest: false, depthWrite: false });
   sizePost();
@@ -907,9 +1420,14 @@ function sizePost() {
                 format: THREE.RGBAFormat,
                 type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
                 encoding: THREE.LinearEncoding, stencilBuffer: false };
-  const q = 4, bw = Math.max(1, (W / q) | 0), bh = Math.max(1, (H / q) | 0);
+  /* HALF RESOLUTION for the room, quarter for the bloom. A firelit
+     interior behind a grain and a vignette does not need four times the
+     pixels, and this is the single biggest saving in the frame. */
+  const sq = 2, q = 4;
+  const sw = Math.max(1, (W / sq) | 0), sh = Math.max(1, (H / sq) | 0);
+  const bw = Math.max(1, (W / q) | 0), bh = Math.max(1, (H / q) | 0);
   if (rtScene) { rtScene.dispose(); rtA.dispose(); rtB.dispose(); }
-  rtScene = new THREE.WebGLRenderTarget(W, H, Object.assign({ depthBuffer: true }, opt));
+  rtScene = new THREE.WebGLRenderTarget(sw, sh, Object.assign({ depthBuffer: true }, opt));
   rtA = new THREE.WebGLRenderTarget(bw, bh, Object.assign({ depthBuffer: false }, opt));
   rtB = new THREE.WebGLRenderTarget(bw, bh, Object.assign({ depthBuffer: false }, opt));
 }
@@ -923,8 +1441,7 @@ function blit(mat, target) {
 
 /* the whole pass, or the plain render when there is no room to grade */
 function drawUnder(t) {
-  const on = roomGroup && roomGroup.visible;
-  if (!on || !postReady) {
+  if (!roomGroup || !postReady) {
     uRen.toneMapping = THREE.ACESFilmicToneMapping;
     uRen.outputEncoding = THREE.sRGBEncoding;
     uRen.setRenderTarget(null);
@@ -961,13 +1478,18 @@ function lens(p) {
   p = Math.max(260, Math.min(6000, p || 2400));
   if (Math.abs(p - PERSP) < 0.5) return;
   PERSP = p;
+  /* the table mounts and fits itself before this layer has a renderer, and
+     the fit sets the lens — so record it and let build() pick it up */
+  if (!renderer) return;
   sizeCam();
   invalidate(6);
 }
 
+/* The room never hides now; this only trims the rig for how far back you
+   are sitting. Called once per drawn frame from the view's own number. */
 function showRoom(on) {
-  if (!roomGroup || roomGroup.visible === !!on) return;
-  roomGroup.visible = !!on;
+  if (!roomGroup || seatedNow === !!on) return;
+  seatedNow = !!on;
   /* ── THE AIR, AND STANDING THE TABLE RIG DOWN ─────────────
      Fog is the cheapest depth cue there is and the reason a room reads as
      a room rather than a diorama: without it the far wall is exactly as
@@ -980,21 +1502,84 @@ function showRoom(on) {
      are right for reading a board from above and are exactly the flat
      fill that was making the room look like a box; while you are sitting
      in the room the hearth is the key and they are barely a fill. */
-  if (on) {
-    uScene.fog = new THREE.FogExp2(0x140e09, FOG_M / (litPX || 600));
-    uScene.background = new THREE.Color(0x140e09);
-  } else {
-    uScene.fog = null;
-    uScene.background = null;
-  }
-  uScene.traverse(o => {
-    if (o.isDirectionalLight && o.userData.base === undefined) o.userData.base = o.intensity;
-    if (o.isDirectionalLight && !roomGroup.getObjectById(o.id))
-      o.intensity = on ? o.userData.base * 0.16 : o.userData.base;
-  });
+  uScene.fog = new THREE.FogExp2(0x140e09, FOG_M / (litPX || 600));
+  uScene.background = new THREE.Color(0x140e09);
   invalidate(20);
 }
 
+/* ══ THE WOOD IS IN THE ROOM, SO THE ROOM LIGHTS IT ════════════
+   grumkata: "the table seems somewhat out of place like its getting
+   diffrent lighting from the rest of the tavern".
+
+   It was, in two ways, and both were mine.
+
+   The table keeps its own rig — three directionals and an ambient, aimed
+   to read a board from above — and that rig was being cut to sixteen
+   percent the instant you crossed half way and put back the instant you
+   crossed it again. Sixteen percent of a studio key is still a key, and
+   it comes from a direction that has nothing to do with the hearth, so
+   the wood was lit by one thing and the room it stands in by another.
+
+   And the table is a Standard material carrying an ENVIRONMENT MAP at
+   full strength, while every surface of the room is Lambert with none.
+   An environment map is an entire second lighting rig, invisible in the
+   code and very visible on the wood: it is why the table sat in the
+   tavern looking cut out and pasted on.
+
+   Both now ride the travel continuously rather than snapping at a
+   threshold — by the time you are in the chair the hearth is the only
+   thing lighting the table, which is the whole point of a hearth. */
+let rigLights = null, woodMats = null, overRig = null;
+function roomLook(u) {
+  if (!roomGroup) return;
+  if (!rigLights) {
+    rigLights = [];
+    uScene.traverse(o => {
+      if (o.isDirectionalLight && !roomGroup.getObjectById(o.id)) {
+        if (o.userData.base === undefined) o.userData.base = o.intensity;
+        rigLights.push(o);
+      }
+    });
+  }
+  if (!woodMats && tableObj) {
+    woodMats = [];
+    tableObj.traverse(o => {
+      if (o.isMesh && o.material && o.material.envMapIntensity !== undefined) {
+        if (o.material.userData.envBase === undefined)
+          o.material.userData.envBase = o.material.envMapIntensity;
+        woodMats.push(o.material);
+      }
+    });
+  }
+  const rig = 1 - 0.97 * u;
+  for (const L of rigLights) L.intensity = L.userData.base * rig;
+  /* The chest and the bin live in the OTHER scene, which the hearth does
+     not reach at all, so their rig cannot be cut the way the table's is:
+     cut it and they go black, which is the thing I was asked to stop doing
+     in the first place. Down far enough that they stop glowing against a
+     firelit room, and no further. */
+  if (!overRig) {
+    overRig = [];
+    scene.traverse(o => { if (o.isDirectionalLight) {
+      if (o.userData.base === undefined) o.userData.base = o.intensity;
+      overRig.push(o); } });
+  }
+  const orig = 1 - 0.42 * u;
+  for (const L of overRig) L.intensity = L.userData.base * orig;
+  const env = 1 - 0.88 * u;
+  for (const m of woodMats) m.envMapIntensity = m.userData.envBase * env;
+}
+
+/* ── THE TABLE IS TOLD, NOT MEASURED ──────────────────────────
+   World (0,0,0) in this layer IS the perspective origin on the screen
+   plane and the camera sits at z = PERSP looking down the axis — which
+   means GL world and the CSS box are the same space, with y flipped. So a
+   point the table layer reports at (x, y, depth) in page pixels goes
+   straight in, and GL's own projection does the rest.
+
+   The markers stay on the rim because other things read them, but nothing
+   is ruled by them any more: two getBoundingClientRects a frame, and an
+   answer that was only right on the optical axis. */
 function placeTable() {
   if (!tableObj || !uRen) return;
   const l = doc.getElementById('tm-l'), r = doc.getElementById('tm-r');
@@ -1004,12 +1589,24 @@ function placeTable() {
   const dia = Math.hypot(b.left - a.left, b.top - a.top);
   if (!dia) { tableObj.visible = false; return; }
   tableObj.visible = true;
+  /* ── AND UNPROJECTED THROUGH IT ───────────────────────────
+     What the markers give is the table AS DRAWN: a midpoint and a width
+     already divided by the perspective. GL is about to divide by its own,
+     so what it wants is the table BEFORE that — which is the same numbers
+     scaled back by the depth the table layer reports. At the wood, and
+     looking straight ahead, the depth is nought and this is the identity
+     it has always been. */
+  const z = root.__stageZ ? root.__stageZ() : 0;
+  const f = z ? Math.max(0.08, (PERSP - z) / PERSP) : 1;
   const cx = (a.left + b.left) / 2, cy = (a.top + b.top) / 2;
-  const [wx, wy] = toWorld({ left: cx, top: cy, width: 0, height: 0 });
-  tableObj.rotation.set(Math.PI / 2 - tilt(), 0, 0);
-  tableObj.position.set(wx, wy, 0);
-  tableObj.scale.set(dia, dia, dia);
-  placeRoom(wx, wy, dia);
+  const [sx, sy] = toWorld({ left: cx, top: cy, width: 0, height: 0 });
+  const wx = sx * f, wy = sy * f, w = dia * f;
+  /* the slab is round, so a spin about its own normal would be invisible —
+     but the grain is not, and the grain turns with the room */
+  tableObj.rotation.set(Math.PI / 2 - tilt(), -headYaw(), 0);
+  tableObj.position.set(wx, wy, z);
+  tableObj.scale.set(w, w, w);
+  placeRoom(wx, wy, z, w / TABLE_M);
 }
 
 /* ══ THE ROOM, AS A REFLECTION ═════════════════════════════════
@@ -1084,6 +1681,22 @@ function dress(ren) {
      Nothing on a table under a soft lamp has an edge like that. VSM blurs
      the map itself, so `radius` is a real penumbra. */
   ren.shadowMap.type = THREE.VSMShadowMap;
+  /* ── AND IT IS NOT REDRAWN SIXTY TIMES A SECOND ───────────
+     grumkata, twice: "MAJOR Lag like i can barley look around".
+
+     This is the frame's biggest single item and it was being paid for
+     nothing. A VSM map is rendered AND THEN BLURRED, so a 2048 map is
+     about seventeen million texel operations every time it updates —
+     more than the room, the bloom and the grade put together. And three
+     updates it on every render by default.
+
+     But the tavern is furniture: it does not move. What moves is the
+     FIRE, and a fire changes the brightness of a light, not where
+     anything is standing — the shadows it casts are the same shadows.
+     So the map is updated when something actually moved, and a light-only
+     change reuses the one already on the card. */
+  ren.shadowMap.autoUpdate = false;
+  ren.shadowMap.needsUpdate = true;
 }
 
 /* ── THE LAMP OVER THE TABLE ──────────────────────────────────
@@ -1143,8 +1756,14 @@ function casts(o) {
    dielectric with a broad one; the boardgame pieces are painted wood, which
    is a dielectric with a much tighter one because the paint is glossy. */
 const DRESS = {
-  chest: { metal: { mul: [0.30, 0.28, 0.26], rough: 0.34, metalness: 1.0 },
-           wood:  { mul: [1, 1, 1],          rough: 0.68, metalness: 0.0 } },
+  /* AND ITS WOOD IS WOOD. The timber of the chest was at mul [1,1,1] —
+     the atlas straight out of the pack, untouched — which under a studio
+     key on a warm oak table came out a pale cold grey. Next to a tavern
+     lit by a fire it was the one object in the picture that looked like it
+     had been photographed somewhere else. Brought down and warmed to the
+     oak it is standing on. */
+  chest: { metal: { mul: [0.26, 0.23, 0.19], rough: 0.34, metalness: 1.0 },
+           wood:  { mul: [0.60, 0.48, 0.36], rough: 0.68, metalness: 0.0 } },
   /* the KayKit container is a pale cream tray in its own atlas, which on
      dark oak under one warm lamp reads as a polystyrene box someone left on
      the table. Brought down and warmed until it belongs to the room. */
@@ -1164,12 +1783,35 @@ const DRESS = {
      toward the walls, and left rough: plaster and old timber have no
      highlight to speak of, and giving them one is what makes a kit look
      like plastic. */
-  room:  { metal: { mul: [0.42, 0.38, 0.33], rough: 0.92, metalness: 0.0 },
-           wood:  { mul: [0.50, 0.44, 0.37], rough: 0.88, metalness: 0.0 } },
+  room:  { metal: { mul: [0.20, 0.17, 0.14], rough: 0.95, metalness: 0.0 },
+           wood:  { mul: [0.24, 0.20, 0.16], rough: 0.92, metalness: 0.0 } },
   /* the furniture is nearer the eye than the walls and catches the fire,
      so it keeps a little more of itself and a little more sheen */
-  tavern:{ metal: { mul: [0.46, 0.42, 0.36], rough: 0.62, metalness: 0.55 },
-           wood:  { mul: [0.62, 0.55, 0.46], rough: 0.72, metalness: 0.0 } },
+  /* THE FRAME IS A SILHOUETTE. Almost no albedo left, so the posts and
+     the banners on them go black against the fire instead of competing
+     with it — which is the whole job of a framing element. */
+  frame: { metal: { mul: [0.07, 0.06, 0.05], rough: 0.98, metalness: 0.0 },
+           wood:  { mul: [0.09, 0.075, 0.06], rough: 0.97, metalness: 0.0 } },
+  tavern:{ metal: { mul: [0.28, 0.25, 0.21], rough: 0.58, metalness: 0.60 },
+           wood:  { mul: [0.34, 0.29, 0.23], rough: 0.74, metalness: 0.0 } },
+  /* A LAMP HAS TO LOOK LIT. There are five lanterns on the walls and every
+     one of them was a dark lump of tin, because a wall lamp in this room is
+     a MODEL and the light in the room comes from somewhere else entirely.
+     Emissive costs nothing — it is added after the lighting, not another
+     light to evaluate — and it is the difference between a room with lamps
+     in it and a room with lamp-shaped objects in it. */
+  /* A SEAT'S CHAIR IS THE SAME CHAIR AS THE ONES AT THE BAR, and it was
+     coming out cream while they came out oak — because the room is merged
+     into Lambert batches with no environment map and a seat is built one
+     at a time in Standard, which samples the room's own bright environment
+     and lifts it two stops. Same wood, dressed to match what it is
+     standing next to. */
+  seat:  { metal: { mul: [0.17, 0.15, 0.12], rough: 0.72, metalness: 0.3 },
+           wood:  { mul: [0.21, 0.18, 0.14], rough: 0.86, metalness: 0.0 } },
+  glow:  { metal: { mul: [0.42, 0.36, 0.28], rough: 0.5, metalness: 0.5,
+                    emis: [0.52, 0.29, 0.10] },
+           wood:  { mul: [0.60, 0.48, 0.34], rough: 0.8, metalness: 0.0,
+                    emis: [0.62, 0.36, 0.13] } },
   /* THE WOOD PACK IS PINE, AND THIS TABLE IS OAK. The atlas that came with
      it is a bright yellow-orange softwood — correct for the pack, wrong for
      a hall lit by one lamp, where it came out looking like a plastic toy.
@@ -1273,7 +1915,7 @@ function mesh(prims, book, dress) {
       vertexColors: !!p.ao,
       roughness: d.rough,
       metalness: d.metalness,
-      envMapIntensity: metal ? 1.15 : 0.75,
+      envMapIntensity: metal ? (seatedNow ? 0.72 : 1.15) : (seatedNow ? 0.30 : 0.75),
       transparent: false,
       alphaTest: p.cut ? 0.5 : 0,
       /* foliage is a flat card whose SHAPE lives in the texture's alpha */
@@ -1294,7 +1936,6 @@ function sizeCam() {
     uRen.setPixelRatio(Math.min(root.devicePixelRatio, 2));
     uRen.setSize(W, H, false);
     uCv.style.width = W + 'px'; uCv.style.height = H + 'px';
-    sizePost();
   }
   const fov = 2 * Math.atan(H / (2 * PERSP)) * 180 / Math.PI;
   /* ── ROOM FOR A ROOM ──────────────────────────────────────
@@ -1304,7 +1945,7 @@ function sizeCam() {
      the far wall fell straight out the back of the frustum. Widened to
      hold it; the ratio is still modest enough that the depth buffer has
      no trouble separating a cup from the table it stands on. */
-  camera = new THREE.PerspectiveCamera(fov, W / H, 300, PERSP + 2800);
+  camera = new THREE.PerspectiveCamera(fov, W / H, 60, PERSP + 26000);
   /* THE EYE SITS ON THE VANISHING POINT, and where that is on the screen is
      what aim() works out. Everything in this layer is measured in screen
      pixels off the DOM, so world (0,0,0) IS the vanishing point on the
@@ -1326,8 +1967,9 @@ function sizeCam() {
     shadowLight.target.updateMatrixWorld();
   }
   /* the plane the shadows land on: the whole screen, just behind the feet */
-  if (catcher) { catcher.scale.set(W * 3, H * 3, 1); catcher.position.set(0, 0, -2); }
-  if (uCatch) { uCatch.scale.set(W * 3, H * 3, 1); uCatch.position.set(0, 0, -2); }
+  /* and the plane the shadows land on goes with them */
+  if (catcher) { catcher.scale.set(W * 6, H * 6, 1); }
+  if (uCatch) { uCatch.scale.set(W * 6, H * 6, 1); }
   if (uLight) {
     const c = uLight.shadow.camera;
     c.left = -W; c.right = W; c.top = H; c.bottom = -H * 1.4;
@@ -1569,6 +2211,26 @@ function siteOf(el, foot) {
 }
 
 /* draw one model over the rect of the DOM anchor that stands for it */
+/* ── EVERYTHING ON THE WOOD SITS AT THE WOOD'S DEPTH ──────────
+   grumkata: "on table view it looks like the toolbox and bin are floating
+   on top of the table".
+
+   Mine, and recent. Until the room arrived, the middle of the wood was at
+   depth nought and so was everything standing on it — one plane, no
+   argument. Then the wood was given its real depth (it is a third of the
+   lens in front of the film even lying flat) and these were left behind at
+   nought: a hundred and thirty pixels NEARER the camera than the surface
+   they are supposed to be resting on. Their own shadows are cast on a
+   catcher plane at that wrong depth too, so the shadow slides out from
+   under the object, which is the exact visual cue for "this is hovering".
+
+   Same arithmetic as the table: take the measured rect, which is already
+   divided by the perspective, and scale it back by the depth it is really
+   at. Screen position and screen size come out identical — what changes is
+   that the thing is now standing on the floor it appears to stand on. */
+function woodZ() { return root.__stageZ ? root.__stageZ() : 0; }
+function woodF(z) { return z ? Math.max(0.08, (PERSP - z) / PERSP) : 1; }
+
 function stand(obj, anchorId, lean, yaw, el, foot) {
   if (!obj) return;
   const a = el || (anchorId && doc.getElementById(anchorId));
@@ -1580,8 +2242,10 @@ function stand(obj, anchorId, lean, yaw, el, foot) {
   obj.visible = !!p;
   if (!p) return;
   obj.rotation.set(Math.PI / 2 - tilt() - lean, yaw, 0);
-  obj.position.set(p.wx, p.wy, 0);
-  obj.scale.set(p.w, p.w, p.w);
+  const z = woodZ(), f = woodF(z);
+  obj.position.set(p.wx * f, p.wy * f, z);
+  const w = p.w * f;
+  obj.scale.set(w, w, w);
 }
 
 /* ══ COUNTERS THAT STAND UP ════════════════════════════════════
@@ -1825,8 +2489,16 @@ function bit(shape, side, px) {
    And there is a heartbeat. If some future change forgets to call
    invalidate, the cost is one stale half-second, not a frozen table —
    which is the right way round for a bug nobody has made yet. */
-let dirty = 8, beat = 0, drawn = 0;
-function invalidate(n) { dirty = Math.max(dirty, n == null ? 4 : n); }
+let dirty = 8, beat = 0, drawn = 0, overDrawn = false;
+/* `lightOnly` means: draw another frame, but nothing has MOVED — so the
+   shadow maps that are already on the card are still correct. The fire is
+   the only caller, and it is the caller that runs twelve times a second
+   for as long as you are in the room. */
+let shadowDirty = true, shadowAt = 0;
+function invalidate(n, lightOnly) {
+  dirty = Math.max(dirty, n == null ? 4 : n);
+  if (!lightOnly) shadowDirty = true;
+}
 /* Two seconds. Long enough that a still table costs almost nothing, short
    enough that a missed invalidate() shows up as a brief stale patch rather
    than a table that has stopped responding. */
@@ -1865,6 +2537,20 @@ function frame(ts) {
   /* one measurement, not two — this took a rect through onScreen() and then
      another of the same element on the line below. And it is the anchor's
      own middle line now, not the box around its projection: see anchorOf. */
+  /* ── AND THEY DO NOT STAND DOWN ───────────────────────────
+     These used to be hidden the moment you leaned back, on the argument
+     that they are tools for working the table from above and that the
+     over-canvas has no depth test against the room, so seated they would
+     paint over the tavern.
+
+     grumkata, twice: "the toolbox and bin are still dissapearing". He is
+     right and the argument was wrong. They are not a top-down affordance,
+     they are the two things on the table you always need to be able to
+     reach — and the clipping the argument was defending against was never
+     the missing depth test. It was the room being drawn in the wrong
+     place, which is fixed: the chest stands ON the wood, the room is
+     BEHIND the wood, so nothing in the room is ever between you and it
+     and there is nothing for the depth test to have decided. */
   const ar = (vp && !vp.hidden) ? siteOf(a, false) : null;
   chest.visible = !!ar;
   stand(bin, 'tb-bin-prop', 0, 0.5);
@@ -1884,10 +2570,11 @@ function frame(ts) {
        this angle; anything standing on it that uses a different one is
        visibly sinking into it. */
     chest.rotation.set(Math.PI / 2 - tilt(), YAW, 0);
-    chest.position.set(cx, cy, 0);
+    const cz = woodZ(), cf = woodF(cz);
+    chest.position.set(cx * cf, cy * cf, cz);
     /* the model is one unit on its longest side, so its screen size IS the
        anchor's width — it zooms with the table for free */
-    const s = ar.w;
+    const s = ar.w * cf;
     chest.scale.set(s, s, s);
 
     /* the lid eases rather than snapping; the asset's own two extremes */
@@ -1896,15 +2583,64 @@ function frame(ts) {
       lidGroup.quaternion.copy(QS).slerp(QO, lidU);
     }
   }
-  renderer.render(scene, camera);
+  /* ── DON'T SWITCH CONTEXTS FOR AN EMPTY CANVAS ────────────
+     This file runs TWO WebGL contexts — models over the pieces, wood and
+     room under them — and switching between them is one of the more
+     expensive things a frame can do on real hardware, whatever a software
+     renderer says about it. Leaned back, the chest and the bin have stood
+     down and the over-canvas often holds nothing at all; rendering an
+     empty scene still pays the switch. So don't. */
+  let over = chest.visible || (bin && bin.visible) || standees.size > 0;
+  if (!over) for (const id in staged) { if (staged[id].g.visible) { over = true; break; } }
+  /* half a second is the insurance: if some future change moves something
+     without saying so, the shadow is stale for two frames rather than for
+     ever, which is the right way round for a bug nobody has made yet */
+  if ((ts || 0) - shadowAt > 500) shadowDirty = true;
+  if (shadowDirty) {
+    renderer.shadowMap.needsUpdate = true;
+    if (uRen) uRen.shadowMap.needsUpdate = true;
+    shadowAt = ts || 0;
+  }
+  const cz2 = woodZ();
+  if (catcher) catcher.position.set(0, 0, cz2 - 2);
+  if (uCatch) uCatch.position.set(0, 0, cz2 - 2);
+  if (over) { renderer.render(scene, camera); overDrawn = true; }
+  else if (overDrawn) { renderer.clear(); overDrawn = false; }
   if (uRen) {
     placeTable();
     /* a fire is never still, so while the room is up this layer never
        idles — that is the one thing worth the frames in here */
     const t = (ts || 0) / 1000;
-    if (roomGroup && roomGroup.visible) { tickFire(t); invalidate(2); }
+    if (roomGroup) {
+      const u = root.__viewU ? root.__viewU() : 0;
+      showRoom(u > 0.5);
+      roomLook(u);
+      /* ── LOOKING THROUGH THE CEILING ──────────────────────
+         Over the wood the eye is ON the table's normal, so anything
+         hanging above the table — a chandelier, a rafter, a banner — is
+         directly between you and the thing you are working on. That is
+         the board across the view. They come in as you sit back and are
+         gone by the time you are over the table. */
+      /* ── AND THE ROOF COMES ON WHEN YOU ARE UNDER IT ──────
+         This was a guessed number on the travel, and a guessed number is
+         wrong at one end or the other: at 0.28 the eye is still well
+         ABOVE the ridge, so the ceiling was switched on while you were
+         looking down through where it is. What decides it is not how far
+         through the move you are, it is whether your head is under the
+         roof — which is a thing the table layer can simply be asked. */
+      if (overGroup) {
+        const up = root.__eye ? root.__eye().up : 9;
+        overGroup.visible = up < (FLOOR_Y + WALL_H) - 0.15;
+      }
+      /* A FIRE AT TWELVE FRAMES A SECOND. It flickers on its own clock
+         anyway (see the note on Quake light styles), so driving it at
+         sixty only spent frames — and because it invalidated every one
+         of them, the whole layer could never idle. */
+      if (t - fireT > 0.083) { fireT = t; tickFire(t); invalidate(2, true); }
+    }
     drawUnder(t);
   }
+  shadowDirty = false;
 }
 
 function setOpen(v) { lidWant = v ? 1 : 0; invalidate(30); }
@@ -1915,7 +2651,145 @@ function setOpen(v) { lidWant = v ? 1 : 0; invalidate(30); }
 ['pointerdown','pointermove','pointerup','wheel','keydown']
   .forEach(k => root.addEventListener(k, () => invalidate(6), { passive: true, capture: true }));
 
+/* what the room editor needs: the plan, a way to replace it, and the
+   list of everything that could go in it */
+function planRows() { return roomPlan().map(r => Object.assign({}, r)); }
+function planKinds() {
+  const out = { R: [], T: [] };
+  if (typeof ROOM !== 'undefined') out.R = Object.keys(ROOM).sort();
+  if (typeof TAVERN !== 'undefined') out.T = Object.keys(TAVERN).sort();
+  return out;
+}
+/* WHAT THE FRAME ACTUALLY COSTS. grumkata's lag is the one thing left
+   that I cannot reproduce here — this container renders through a software
+   rasteriser, so wall-clock timings measured in it say nothing about his
+   machine. Draw calls, triangles, programs and lights do NOT depend on the
+   renderer, so those are the numbers worth reading, and this is how. */
+function glStats() {
+  const one = (r, sc) => {
+    if (!r) return null;
+    const i = r.info;
+    return { calls: i.render.calls, tris: i.render.triangles,
+             geoms: i.memory.geometries, texs: i.memory.textures,
+             programs: i.programs ? i.programs.length : -1,
+             lights: sc ? sc.children.filter(o => o.isLight).length : -1 };
+  };
+  return { over: one(renderer, scene), under: one(uRen, uScene),
+           roomLights: lit.length };
+}
+root.__glStats = glStats;
+/* every flame that is currently alight, and where. A light burning in
+   clear air is the one room bug that looks like magic rather than a
+   mistake, so it should be one call to check for. */
+root.__flames = () => {
+  const out = [];
+  if (flamePool) for (const f of flamePool) if (f.visible)
+    out.push([+f.position.x.toFixed(2), +f.position.y.toFixed(2), +f.position.z.toFixed(2)]);
+  return out;
+};
+
+/* ══ WHAT IS THAT THING ════════════════════════════════════════
+   The room is merged into five buffers, so a raycast can only ever answer
+   "the oak bucket" — useless for "what is that floating chair". But the
+   room is also a LIST, and every row's place is known exactly, so each one
+   can be pushed through the same transform the renderer uses and asked
+   where it lands on screen.
+
+   Point at a pixel, get the rows nearest it, nearest first. Three guesses
+   at the same complaint is two too many; this is how it should have been
+   settled the first time. */
+root.__what = (sx, sy, n) => {
+  if (!roomGroup || !camera) return [];
+  const rows = roomPlan(), out = [], v = new THREE.Vector3();
+  const W = root.innerWidth, H = root.innerHeight;
+  roomGroup.updateMatrixWorld(true);
+  for (const r of rows) {
+    if (!r.m) continue;
+    const lib = r.p === 'T' ? (typeof TAVERN !== 'undefined' ? TAVERN : null)
+                            : (typeof ROOM   !== 'undefined' ? ROOM   : null);
+    const mm = lib && lib[r.m];
+    if (!mm) continue;
+    /* the middle of the model's own box, so a tall thing reports its middle */
+    let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (const pr of mm.prims) for (let i = 0; i < pr.p.length; i += 3)
+      for (let k = 0; k < 3; k++) { const q = pr.p[i + k];
+        if (q < lo[k]) lo[k] = q; if (q > hi[k]) hi[k] = q; }
+    const sc = r.s == null ? 1 : r.s;
+    const sx3 = r.sx != null ? r.sx : sc, sy3 = r.sy != null ? r.sy : sc,
+          sz3 = r.sz != null ? r.sz : sc;
+    const cx = (lo[0] + hi[0]) / 2 * sx3, cy = (lo[1] + hi[1]) / 2 * sy3,
+          cz = (lo[2] + hi[2]) / 2 * sz3;
+    const th = (r.r || 0) * Math.PI / 180, C = Math.cos(th), S = Math.sin(th);
+    v.set(r.x + cx * C + cz * S, FLOOR_Y + (r.y || 0) + cy, r.z - cx * S + cz * C);
+    roomGroup.localToWorld(v);
+    v.project(camera);
+    const px = (v.x * 0.5 + 0.5) * W, py = (-v.y * 0.5 + 0.5) * H;
+    out.push({ m: r.m, at: [r.x, r.y || 0, r.z], over: r.over ? 1 : 0,
+               px: Math.round(px), py: Math.round(py),
+               d: Math.round(Math.hypot(px - sx, py - sy)) });
+  }
+  /* and the things that are not rows: the seats, and whatever hangs
+     overhead, because a "floating chair" is exactly the sort of thing that
+     would not be in the plan at all */
+  const extra = (g, tag) => { if (!g) return;
+    g.updateMatrixWorld(true);
+    g.children.forEach((o, i) => {
+      o.getWorldPosition(v); v.project(camera);
+      const px = (v.x * 0.5 + 0.5) * W, py = (-v.y * 0.5 + 0.5) * H;
+      out.push({ m: tag + '#' + i, at: [+o.position.x.toFixed(2),
+                 +o.position.y.toFixed(2), +o.position.z.toFixed(2)], over: 0,
+                 px: Math.round(px), py: Math.round(py),
+                 d: Math.round(Math.hypot(px - sx, py - sy)) });
+    });
+  };
+  extra(seatRoot, 'SEAT');
+  extra(overGroup, 'OVERHEAD');
+  if (chest && chest.visible) { chest.getWorldPosition(v); v.project(camera);
+    out.push({ m: 'CHEST', at: [0,0,0], over: 0,
+               px: Math.round((v.x*0.5+0.5)*W), py: Math.round((-v.y*0.5+0.5)*H),
+               d: Math.round(Math.hypot((v.x*0.5+0.5)*W - sx, (-v.y*0.5+0.5)*H - sy)) }); }
+  out.sort((a, b) => a.d - b.d);
+  return out.slice(0, n || 6);
+};
+/* ══ IS THE EYE ACTUALLY FIXED IN THE ROOM? ════════════════════
+   The test that found the reversed yaw, kept because it is the only
+   honest way to ask the question. Everything else about a turn can look
+   plausible while being wrong — the room is roughly symmetric, the table
+   is round, and a scene sliding past at twice the rate reads as "weird"
+   rather than as "the sign is inverted".
+
+   So do not look at it: ask the ROOM where the camera is. Standing still
+   and turning your head means that answer does not change, at any angle,
+   ever. It came back (-0.05, 0.62, 1.24) at nought, at thirty-two and at
+   sixty-four degrees, and that is the whole proof.
+
+   It also reports how far off every seat is, in metres, which settles
+   "that banner looks too close" without squinting at a screenshot. */
+root.__near = () => {
+  const out = [];
+  if (roomGroup && camera) {
+    const o = new THREE.Vector3().setFromMatrixPosition(roomGroup.matrixWorld);
+    const e = roomGroup.worldToLocal(camera.position.clone());
+    out.push({ seat: 'ROOM', at: 0, m: +(o.distanceTo(camera.position) / roomGroup.scale.x).toFixed(3),
+               eyeInRoom: [+e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)],
+               w: +roomGroup.scale.x.toFixed(1) });
+  }
+  if (!seatRoot || !camera) return out;
+  const p = new THREE.Vector3();
+  seatRoot.updateMatrixWorld(true);
+  seatRoot.children.forEach((g, i) => g.traverse(o => {
+    if (!o.isMesh) return;
+    o.getWorldPosition(p);
+    out.push({ seat: i, at: Math.round((g.rotation.y * 180 / Math.PI)),
+               m: +(p.distanceTo(camera.position) / (roomGroup ? roomGroup.scale.x : 1)).toFixed(2),
+               w: +(o.geometry.parameters ? (o.geometry.parameters.width || 0) : 0).toFixed(2) });
+  }));
+  return out;
+};
+
 root.TableGL = { build, setOpen, sync, thumb, bit, onTextures, invalidate, showRoom, lens, syncSeats,
+  planRows, planKinds, setPlan, resetPlan, defaultPlan: () => TAVERN_PLAN.map(r => Object.assign({}, r)),
+  stats: glStats,
   get frames() { return drawn; },
   get waiting() { return waiting; },
   get ready() { return !!renderer; } };

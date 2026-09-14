@@ -23,10 +23,18 @@
        CSS slab in the same stack — put a canvas between them and the floor
        paints straight over the table. #tblu carries the same transform as
        #tbl so the floor still parallaxes with the wood. -->
-  <div id="tblu">
-    <div class="floorboards" style="left:-2700px;top:-1300px;width:8000px;height:5200px"></div>
-    <div class="floor" style="left:60px;top:200px;width:2480px;height:2480px"></div>
-  </div>
+  <!-- EMPTY ON PURPOSE. This used to hold two CSS floors — a wide pale
+       plank layer eight thousand pixels across and a second, different
+       board tucked under the table — and they were right for a table
+       standing in an abstract dark hall. There is a real floor now: the
+       tavern lays its own boards in the GL layer below, from the same pack
+       and under the same lights as the walls. Two floors of different woods
+       at different brightnesses, one of them a square patch under the
+       table, is what grumkata saw as "a different kinda board underneath
+       the table compared to the rest of the room". The element stays
+       because it carries the table's transform for anything that needs to
+       parallax with the wood. -->
+  <div id="tblu"></div>
   <canvas id="tglu"></canvas>
   <div id="tbl">
   <div class="slab round" style="width:2600px;height:2600px"></div>

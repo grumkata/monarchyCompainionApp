@@ -15,7 +15,7 @@
    the view, so it is tested AT THE EDGES on purpose. The second is
    a rule about the table that did not know the field existed.
 ══════════════════════════════════════════════════════════════ */
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const { chromium } = require('playwright');
 const path = require('path');
 const ok = [], bad = [];
 const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL  ') + n); };

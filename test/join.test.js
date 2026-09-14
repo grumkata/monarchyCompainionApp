@@ -3,7 +3,7 @@
 
    This is the test that matters: everything else checks that a part works;
    this checks that the parts are connected, which is what the app was missing. */
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const { chromium } = require('playwright');
 const path = require('path');
 const ok = [], bad = [];
 const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL  ') + n); };

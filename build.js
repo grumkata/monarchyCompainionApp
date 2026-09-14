@@ -17,8 +17,97 @@
      node build.js
 ══════════════════════════════════════════════════════════════ */
 const fs = require('fs'), path = require('path');
+const crypto = require('crypto');
 const { scope } = require('./tools/scope-css.js');
 const R = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
+
+/* ══ THE PICTURES COME OUT ══════════════════════════════════════
+   Every pack bakes its textures into the JavaScript as
+   `data:image/jpeg;base64,...`. That was right while this was one file you
+   could mail to somebody; it stopped being right at the tavern, which
+   carries twenty-seven 1024x1024 JPEGs — four megabytes of picture inside a
+   seven megabyte script.
+
+   A data URI is the worst container an image can have. base64 costs a third
+   on top of the bytes; the bytes go through the JAVASCRIPT parser on the
+   main thread before the browser knows they are a picture; and nothing can
+   start decoding until the whole script has been read. The same picture as a
+   .jpg next to the page is fetched off-thread, decoded off-thread, and never
+   touches the JS parser at all.
+
+   So tools/bake-textures.py writes them to src/assets/tex/ as real files,
+   halved to 512 on the longest edge, and leaves a manifest keyed by the hash
+   of the URI it replaced. This swaps them in as it stitches.
+
+   THE PACK FILES ARE NEVER EDITED. They stay exactly as their bake script
+   wrote them, so re-baking a pack is still safe — you just re-run
+   bake-textures.py afterwards to pick up the new pictures. Anything not in
+   the manifest is left inline and reported, so a forgotten re-run is a
+   slightly fatter build and a line of output, never a missing texture. */
+/* ══ AND THE VERTICES GO BINARY ════════════════════════════════
+   The other five megabytes. A baked pack writes its vertices as decimal
+   text — `"p":[0.4399,1.2643,-0.4406,...]` — and every one of those numbers
+   is read by the JavaScript parser to make a double that is immediately
+   truncated into a Float32Array. tools/pack-geometry.js replaces each
+   geometry literal with one base64 blob and a JSON skeleton of descriptors;
+   src/js/00-geo-runtime.js reads them back as typed array views.
+
+   The map is `global name per pack file`, and only the geometry ones are
+   listed: 36-sprite-assets is pictures end to end, and 02-charge-assets is
+   SVG path strings, so neither has a vertex to pack.
+
+   A pack that fails to pack is REPORTED AND LEFT ALONE. A wrong vertex is
+   far worse than a fat one, so pack-geometry checks every array it writes
+   against the numbers it replaced and refuses rather than guesses. */
+const GEO_PACKS = {
+  '01-castle-assets.js': 'CASTLE',
+  '20-chest-asset.js':   'CHEST',
+  '19-bin-asset.js':     'BIN3D',
+  '17-wood-assets.js':   'WOOD',
+  '18-bits-assets.js':   'BITS',
+  '33-dice-assets.js':   'DICE_ASSETS',
+  '35-kit-assets.js':    'KIT',
+  '52-room-assets.js':   'ROOM',
+  '53-tavern-assets.js': 'TAVERN'
+};
+const { pack } = require('./tools/pack-geometry.js');
+let geoWas = 0, geoNow = 0, geoArrays = 0;
+const geoNotes = [];
+function repack(src, file) {
+  const name = GEO_PACKS[path.basename(file)];
+  if (!name) return src;
+  let r;
+  try { r = pack(src, name); }
+  catch (e) { geoNotes.push(`${path.basename(file)}: ${e.message}`); return src; }
+  if (!r) return src;
+  if (r.error) { geoNotes.push(`${path.basename(file)}: ${r.error}`); return src; }
+  geoWas += r.stats.wasText; geoNow += r.stats.nowText; geoArrays += r.stats.arrays;
+  return r.js;
+}
+
+const TEX_DIR  = path.join(__dirname, 'src/assets/tex');
+const TEX_MAP  = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(TEX_DIR, 'manifest.json'), 'utf8')); }
+  catch (e) { return null; }
+})();
+const DATA_URI = /data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g;
+
+/* A picture small enough to be cheaper inline than as a round trip stays
+   inline, and is not worth a warning. 32-combat-app.js's 1x1 transparent GIF
+   — the one that suppresses the browser's drag ghost — is 62 bytes, and
+   making the browser go and fetch it would make dragging worse, not better. */
+const INLINE_OK = 2048;
+
+let texHit = 0, texMiss = 0, texWas = 0, texNow = 0;
+function unpicture(src) {
+  if (!TEX_MAP) return src;
+  return src.replace(DATA_URI, uri => {
+    const to = TEX_MAP[crypto.createHash('sha1').update(uri).digest('hex')];
+    if (!to) { if (uri.length > INLINE_OK) texMiss++; return uri; }
+    texHit++; texWas += uri.length; texNow += to.length;
+    return to;
+  });
+}
 
 /* Load order is load-bearing, so it is written down rather than globbed:
    adding a file is a decision, not an accident. */
@@ -35,6 +124,7 @@ const CSS = [
 const JS = [
   'src/js/29-role.js',           // which side of the table you are
   'src/js/00-three.js',          // vendor
+  'src/js/00-geo-runtime.js',    // reads the packed vertices; needs THREE, precedes every pack
   'src/js/01-castle-assets.js',  // Castle Pack, baked by tools/bake_castle.py
   'src/js/02-charge-assets.js',  // heraldic charges (game-icons.net, CC BY 3.0)
   'src/js/20-chest-asset.js',    // AnimatedChest, baked by tools/bake_chest.py
@@ -66,6 +156,7 @@ const JS = [
   'src/js/22-table-model.js',
   'src/js/23-table3d.js',        // viewport: pan, zoom, prop drag, lock-in
   'src/js/24-table-props.js',
+  'src/js/54-room-editor.js',  // place the tavern by hand
   'src/js/48-library.js',        // what there is to put on the table
   'src/js/49-pictures.js',       // getting a picture in, and its real shape
   'src/js/46-figures.js',        // what a thing looks like before it is a thing
@@ -110,7 +201,7 @@ const body =
    way the work does, pausing on the big asset files, because that is what
    is happening. */
 const tail = JS.map((f, i) =>
-  `<script>\n/* ${path.basename(f)} */\n${R(f)}\n</script>\n` +
+  `<script>\n/* ${path.basename(f)} */\n${repack(unpicture(R(f)), f)}\n</script>\n` +
   `<script>window.__boot&&__boot(${i + 1},${JS.length})</script>`).join('\n');
 
 const LOADING = `
@@ -189,5 +280,43 @@ ${tail}
 
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(__dirname, 'dist/monarchy.html'), html);
+
+/* The pictures have to travel with the page. electron/main.js does
+   loadFile(dist/monarchy.html), so `assets/tex/x.jpg` resolves next to it —
+   and electron-builder ships the whole of dist, so they are in the .exe too.
+   Copied rather than symlinked: a symlink does not survive packaging. */
+let copied = 0, copiedBytes = 0;
+if (TEX_MAP) {
+  const to = path.join(__dirname, 'dist/assets/tex');
+  fs.mkdirSync(to, { recursive: true });
+  const want = new Set(Object.values(TEX_MAP).map(p => path.basename(p)));
+  /* Stale pictures are deleted, not left to rot: a renamed or re-baked
+     texture would otherwise sit in dist for ever and ride into the build. */
+  for (const f of fs.readdirSync(to)) if (!want.has(f)) fs.unlinkSync(path.join(to, f));
+  for (const f of want) {
+    const src = path.join(TEX_DIR, f), dst = path.join(to, f);
+    if (!fs.existsSync(src)) { console.log(`  !! missing ${f} — run tools/bake-textures.py`); continue; }
+    const s = fs.statSync(src);
+    /* mtime+size is enough to skip a copy here and keeps rebuilds instant */
+    if (!fs.existsSync(dst) || fs.statSync(dst).size !== s.size) fs.copyFileSync(src, dst);
+    copied++; copiedBytes += s.size;
+  }
+}
+
 console.log(`dist/monarchy.html  ${(html.length / 1024 / 1024).toFixed(2)} MB  ` +
             `(${CSS.length} css, ${JS.length} js)`);
+if (geoArrays) {
+  console.log(`  vertices            ${geoArrays} arrays, ` +
+              `${(geoWas / 1048576).toFixed(2)} MB of number literals -> ` +
+              `${(geoNow / 1048576).toFixed(2)} MB binary`);
+}
+for (const n of geoNotes) console.log(`  !! geometry left as text — ${n}`);
+if (TEX_MAP) {
+  console.log(`dist/assets/tex     ${(copiedBytes / 1024 / 1024).toFixed(2)} MB  ` +
+              `(${copied} pictures, ${(texWas / 1048576).toFixed(2)} MB of base64 lifted out)`);
+  if (texMiss) console.log(`  !! ${texMiss} picture(s) not in the manifest, left inline — ` +
+                           `run: python tools/bake-textures.py`);
+} else {
+  console.log('  !! no src/assets/tex/manifest.json — every picture is inline. ' +
+              'Run: python tools/bake-textures.py');
+}

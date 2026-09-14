@@ -1554,3 +1554,96 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 
 /* one switch for the whole thing, for when you want to see it raw */
 body.nograde #grade, body.nograde #grain{ display:none }
+
+/* ══════════════════════════════════════════════════════════════
+   THE ROOM EDITOR — grumkata's hands on the tavern
+
+   Deliberately small, dark and cornered. It is a tool you hold while
+   looking past it at the room, so it must not become the thing you are
+   looking at: no scrim, no modal, nothing that dims the scene it exists
+   to judge. It sits above the model canvases (#tgl is 870) because a
+   chandelier painting over the list would make it unusable.
+══════════════════════════════════════════════════════════════ */
+#room-ed{
+  position:fixed; left:14px; top:14px; z-index:960;
+  width:264px; max-height:calc(100vh - 28px); display:flex; flex-direction:column;
+  background:linear-gradient(176deg,rgba(34,25,16,.97) 0%,rgba(20,14,9,.97) 100%);
+  border:1px solid #4a3418;
+  box-shadow:0 22px 54px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,224,172,.14);
+  color:#e8dfc8; font-family:'Crimson Text',serif;
+}
+#room-ed[hidden]{ display:none }
+
+.re-head{
+  display:flex; align-items:center; gap:8px; padding:7px 10px;
+  background:linear-gradient(180deg,#553d1d,#33240f);
+  border-bottom:1px solid #241708;
+  box-shadow:inset 0 1px 0 rgba(255,224,172,.22);
+  font-family:'Cinzel',serif; font-size:10px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; color:#f4e8cc;
+}
+.re-head .re-x{
+  margin-left:auto; background:transparent; border:0; cursor:pointer;
+  color:rgba(244,232,204,.55); font-size:13px; line-height:1; padding:2px 3px;
+}
+.re-head .re-x:hover{ color:#ffd9b0 }
+
+/* the list is the room, in the order it is built */
+.re-list{
+  flex:1 1 auto; min-height:90px; max-height:38vh; overflow-y:auto;
+  padding:4px 0; border-bottom:1px solid rgba(232,201,138,.14);
+}
+.re-row{
+  display:block; width:100%; text-align:left; cursor:pointer;
+  padding:3px 10px; border:0; background:transparent;
+  font-family:'Crimson Text',serif; font-size:12px;
+  color:rgba(232,223,200,.62); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.re-row:hover{ color:#f4e8cc; background:rgba(232,201,138,.06) }
+.re-row.on{
+  color:#ffd9b0; background:rgba(201,116,62,.16);
+  box-shadow:inset 2px 0 0 #c9743e;
+}
+
+.re-fields{ padding:8px 10px 4px; display:flex; flex-wrap:wrap; gap:6px 8px }
+.re-fields[hidden]{ display:none }
+.re-fields label{
+  flex:1 1 44%; display:flex; align-items:baseline; gap:5px;
+  font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; color:rgba(232,201,138,.55);
+}
+.re-fields input{
+  flex:1 1 auto; width:100%; min-width:0;
+  font-family:'Crimson Text',serif; font-size:13px; color:#f4e8cc;
+  background:rgba(0,0,0,.3); border:0;
+  border-bottom:1px solid rgba(232,201,138,.24);
+  outline:0; padding:2px 4px; border-radius:0;
+}
+.re-fields input:focus{ border-bottom-color:#c9743e; background:rgba(201,116,62,.12) }
+.re-hint{
+  flex:1 1 100%; margin-top:2px;
+  font-style:italic; font-size:11px; color:rgba(232,223,200,.34);
+}
+.re-hint b{ font-style:normal; color:rgba(232,201,138,.62) }
+
+.re-add, .re-foot{
+  display:flex; gap:5px; padding:7px 10px;
+  border-top:1px solid rgba(232,201,138,.14);
+}
+.re-add select{
+  flex:1 1 auto; min-width:0;
+  font-family:'Crimson Text',serif; font-size:12px; color:#f4e8cc;
+  background:rgba(0,0,0,.34); border:1px solid rgba(232,201,138,.24);
+  outline:0; padding:3px 4px; border-radius:0;
+}
+#room-ed button:not(.re-x){
+  flex:0 0 auto; cursor:pointer; transition:.13s;
+  font-family:'Cinzel',serif; font-size:7px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase;
+  color:rgba(244,232,204,.8); background:transparent;
+  border:1px solid rgba(244,232,204,.28); padding:4px 7px;
+}
+#room-ed button:not(.re-x):hover{ color:#fff6e2; border-color:#d8b268 }
+#room-ed .re-foot button{ flex:1 1 auto }
+#room-ed #re-del:hover{ color:#ffb9a4; border-color:#c9743e }

@@ -25,18 +25,40 @@
    hand, on the wood, before it is anywhere else. The choice must be
    makeable while it is in your hand. A scene must land fitted.
 ══════════════════════════════════════════════════════════════ */
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const { chromium } = require('playwright');
 const path = require('path');
 const ok = [], bad = [];
 const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL  ') + n); };
 
 (async () => {
-  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+  const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox','--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const pg = await b.newPage({ viewport: { width: 1500, height: 950 } });
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
   const file = 'file://' + path.join(__dirname, '../dist/monarchy.html');
   const st = () => pg.evaluate(() => JSON.parse(JSON.stringify(window.TableModel.state)));
   const wait = ms => pg.waitForTimeout(ms);
+  /* ── CLICK WITH THE MOUSE, NOT WITH page.click ─────────────
+     page.click waits for "scheduled navigations to finish" after it has
+     already dispatched, and against this page that wait is a coin toss:
+     the tavern's fire drives the render loop continuously, this container
+     has no GPU to run it on, and the main thread is pinned hard enough
+     that Playwright's own post-click check cannot get an answer inside
+     thirty seconds. Nothing is wrong with the click — the same press sent
+     as real mouse events opens the chest every time.
+
+     So press it like a person does. Same events, same order, no wait on a
+     navigation that is never coming. */
+  const press = async sel => {
+    const r = await pg.evaluate(s => {
+      const e = document.querySelector(s); if (!e) return null;
+      const b = e.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }, sel);
+    if (!r) throw new Error('nothing to press: ' + sel);
+    await pg.mouse.move(r.x, r.y);
+    await wait(60);
+    await pg.mouse.down(); await wait(70); await pg.mouse.up();
+  };
 
   await pg.goto(file);
   await wait(900);
@@ -86,16 +108,21 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
           && Math.abs(r.y - window.Table3D.TH / 2) < 6;
     }));
 
-  T('and it stands on a floor at its own depth, so panning parallaxes',
+  /* THE FLOOR IS THE TAVERN'S NOW. This used to assert a CSS plank layer
+     inside #tblu, which was the right answer while the table stood in an
+     abstract dark hall. The room lays real boards in the GL layer, from the
+     same pack and under the same lights as its walls — and having both was
+     what grumkata saw as "a different kinda board underneath the table
+     compared to the rest of the room". So the assertion is that there is
+     exactly ONE floor, it is the room's, and the wood still stands at a
+     depth of its own, which is what parallaxes. */
+  T('and it stands on the room\'s own floor, at a depth of its own',
     await pg.evaluate(() => {
-      const f = document.querySelector('.floorboards');
-      if (!f) return false;
-      /* the floor lives BELOW the table canvas now (#tblu, z-index 0) — inside
-         #tbl it painted straight over the wood and the table was invisible */
-      if (!f.closest('#tblu')) return false;
-      /* the browser hands back a matrix3d; m43 is the z translation */
-      const m = getComputedStyle(f).transform.match(/matrix3d\(([^)]+)\)/);
-      return !!m && parseFloat(m[1].split(',')[14]) < -300;
+      if (document.querySelector('.floorboards')) return false;
+      if (document.querySelector('#tblu .floor')) return false;
+      const rows = window.TableGL.planRows();
+      if (!rows.some(r => r.k === 'floor')) return false;
+      return Math.abs(window.__stageZ()) > 40;
     }));
 
   /* THE ROOM. The fit used to run the slab edge to edge with the viewport, so
@@ -141,7 +168,7 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   T('the bar is down to begin with', await pg.evaluate(() =>
     !window.Hand.isUp() && !document.querySelector('.hb.up')));
 
-  await pg.click('#tb-anchor', { force: true });
+  await press('#tb-anchor');
   await wait(700);
   T('opening the chest brings the bar up', await pg.evaluate(() =>
     window.Hand.isUp() && !!document.querySelector('.hb.up')
@@ -327,7 +354,7 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     typeof S !== 'undefined' && S.lines.length === 8 && S.width === 12));
 
   /* ══ A PIECE, WHERE YOU PUT IT ═════════════════════════════ */
-  await pg.click('#tb-anchor', { force: true });
+  await press('#tb-anchor');
   await wait(600);
   await pg.evaluate(() => window.Hand.take(
     window.Toolbox.options('people').find(o => o.name === 'Aldric Vane')));
