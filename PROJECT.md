@@ -684,6 +684,108 @@ Added 2026-07-13. The app is no longer distributed as a plain HTML file —
 - **`release/`** is the output directory (gitignore it — it's large,
   ~85-130MB per platform, and fully regenerable via `npm run dist`).
 
+### 3.12 Distribution: auto-update (2026-09-15)
+
+Real binary auto-update, via `electron-updater` — not to be confused with
+a separate, unrelated `updater.js` that briefly sat at the repo root: a
+hand-rolled scheme that polled the GitHub Releases API for a `content.zip`
+and hot-patched just the web content inside a fixed shell. grumkata chose
+the real thing instead (full package replacement) over that content-patch
+approach; the old file is still there, **unused**, kept only until someone
+decides it's worth deleting. `electron/updater.js` is the one that's wired
+in.
+
+- **Only the `nsis` Windows target actually auto-updates.**
+  electron-updater's Windows mechanism works by having the installed
+  NSIS uninstaller silently re-run a newer installer in place — there is
+  no equivalent for the `portable` target (also shipped, see 3.11), which
+  is just a standalone .exe someone downloaded and runs directly. A
+  player on the portable build will never auto-update; they have to grab
+  a new copy by hand. This is a property of how NSIS auto-update works,
+  not a limitation of anything written here — nothing can fix it short of
+  dropping the portable target.
+- **Where it lives**: `electron/updater.js` wraps `autoUpdater` from
+  `electron-updater` (a real npm dependency — see the note below on why
+  that classification matters) and is called once from `main.js`, after
+  `createWindow()`, inside the same `app.whenReady()` block. AFTER the
+  window on purpose: grumkata chose checking quietly in the background
+  over blocking startup on it, and `autoDownload`/`autoInstallOnAppQuit`
+  (both default `true`) already do almost exactly that on their own —
+  download while the session continues, install on the next natural quit.
+  The native OS "update available" toast electron-updater can show by
+  itself (`checkForUpdatesAndNotify()`) is deliberately skipped in favor
+  of `checkForUpdates()` plus console logging, for the same reason this
+  app removed the default menu bar and hides its own chrome: a system
+  toast reads as a webpage/Electron tell, not as a real desktop app.
+  Every event also logs to the console, the same place every other
+  failure in this app already reports (see `glFailed()` in
+  `27-table-gl.js` for one).
+- **The in-app UI is a popup on the hall, not anything in Settings.**
+  First built inside Settings (a version line + a "Check for Updates"
+  button) and then deliberately moved — grumkata: the hall is the one
+  screen every session actually passes through, whether or not anyone
+  ever opens Settings at all, and that's exactly the point of a
+  background-checked update: nobody should have to go looking for it.
+  `#update-card` (`menu-body.html`) sits top-right, hidden until
+  `16-menu.js`'s status listener sees `state: 'downloaded'` — every other
+  state (`checking`/`available`/`downloading`/`error`) is silent on
+  purpose, since none of them are anything a player needs to act on.
+  Two buttons, both plain `.lk`: "Restart & update" calls
+  `autoUpdater.quitAndInstall()` (via IPC), "Later" just hides the card
+  for this session — installing on the next natural quit was already
+  going to happen regardless (`autoInstallOnAppQuit`), so "Later" costs
+  nothing. `z-index:50` — above the hall's own chrome (`#ui` is `z:2`)
+  but below the record screen (`#screen` is `z:20`, `.back` is `z:24`),
+  so opening anything covers it and it's there again the moment you
+  return to the bare hall. Deliberate, not a gap: this was asked for on
+  the *starting* screen specifically, not as a thing that follows you
+  everywhere.
+- **`electron/preload.js`** is new — this app had no preload at all
+  before this. `contextIsolation: true` and `sandbox: true` stay exactly
+  as they were; the preload opens exactly one hole in that seal,
+  `window.AppUpdate` (`onStatus`/`checkNow`/`restartNow`), via
+  `contextBridge`. It's undefined anywhere this HTML runs without that
+  preload attached — `test/serve.js`'s plain browser, or the bare
+  `BrowserWindow` `tools/shot.js` opens for screenshots — and every
+  consumer in `16-menu.js` checks for it before touching it, for exactly
+  that reason.
+- **Guarded against dev runs**: `setupAutoUpdater()` no-ops immediately if
+  `!app.isPackaged`. Unpackaged (`npm start`, or anything driven through
+  `tools/shot.js`/`test/serve.js`), there is no `app-update.yml` for
+  electron-updater to read and nothing meaningful to compare against — it
+  throws rather than silently skipping if you let it try. Confirmed
+  quiet: `npm start` logs `[updater] skipped — not a packaged build`
+  immediately after the window opens and touches nothing else.
+- **`electron-updater` is a real `dependencies` entry, not
+  `devDependencies`.** It `require()`s inside `electron/updater.js`, which
+  runs in the packaged app's own main process at runtime — and
+  electron-builder strips devDependencies out of the asar it builds. Get
+  this wrong and `npm start` still works fine (dev pulls straight from a
+  fully-populated `node_modules`), which is exactly what makes it a trap:
+  the packaged .exe would throw `Cannot find module 'electron-updater'`
+  the first time a real player launched it, and nothing in a normal dev
+  session would ever surface that before it shipped.
+- **`build.publish`** (in `package.json`) is now set to the `github`
+  provider, pointed at this repo. Adding it does **nothing** to what
+  `npm run dist` does today — it still only builds locally into
+  `release/`, exactly as before. It only takes effect the moment
+  something either (a) runs electron-builder with an explicit publish
+  flag and a `GH_TOKEN`, which uploads the installer plus a generated
+  `latest.yml` to a GitHub Release, or (b) a packaged app calls
+  `checkForUpdates()`, which reads that same config to know where to
+  look. **No release, tag, or token was created as part of this work** —
+  cutting an actual update is a distribution decision, made deliberately,
+  not a side effect of writing the updater.
+- **What actually publishing an update requires**, once ready: bump
+  `package.json`'s `"version"` (electron-updater compares against
+  `app.getVersion()`, which reads straight from it — nothing here bumps
+  it automatically, and forgetting to is the one way this whole mechanism
+  goes quiet with nothing to report), then build and publish with a
+  `GH_TOKEN` environment variable set (a GitHub personal access token with
+  permission to upload release assets on this repo) — e.g.
+  `GH_TOKEN=... npx electron-builder --publish always` after
+  `node build.js`. That step was intentionally not run or scripted here.
+
 ---
 
 ## 4. Game system summary (content, not code)
@@ -869,6 +971,8 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-15 | **In-app update UI**, on the hall rather than in Settings — grumkata's correction after a first pass put it there. `electron/preload.js` (new: this app had no preload before) exposes `window.AppUpdate` over `contextBridge`, `electron/updater.js` now pushes a status object on every electron-updater event, and `#update-card` in `menu-body.html` shows itself only for `state:'downloaded'` — a small top-right popup with "Restart & update" (calls `quitAndInstall()`) and "Later" (dismisses for the session; the update installs on the next quit regardless). Verified with a fake preload standing in for the real one, so a `'downloaded'` push could be fired without an actual GitHub release to test against — screenshotted showing correctly on the bare hall, clear of the banners and `#arms`. Full `npm test` (119/119) green throughout. See 3.12. |
+| 2026-09-15 | **Real auto-update wired in**, via `electron-updater` against this repo's GitHub Releases — `electron/updater.js`, called from `main.js` after the window opens (checks and downloads quietly in the background, installs on the next natural quit, per grumkata's choice over blocking startup). Chosen over an earlier hand-rolled `updater.js` (still at the repo root, now unused) that only ever hot-patched web content inside a fixed shell; this instead replaces the whole packaged app via the `nsis` installer target — the `portable` target has no equivalent mechanism and cannot auto-update, a real limitation of NSIS rather than of this code. `electron-updater` added as a genuine `dependencies` entry (not `devDependencies` — it runs in the packaged app's own main process, and electron-builder strips devDependencies from the asar), and `package.json`'s `build.publish` now points at the `github` provider for this repo, which changes nothing about what `npm run dist` produces today and only matters once an actual publish (with a `GH_TOKEN`) or a running app's own update check reads it. No release, tag, or token was created or touched. Verified: syntax-checked, and confirmed live via `npm start` that the updater guard fires correctly and silently in an unpackaged dev run (`[updater] skipped — not a packaged build`) with no effect on normal startup; full `npm test` suite unaffected. See 3.12. |
 | 2026-09-14 | **Deleted the previous generation.** `src/index.html` and the 32 CSS/JS files only it loaded had been unbuilt for months — `build.js` names every file it stitches, and none of them were on the list, so the shipped app had not contained a line of them in a long time. Removing them changed `dist/monarchy.html` by zero bytes, which is the proof they were dead. Gone with them: `test/smoke.js` and `test/multi-sheet.test.js` (both asserted on `WM`, both already failing, neither in `npm test`), `extract.py` (a one-time migration that reads an `original.html` no longer in the repo), `_canary.txt`, and `src/assets/images` (3 SVGs referenced only by the old entry point). **Features that went with that generation and are NOT rebuilt:** live GM/player sync, GM tools, fog of war, the window manager, multi-sheet editing — recorded in 2.1 rather than left to be discovered. **`firebase` dropped from `dependencies`**: nothing in the current source imports it, and electron-builder was bundling 45 MB of it into every installer (979 entries in the 129 MB `app.asar`) for the sync layer the hall's own Join screen says is not built. **Dead code inside the live files:** `27-table-gl.js` carried a whole post-processing chain — bright-pass, two blur passes, an ACES/split-tone/vignette/grain grade, three render targets, ~190 lines — behind `postReady`, and `buildPost()` was never called, so the condition could not fire and `drawUnder` had been taking the plain branch the whole time. The author's own note on it (measured: 14ms with the GL canvases hidden, 3001ms with them on, and `#grade` in table-body.html already grading the whole composite) had been pasted ABOVE the file's header, outside the IIFE, as a second `drawUnder` whose `uRen`/`uScene` did not even resolve — dead and unreachable. Both removed, the reasoning kept. Also `wallAt()` and `BIN_KEEPS`, the only two genuinely unreferenced symbols in the whole live source: a sweep of every top-level function found 14 candidates and 13 were false positives, called from template literals. **`tools/` cut from 20 files to 9**: the eleven `shot-*`/`dbg-*`/`diag` scripts all required playwright from `/home/claude/.npm-global/...` and opened `file:///tmp/mon/dist/monarchy.html`, paths inside a container that no longer exists, so not one could run. Replaced by `tools/shot.js`, which is Electron rather than Playwright because three.js does not set `preserveDrawingBuffer` — a Playwright screenshot reads an already-cleared buffer and produces a black page with the DOM chrome drawn on top, which looks like a broken app rather than a broken camera. **CSS was left alone on purpose:** 34 class names are never mentioned anywhere, but they are worth 1.9 KB of 290 KB and zero removable rules in the two largest sheets, and the `t3-*` family among them is built by concatenation in `24-table-props.js` (`'prop t3-thing t3-' + t.kind`), so the analysis that flagged them is exactly wrong about those. Not worth the risk. Verified: `dist/monarchy.html` unchanged at 4.24 MB through every step, 119 tests green, hall and table screenshots unchanged. |
 | 2026-09-14 | **The assets came out of the JavaScript.** `dist/monarchy.html` was 15.28 MB and every byte of it was parsed on the main thread before the page could show anything — the long white pause `build.js` has been apologising for since the tavern arrived. Two things were in there that had no business being in a script. **The pictures:** every pack baked its textures in as `data:image/jpeg;base64,...`, 7.60 MB of it, of which 5.42 MB was the tavern's twenty-seven 1024×1024 albedos. base64 costs a third on top of the bytes, the bytes go through the *JavaScript* parser before the browser knows they are a picture, and nothing can start decoding until the whole script has been read. New `tools/bake-textures.py` writes them to `src/assets/tex/` as real files at 512 on the longest edge, named by content hash so a picture shared by two packs is stored once; `build.js` swaps the URIs for paths as it stitches and copies the folder into `dist/`. Textures are now also *lazy for free* — `TextureLoader` only fires when a mesh is built, so opening the hall fetches none of them. **The vertices:** 5.61 MB of decimal number literals, each read by the parser into a double and immediately truncated into a `Float32Array`. New `tools/pack-geometry.js` replaces each geometry literal with one base64 blob plus a JSON skeleton of descriptors — positions 16-bit over each prim's own bounding box, normals 8-bit, UVs 16-bit, indices bit-exact — and new `src/js/00-geo-runtime.js` reads them back as typed-array views (one `atob` per pack instead of the parser walking five megabytes). **Neither tool edits a pack file**: both transform in memory inside `build.js`, so re-baking with the Python tools stays safe — just re-run `bake-textures.py` afterwards. Result: **15.28 MB → 4.24 MB page + 2.25 MB of images**, DOMContentLoaded 835 → 559 ms, texture decode 27.2 → 6.9 megapixels, textures settled 499 → 262 ms. Two judgement calls worth keeping: a PNG stays a PNG (`CASTLE.tex.Walls` is tiled 12×22 by `13-hall3d.js`, and JPEG's 8×8 blocks would print 264 copies of the same seam), and `32-combat-app.js`'s 1×1 drag-ghost GIF stays inline because fetching it would make dragging worse. Also: `setIndex` is widened once in `00-geo-runtime.js` to accept a typed array — it previously assigned one straight to `.index`, producing a geometry that silently drew nothing. New `test/geometry.test.js` decodes all 210 prims with the *browser's own* decoder and fails the build if any array drifts past tolerance (worst seen: positions 7.6e-6 of prim extent, normals 0.22°, indices exact); wired into `npm test`, which also had three test files unblocked — they hardcoded `/home/claude/.npm-global/lib/node_modules/playwright`. Still on the table: `WOOD` carries 46% duplicate vertex positions and `CASTLE` 63%, so welding on the full (p,n,u) tuple would cut geometry again — not done here because it can change shading and wanted its own verification pass. Verified: 74-file syntax sweep, `geometry.test.js` 210/210, `table.test.js` 23/23, hall and table screenshots pixel-identical to the 15 MB build. |
 | 2026-08-21 | **Phase 0 of the completion plan** (see `claude/completion-plan.md` in the Claude project, or https://claude.ai/code/artifact/766e657a-1c35-4352-bb22-aa0c6acfacae). **P0-1:** every client now signs in anonymously before the database connection opens — new `_uid`/`getMyUid()` in `09-session-sync.js`, `signInAnonymously()` inside `_ensureFirebase()` (returns `false` and reports loudly if it fails, since everything downstream needs an identity), an `owners` **set** of uids claimed by the first host of an unclaimed table (a set, not a single `owner` field: anonymous uids are per-browser-profile, so a single value would lock you out of your own table from a second machine), and a `uid` field on `serializePlayerVitals()`. Player/presence nodes are still keyed by display name on purpose — the name is load-bearing in five places (node keys, `chip.dataset.linkedPlayer`, `_connectedPlayers`, `cmd.target` matching in `_applyGmCommands`, and the `updateGmPlayerLinkDropdowns()` option values), so the uid rides *inside* the node instead. Also fixed a real latent bug in `index.html`'s SDK loader: app/database compat were loaded in parallel via `Promise.all`, but dynamically-inserted scripts are async, and database-compat needs the `firebase` global app-compat creates — if database won the race it threw `ReferenceError`, which `onerror` does *not* catch, so `__firebaseSdkReady` resolved `true` with a missing SDK. Now app loads first, then database + auth in parallel. **P0-3:** Health and Stamina round up (`Math.ceil`) per the rules instead of `Math.round`/`Math.floor`; Health's missing `+ Resilience` term is deliberately deferred to plan task P1-3. **P0-4:** both dead monkey-patches deleted (Known Issues 1 and 8). **P0-5:** `dist/` gitignored, settling the open question left by the 07-19 entry. Requires **Anonymous sign-in enabled** in the Firebase console; sync refuses to start without it. Still open: security rules are `.read`/`.write: true` on `servers/$serverId` — anyone with a table ID has full access. That's plan task P0-2. Verified: full JS syntax sweep, `node build.js`, `npm test` 30/30 smoke + 18/18 multi-sheet, exit 0. |

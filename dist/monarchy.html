@@ -293,7 +293,26 @@ body.at-table .to-hall { display: block; }
   background:#f4e8cc;color:#1a1109;padding:12px 24px;font-size:11px;font-weight:700;
   letter-spacing:.18em;text-transform:uppercase;opacity:0;pointer-events:none;
   transition:opacity .18s;box-shadow:0 8px 24px rgba(0,0,0,.6)}body.at-hall .toast.show{opacity:1}
-@media (prefers-reduced-motion:reduce){body.at-hall *{animation-duration:.01ms!important}}/* ── every picker is a grid of the thing itself, drawn ── */body.at-hall .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}body.at-hall .swgrid.tall{max-height:268px;overflow-y:auto;padding:4px;
+@media (prefers-reduced-motion:reduce){body.at-hall *{animation-duration:.01ms!important}}/* ══ THE UPDATE CARD ═══════════════════════════════════════════
+   Shown only once electron/updater.js reports a downloaded update — see
+   16-menu.js, which is the only thing that ever sets this to
+   display:flex. Top-right, clear of the lintel, the banners, and #arms
+   in the opposite corner.
+
+   z:50 sits above the hall's own chrome (#ui is z:2) but below the
+   record screen (#screen is z:20, .back is z:24) — opening anything
+   covers it, and it's there again the moment you return to the bare
+   hall. That is deliberate, not a gap to fix: grumkata asked for this
+   on the STARTING screen specifically, not as something that follows
+   you everywhere, and the update installs on the next quit regardless
+   of whether this is ever seen (autoInstallOnAppQuit, see updater.js) —
+   so nothing is lost by it being covered while you're doing something
+   else. */body.at-hall #update-card{position:fixed;top:24px;right:28px;z-index:50;
+  display:flex;flex-direction:column;gap:10px;max-width:280px;
+  padding:16px 18px;background:rgba(18,10,5,.82);
+  border:1px solid rgba(255,214,150,.4);
+  box-shadow:0 10px 28px rgba(0,0,0,.6)}body.at-hall #update-card .uc-txt{font-family:'Crimson Text',serif;font-style:italic;
+  font-size:15px;color:rgba(255,246,226,.86)}body.at-hall #update-card .uc-row{display:flex;gap:8px;flex-wrap:wrap}/* ── every picker is a grid of the thing itself, drawn ── */body.at-hall .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}body.at-hall .swgrid.tall{max-height:268px;overflow-y:auto;padding:4px;
   border:1px solid rgba(255,214,150,.16);background:rgba(0,0,0,.20)}body.at-hall .swgrid.tall::-webkit-scrollbar{width:4px}body.at-hall .swgrid.tall::-webkit-scrollbar-thumb{background:rgba(255,240,210,.3)}body.at-hall .sw{aspect-ratio:1;display:block;padding:0;overflow:hidden;
   border:1px solid rgba(255,214,150,.20);background:rgba(0,0,0,.22)}body.at-hall .sw:hover{border-color:rgba(255,214,150,.8)}body.at-hall .sw.on{border-color:#fff7e4;box-shadow:0 0 0 2px #fff7e4,0 4px 12px rgba(0,0,0,.55)}body.at-hall .sw svg{width:100%;height:100%;display:block}body.at-hall .num{padding:8px 16px;border:1px solid rgba(255,214,150,.30);font-size:10px;
   font-weight:700;letter-spacing:.14em;text-transform:uppercase;
@@ -2455,6 +2474,17 @@ to{opacity:1;transform:translateZ(10px) scale(1)}
       <div class="nm unset" id="myname">unnamed</div>
       <div class="edit">click to blazon or upload</div>
     </div>
+  </div>
+</div>
+
+<!-- shown only when electron/updater.js reports a downloaded update
+     (window.AppUpdate, wired in 16-menu.js) — absent entirely outside the
+     packaged app, since nothing ever calls .style.display='flex' on it -->
+<div id="update-card" style="display:none">
+  <div class="uc-txt"></div>
+  <div class="uc-row">
+    <button class="lk" id="update-now">Restart &amp; update</button>
+    <button class="lk" id="update-later">Later</button>
   </div>
 </div>
 
@@ -20929,6 +20959,44 @@ function render(){ sbody.innerHTML = (VIEW[at] || VIEW.set)(); if (AFTER[at]) AF
 
 /* ══ THE VIEWS ════════════════════════════════════════════════ */
 const VIEW = {}, AFTER = {};
+
+/* ══ AUTO-UPDATE, ON THE STARTING SCREEN ══════════════════════
+   grumkata: not tucked into Settings — a popup on the hall itself, since
+   that's the one screen every session actually passes through, whether
+   or not anyone ever opens Settings at all.
+
+   window.AppUpdate only exists when this page is running inside the
+   packaged app's own window with electron/preload.js attached — NOT in
+   test/serve.js's plain browser, and NOT in the bare Electron window
+   tools/shot.js opens for screenshots, since neither sets a preload. So
+   this degrades to doing nothing at all when it isn't there, same as
+   every other place this app checks for something Electron-only.
+
+   Only 'downloaded' is worth a popup for. 'checking'/'available'/
+   'downloading' are background noise nobody asked to watch — the whole
+   point of the background-check choice was that a player never has to
+   think about updating until there's something to actually act on. */
+if (window.AppUpdate){
+  const card = document.getElementById('update-card');
+  if (card){
+    const txt = card.querySelector('.uc-txt');
+    const now = card.querySelector('#update-now'), later = card.querySelector('#update-later');
+    if (now)   now.addEventListener('click', () => window.AppUpdate.restartNow());
+    /* "Later" doesn't need to remember the dismissal past this session —
+       autoInstallOnAppQuit means the update installs on the next real
+       quit regardless of whether this card is ever seen again. It exists
+       purely so someone mid-table isn't nagged while they're busy. */
+    if (later) later.addEventListener('click', () => { card.style.display = 'none'; });
+    window.AppUpdate.onStatus(s => {
+      if (s.state === 'downloaded'){
+        if (txt) txt.textContent = 'An update (' + s.latest + ') is ready.';
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+}
 
 /* ── the tables ── */
 VIEW.tables = () => `

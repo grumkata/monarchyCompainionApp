@@ -16,6 +16,17 @@
   </div>
 </div>
 
+<!-- shown only when electron/updater.js reports a downloaded update
+     (window.AppUpdate, wired in 16-menu.js) — absent entirely outside the
+     packaged app, since nothing ever calls .style.display='flex' on it -->
+<div id="update-card" style="display:none">
+  <div class="uc-txt"></div>
+  <div class="uc-row">
+    <button class="lk" id="update-now">Restart &amp; update</button>
+    <button class="lk" id="update-later">Later</button>
+  </div>
+</div>
+
 <section id="screen">
   <div class="cloth"></div><div class="weave"></div>
   <svg class="device" id="device" viewBox="0 0 200 400" preserveAspectRatio="xMidYMid meet"></svg>

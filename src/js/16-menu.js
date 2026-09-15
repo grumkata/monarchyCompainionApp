@@ -158,6 +158,44 @@ function render(){ sbody.innerHTML = (VIEW[at] || VIEW.set)(); if (AFTER[at]) AF
 /* ══ THE VIEWS ════════════════════════════════════════════════ */
 const VIEW = {}, AFTER = {};
 
+/* ══ AUTO-UPDATE, ON THE STARTING SCREEN ══════════════════════
+   grumkata: not tucked into Settings — a popup on the hall itself, since
+   that's the one screen every session actually passes through, whether
+   or not anyone ever opens Settings at all.
+
+   window.AppUpdate only exists when this page is running inside the
+   packaged app's own window with electron/preload.js attached — NOT in
+   test/serve.js's plain browser, and NOT in the bare Electron window
+   tools/shot.js opens for screenshots, since neither sets a preload. So
+   this degrades to doing nothing at all when it isn't there, same as
+   every other place this app checks for something Electron-only.
+
+   Only 'downloaded' is worth a popup for. 'checking'/'available'/
+   'downloading' are background noise nobody asked to watch — the whole
+   point of the background-check choice was that a player never has to
+   think about updating until there's something to actually act on. */
+if (window.AppUpdate){
+  const card = document.getElementById('update-card');
+  if (card){
+    const txt = card.querySelector('.uc-txt');
+    const now = card.querySelector('#update-now'), later = card.querySelector('#update-later');
+    if (now)   now.addEventListener('click', () => window.AppUpdate.restartNow());
+    /* "Later" doesn't need to remember the dismissal past this session —
+       autoInstallOnAppQuit means the update installs on the next real
+       quit regardless of whether this card is ever seen again. It exists
+       purely so someone mid-table isn't nagged while they're busy. */
+    if (later) later.addEventListener('click', () => { card.style.display = 'none'; });
+    window.AppUpdate.onStatus(s => {
+      if (s.state === 'downloaded'){
+        if (txt) txt.textContent = 'An update (' + s.latest + ') is ready.';
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+}
+
 /* ── the tables ── */
 VIEW.tables = () => `
   <h2>The Tables</h2>

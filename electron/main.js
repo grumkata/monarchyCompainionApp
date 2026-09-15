@@ -6,6 +6,7 @@
 
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
+const { setupAutoUpdater } = require('./updater');
 
 // Remove Electron's default application menu (File/Edit/View/Window/Help).
 Menu.setApplicationMenu(null);
@@ -21,7 +22,13 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,   // the app is plain browser JS/HTML/CSS — no Node API surface needed
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      // The one hole in that seal: exposes window.AppUpdate (see
+      // preload.js) so Settings can show real update status and let a
+      // player restart into a downloaded update — nothing else about the
+      // renderer's access changes. Runs fine sandboxed; contextBridge is
+      // exactly what a sandboxed preload is for.
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -32,10 +39,19 @@ function createWindow() {
   // lives on the View menu — this openDevTools() call is the only way
   // in until/unless a menu gets added back):
   // win.webContents.openDevTools();
+
+  return win;
 }
 
 app.whenReady().then(() => {
-  createWindow();
+  const win = createWindow();
+
+  // AFTER the window, not before — the check and any download run in the
+  // background against whatever is already on screen. Nothing in this app
+  // waits on it, and a stale network or a repo with no release published
+  // yet leaves the running session untouched either way. See
+  // electron/updater.js for what happens and why.
+  setupAutoUpdater(win);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
