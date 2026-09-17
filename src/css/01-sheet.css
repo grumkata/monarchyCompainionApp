@@ -17,13 +17,18 @@
 
 /* ── the two index plaques, hanging off the top of the leaf ── */
 .deck .tabs{display:flex;justify-content:center;gap:0;padding:0;position:relative;z-index:4}
-.deck .tab-btn{font-family:'Cinzel',serif;font-size:10px;font-weight:700;letter-spacing:.2em;
-  text-transform:uppercase;padding:11px 30px 13px;background:linear-gradient(180deg,#3a2f20,#160f08);
-  color:#7d6a45;border:1px solid rgba(214,170,96,.28);border-bottom:0;cursor:pointer;
-  text-align:center;transition:.15s;box-shadow:0 6px 18px rgba(0,0,0,.5)}
-.deck .tab-btn:hover{color:#d8b268}
-.deck .tab-btn.active{background:linear-gradient(180deg,#f6ecd2,#e6d7b2);color:#2a1d10;
-  border-color:#a8813c}
+/* BLAZON: a closed tab is chrome (Sable, counterchanged under the pointer);
+   the open one is the leaf itself, so it is vellum, crowned with a rubric
+   rule - the red a scribe marked the page you are on with */
+.deck .tab-btn{font-family:var(--m-f-cap);font-size:10px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:uppercase;padding:11px 30px 13px;
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable);
+  color:var(--m-quiet);border:0;cursor:pointer;clip-path:var(--m-plaque);
+  text-align:center;box-shadow:inset 0 0 0 1px var(--m-line);
+  transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle)}
+.deck .tab-btn:hover{background-position:0 0;color:var(--m-sable)}
+.deck .tab-btn.active{background:linear-gradient(180deg,var(--m-vellum),var(--m-vellum-2));
+  color:var(--m-ink);box-shadow:inset 0 3px 0 var(--m-rubric)}
 
 /* ── the parchment ── */
 .leafwrap{position:relative;filter:drop-shadow(0 24px 36px rgba(0,0,0,.58))
@@ -35,8 +40,11 @@
 .leaf{position:relative;z-index:1;clip-path:polygon(0.0% 1.4px,3.33% 0.4px,6.67% 1.1px,10.0% 0.6px,13.33% 1.5px,16.67% 0.1px,20.0% 0.5px,23.33% 1.3px,26.67% 1.4px,30.0% 1.5px,33.33% 0.8px,36.67% 0.5px,40.0% 1.8px,43.33% 1.1px,46.67% 0.1px,50.0% 0.3px,53.33% 3.0px,56.67% 0.3px,60.0% 0.9px,63.33% 1.3px,66.67% 0.1px,70.0% 0.2px,73.33% 0.4px,76.67% 0.1px,80.0% 0.3px,83.33% 0.8px,86.67% 1.3px,90.0% 0.2px,93.33% 2.1px,96.67% 0.8px,calc(100% - 1.3px) 0.0%,calc(100% - 0.2px) 2.5%,calc(100% - 1.4px) 5.0%,calc(100% - 0.0px) 7.5%,calc(100% - 0.7px) 10.0%,calc(100% - 0.2px) 12.5%,calc(100% - 3.1px) 15.0%,calc(100% - 0.0px) 17.5%,calc(100% - 0.8px) 20.0%,calc(100% - 1.3px) 22.5%,calc(100% - 0.3px) 25.0%,calc(100% - 0.6px) 27.5%,calc(100% - 0.1px) 30.0%,calc(100% - 0.4px) 32.5%,calc(100% - 0.1px) 35.0%,calc(100% - 1.0px) 37.5%,calc(100% - 0.5px) 40.0%,calc(100% - 0.8px) 42.5%,calc(100% - 1.8px) 45.0%,calc(100% - 0.5px) 47.5%,calc(100% - 0.7px) 50.0%,calc(100% - 0.0px) 52.5%,calc(100% - 0.9px) 55.0%,calc(100% - 0.6px) 57.5%,calc(100% - 0.9px) 60.0%,calc(100% - 0.1px) 62.5%,calc(100% - 1.2px) 65.0%,calc(100% - 0.6px) 67.5%,calc(100% - 0.1px) 70.0%,calc(100% - 0.7px) 72.5%,calc(100% - 0.7px) 75.0%,calc(100% - 0.4px) 77.5%,calc(100% - 1.6px) 80.0%,calc(100% - 0.4px) 82.5%,calc(100% - 0.5px) 85.0%,calc(100% - 0.5px) 87.5%,calc(100% - 0.3px) 90.0%,calc(100% - 0.2px) 92.5%,calc(100% - 0.2px) 95.0%,calc(100% - 0.6px) 97.5%,100.0% calc(100% - 1.2px),96.67% calc(100% - 0.5px),93.33% calc(100% - 0.7px),90.0% calc(100% - 1.7px),86.67% calc(100% - 1.1px),83.33% calc(100% - 1.2px),80.0% calc(100% - 0.9px),76.67% calc(100% - 0.8px),73.33% calc(100% - 0.2px),70.0% calc(100% - 0.9px),66.67% calc(100% - 2.0px),63.33% calc(100% - 0.4px),60.0% calc(100% - 0.8px),56.67% calc(100% - 2.3px),53.33% calc(100% - 0.3px),50.0% calc(100% - 1.1px),46.67% calc(100% - 1.0px),43.33% calc(100% - 1.3px),40.0% calc(100% - 2.8px),36.67% calc(100% - 2.0px),33.33% calc(100% - 0.2px),30.0% calc(100% - 0.9px),26.67% calc(100% - 0.1px),23.33% calc(100% - 1.0px),20.0% calc(100% - 0.1px),16.67% calc(100% - 0.4px),13.33% calc(100% - 1.3px),10.0% calc(100% - 0.8px),6.67% calc(100% - 0.1px),3.33% calc(100% - 1.6px),0.7px 100.0%,0.8px 97.5%,1.1px 95.0%,0.3px 92.5%,1.7px 90.0%,0.9px 87.5%,0.2px 85.0%,0.5px 82.5%,1.5px 80.0%,1.0px 77.5%,0.0px 75.0%,0.6px 72.5%,0.1px 70.0%,2.3px 67.5%,0.8px 65.0%,2.2px 62.5%,1.0px 60.0%,0.9px 57.5%,0.4px 55.0%,0.2px 52.5%,2.4px 50.0%,0.6px 47.5%,0.1px 45.0%,1.5px 42.5%,0.1px 40.0%,1.8px 37.5%,0.7px 35.0%,0.5px 32.5%,0.7px 30.0%,1.4px 27.5%,0.6px 25.0%,0.3px 22.5%,1.7px 20.0%,0.7px 17.5%,0.6px 15.0%,0.5px 12.5%,0.6px 10.0%,0.3px 7.5%,0.7px 5.0%,0.1px 2.5%);
   --ink:#16100a; --paper:#f0e6cc; --paper2:#e8d9b5; --paper3:#deca9a;
   --mid:rgba(22,16,10,0.35); --faint:rgba(22,16,10,0.14); --heavy:rgba(22,16,10,0.82);
-  --red:#8b1a1a; --red-faint:rgba(139,26,26,0.12); --gold:#7a5c1e;
-  color:var(--ink);font-family:'Crimson Text',serif;
+  /* rubric and gilt are Blazon's (20-shell.css) - the leaf's red is the
+     banners' Gules now, so a heading on the record and the Tables cloth
+     are visibly the same red */
+  --red:var(--m-rubric); --red-faint:rgba(163,35,43,0.12); --gold:var(--m-or-lo);
+  color:var(--ink);font-family:var(--m-f-hand);
   background:
     radial-gradient(ellipse 30% 20% at 9% 6%,rgba(150,108,48,.13),transparent 70%),
     radial-gradient(ellipse 26% 16% at 92% 32%,rgba(150,108,48,.11),transparent 70%),
@@ -316,8 +324,14 @@
 .leaf .favor-note{font-family:'Crimson Text',serif;font-style:italic;font-size:10.5px;opacity:.45}
 
 .leaf .sheet-header{text-align:center;margin-bottom:22px}
-.leaf .game-title{font-family:'UnifrakturMaguntia',serif;font-size:40px;line-height:1;
+.leaf .game-title{font-family:var(--m-f-mark);font-size:46px;line-height:1;
   color:var(--ink);text-shadow:0 2px 5px rgba(120,84,36,.28)}
+/* the same lozenge rule as the hall's lintel, in ink and rubric */
+.leaf .game-title::after{content:'';display:block;width:200px;height:9px;margin:10px auto 0;
+  background:
+    linear-gradient(45deg,transparent 35%,var(--m-rubric) 35% 65%,transparent 65%) center / 9px 9px no-repeat,
+    linear-gradient(90deg,transparent,var(--ink) 38%,transparent 46%,transparent 54%,var(--ink) 62%,transparent)
+      center / 100% 1px no-repeat;opacity:.8}
 .leaf .sheet-sublabel{font-family:'Cinzel',serif;font-size:8px;font-weight:700;letter-spacing:.3em;
   text-transform:uppercase;opacity:.4;margin-top:6px}
 .leaf .page-foot{text-align:right;padding:0 42px 26px;font-family:'Cinzel',serif;font-size:7px;
@@ -329,28 +343,33 @@
 /* ── the two doors of creation ── */
 .doors{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:900px;margin-top:10px;
   align-items:stretch}
+/* BLAZON: a door is a panel in the layered frame, cut on the bend at two
+   corners; its numeral is a big Or capital, and opening one sweeps Or along
+   its foot. (Not the blackletter mark: a blackletter I reads as J, so "II"
+   became "JJ".) */
 .door{position:relative;display:flex;flex-direction:column;min-height:262px;height:100%;
-  padding:34px 32px 30px;text-align:left;
-  border:1px solid rgba(255,214,150,.34);background:rgba(18,10,5,.30);
-  transition:.18s cubic-bezier(.2,.9,.3,1)}
-.door .no{font-family:'Cinzel',serif;font-size:26px;font-weight:900;letter-spacing:.1em;
-  line-height:1;color:rgba(255,214,150,.44)}
-.door b{display:block;margin:auto 0 10px;font-family:'Cinzel',serif;font-size:20px;
-  font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#fff7e4}
-.door i{display:block;font-family:'Crimson Text',serif;font-style:italic;font-size:15px;
-  line-height:1.5;color:rgba(255,246,226,.72)}
-.door:not(.shut):hover{background:rgba(18,10,5,.55);border-color:#f0cf87;transform:translateY(-4px)}
-.door:not(.shut)::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;
-  background:linear-gradient(90deg,#f2d68e,#b48b3e 60%,transparent);
-  transform:scaleX(0);transform-origin:left;transition:transform .28s}
+  padding:34px 32px 30px;text-align:left;border:0;
+  background:var(--m-marks),rgba(11,9,7,.42);box-shadow:var(--m-frame);
+  clip-path:var(--m-cut);
+  transition:transform var(--t-hover) var(--pop),background-color var(--t-hover) var(--settle)}
+.door .no{font-family:var(--m-f-cap);font-size:34px;font-weight:900;letter-spacing:.1em;
+  line-height:1;color:var(--m-or)}
+.door b{display:block;margin:auto 0 10px;font-family:var(--m-f-cap);font-size:20px;
+  font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--m-argent-hi)}
+.door i{display:block;font-family:var(--m-f-hand);font-style:italic;font-size:16px;
+  line-height:1.5;color:rgba(244,239,226,.74)}
+.door:not(.shut):hover{background-color:rgba(11,9,7,.62);transform:translateY(-4px)}
+.door:not(.shut)::after{content:'';position:absolute;left:0;right:0;bottom:0;height:5px;
+  background:linear-gradient(115deg,var(--m-or) 0 92%,transparent 92.2%);
+  transform:scaleX(0);transform-origin:left;transition:transform var(--t-move) var(--settle)}
 .door:not(.shut):hover::after{transform:scaleX(1)}
-.door.shut{cursor:not-allowed;border-color:rgba(255,214,150,.12);
+.door.shut{cursor:not-allowed;box-shadow:inset 0 0 0 1px rgba(201,162,39,.14);
   background:linear-gradient(160deg,#0a0806,#050403)}
 .door.shut .no,.door.shut b,.door.shut i{color:rgba(220,205,180,.18)}
 .door.shut::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:repeating-linear-gradient(-45deg,transparent 0 13px,rgba(255,255,255,.022) 13px 26px)}
 .shutmark{position:absolute;right:20px;top:20px;display:flex;align-items:center;gap:8px;
-  font-family:'Cinzel',serif;font-size:8px;font-weight:700;letter-spacing:.2em;
+  font-family:var(--m-f-cap);font-size:8px;font-weight:700;letter-spacing:.2em;
   text-transform:uppercase;color:rgba(230,150,110,.42)}
 .shutmark .wax2{width:22px;height:22px;
   background:radial-gradient(circle at 36% 28%,#5a2317,#33110a 55%,#1a0805 100%);
@@ -370,17 +389,24 @@
    are reachable without scrolling a page that is 1700px tall.
 ══════════════════════════════════════════════════════════════ */
 #scribe{position:fixed;right:26px;top:24px;z-index:24;display:flex;align-items:center;gap:8px}
+/* BLAZON: Sable chrome like Back opposite it; Save is the one Or plaque,
+   because it is the one act here that commits anything */
 #scribe .sb{width:34px;height:34px;display:grid;place-items:center;font-size:19px;line-height:1;
-  font-family:system-ui,'Segoe UI Symbol',sans-serif;color:#e8d6ac;padding-bottom:2px;background:rgba(12,7,3,.66);
-  border:1px solid rgba(214,170,96,.34);cursor:pointer;transition:.14s;
-  backdrop-filter:blur(3px)}
-#scribe .sb.wide{width:auto;padding:0 16px;font-family:'Cinzel',serif;font-size:10px;
-  font-weight:700;letter-spacing:.2em;text-transform:uppercase}
-#scribe .sb:hover:not(:disabled){background:rgba(18,10,5,.86);border-color:#e5bb70;color:#fff6e2}
+  font-family:system-ui,'Segoe UI Symbol',sans-serif;color:var(--m-text);padding-bottom:2px;border:0;
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable);
+  box-shadow:inset 0 0 0 1px var(--m-line);cursor:pointer;
+  transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle),
+    opacity var(--t-hover) var(--settle)}
+#scribe .sb.wide{width:auto;padding:0 20px;font-family:var(--m-f-cap);font-size:10px;
+  font-weight:700;letter-spacing:var(--m-track);text-transform:uppercase;
+  color:var(--m-sable);clip-path:var(--m-plaque);box-shadow:none;
+  background:var(--m-sweep-house) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-or)}
+#scribe .sb:hover:not(:disabled){background-position:0 0;color:var(--m-sable)}
+#scribe .sb.wide:hover:not(:disabled){color:var(--m-house-ink)}
 #scribe .sb:disabled{opacity:.28;cursor:default}
-#scribe .saved{font-family:'Crimson Text',serif;font-style:italic;font-size:12.5px;
-  color:rgba(255,246,226,.42);min-width:118px;transition:color .2s}
-#scribe .saved.flash{color:#ffdf9e}
+#scribe .saved{font-family:var(--m-f-hand);font-style:italic;font-size:13.5px;
+  color:rgba(244,239,226,.5);min-width:118px;transition:color .2s}
+#scribe .saved.flash{color:var(--m-or-hi)}
 
 /* ══ MOVE HANDLES ══ small, and only there when you are on the row */
 .leaf .mv{display:flex;flex-direction:column;gap:1px;flex:0 0 auto;opacity:.16;transition:opacity .14s}

@@ -6,6 +6,8 @@
      npx electron tools/shot.js chest out.png # framed on the chest
      npx electron tools/shot.js box           # the toolbox open
      npx electron tools/shot.js bar           # the hand bar
+     npx electron tools/shot.js tables        # a hall cloth: tables, chars,
+                                              #   settings, join, arms
 
    Add a view by adding a line to VIEWS.
 
@@ -49,13 +51,22 @@ const VIEWS = {
   box:   'Toolbox.open()',
   bar:   'Hand && Hand.show && Hand.show()'
 };
+/* Views that stay in the hall and open one of its cloths. Kept apart from
+   VIEWS because they must NOT walk into a table first. */
+const HALL = {
+  tables:   'Menu.take("tables")',
+  chars:    'Menu.take("chars")',
+  settings: 'Menu.take("set")',
+  join:     'Menu.take("join")',
+  arms:     'document.getElementById("arms").click()'
+};
 
 const view = process.argv[2] || 'hall';
 const out = path.resolve(process.argv[3] || ('shot-' + view + '.png'));
 const page = path.join(__dirname, '..', 'dist', 'monarchy.html');
 
-if (!(view in VIEWS)) {
-  console.error('  views: ' + Object.keys(VIEWS).join(', '));
+if (!(view in VIEWS) && !(view in HALL)) {
+  console.error('  views: ' + Object.keys(VIEWS).concat(Object.keys(HALL)).join(', '));
   process.exit(1);
 }
 if (!fs.existsSync(page)) {
@@ -67,16 +78,34 @@ app.on('window-all-closed', () => {});
 process.on('uncaughtException', e => { console.error('  ' + e.message); app.exit(1); });
 
 app.whenReady().then(async () => {
+  /* ── OFFSCREEN, NOT MERELY HIDDEN ──────────────────────────
+     A plain `show:false` window stops producing frames. capturePage() then
+     hands back the last frame it did paint, so every change made after load
+     was missing from the picture — `box` came out identical to `table` —
+     and the Web Animations clock never advanced, so a hall cloth stayed at
+     clip-path frame 0 and was never in the picture at all. Offscreen
+     rendering keeps painting a window nobody can see, and the frame is taken
+     from its own paint event. */
   const win = new BrowserWindow({ width: 1500, height: 950, show: false,
-    webPreferences: { contextIsolation: true, sandbox: true } });
-  win.webContents.on('console-message', (e, level, m) => {
-    if (level >= 2 && !/Security Warning/.test(m)) console.log('  page: ' + m);
+    webPreferences: { contextIsolation: true, sandbox: true,
+                      offscreen: true, backgroundThrottling: false } });
+  win.webContents.setFrameRate(30);
+  let frame = null;
+  win.webContents.on('paint', (e, dirty, img) => { frame = img; });
+  win.webContents.on('console-message', (e) => {
+    if ((e.level === 'error' || e.level === 'warning') && !/Security Warning/.test(e.message))
+      console.log('  page: ' + e.message);
   });
 
   await win.loadFile(page);
   await wait(1200);
 
-  if (VIEWS[view] !== null) {
+  if (view in HALL) {
+    await wait(2500);
+    await win.webContents.executeJavaScript(HALL[view]).catch(e =>
+      console.log('  view failed: ' + e.message));
+    await wait(1400);
+  } else if (VIEWS[view] !== null) {
     await win.webContents.executeJavaScript("Shell.openTable('shot-" + Date.now() + "')");
     await wait(2500);
     /* The room's textures arrive on their own schedule and a photograph
@@ -93,7 +122,10 @@ app.whenReady().then(async () => {
     await wait(5000);
   }
 
-  fs.writeFileSync(out, (await win.webContents.capturePage()).toPNG());
+  win.webContents.invalidate();
+  await wait(300);
+  if (!frame) { console.error('  no frame was painted'); app.exit(1); return; }
+  fs.writeFileSync(out, frame.toPNG());
   console.log('  wrote ' + out);
   app.exit(0);
 });

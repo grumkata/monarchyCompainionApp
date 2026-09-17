@@ -8,7 +8,7 @@
     "build:html": "node build.js",
     "start": "npm run build:html && electron .",
     "dist": "npm run build:html && electron-builder",
-    "test": "node build.js && node test/geometry.test.js && node test/table.test.js && node test/table-ui.test.js && node test/join.test.js && node test/handling.test.js",
+    "test": "node build.js && node test/tincture.test.js && node test/geometry.test.js && node test/table.test.js && node test/table-ui.test.js && node test/join.test.js && node test/handling.test.js && node test/herald.test.js",
     "test:ui": "node build.js && node test/table-ui.test.js"
   },
   "devDependencies": {

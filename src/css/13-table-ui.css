@@ -279,10 +279,15 @@
   border:1px solid rgba(232,201,138,.24); border-bottom-color:rgba(232,201,138,.5);
 }
 .sc-opt{ border-bottom:1px solid rgba(232,201,138,.12) }
-.sc-btn{ color:#e8dfc8; border:1px solid rgba(232,201,138,.32); background:transparent }
-.sc-btn:hover{ border-color:#d8b268; background:rgba(232,201,138,.1) }
-.sc-btn.go{ color:#1c1409; background:#d8b268; border-color:#d8b268 }
-.sc-btn.go:hover{ background:#ecc47c }
+/* BLAZON's two tiers: a secondary is Sable and counterchanges to Or; the
+   primary is Or and counterchanges to your livery */
+.sc-btn{ color:var(--m-text); border:0; box-shadow:inset 0 0 0 1px var(--m-line);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, transparent;
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle) }
+.sc-btn:hover{ background-position:0 0; color:var(--m-sable) }
+.sc-btn.go{ color:var(--m-sable); box-shadow:none; clip-path:var(--m-plaque); padding-inline:24px;
+  background:var(--m-sweep-house) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-or) }
+.sc-btn.go:hover{ background-position:0 0; color:var(--m-house-ink) }
 .sc-slide{ background:rgba(0,0,0,.35); border:1.5px solid rgba(232,201,138,.34) }
 .sc-slide::after{ background:rgba(232,223,200,.6) }
 .sc-switch input:checked + .sc-slide{ background:rgba(216,178,104,.22); border-color:#d8b268 }
@@ -447,13 +452,21 @@
 .hb.up > *{ pointer-events:auto; }
 
 /* the name of the thing you are pointing at, and nothing else */
+/* BLAZON: the name is a pennon, Or on Sable, that unfurls from the left
+   when you point at something — the same bend-cut the whole app uses,
+   so even the one word a hotbar needs is in the house style. */
 .hb-tip{
-  font-family:'Cinzel',serif; font-size:11px; font-weight:700;
-  letter-spacing:.22em; text-transform:uppercase; color:#f6e6c0;
-  text-shadow:0 2px 6px #000, 0 0 18px rgba(0,0,0,.9);
-  opacity:0; transition:opacity .12s; height:14px; line-height:14px;
+  font-family:var(--m-f-cap); font-size:11px; font-weight:700;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or);
+  background:var(--m-sable); padding:0 30px 0 16px;
+  clip-path:polygon(0 0,100% 0,calc(100% - 10px) 50%,100% 100%,0 100%);
+  box-shadow:inset 4px 0 0 var(--m-house);
+  height:26px; line-height:26px;
+  opacity:0; transform:scaleX(.6); transform-origin:left center;
+  transition:opacity .12s var(--settle), transform var(--t-wipe) var(--pop);
 }
-.hb-tip.on{ opacity:1; }
+.hb-tip:empty{ visibility:hidden; }
+.hb-tip.on{ opacity:1; transform:none; }
 
 /* ── the variants, floating over the bar ─────────────────────
    What you may choose WHILE HOLDING IT. Same figure, drawn each way,
@@ -471,10 +484,10 @@
   background:radial-gradient(ellipse at 50% 18%,#3b2c19,#1a1209 78%);
   border:1px solid #4a3418; transition:.12s;
 }
-.hb-var:hover{ border-color:#d8b268; }
+.hb-var:hover{ border-color:var(--m-or); }
 .hb-var.on{
-  border-color:#f0c274;
-  box-shadow:inset 0 0 0 1px rgba(255,214,140,.5), 0 0 16px rgba(216,178,104,.35);
+  border-color:var(--m-or-hi);
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.55), 0 0 16px rgba(201,162,39,.35);
 }
 
 /* ── the plank ── */
@@ -514,6 +527,18 @@
   transition:.11s;
 }
 .hb-slot + .hb-slot{ border-left-color:rgba(255,214,158,.12); }
+/* opening the chest DEALS the plank: each slot's object springs up in turn,
+   and a tray's options do the same, faster. `translate`, not transform, so
+   the hover lift on .hb-fig is untouched. */
+.hb.up .hb-slot .hb-fig{ animation:slot-up .44s var(--pop) both; }
+.hb.up .hb-slot:nth-child(2) .hb-fig{ animation-delay:.05s }
+.hb.up .hb-slot:nth-child(3) .hb-fig{ animation-delay:.10s }
+.hb.up .hb-slot:nth-child(4) .hb-fig{ animation-delay:.15s }
+.hb.up .hb-slot:nth-child(5) .hb-fig{ animation-delay:.20s }
+.hb.up .hb-slot:nth-child(6) .hb-fig{ animation-delay:.25s }
+.hb.up .hb-slot:nth-child(n+7) .hb-fig{ animation-delay:.30s }
+.hb-tray:not([hidden]) .hb-opt .hb-fig{ animation:slot-up .34s var(--pop) both; }
+@keyframes slot-up{ from{ opacity:0; translate:0 22px; scale:.6; } }
 .hb-fig{
   position:absolute; inset:0; display:block;
   transition:transform .12s cubic-bezier(.2,.9,.3,1);
@@ -522,17 +547,23 @@
 .hb-slot:hover .hb-fig{ transform:translateY(-4px) scale(1.06); }
 /* the one you have selected, the way a hotbar marks it: a bezel that
    stands PROUD of the plank, not a coloured border */
+/* …and the bezel is Or, with a bend of your livery across its corner — the
+   slot is counterchanged the way every chosen thing in the app is */
 .hb-slot.on{
-  border-color:#f0c274;
-  box-shadow:inset 0 0 0 1px rgba(255,214,140,.45), inset 0 3px 8px rgba(0,0,0,.5),
-             0 0 20px rgba(216,178,104,.4);
+  border-color:var(--m-or-hi);
+  background:
+    linear-gradient(135deg,var(--m-house) 0 13px,transparent 13.5px),
+    radial-gradient(ellipse at 50% 14%,#4d3a20,#161008 82%);
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.55), inset 0 3px 8px rgba(0,0,0,.5),
+             0 0 20px rgba(201,162,39,.4);
 }
 .hb-slot.on .hb-fig{ transform:translateY(-3px) scale(1.05); }
 .hb-key{
   position:absolute; right:3px; bottom:1px; font-style:normal;
-  font-family:'Cinzel',serif; font-size:9px; font-weight:700;
-  color:rgba(240,220,180,.34); pointer-events:none;
+  font-family:var(--m-f-tally); font-size:12px; font-weight:600;
+  color:rgba(222,216,200,.34); pointer-events:none;
 }
+.hb-slot.on .hb-key{ color:var(--m-or); }
 
 /* ══════════════════════════════════════════════════════════════
    WHAT YOU ARE HOLDING
@@ -946,14 +977,17 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
     -3px 0 0 #8a6c33, 3px 0 0 #8a6c33,          /* the brass side bands */
     0 26px 54px rgba(0,0,0,.72) !important;
 }
+/* BLAZON: the brass cap is Or leaf now — the same metal as every plaque —
+   with your livery as the rule beneath it */
 .sc-opts-head{
-  background:linear-gradient(180deg,#c19a4c 0%,#8a6a2c 44%,#4e3714 100%) !important;
-  color:#241708 !important;
-  box-shadow:inset 0 2px 0 rgba(255,240,200,.6), inset 0 -2px 0 rgba(0,0,0,.5);
-  padding:9px 12px !important;
+  background:linear-gradient(180deg,var(--m-or-hi) 0%,var(--m-or) 46%,var(--m-or-lo) 100%) !important;
+  color:var(--m-sable) !important;
+  box-shadow:inset 0 2px 0 rgba(255,244,214,.55), inset 0 -3px 0 var(--m-house);
+  padding:9px 12px 11px !important;
 }
-.sc-opts-head b{ color:#1c1208; text-shadow:0 1px 0 rgba(255,240,200,.45); }
-.sc-opts-head i{ color:rgba(36,23,8,.62) !important; }
+.sc-opts-head b{ color:var(--m-sable); font-family:var(--m-f-cap); letter-spacing:.12em;
+  text-transform:uppercase; text-shadow:0 1px 0 rgba(255,244,214,.45); }
+.sc-opts-head i{ color:rgba(23,19,16,.66) !important; font-family:var(--m-f-hand); }
 .sc-opts-x{
   color:#2a1c0a !important; background:rgba(0,0,0,.14) !important;
   border:1px solid rgba(36,23,8,.4) !important;
@@ -967,8 +1001,8 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
   padding:11px 12px !important;
 }
 .sc-opt:last-child{ box-shadow:none; }
-.sc-opt-text b{ color:#f0d9a4 !important; }
-.sc-opt-text i{ color:rgba(232,223,200,.44) !important; }
+.sc-opt-text b{ color:var(--m-or-hi) !important; font-family:var(--m-f-cap); letter-spacing:.06em; }
+.sc-opt-text i{ color:var(--m-quiet) !important; font-family:var(--m-f-hand); font-size:12px; }
 
 /* ── a real toggle: a brass lever in a sunk slot ── */
 .sc-switch{ width:44px !important; height:22px !important; }
@@ -990,7 +1024,12 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 }
 .sc-switch input:checked + .sc-slide::after{
   left:25px !important;
-  background:linear-gradient(180deg,#ffe9a8,#d8b268 58%,#8a6a2c) !important;
+  background:linear-gradient(180deg,var(--m-or-hi),var(--m-or) 58%,var(--m-or-lo)) !important;
+}
+/* on is a colour you can read from across the table, not just a lever
+   that moved: the slot fills with your livery */
+.sc-switch input:checked + .sc-slide{
+  background:linear-gradient(180deg,var(--m-house),var(--m-sable)) !important;
 }
 
 /* ── a number stamped into brass ── */
@@ -1050,7 +1089,7 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 .hb-opt .hb-fig{ position:absolute; inset:0; display:block;
   transition:transform .12s cubic-bezier(.2,.9,.3,1); }
 .hb-opt:hover{ background:radial-gradient(ellipse at 50% 14%,#4d3a20,#1c1409 82%);
-  border-color:#d8b268; }
+  border-color:var(--m-or); }
 .hb-opt:hover .hb-fig{ transform:translateY(-3px) scale(1.07); }
 /* the brass plus on a slot that makes a new one */
 .hb-plus{
@@ -1397,17 +1436,23 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 
    `outline` and not `border`, because a border changes the box and
    would nudge every piece the moment it was picked.                */
+/* BLAZON: the ring is Or, and its outer frame is cut on the bend at two
+   corners — the same --m-cut every panel takes — so a chosen piece wears
+   the house mark rather than a generic focus glow */
 .prop.t3-thing.sel > .face{
-  outline:2px solid rgba(240,196,116,.92);
+  outline:2px solid var(--m-or);
   outline-offset:3px;
-  box-shadow:0 0 0 1px rgba(24,16,6,.55), 0 0 22px rgba(216,178,104,.30);
+  box-shadow:0 0 0 1px rgba(24,16,6,.55), 0 0 22px rgba(201,162,39,.32);
 }
 .prop.t3-thing.sel > .face::after{
-  content:''; position:absolute; inset:-9px; pointer-events:none;
-  border:1px solid rgba(240,196,116,.28);
+  content:''; position:absolute; inset:-10px; pointer-events:none;
+  background:
+    linear-gradient(135deg,var(--m-or) 0 7px,transparent 7.5px) left top / 16px 16px no-repeat,
+    linear-gradient(315deg,var(--m-or) 0 7px,transparent 7.5px) right bottom / 16px 16px no-repeat;
+  border:1px solid rgba(201,162,39,.3);
 }
 /* the piece you are actually holding does not need a ring as well */
-.prop.t3-thing.lift.sel > .face{ outline-color:rgba(240,196,116,.45); }
+.prop.t3-thing.lift.sel > .face{ outline-color:rgba(201,162,39,.45); }
 
 
 /* ══ SOMEONE SAID SOMETHING ════════════════════════════════════
@@ -1420,15 +1465,15 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
   padding:5px 11px; line-height:1.45;
 }
 .cl.said > b{
-  flex:0 0 auto; font-family:'Cinzel',serif; font-size:9px; font-weight:700;
-  letter-spacing:.14em; text-transform:uppercase; color:#c9a45e; padding-top:2px;
+  flex:0 0 auto; font-family:var(--m-f-cap); font-size:9px; font-weight:700;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); padding-top:3px;
 }
-.cl.said .stxt{ color:#f0e3c6; font-size:13px; }
+.cl.said .stxt{ color:var(--m-text); font-size:14px; }
 .cl.said.emote{ font-style:italic; }
-.cl.said.emote .stxt{ color:#cbb389; }
+.cl.said.emote .stxt{ color:var(--m-quiet); }
 .cl.said.emote .stxt b{
-  font-style:normal; font-family:'Cinzel',serif; font-size:9px;
-  letter-spacing:.14em; text-transform:uppercase; color:#c9a45e;
+  font-style:normal; font-family:var(--m-f-cap); font-size:9px;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or);
 }
 
 

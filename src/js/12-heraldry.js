@@ -21,7 +21,9 @@
 'use strict';
 
 const TINCT = {
-  gules:'#a3232b', azure:'#27508f', vert:'#2c6b41', purpure:'#67326f',
+  /* vert was #2c6b41 — two steps darker so Argent on it clears 4.5:1
+     (test/tincture.test.js), which is invisible on a banner */
+  gules:'#a3232b', azure:'#27508f', vert:'#2b6940', purpure:'#67326f',
   sable:'#171310', tenne:'#8a4a1e', murrey:'#6d2038', bleu:'#5d7fa8',
   or:'#c9a227', argent:'#ded8c8'
 };
@@ -196,16 +198,41 @@ function hem(kind, W, H){
   if (kind === 'pennon') return `L${W},${H*.72} L${W*.5},${H} L0,${H*.72}`;
   return `L${W},${H} L0,${H}`;
 }
-function shieldPath(W, H){
-  return `M0,0 H${W} V${H*.58} C${W},${H*.82} ${W*.72},${H*.94} ${W/2},${H}
-          C${W*.28},${H*.94} 0,${H*.82} 0,${H*.58} Z`;
+/* `inset` pulls every point of the outline in from the WxH box by that
+   many px on each side — 0 (the default) is the original shape, touching
+   the box exactly, which is exactly what armsSVG must NOT hand to a
+   stroked path (see the note there). Every other caller (16-menu.js's
+   stationer's mark, the raw fill-only watermark on a blank sheet) wants
+   the untouched shape and gets it for free by not passing one. */
+function shieldPath(W, H, inset){
+  const m = inset || 0, w = W - m*2, h = H - m*2;
+  return `M${m},${m} H${m+w} V${m+h*.58} C${m+w},${m+h*.82} ${m+w*.72},${m+h*.94} ${m+w/2},${m+h}
+          C${m+w*.28},${m+h*.94} ${m},${m+h*.82} ${m},${m+h*.58} Z`;
 }
 
 function armsSVG(A, o){
   o = o || {};
   const W = o.w || 200, H = o.h || (o.shape === 'shield' ? 240 : 400);
   const shape = o.shape || 'banner';
-  const clip = shape === 'shield' ? shieldPath(W, H)
+  const edge = o.edge || 5;
+  /* THE COAT OF ARMS WAS LOSING ITS OWN BORDER. grumkata: "cutoff...
+     it's a different shape" — meaning different from the empty-shield
+     placeholder and an uploaded picture (#arms in 00-hall.css), which
+     ring themselves with an INSET box-shadow that physically cannot
+     draw outside their own box. This shield instead strokes its outline
+     — `stroke-width="${edge}"` below — and an SVG stroke straddles its
+     path, half in and half out. shieldPath used to touch x=0, x=W and
+     y=0 exactly, so the OUTER half of that stroke fell outside the
+     <svg>'s own viewBox and was clipped clean off by its default
+     overflow:hidden — worst along the flat top edge and both dead-straight
+     sides, where it ran parallel to the clip boundary for a long stretch
+     rather than just grazing a point. Insetting the shape itself by half
+     the stroke width puts the WHOLE stroke inside the box instead. The
+     field/charges/bordure below clip to this exact same `clip` value, so
+     they shrink by the same half-edge and the border still sits flush
+     against them — nothing moves relative to anything else, the border
+     just stops eating itself. */
+  const clip = shape === 'shield' ? shieldPath(W, H, edge / 2)
              : `M0,0 L${W},0 ${hem(o.hem||'straight',W,H)} Z`;
   const inner = field(A.div, A.a, A.b, W, H)
               + ordinary(A.ord, A.ordT, W, H)
@@ -222,7 +249,7 @@ function armsSVG(A, o){
       </pattern>
     </defs>
     <g clip-path="url(#cp)">${inner}${weave}</g>
-    <path d="${clip}" fill="none" stroke="#0d0906" stroke-width="${o.edge||5}"
+    <path d="${clip}" fill="none" stroke="#0d0906" stroke-width="${edge}"
           stroke-opacity=".8"/>
   </svg>`;
 }

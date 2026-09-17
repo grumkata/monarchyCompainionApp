@@ -85,6 +85,9 @@ const layer = $('#ui');
 BANNERS.forEach((b,i) => {
   const p = document.createElement('button');
   p.className = 'plate' + (b.dead ? ' dead' : '');
+  /* the plate counterchanges into its own banner's field (00-hall.css) */
+  p.style.setProperty('--house', H.col(b.arms.a));
+  p.style.setProperty('--n', i);                 /* hung in order (00-hall.css) */
   p.innerHTML = b.name + (b.dead ? '<span class="tag">not built</span>' : '');
   p.dataset.i = i; layer.appendChild(p); b.el = p;
   const f = document.createElement('div');
@@ -126,18 +129,29 @@ function backOne(){
   if (!path.length) return hang();
   at = path.pop(); drawView(-10);
 }
+/* THE CLOTH FALLS WITH A SWALLOWTAIL HEM — the notch cut into the Tables
+   banner — rather than a flat edge wiping down. Same five points at both
+   ends so the polygon interpolates; at rest the notch is above the screen,
+   when down the hem's corners are below it and only the V's tip touches. */
+const HEM = '16vh';
+const CLOTH_UP   = `polygon(0 0,100% 0,100% 0%,50% calc(0% - ${HEM}),0 0%)`;
+const CLOTH_DOWN = `polygon(0 0,100% 0,100% calc(100% + ${HEM}),50% 100%,0 calc(100% + ${HEM}))`;
+function fall(){
+  screen.animate([{clipPath:CLOTH_UP},{clipPath:CLOTH_DOWN}],
+    {duration:620, easing:'cubic-bezier(.16,.84,.24,1)', fill:'forwards'});
+}
 function take(id){
   const b = BANNERS.find(x => x.id === id);
   if (!b || b.dead) return toast('Not built yet');
   at = id; path = []; paint();
   screen.style.setProperty('--field', H.TINCT[b.arms.a]);
+  screen.dataset.house = H.TNAME[b.arms.a] || '';     /* up the edge, 00-hall.css */
   $('#device').innerHTML = H.ordinary(b.arms.ord, b.arms.ordT, 200, 400)
                          + H.charge(b.arms.chg, b.arms.chgT, 200, 400, b.arms.chgN);
   render();
   window.Hall.lock(true);
   screen.classList.add('on');
-  screen.animate([{clipPath:'inset(0 0 100% 0)'},{clipPath:'inset(0 0 0% 0)'}],
-    {duration:540, easing:'cubic-bezier(.16,.84,.24,1)', fill:'forwards'});
+  fall();
   sbody.animate([{opacity:0,transform:'translateY(24px)'},{opacity:1,transform:'none'}],
     {duration:400, delay:250, easing:'ease-out', fill:'both'});
   /* once the cloth has finished falling the hall is fully covered — stop drawing it */
@@ -148,9 +162,9 @@ function hang(){
   if (!at) return;
   at = null; path = []; cur = null; screen.classList.remove('paper');
   window.Hall.sleep(false); window.Hall.lock(false);
-  const a = screen.animate([{clipPath:'inset(0 0 0% 0)'},{clipPath:'inset(0 0 100% 0)'}],
-    {duration:380, easing:'cubic-bezier(.5,0,.85,.4)', fill:'forwards'});
-  a.onfinish = () => { screen.classList.remove('on'); screen.style.clipPath='inset(0 0 100% 0)'; };
+  const a = screen.animate([{clipPath:CLOTH_DOWN},{clipPath:CLOTH_UP}],
+    {duration:420, easing:'cubic-bezier(.5,0,.85,.4)', fill:'forwards'});
+  a.onfinish = () => { screen.classList.remove('on'); screen.style.clipPath = CLOTH_UP; };
   backBtn.style.display = 'none';
 }
 function render(){ sbody.innerHTML = (VIEW[at] || VIEW.set)(); if (AFTER[at]) AFTER[at](); }
@@ -586,15 +600,26 @@ function repaintMaker(){
 }
 
 /* ══ YOUR ARMS, IN THE HALL ═══════════════════════════════════ */
+/* THE SAME OUTLINE FOR ALL THREE STATES. No arms, an uploaded picture, and
+   real heraldry used to be three different shields: the flat, straight-sided
+   pentagon below was hand-copied as a CSS clip-path (once here, once in
+   00-hall.css's .blank rule) while real arms went through H.armsSVG's
+   properly curved heater shieldPath — so the corner's silhouette visibly
+   changed shape the moment you set arms, and the placeholder read as a
+   cut-down, lesser version of the real thing rather than an empty version
+   of the SAME shield. One shape now, driven from the one place that
+   defines it (H.shieldPath), used inline for the two CSS-clipped states —
+   00-hall.css's .blank no longer carries its own clip-path at all. */
 function paintArms(){
   const s = $('#myshield'), n = $('#myname');
+  const clip = "path('" + H.shieldPath(92, 110).replace(/\s+/g, ' ') + "')";
   s.innerHTML = me.pic
-    ? `<img src="${esc(me.pic)}" alt="" style="clip-path:polygon(0 0,100% 0,100% 58%,50% 100%,0 58%);
+    ? `<img src="${esc(me.pic)}" alt="" style="clip-path:${clip};
         object-fit:cover;height:110px">`
     : (me.arms && (me.arms.ord !== 'none' || me.arms.chg || me.arms.bord
        || me.arms.div !== 'plain' || me.arms.a !== 'sable'))
       ? H.armsSVG(me.arms, { shape:'shield', w:184, h:220, edge:7 })
-      : `<div class="blank">no arms<br>yet</div>`;
+      : `<div class="blank" style="clip-path:${clip}">no arms<br>yet</div>`;
   n.textContent = me.name || 'unnamed';
   n.classList.toggle('unset', !me.name);
 }
@@ -607,10 +632,10 @@ document.addEventListener('click', e => {
   if (e.target.closest('#arms')){ draft = Object.assign({}, me.arms); at = 'arms';
     screen.style.setProperty('--field', H.TINCT[me.arms.a] || '#2a2118');
     if (me.arms.a === 'sable') screen.style.setProperty('--field', '#3a3126');
+    screen.dataset.house = (H.TNAME[me.arms.a] || '') ;
     $('#device').innerHTML = '';
     render(); window.Hall.lock(true); screen.classList.add('on');
-    screen.animate([{clipPath:'inset(0 0 100% 0)'},{clipPath:'inset(0 0 0% 0)'}],
-      {duration:540, easing:'cubic-bezier(.16,.84,.24,1)', fill:'forwards'});
+    fall();
     setTimeout(() => { if (at) window.Hall.sleep(true); }, 620);
     backBtn.style.display='flex'; return; }
   if (e.target.closest('#back')) return backOne();
@@ -880,6 +905,8 @@ function takeArms(){
   const n = ($('#aname') || {}).value;
   if (n != null) me.name = n.trim();
   saveM(); paintArms();
+  /* the chrome wears your livery (42-shell.js), so new arms re-dye it */
+  if (window.Shell && window.Shell.livery) window.Shell.livery();
   setTimeout(() => { hang(); toast(me.pic ? 'Kept — your picture is still what shows'
                                           : 'Arms taken'); }, 260);
 }

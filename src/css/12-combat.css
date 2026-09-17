@@ -11,28 +11,34 @@
      · parchment light mode, not inverted grey
 ══════════════════════════════════════════════════════════════ */
 :root{
-  /* ── PARCHMENT (default) ── */
-  --page:#b6996a; --field:#e0cfa9; --sunk:#bda684;
+  /* ── PARCHMENT (default) ──
+     Re-pointed at Blazon (20-shell.css) where a local name meant a tincture:
+     the enemy is Gules and the ally Azure — the same paint as the banners —
+     and the four type names are the shared voices. The rest are this mat's
+     own materials and stay its own. (Two lines here used to carry garbage —
+     `--rule-i:#c9a societal` and a full-width digit in `--ink-2` — each
+     rescued only by a correct duplicate declared after it.) */
+  --page:#b6996a; --field:var(--m-vellum-2); --sunk:#bda684;
   --pat:rgba(96,66,28,.10);
-  --band:#8a6432; --rule-o:#3d2812; --rule-i:#c9a societal;
+  --band:var(--m-or-lo); --rule-o:var(--m-sable);
   --rule-i:#c9a86a; --emboss:rgba(255,244,214,.55);
-  --ink:#241708; --ink-2:#4a3418; --ink-3:#6a5029;
-  --gold:#8a6a24; --en:#8f2a19; --al:#2a5674;
-  --en-f:rgba(143,42,25,.22); --al-f:rgba(42,86,116,.20);
-  --good:#3f6b40; --warn:#9a7419; --crum:#a2571f; --bad:#8f2a19;
-  --f-blk:'UnifrakturMaguntia',serif; --f-disp:'Cinzel',serif;
-  --f-num:'Barlow Condensed',sans-serif; --f-flav:'Crimson Text',serif;
+  --ink:var(--m-ink); --ink-2:var(--m-ink-2); --ink-3:#6a5029;
+  --gold:var(--m-or-lo); --en:var(--m-gules); --al:var(--m-azure);
+  --en-f:rgba(163,35,43,.20); --al-f:rgba(39,80,143,.18);
+  --good:#3f6b40; --warn:#9a7419; --crum:#a2571f; --bad:var(--m-gules);
+  --f-blk:var(--m-f-mark); --f-disp:var(--m-f-cap);
+  --f-num:var(--m-f-tally); --f-flav:var(--m-f-hand);
   --slot:94px; --gap:5px;
 }
 body.dark{
   /* gold reads on the dark ground, so use it there */
-  --page:#100c08; --field:#191309; --sunk:#0a0705;
+  --page:#100c08; --field:#191309; --sunk:var(--m-sable-0);
   --pat:rgba(200,168,90,.055);
   --band:#5a4020; --rule-o:#180f07; --rule-i:#8a6a34; --emboss:rgba(255,228,170,.16);
-  --ink:#e6dcc2; --ink-2:#ad9c７d; --ink-2:#ad9c7d; --ink-3:#7d7059;
-  --gold:#c8a85a; --en:#b84230; --al:#5b96c0;
-  --en-f:rgba(160,50,34,.16); --al-f:rgba(60,120,165,.16);
-  --good:#7fae86; --warn:#c9a94c; --crum:#c9803c; --bad:#b4432f;
+  --ink:#e6dcc2; --ink-2:#ad9c7d; --ink-3:#7d7059;
+  --gold:var(--m-or); --en:var(--m-gules-hi); --al:var(--m-bleu);
+  --en-f:rgba(201,68,58,.16); --al-f:rgba(93,127,168,.16);
+  --good:#7fae86; --warn:#c9a94c; --crum:#c9803c; --bad:var(--m-gules-hi);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--page);color:var(--ink);font-family:var(--f-disp);
@@ -374,11 +380,17 @@ body.dark .pc .nm{color:#f0d79a;border-bottom-color:#c19a45}
   border-left:1px solid rgba(0,0,0,.35);font-family:var(--f-disp);font-size:8px;font-weight:700;
   letter-spacing:.2em;text-transform:uppercase;color:rgba(255,240,210,.75)}
 .role b{color:#f0d79a;margin-left:7px;font-size:10px}
-.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);z-index:400;
-  font-family:var(--f-disp);font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  padding:9px 20px;background:var(--band);color:#f6ecd2;border:1px solid var(--rule-o);
-  box-shadow:inset 0 1px 0 var(--emboss),0 4px 14px rgba(0,0,0,.5);opacity:0;transition:opacity .18s}
-.toast.show{opacity:1}
+/* BLAZON: a herald's slip — Sable, your livery down its leading edge, a
+   pennon cut on the trailing one, and it drops in rather than fading.
+   `.on` as well as `.show`: 45-papers.js has always added `on`, so every
+   toast the papers ever raised was set and never seen. */
+.toast{position:fixed;left:50%;bottom:104px;transform:translate(-50%,-8px);z-index:400;
+  font-family:var(--m-f-cap);font-size:10px;font-weight:700;letter-spacing:var(--m-track);text-transform:uppercase;
+  padding:11px 34px 11px 22px;background:var(--m-sable);color:var(--m-argent-hi);border:0;
+  clip-path:var(--m-pennon);
+  box-shadow:inset 5px 0 0 var(--m-house),inset 0 0 0 1px var(--m-line);
+  opacity:0;transition:opacity .18s var(--settle),transform var(--t-move) var(--pop)}
+.toast.show,.toast.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* token editor in the selected bar */
@@ -591,16 +603,27 @@ body{display:block;padding:0}
 /* ── HUD: the only screen-fixed layer ── */
 .hud{position:fixed;z-index:2000;font-family:var(--f-disp);font-size:9px;font-weight:700;
   letter-spacing:.18em;text-transform:uppercase}
-.hud.tl{bottom:13px;left:17px;color:var(--gold);max-width:46vw}
-.hud.tl em{display:block;font-family:var(--f-flav);font-style:italic;font-size:12px;letter-spacing:0;
-  text-transform:none;color:rgba(232,223,200,.55);margin-top:4px;font-weight:400}
-.hud.br{bottom:15px;right:17px;display:flex;gap:7px;align-items:center}
-.hud button{font-family:var(--f-disp);font-size:8.5px;font-weight:700;letter-spacing:.14em;
-  text-transform:uppercase;padding:9px 14px;cursor:pointer;color:#f4e8cc;border:1px solid #3d2812;
-  background:linear-gradient(180deg,#8a6432,#5a4020);box-shadow:inset 0 1px 0 rgba(255,240,210,.3)}
-.hud button:hover{background:linear-gradient(180deg,#a8783c,#6d4e26)}
-.zl{font-family:var(--f-num);font-size:12px;letter-spacing:.1em;
-  color:rgba(232,223,200,.45);padding-right:6px}
+/* ── BLAZON: the HUD is chrome, so it is Sable and Or whatever the mat's
+   theme — it never borrows --gold/--ink, which flip with the Theme button ── */
+/* the corner names THIS table (42-shell.js writes it), in the mark's hand */
+.hud.tl{bottom:13px;left:17px;color:var(--m-argent-hi);max-width:46vw;
+  font-family:var(--m-f-mark);font-size:30px;font-weight:400;letter-spacing:.01em;
+  text-transform:none;line-height:1;text-shadow:0 2px 0 rgba(0,0,0,.8),0 0 18px rgba(0,0,0,.9)}
+.hud.tl em{display:block;font-family:var(--m-f-hand);font-style:italic;font-size:12.5px;letter-spacing:0;
+  text-transform:none;color:var(--m-quiet);margin-top:6px;padding-top:5px;font-weight:400;
+  border-top:1px solid var(--m-line);max-width:640px}
+.hud.tl em b{color:var(--m-or);font-style:normal;font-family:var(--m-f-cap);font-size:10px;letter-spacing:.08em}
+.hud.br{bottom:15px;right:17px;display:flex;gap:6px;align-items:center}
+.hud button{font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:uppercase;padding:10px 18px;cursor:pointer;color:var(--m-text);border:0;
+  clip-path:var(--m-plaque);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable);
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 0 var(--m-house);
+  transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle),
+    transform var(--t-press) var(--snap)}
+.hud button:hover{background-position:0 0;color:var(--m-sable)}
+.zl{font-family:var(--m-f-tally);font-size:15px;font-weight:600;letter-spacing:.06em;
+  color:var(--m-quiet);padding-right:8px;font-variant-numeric:tabular-nums}
 .toast{bottom:auto;top:64px}
 /* ══ THE PIECES ══
    Drawn by the WebGL layer (gl.js): counters and large-unit shields get real
@@ -720,22 +743,65 @@ body{display:block;padding:0}
 .cwin .nm{transform:translateZ(3px)}
 .ped{display:none}
 /* ══ CHAT — fixed at the screen edge, NOT a prop on the table ══ */
+/* BLAZON: this was a flat parchment column — the one surface at the table
+   that read as a web form. It is chrome, so it is Sable: a hanging of dark
+   cloth down the right edge, your livery in a band along its inner hem, and
+   the words in Argent on it. It no longer follows the Theme button; the mat
+   does, the chrome does not. */
 .chatdock{position:fixed;top:0;right:0;bottom:0;width:300px;z-index:1500;
-  display:flex;flex-direction:column;background:var(--field);
-  border-left:1px solid var(--rule-o);box-shadow:inset 1px 0 0 var(--rule-i),-14px 0 40px rgba(0,0,0,.55)}
-.chatdock>.plaque{margin:12px 0 0 14px;align-self:flex-start}
-.chatdock .cb{flex:1;overflow:auto;padding:14px 14px 10px;min-height:0}
-.cl{font-family:var(--f-flav);font-size:13px;line-height:1.44;color:var(--ink-2);margin-bottom:10px}
-.cl b{display:block;font-family:var(--f-disp);font-size:8.5px;font-weight:700;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--gold);margin-bottom:1px}
-.cl.me{color:var(--ink)}
-.cin{display:flex;gap:7px;padding:10px 12px;border-top:1px solid var(--rule-i);background:rgba(0,0,0,.08)}
-.cin input{flex:1;min-width:0;background:var(--sunk);border:1px solid var(--rule-o);color:var(--ink);
-  font-family:var(--f-flav);font-size:13px;padding:6px 9px;outline:none;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
-.cin button{font-family:var(--f-disp);font-size:8px;font-weight:700;letter-spacing:.13em;
-  text-transform:uppercase;padding:7px 12px;cursor:pointer;color:#f4e8cc;border:1px solid var(--rule-o);
-  background:var(--band);box-shadow:inset 0 1px 0 var(--emboss)}
+  display:flex;flex-direction:column;color:var(--m-text);
+  background:
+    /* each merlon wears a gilt cap and a face a shade up from the cloth */
+    linear-gradient(var(--m-or),var(--m-or)) 0 6px / 12px 36px repeat-y,
+    linear-gradient(transparent 0 2px,var(--m-sable-3) 2px) 0 6px / 12px 36px repeat-y,
+    linear-gradient(var(--m-house),var(--m-house)) 12px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--m-line),var(--m-line)) 18px 0 / 1px 100% no-repeat,
+    repeating-linear-gradient(90deg,rgba(0,0,0,.16) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 4px),
+    linear-gradient(180deg,var(--m-sable-2),var(--m-sable) 40%);
+  border-left:0;
+  /* EMBATTLED. Its inner edge is a battlement — merlons and crenels, the
+     heraldic line of partition a castle wall is drawn with — so the column
+     reads as a hanging on a keep, not as a sidebar. A mask, because the
+     notches must go through everything inside it too. */
+  -webkit-mask:
+    linear-gradient(#000,#000) 12px 0 / calc(100% - 12px) 100% no-repeat,
+    linear-gradient(#000 0 50%,transparent 50%) 0 6px / 12px 36px repeat-y;
+          mask:
+    linear-gradient(#000,#000) 12px 0 / calc(100% - 12px) 100% no-repeat,
+    linear-gradient(#000 0 50%,transparent 50%) 0 6px / 12px 36px repeat-y}
+/* every line of talk arrives from the hem, and a roll's total is stamped */
+.cl{animation:cl-in .36s var(--pop) both}
+@keyframes cl-in{from{opacity:0;translate:28px 0}}
+.rtot{animation:stamp-in .5s var(--pop) .1s both}
+@keyframes stamp-in{from{opacity:0;transform:scale(2.2) rotate(-8deg)}}
+/* the name of the hanging is an Or plaque riding its top edge */
+.chatdock>.plaque{margin:0 0 0 30px;align-self:flex-start;padding:9px 26px 8px;
+  background:var(--m-or);color:var(--m-sable);border:0;clip-path:polygon(0 0,100% 0,calc(100% - 9px) 100%,9px 100%);
+  box-shadow:inset 0 -1px 0 var(--m-or-lo);font-family:var(--m-f-cap);letter-spacing:var(--m-track)}
+.chatdock .cb{flex:1;overflow:auto;padding:16px 16px 10px 28px;min-height:0}
+.chatdock .cb::-webkit-scrollbar{width:4px}
+.chatdock .cb::-webkit-scrollbar-thumb{background:var(--m-line)}
+.cl{font-family:var(--m-f-hand);font-size:14px;line-height:1.44;color:var(--m-quiet);margin-bottom:10px}
+.cl b{display:block;font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:uppercase;color:var(--m-or);margin-bottom:1px}
+.cl.me{color:var(--m-text)}
+.cin{display:flex;gap:6px;padding:11px 12px 12px 26px;border-top:1px solid var(--m-line);
+  background:var(--m-sable-0)}
+.cin input{flex:1;min-width:0;background:var(--m-sable-2);border:0;color:var(--m-argent-hi);
+  font-family:var(--m-f-hand);font-size:14px;padding:7px 10px;outline:none;
+  box-shadow:inset 0 0 0 1px var(--m-line),inset 0 2px 4px rgba(0,0,0,.6);
+  transition:box-shadow var(--t-hover) var(--settle)}
+.cin input::placeholder{color:var(--m-hush);font-style:italic}
+.cin input:focus{box-shadow:inset 0 0 0 1px var(--m-or),inset 0 2px 4px rgba(0,0,0,.6)}
+/* the primary act here: an Or plaque, and the counterchange runs the other
+   way — your livery sweeps over the gold */
+.cin button{font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:uppercase;padding:8px 14px;cursor:pointer;color:var(--m-sable);border:0;
+  background:var(--m-sweep-house) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-or);
+  transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle),
+    transform var(--t-press) var(--snap)}
+.cin button:hover{background-position:0 0;color:var(--m-house-ink)}
 #vp{right:300px}
 /* ── THE CORNER IS THE HUD'S AGAIN ───────────────────────────
    The bin used to live in these exact pixels and the zoom readout could not
@@ -756,54 +822,94 @@ body{display:block;padding:0}
    while you pan and zoom — but it draws nothing whatsoever. */
 .dicetray{position:absolute;transform:translateZ(2px);pointer-events:none}
 /* ══ THE ROLLER ══ */
-.dicebar{border-top:1px solid var(--rule-i);padding:10px 12px 11px;
-  background:rgba(0,0,0,.10);display:flex;flex-direction:column;gap:7px}
-.dtypes{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
-.dtypes button{position:relative;font-family:var(--f-disp);font-size:9px;font-weight:700;
-  letter-spacing:.1em;text-transform:uppercase;padding:7px 0 8px;cursor:pointer;
-  color:var(--ink-2);border:1px solid var(--rule-o);background:var(--sunk);
-  box-shadow:inset 0 1px 0 var(--emboss)}
-.dtypes button:hover{color:var(--ink);background:var(--band);}
-.dtypes button.has{color:#fdf1d4;background:var(--band);border-color:var(--rule-o)}
-.dtypes button.has::after{content:attr(data-n);position:absolute;top:-5px;right:-4px;
-  min-width:14px;padding:0 3px;font-family:var(--f-num);font-size:10px;line-height:14px;
-  color:#2a1c0c;background:var(--gold);border:1px solid var(--rule-o)}
-.dpool{font-family:var(--f-num);font-size:14px;letter-spacing:.06em;color:var(--ink);
-  background:var(--sunk);border:1px solid var(--rule-o);padding:5px 9px;min-height:26px;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
-.dpool.empty{font-family:var(--f-flav);font-style:italic;font-size:12px;color:var(--ink-3)}
+/* BLAZON: the roller is part of the hanging, so Sable too. Each die is a
+   small plaque you counterchange by pointing at it; a die you have picked
+   up stays counterchanged, with how many you hold on a Gules tab. */
+.dicebar{border-top:1px solid var(--m-line);padding:12px 8px 12px 22px;
+  background:linear-gradient(180deg,rgba(0,0,0,.25),transparent 60%);
+  display:flex;flex-direction:column;gap:8px}
+/* LOZENGY. The dice are not a grid of keys: they are lozenges, set the way
+   a lozengy field is — the second row sits in the notches of the first —
+   on a half-cell grid, each die two half-cells wide and two tall. The
+   clip-path is also the hit area, so the overlapping boxes never steal
+   each other's clicks. The gilt outline is the button's own ground; the
+   Sable face (and the counterchange) is ::before, a lozenge a hair inside. */
+.dtypes{display:grid;grid-template-columns:repeat(9,29px);grid-template-rows:repeat(3,24px);
+  gap:0;justify-content:center;margin:2px 0 4px}
+.dtypes button{position:relative;isolation:isolate;font-family:var(--m-f-tally);font-size:13.5px;
+  font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 0 3px;cursor:pointer;
+  color:var(--m-text);border:0;background:rgba(201,162,39,.5);clip-path:var(--m-lozenge);
+  transition:color var(--t-wipe) var(--settle),transform var(--t-press) var(--snap),
+    background-color var(--t-hover) var(--settle)}
+.dtypes button::before{content:'';position:absolute;inset:0;z-index:-1;
+  clip-path:polygon(50% 2px,calc(100% - 2.6px) 50%,50% calc(100% - 2px),2.6px 50%);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
+  transition:background-position var(--t-wipe) var(--settle)}
+.dtypes button:nth-child(1){grid-area:1/1/3/3} .dtypes button:nth-child(2){grid-area:1/3/3/5}
+.dtypes button:nth-child(3){grid-area:1/5/3/7} .dtypes button:nth-child(4){grid-area:1/7/3/9}
+.dtypes button:nth-child(5){grid-area:2/2/4/4} .dtypes button:nth-child(6){grid-area:2/4/4/6}
+.dtypes button:nth-child(7){grid-area:2/6/4/8} .dtypes button:nth-child(8){grid-area:2/8/4/10}
+.dtypes button:hover,.dtypes button.has{color:var(--m-sable);background-color:var(--m-or-hi)}
+.dtypes button:hover::before,.dtypes button.has::before{background-position:0 0}
+.dtypes button:active{transform:scale(.92)}
+/* how many you hold is written in the lozenge's foot, in Gules on the gilt */
+.dtypes button.has{padding-bottom:13px}
+.dtypes button.has::after{content:attr(data-n);position:absolute;left:50%;bottom:5px;
+  transform:translateX(-50%);font-family:var(--m-f-tally);font-size:11px;font-weight:700;
+  line-height:1;color:var(--m-gules)}
+.dpool{font-family:var(--m-f-tally);font-size:16px;font-weight:600;letter-spacing:.06em;color:var(--m-or);
+  background:var(--m-sable-0);border:0;padding:5px 10px;min-height:28px;
+  box-shadow:inset 0 0 0 1px var(--m-line),inset 0 2px 5px rgba(0,0,0,.7)}
+.dpool.empty{font-family:var(--m-f-hand);font-style:italic;font-size:13px;font-weight:400;
+  letter-spacing:0;color:var(--m-hush)}
 .drow{display:flex;align-items:center;gap:6px}
-.dmod{display:flex;align-items:center;gap:5px;font-family:var(--f-disp);font-size:8px;
-  font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
-.dmod input{width:46px;background:var(--sunk);border:1px solid var(--rule-o);color:var(--ink);
-  font-family:var(--f-num);font-size:13px;padding:4px 5px;outline:none;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
-.dtog{display:flex;align-items:center;gap:5px;font-family:var(--f-disp);font-size:8px;
-  font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
-  cursor:pointer;flex:1}
-.dtog input{accent-color:var(--gold)}
-.dicebar button.droll,.dicebar button.dclear{font-family:var(--f-disp);font-size:8.5px;
-  font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:7px 12px;cursor:pointer;
-  border:1px solid var(--rule-o);box-shadow:inset 0 1px 0 var(--emboss)}
-.dicebar button.dclear{color:var(--ink-2);background:var(--sunk)}
-.dicebar button.droll{color:#f6ecd2;background:linear-gradient(180deg,#8a6432,#5a4020)}
-.dicebar button.droll:hover{background:linear-gradient(180deg,#a8783c,#6d4e26)}
+.dmod{display:flex;align-items:center;gap:5px;font-family:var(--m-f-cap);font-size:8.5px;
+  font-weight:700;letter-spacing:var(--m-track);text-transform:uppercase;color:var(--m-quiet)}
+.dmod input{width:46px;background:var(--m-sable-0);border:0;color:var(--m-or);
+  font-family:var(--m-f-tally);font-size:15px;font-weight:600;padding:4px 6px;outline:none;
+  box-shadow:inset 0 0 0 1px var(--m-line),inset 0 2px 5px rgba(0,0,0,.7)}
+.dmod input:focus{box-shadow:inset 0 0 0 1px var(--m-or),inset 0 2px 5px rgba(0,0,0,.7)}
+.dtog{display:flex;align-items:center;gap:5px;font-family:var(--m-f-cap);font-size:8.5px;
+  font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--m-quiet);
+  cursor:pointer;flex:1;line-height:1.25}
+.dtog input{accent-color:var(--m-or)}
+.dicebar button.droll,.dicebar button.dclear{font-family:var(--m-f-cap);font-size:9px;
+  font-weight:700;letter-spacing:var(--m-track);text-transform:uppercase;padding:8px 13px;cursor:pointer;
+  border:0;transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle),
+    transform var(--t-press) var(--snap)}
+.dicebar button.dclear{color:var(--m-quiet);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, transparent;
+  box-shadow:inset 0 0 0 1px var(--m-line)}
+.dicebar button.dclear:hover{background-position:0 0;color:var(--m-sable)}
+/* THE ROLL IS A SEAL. Committing dice is a commitment, and every
+   commitment in Monarchy is pressed into wax — the same outline and melt as
+   the hall's seal (20-shell.css --m-wax), the same stamp, and 55-herald.js
+   throws gilt off it. */
+.dicebar button.droll{width:54px;height:54px;flex:0 0 auto;padding:0;margin:-6px 0 -6px 2px;
+  display:grid;place-items:center;color:var(--m-argent-hi);letter-spacing:.14em;
+  clip-path:var(--m-wax);background:var(--m-wax-melt);
+  text-shadow:0 1px 0 rgba(40,6,6,.7);
+  transition:transform .16s var(--pop),filter var(--t-hover) var(--settle)}
+.dicebar button.droll:hover{transform:scale(1.07) rotate(-4deg);filter:brightness(1.12)}
+.dicebar button.droll:active{transform:scale(.9) rotate(-1deg);
+  transition-duration:var(--t-press);transition-timing-function:var(--snap)}
 /* a roll in the chat log reads as a result, not as a sentence */
 .cl.roll{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
 .cl.roll b{width:100%}
-.rspec{font-family:var(--f-disp);font-size:8px;font-weight:700;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--ink-3);padding-right:2px}
+.rspec{font-family:var(--m-f-cap);font-size:8.5px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:uppercase;color:var(--m-quiet);padding-right:2px}
 .rdice{display:flex;flex-wrap:wrap;align-items:center;gap:3px}
-.rdice i{font-family:var(--f-num);font-style:normal;font-weight:700;font-size:13px;
-  min-width:22px;text-align:center;padding:1px 4px;color:var(--ink);
-  background:var(--sunk);border:1px solid var(--rule-o);box-shadow:inset 0 1px 0 var(--emboss)}
-.rdice i.hi{color:#1d2e1d;background:#7fae86;border-color:#3f6b40}
-.rdice i.lo{color:#f4e0da;background:#8f2a19;border-color:#5a1a0f}
-.rdice i.cn{font-family:var(--f-disp);font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+.rdice i{font-family:var(--m-f-tally);font-style:normal;font-weight:700;font-size:15px;
+  min-width:24px;text-align:center;padding:1px 4px;color:var(--m-text);
+  background:var(--m-sable-2);border:0;box-shadow:inset 0 0 0 1px var(--m-line)}
+/* the best a die can do is gilt; the worst is blood */
+.rdice i.hi{color:var(--m-sable);background:var(--m-or);box-shadow:none}
+.rdice i.lo{color:var(--m-argent-hi);background:var(--m-gules);box-shadow:none}
+.rdice i.cn{font-family:var(--m-f-cap);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
   min-width:auto;padding:3px 7px}
-.rdice u{text-decoration:none;font-family:var(--f-num);font-size:12px;color:var(--ink-3);padding:0 2px}
-.rtot{font-family:var(--f-num);font-weight:700;font-size:17px;color:var(--gold);
-  margin-left:auto;padding-left:8px;border-left:1px solid var(--rule-i)}
+.rdice u{text-decoration:none;font-family:var(--m-f-tally);font-size:13px;color:var(--m-hush);padding:0 2px}
+.rtot{font-family:var(--m-f-tally);font-weight:700;font-size:22px;line-height:1;color:var(--m-or);
+  margin-left:auto;padding-left:10px;border-left:1px solid var(--m-line)}
 /* ══ FALLBACK: no WebGL ══
    gl.js paints the pieces, so if it cannot start the DOM tokens must come back
    or the board is a grid of empty sockets. Restores the flat 2D pieces. */

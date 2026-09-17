@@ -1,7 +1,7 @@
 # MONARCHY — Project Reference
 
 **Status:** Active development
-**Last updated:** 2026-07-13
+**Last updated:** 2026-09-17
 
 > **Purpose of this document:** this is the single place to check before
 > working on the project — what exists, how it's built, and what rules to
@@ -74,13 +74,16 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
                             pictures, token maker, preview, lines, combat scene, room editor
     30-34, 37-39            the fight: rules, content, combat app, GL pieces, field, bar, dice
     29-role.js              which side of the table you are
+    55-herald.js            Blazon's motion: the Bend transition, the Cry, gilt (see 3.13) — before 42-shell
     42-shell.js             which half you are looking at
   assets/tex/              ← the textures, as real files (see 2.3)
+  assets/fonts/            ← Blazon's four typefaces, once fetched (see 3.13) — copied to dist/ like tex
 
 tools/
   scope-css.js, pack-geometry.js   ← build inputs, used by build.js
   bake*.py                         ← re-bake a model pack from its glTF/FBX
   bake-textures.py                 ← pull the textures back out to files
+  fetch-fonts.js                   ← one-off: download the OFL fonts into src/assets/fonts
   shot.js                          ← photograph the built app (Electron, not Playwright — see its header)
 
 test/
@@ -90,6 +93,10 @@ test/
   table-ui.test.js         ← the chest, the bar, and what is in your hand
   join.test.js             ← a character joining a table
   handling.test.js         ← picking things up and putting them down
+  tincture.test.js         ← the chrome's palette still IS the banners' palette (see 3.13)
+  herald.test.js           ← the Bend still lands a table; turns and natural 20s are still cried
+
+STYLE.md                  ← Blazon, the look of the app: the rules behind 20-shell.css's tokens
 
 build.js                  ← `node build.js` produces dist/monarchy.html (see 2.3)
 dist/monarchy.html        ← build artifact. NOT standalone any more — needs dist/assets/tex
@@ -786,6 +793,74 @@ in.
   `GH_TOKEN=... npx electron-builder --publish always` after
   `node build.js`. That step was intentionally not run or scripted here.
 
+### 3.13 The look: Blazon (2026-09-17)
+
+The app used to speak four visual dialects: the dark 3D hall, the parchment
+record, a flat beige chat column with web-form buttons at the table, and the
+bright cartoon field. Now there's one system, **Blazon**. It's heraldry used
+as a graphic system, the way Persona 5 uses its own theme. **`STYLE.md` is
+the full reference.** In short:
+
+- **Tokens** are all in `20-shell.css` (unscoped), prefixed `--m-` so they
+  can't collide with the local `--ink`/`--gold` names the scoped sheets
+  already define. The palette is `12-heraldry.js`'s `TINCT`, copied exactly,
+  and `test/tincture.test.js` fails if the two drift or if Argent stops
+  clearing 4.5:1 on a colour.
+- **Three surfaces:**
+  - **Sable** for all chrome. It no longer follows the Theme button; only
+    the mat does.
+  - **Cloth** for the hall's views.
+  - **Vellum** for records.
+- **The signature interaction is the counterchange.** An Or band sweeps in on
+  a 115° bend and the ink flips to Sable. It's on the hall's plates (in each
+  banner's own tincture), Back, `.lk`, the roll, the record's tabs, the scribe
+  bar, the HUD, chat, dice, the GM board and the scene dialog.
+- **Livery.** The chrome's one accent, `--m-house`, is meant to come from the
+  player's own arms. `42-shell.js` sets it (`Shell.livery()`, also called by
+  `takeArms()`). The choice of tincture, `houseTincture()`, is an open TODO
+  for grumkata. Until it's written, the livery is Gules.
+- **Type.** The four families were never loaded: there was no `@font-face`
+  anywhere, so everything was Times New Roman. `20-shell.css` now declares
+  each family, trying an installed copy, then `assets/fonts/*.woff2`, then a
+  Windows face (Constantia, Sitka Text, Old English Text MT / Sitka Banner,
+  Bahnschrift SemiCondensed). **The woff2 files aren't in the repo yet.** Run
+  `node tools/fetch-fonts.js` once and commit them; `build.js` copies the
+  folder into `dist/` and says so in its output.
+- **Motion and shaders, second pass (2026-09-17).** New
+  `src/js/55-herald.js` (loaded just before `42-shell.js`) is Blazon's motion
+  runtime. `STYLE.md` §6–6¾ has the full detail.
+  - **`Herald.wipe`:** a raw-WebGL shader transition, the Bend (a livery
+    cloth with a dancetty gilt edge and a sun in splendour behind the
+    destination's name). `Shell.show()` now goes through it. The switch
+    itself is still the synchronous `swap()`, run on a timer at full
+    cover, and a table's first boot happens under the cloth.
+    `show(where, id, true)` skips it; `?table=` uses that.
+  - **`Herald.proclaim`:** P5-style cries for round and phase changes
+    (watching `#round` and `.ph`) and for natural 20s and 1s (watching
+    `#chat-body`).
+  - **`Herald.burst`:** gilt thrown off every wax seal.
+  - **Hall shaders (`13-hall3d.js`):** the banner shader gains weave, gold
+    leaf and a counterchange sweep on hover, and there's a new GPU gilt-dust
+    system.
+  - **Layout:**
+    - Cloth screens get a full-field bend, a huge drifting device, a
+      vertical tincture name, and titles on ribbons bleeding off the left.
+      `#screen .body` now spans the screen with computed padding.
+    - Rolls step down a bend.
+    - The cloth falls with a swallowtail hem (`16-menu.js` `fall()`).
+    - The chat hanging has an embattled edge (CSS mask), the dice are
+      lozengy, Roll is a wax seal (`--m-wax`), and the HUD corner names the
+      table.
+- **Fixed on the way:**
+  - `12-combat.css` had two corrupted token lines (`--rule-i:#c9a societal`
+    and a full-width digit in `--ink-2`), each rescued only by a duplicate
+    declared after it.
+  - `.to-hall` had been drawn with no padding since the split, because
+    `body.at-table *{padding:0}` outranks a bare class.
+  - Every toast `45-papers.js` raised was invisible: it adds `.on`, while
+    the CSS only showed `.show`.
+  - Vert moved `#2c6b41` → `#2b6940` so Argent on it passes AA.
+
 ---
 
 ## 4. Game system summary (content, not code)
@@ -941,11 +1016,14 @@ else, and so they're not mistaken for split-related bugs.
 12. **Don't rename or remove `#sheet-root`'s id.** It's the only hook
     `WM.enableScaling()` has to find and scale the sheet's content — see
     3.10.
-13. **Theme colors for table-level UI (title screen, table, dock) go in
-    `05-shell.css`'s `:root` / `body.dark-mode` custom properties**, not
-    hardcoded per-element. Anything new added to the table should use
-    `var(--table-*)` tokens so the global theme toggle keeps working
-    everywhere, not just on the sheet.
+13. **Colour, type and shape come from Blazon's `--m-*` tokens in
+    `20-shell.css`, not from new hex literals.** (This rule used to name
+    `05-shell.css`'s `--table-*` tokens; that file went with the previous
+    generation.) Pick the surface first (Sable chrome, Cloth, or Vellum),
+    keep to the rule of tincture, give anything hoverable or chosen the
+    counterchange, and use no `border-radius`. A tincture changed in
+    `12-heraldry.js` must change in `20-shell.css` too, or
+    `test/tincture.test.js` fails. `STYLE.md` §8 is the checklist.
 14. **New table-level controls go in `#table-left-controls`, styled with
     the existing `.table-ctrl-btn` class** — small, low-opacity, brighten
     on hover. Don't add a second visible control cluster; the dock at the
@@ -971,6 +1049,8 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-17 | **Blazon, second pass: motion, shaders, and out of the box** (3.13; `STYLE.md` §6–6¾).<br>• **The Herald** (new `55-herald.js`, loaded before `42-shell.js`): **the Bend**, a WebGL shader wipe between hall and table under which the table now boots; **the Cry**, P5-style proclamations for rounds, phases and natural 20s/1s, hooked by `MutationObserver` so `32-combat-app.js` and `39-dice.js` are untouched; and **gilt bursts** off seals.<br>• **Hall shaders:** banner gold leaf, weave and hover sweep, plus GPU gilt dust.<br>• **Layout:** swallowtail cloth fall, full-field bend, drifting device, vertical tincture name, bleeding title ribbons, stepped rolls, name scroll, embattled chat hanging, lozengy dice, wax-seal Roll, and a named HUD corner.<br>• **Arrivals:** the lintel resolves in and glints every 9 s, plates are hung in turn, chat lines slide in, totals are stamped, toolbox slots are dealt, and the loading screen matches the lintel.<br>• **One bug found in my own watcher and fixed:** the visibility observer nulled the turn state its sibling had just read, so the first End Turn after placing a fight was silent.<br>• **New `test/herald.test.js`** (10 checks), now in `npm test`.<br>**Verified:** full `npm test` green; every new moment photographed mid-motion through the offscreen gallery. |
+| 2026-09-17 | **Blazon: one look for the whole app** (see 3.13 and the new `STYLE.md`). **Problem:** the app was four visual dialects, no web font had ever been loaded (205 rules asking for Cinzel or Crimson Text all got Times New Roman), and there were ~460 unique hex literals, with at least three different golds. **The system:** heraldry used as a graphic system.<br>• **Palette:** `20-shell.css` gains `--m-*` tokens that are `12-heraldry.js`'s `TINCT` exactly, and new `test/tincture.test.js` (now in `npm test`) keeps them identical and holds Argent-on-colour to 4.5:1. Its first run caught Vert at 4.49, so Vert moved two steps darker.<br>• **Type:** `@font-face` aliases give every existing family name a real face on any Windows 10/11 machine today, and the bundled woff2 files are used once `tools/fetch-fonts.js` has been run (not run here: downloading needs the owner's go-ahead). `build.js` copies `src/assets/fonts` like the textures, and the loading screen now uses the tokens.<br>• **Restyled onto the tokens:** the table's chat dock and dice roller (from flat parchment to Sable chrome), HUD buttons, the back-to-hall pennon, papers, toasts (both halves), the hotbar name tag (now a pennon) and selected slot, the GM board's cap and switches, the scene dialog's buttons, and the selection ring. In the hall: the lintel (lozenge rule), plates (counterchanged in their own banner's tincture via a per-plate `--house` from `16-menu.js`), illuminated `h2` initials, the bend strip, Back, fields, `.lk`, the roll, flag-maker "on" states and the update card. In the record: tabs, title rule, doors and the scribe bar.<br>• **Mat tokens re-pointed:** `12-combat.css` sends enemy → Gules, ally → Azure and its fonts → the shared voices.<br>• **Livery:** `42-shell.js` gains `Shell.livery()`, which dyes the chrome's accent from the player's arms. Choosing the tincture, `houseTincture()`, is left as a TODO for grumkata.<br>• **Bugs fixed on the way:** two corrupted token lines in `12-combat.css`, `.to-hall`'s missing padding, and papers toasts that could never show.<br>**Verified:** `npm test` all green (tincture 17, geometry, 23 + 60 + 11 + 25). All 15 screens were photographed before and after through an offscreen-rendered Electron window: `tools/shot.js`'s hidden window never advances the Web Animations clock, so the hall's cloth-drop was frozen at frame 0 in every capture of a hall view. |
 | 2026-09-15 | **In-app update UI**, on the hall rather than in Settings — grumkata's correction after a first pass put it there. `electron/preload.js` (new: this app had no preload before) exposes `window.AppUpdate` over `contextBridge`, `electron/updater.js` now pushes a status object on every electron-updater event, and `#update-card` in `menu-body.html` shows itself only for `state:'downloaded'` — a small top-right popup with "Restart & update" (calls `quitAndInstall()`) and "Later" (dismisses for the session; the update installs on the next quit regardless). Verified with a fake preload standing in for the real one, so a `'downloaded'` push could be fired without an actual GitHub release to test against — screenshotted showing correctly on the bare hall, clear of the banners and `#arms`. Full `npm test` (119/119) green throughout. See 3.12. |
 | 2026-09-15 | **Real auto-update wired in**, via `electron-updater` against this repo's GitHub Releases — `electron/updater.js`, called from `main.js` after the window opens (checks and downloads quietly in the background, installs on the next natural quit, per grumkata's choice over blocking startup). Chosen over an earlier hand-rolled `updater.js` (still at the repo root, now unused) that only ever hot-patched web content inside a fixed shell; this instead replaces the whole packaged app via the `nsis` installer target — the `portable` target has no equivalent mechanism and cannot auto-update, a real limitation of NSIS rather than of this code. `electron-updater` added as a genuine `dependencies` entry (not `devDependencies` — it runs in the packaged app's own main process, and electron-builder strips devDependencies from the asar), and `package.json`'s `build.publish` now points at the `github` provider for this repo, which changes nothing about what `npm run dist` produces today and only matters once an actual publish (with a `GH_TOKEN`) or a running app's own update check reads it. No release, tag, or token was created or touched. Verified: syntax-checked, and confirmed live via `npm start` that the updater guard fires correctly and silently in an unpackaged dev run (`[updater] skipped — not a packaged build`) with no effect on normal startup; full `npm test` suite unaffected. See 3.12. |
 | 2026-09-14 | **Deleted the previous generation.** `src/index.html` and the 32 CSS/JS files only it loaded had been unbuilt for months — `build.js` names every file it stitches, and none of them were on the list, so the shipped app had not contained a line of them in a long time. Removing them changed `dist/monarchy.html` by zero bytes, which is the proof they were dead. Gone with them: `test/smoke.js` and `test/multi-sheet.test.js` (both asserted on `WM`, both already failing, neither in `npm test`), `extract.py` (a one-time migration that reads an `original.html` no longer in the repo), `_canary.txt`, and `src/assets/images` (3 SVGs referenced only by the old entry point). **Features that went with that generation and are NOT rebuilt:** live GM/player sync, GM tools, fog of war, the window manager, multi-sheet editing — recorded in 2.1 rather than left to be discovered. **`firebase` dropped from `dependencies`**: nothing in the current source imports it, and electron-builder was bundling 45 MB of it into every installer (979 entries in the 129 MB `app.asar`) for the sync layer the hall's own Join screen says is not built. **Dead code inside the live files:** `27-table-gl.js` carried a whole post-processing chain — bright-pass, two blur passes, an ACES/split-tone/vignette/grain grade, three render targets, ~190 lines — behind `postReady`, and `buildPost()` was never called, so the condition could not fire and `drawUnder` had been taking the plain branch the whole time. The author's own note on it (measured: 14ms with the GL canvases hidden, 3001ms with them on, and `#grade` in table-body.html already grading the whole composite) had been pasted ABOVE the file's header, outside the IIFE, as a second `drawUnder` whose `uRen`/`uScene` did not even resolve — dead and unreachable. Both removed, the reasoning kept. Also `wallAt()` and `BIN_KEEPS`, the only two genuinely unreferenced symbols in the whole live source: a sweep of every top-level function found 14 candidates and 13 were false positives, called from template literals. **`tools/` cut from 20 files to 9**: the eleven `shot-*`/`dbg-*`/`diag` scripts all required playwright from `/home/claude/.npm-global/...` and opened `file:///tmp/mon/dist/monarchy.html`, paths inside a container that no longer exists, so not one could run. Replaced by `tools/shot.js`, which is Electron rather than Playwright because three.js does not set `preserveDrawingBuffer` — a Playwright screenshot reads an already-cleared buffer and produces a black page with the DOM chrome drawn on top, which looks like a broken app rather than a broken camera. **CSS was left alone on purpose:** 34 class names are never mentioned anywhere, but they are worth 1.9 KB of 290 KB and zero removable rules in the two largest sheets, and the `t3-*` family among them is built by concatenation in `24-table-props.js` (`'prop t3-thing t3-' + t.kind`), so the analysis that flagged them is exactly wrong about those. Not worth the risk. Verified: `dist/monarchy.html` unchanged at 4.24 MB through every step, 119 tests green, hall and table screenshots unchanged. |

@@ -39,7 +39,180 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: #0a0705; }
   --t-press: .07s;     /* a press must beat the eye, not animate for it */
   --t-hover: .16s;
   --t-move:  .26s;
+  --t-wipe:  .22s;     /* the counterchange sweep — see BLAZON below */
 }
+
+/* ══════════════════════════════════════════════════════════════
+   BLAZON — THE LOOK OF THE WHOLE APP, IN ONE PLACE
+   STYLE.md is the long form. This is the part the browser reads.
+
+   Persona 5 is recognisable from one frame because its theme IS its
+   graphic system: a strict palette, one shape language, type used as
+   image. Monarchy's theme is heraldry, and heraldry already is a
+   graphic system — a thousand years old, with rules. So the app takes
+   heraldry's rules instead of inventing a style:
+
+     · THE TINCTURES are the palette. Nothing else. Two metals (Or,
+       Argent), the colours, and Sable. The values below are
+       12-heraldry.js's TINCT, copied exactly — the banners in the hall
+       are painted from that table, and the chrome has to be the same
+       paint. test/tincture.test.js fails the build if they drift.
+     · THE RULE OF TINCTURE is the contrast rule. Metal on colour,
+       colour on metal, never metal on metal or colour on colour. It
+       is why a herald could read a shield across a field, and it is
+       why Argent text on any colour here clears 4.5:1. Or on a colour
+       only clears 3:1, so Or on a colour is for DISPLAY type only;
+       Or on Sable clears 7:1 and may be any size.
+     · THREE SURFACES, never mixed:
+         Sable  — chrome. Every bar, button, panel, toast. Always dark,
+                  whatever the table's theme, the way P5's UI is always
+                  red and black whichever world it is laid over.
+         Cloth  — navigation. The hall's screens, dyed the tincture of
+                  the banner you took down (00-hall.css --field).
+         Vellum — records. The sheet, papers, the battle mat. Sable
+                  ink, and Gules for headings: RUBRICATION, the red a
+                  scribe used for the parts you should find first.
+     · THE BEND is the signature line — the heraldic diagonal. Anything
+       that is chosen, hovered or live is COUNTERCHANGED along a bend:
+       an Or band sweeps in on the diagonal and the ink flips to Sable.
+       That sweep is this app's equivalent of P5's red slash, and it is
+       the one piece of motion every control shares.
+══════════════════════════════════════════════════════════════ */
+:root{
+  /* ── the tinctures (= 12-heraldry.js TINCT) ── */
+  --m-gules:#a3232b; --m-azure:#27508f; --m-vert:#2b6940; --m-purpure:#67326f;
+  --m-sable:#171310; --m-tenne:#8a4a1e; --m-murrey:#6d2038; --m-bleu:#5d7fa8;
+  --m-or:#c9a227;    --m-argent:#ded8c8;
+
+  /* ── the same paint, lit and shaded, for things with depth ── */
+  /* shaded gold leans warm — Or darkened straight toward black goes olive */
+  --m-or-hi:#ecd27a;  --m-or-lo:#86621c;
+  --m-argent-hi:#f4efe2; --m-argent-lo:#a39c8b;
+  --m-gules-hi:#c9443a; --m-gules-lo:#5c1016;
+  --m-sable-2:#221c16;   /* a raised panel */
+  --m-sable-3:#30271e;   /* a raised panel under the pointer */
+  --m-sable-0:#0b0907;   /* a well, a slot, anything sunk */
+
+  /* ── vellum: the ground a record is written on ── */
+  --m-vellum:#efe4c8; --m-vellum-2:#e2d3ad; --m-vellum-3:#cdb98e;
+  --m-ink:#1c140c;       /* sable ink */
+  --m-ink-2:#4a3a28; --m-ink-3:#7a6a55;
+  --m-rubric:var(--m-gules);
+
+  /* ── roles: what a rule should reach for ── */
+  --m-voice:var(--m-or);            /* headings, the live thing */
+  --m-text:var(--m-argent);         /* reading, on chrome and cloth */
+  --m-quiet:rgba(222,216,200,.56);  /* the second line */
+  --m-hush:rgba(222,216,200,.34);   /* the third */
+  --m-line:rgba(201,162,39,.34);    /* a hairline of gilt */
+  --m-line-hi:rgba(201,162,39,.8);
+  /* YOUR LIVERY. The accent the chrome wears is the field of your own arms
+     — 42-shell.js sets it from them. Gules until you have any. */
+  --m-house:var(--m-gules);
+  --m-house-ink:var(--m-argent);
+
+  /* ── type: four voices, and each has one job ──
+       mark   the name of the thing — "Monarchy", a person's name
+       cap    engraved capitals — every label, button and heading
+       hand   the book's own voice — anything you read as a sentence
+       tally  a number you act on — rounds, dice, counts
+     The family names are the real fonts; the @font-face blocks below
+     alias each one onto something every Windows machine already has
+     until the real files are in src/assets/fonts. */
+  --m-f-mark:'UnifrakturMaguntia','Old English Text MT','Sitka Banner',serif;
+  --m-f-cap:'Cinzel','Constantia',serif;
+  --m-f-hand:'Crimson Text','Sitka Text','Palatino Linotype',Georgia,serif;
+  --m-f-tally:'Barlow Condensed','Bahnschrift SemiCondensed','Bahnschrift',sans-serif;
+  --m-track:.2em;       /* the one letter-spacing for engraved capitals */
+
+  /* ── the cuts: the only shapes a panel or a control may take ── */
+  --m-plaque:polygon(8px 0,calc(100% - 8px) 0,100% 100%,0 100%);
+  --m-cut:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);
+  --m-pennon:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%);
+  /* a lozenge — the dice are lozengy (12-combat.css) */
+  --m-lozenge:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  /* WAX: every commitment is a seal. The outline and the melt are shared so
+     the hall's seal and the table's Roll are visibly the same wax. */
+  --m-wax:polygon(50% 0%,63% 5%,77% 3%,88% 13%,96% 25%,94% 39%,100% 52%,93% 64%,
+    95% 77%,84% 86%,74% 96%,60% 93%,50% 100%,38% 95%,25% 97%,15% 86%,5% 77%,8% 62%,
+    0% 51%,7% 38%,4% 24%,16% 14%,25% 4%,37% 7%);
+  --m-wax-melt:radial-gradient(circle at 34% 26%,#d4574a,var(--m-gules) 44%,var(--m-gules-lo) 100%);
+
+  /* ── the counterchange. Used as the FIRST background layer, parked off
+     to the right at rest (background-position 102%) and swept to 0 when
+     the thing is hovered, chosen or live. See STYLE.md for the recipe. ── */
+  --m-sweep:linear-gradient(115deg,var(--m-or) 0 50%,transparent calc(50% + .5px));
+  /* the same cut, for a control that is ALREADY Or at rest: your livery
+     sweeps over the metal instead, and the ink flips to --m-house-ink */
+  --m-sweep-house:linear-gradient(115deg,var(--m-house) 0 50%,transparent calc(50% + .5px));
+  --m-sweep-size:260% 100%;
+
+  /* ── the frame: a Sable rule outside a gilt one, and corner marks at
+     3px — the "layered frame" from grumkata's references. The marks sit on
+     the BEND SINISTER (top right, bottom left) because --m-cut takes the
+     other two corners: cuts on one diagonal, marks on the other, so a panel
+     can wear both and neither eats the other. ── */
+  --m-frame:inset 0 0 0 1px var(--m-sable), inset 0 0 0 2px rgba(201,162,39,.55);
+  --m-marks:
+    linear-gradient(var(--m-or),var(--m-or)) calc(100% - 5px) 5px / 12px 2px no-repeat,
+    linear-gradient(var(--m-or),var(--m-or)) calc(100% - 5px) 5px / 2px 12px no-repeat,
+    linear-gradient(var(--m-or),var(--m-or)) 5px calc(100% - 5px) / 12px 2px no-repeat,
+    linear-gradient(var(--m-or),var(--m-or)) 5px calc(100% - 5px) / 2px 12px no-repeat;
+  --m-lift:0 14px 34px rgba(0,0,0,.62);
+}
+
+/* ══ THE TYPE, ALIASED ═════════════════════════════════════════
+   Before this, not one of these four families was ever loaded — there
+   was no @font-face and no link anywhere — so 205 rules asking for
+   Cinzel and Crimson Text were all quietly getting Times New Roman,
+   which is most of why the app read as a web page.
+
+   Each family is declared once here, and its src list is tried in
+   order: an installed copy, then the bundled file (tools/fetch-fonts.js
+   puts it in src/assets/fonts, build.js copies it beside the page),
+   then a face every Windows 10/11 machine ships with. So every existing
+   `font-family:'Cinzel'` rule starts working today without being
+   touched, and gets the real letters the moment the files exist.
+
+   Weight is split in two faces so a local fallback gets its REAL bold
+   rather than a smeared synthetic one. Unscoped by nature: tools/
+   scope-css.js passes @font-face through untouched. */
+@font-face{font-family:'Cinzel';font-weight:400 599;font-display:swap;
+  src:local('Cinzel'),url('assets/fonts/cinzel.woff2') format('woff2'),local('Constantia')}
+@font-face{font-family:'Cinzel';font-weight:600 900;font-display:swap;
+  src:local('Cinzel Bold'),url('assets/fonts/cinzel.woff2') format('woff2'),local('Constantia Bold')}
+@font-face{font-family:'Crimson Text';font-weight:400 599;font-style:normal;font-display:swap;
+  src:local('Crimson Text'),url('assets/fonts/crimson-text.woff2') format('woff2'),
+      local('Sitka Text'),local('Palatino Linotype')}
+@font-face{font-family:'Crimson Text';font-weight:400 599;font-style:italic;font-display:swap;
+  src:local('Crimson Text Italic'),url('assets/fonts/crimson-text-italic.woff2') format('woff2'),
+      local('Sitka Text Italic'),local('Palatino Linotype Italic')}
+@font-face{font-family:'Crimson Text';font-weight:600 900;font-style:normal;font-display:swap;
+  src:local('Crimson Text SemiBold'),url('assets/fonts/crimson-text-bold.woff2') format('woff2'),
+      local('Palatino Linotype Bold')}
+@font-face{font-family:'UnifrakturMaguntia';font-display:swap;
+  src:local('UnifrakturMaguntia'),url('assets/fonts/unifraktur-maguntia.woff2') format('woff2'),
+      local('Old English Text MT'),local('Sitka Banner')}
+@font-face{font-family:'Barlow Condensed';font-weight:400 599;font-display:swap;
+  src:local('Barlow Condensed Medium'),url('assets/fonts/barlow-condensed.woff2') format('woff2'),
+      local('Bahnschrift SemiCondensed')}
+@font-face{font-family:'Barlow Condensed';font-weight:600 900;font-display:swap;
+  src:local('Barlow Condensed Bold'),url('assets/fonts/barlow-condensed-bold.woff2') format('woff2'),
+      local('Bahnschrift SemiCondensed')}
+
+/* ══ THE COUNTERCHANGE, AS A CLASS ═════════════════════════════
+   For new markup. Existing controls get the same recipe written into
+   their own (scoped) rules, because a bare class here loses to their
+   two-class selectors — see rule 5 in PROJECT.md. */
+.m-cc{
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
+  color:var(--m-text);
+  transition:background-position var(--t-wipe) var(--settle),
+             color var(--t-wipe) var(--settle), transform var(--t-press) var(--snap);
+}
+.m-cc:hover, .m-cc.on, .m-cc[aria-pressed="true"]{ background-position:0 0; color:var(--m-sable); }
+/* the keyboard gets the same sweep plus a ring, never just the ring */
+:focus-visible{ outline:2px solid var(--m-or); outline-offset:2px; }
 
 /* ══ PRESSES ═════════════════════════════════════════════
    There was ONE `:active` rule in the entire application before this — a
@@ -79,16 +252,25 @@ body.at-hall  #table-app { display: none; }
 body.at-hall #gl, body.at-hall #gl2, body.at-hall #tgl { display: none !important; }
 
 /* the way back, on the table */
-.to-hall {
+/* Sable chrome with the counterchange, and a pennon cut on its right end so
+   it reads as pointing back the way you came.
+   `html body` because 12-combat.css opens with `*{padding:0}`, scoped to
+   `body.at-table *` — two points of specificity to a bare class's one, and
+   this sheet loads first, so this button had been drawn with no padding at
+   all since the shell was split. */
+html body .to-hall {
   position: fixed; left: 17px; top: 15px; z-index: 940; display: none;
-  font-family: 'Cinzel', serif; font-size: 8.5px; font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase; cursor: pointer;
-  color: #f4e8cc; border: 1px solid #3d2812; padding: 9px 14px;
-  background: linear-gradient(180deg, #8a6432, #5a4020);
-  box-shadow: inset 0 1px 0 rgba(255,240,210,.3);
+  font-family: var(--m-f-cap); font-size: 9.5px; font-weight: 700;
+  letter-spacing: var(--m-track); text-transform: uppercase; cursor: pointer;
+  color: var(--m-text); border: 0; padding: 10px 26px 10px 14px;
+  background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable);
+  clip-path: var(--m-pennon);
+  box-shadow: inset 3px 0 0 var(--m-house), inset 0 0 0 1px var(--m-line);
+  transition: background-position var(--t-wipe) var(--settle),
+              color var(--t-wipe) var(--settle), transform var(--t-press) var(--snap);
 }
-body.at-table .to-hall { display: block; }
-.to-hall:hover { background: linear-gradient(180deg, #a8783c, #6d4e26); }
+html body.at-table .to-hall { display: block; }
+html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
 
 /* ══════════════════════════════════════════════════════════════
    PAPERS — a record open at the table, on your own end.
@@ -101,62 +283,67 @@ body.at-table .to-hall { display: block; }
 .tp {
   position: fixed; right: 316px; top: 14px; bottom: 14px; width: min(720px, 52vw);
   z-index: 930; display: flex; flex-direction: column;
+  /* vellum, with the faint lattice every record is ruled on */
   background:
-    repeating-linear-gradient(45deg, rgba(0,0,0,.045) 0 2px, transparent 2px 7px),
-    repeating-linear-gradient(-45deg, rgba(0,0,0,.045) 0 2px, transparent 2px 7px),
-    linear-gradient(176deg, #e0cfa9 0%, #cdb98e 100%);
-  border: 3px solid #3d2812;
-  box-shadow: inset 0 0 0 2px #8a6432, inset 0 0 0 4px #c9a86a,
+    repeating-linear-gradient(45deg, rgba(28,20,12,.04) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, rgba(28,20,12,.04) 0 2px, transparent 2px 7px),
+    linear-gradient(176deg, var(--m-vellum-2) 0%, var(--m-vellum-3) 100%);
+  border: 3px solid var(--m-sable);
+  box-shadow: inset 0 0 0 2px var(--m-or-lo), inset 0 0 0 4px rgba(201,162,39,.45),
               0 26px 70px rgba(0,0,0,.6);
-  color: #2a1c0d;
+  color: var(--m-ink);
 }
 .tp[hidden] { display: none !important; }
 /* corner marks — four, at 3px inset, per the design language */
 .tp::before {
   content: ''; position: absolute; inset: 3px; pointer-events: none; z-index: 2;
   background:
-    linear-gradient(#3d2812,#3d2812) left top / 14px 2px no-repeat,
-    linear-gradient(#3d2812,#3d2812) left top / 2px 14px no-repeat,
-    linear-gradient(#3d2812,#3d2812) right bottom / 14px 2px no-repeat,
-    linear-gradient(#3d2812,#3d2812) right bottom / 2px 14px no-repeat;
+    linear-gradient(var(--m-sable),var(--m-sable)) left top / 14px 2px no-repeat,
+    linear-gradient(var(--m-sable),var(--m-sable)) left top / 2px 14px no-repeat,
+    linear-gradient(var(--m-sable),var(--m-sable)) right bottom / 14px 2px no-repeat,
+    linear-gradient(var(--m-sable),var(--m-sable)) right bottom / 2px 14px no-repeat;
 }
+/* the head is chrome, so it is Sable — with your livery down its edge */
 .tp-head {
   flex: 0 0 auto; position: relative; height: 30px; margin: 0 0 6px;
-  border-bottom: 2px solid #3d2812;
-  background: linear-gradient(180deg, #8a6432, #5a4020);
+  border-bottom: 2px solid var(--m-or-lo);
+  background: var(--m-sable);
+  box-shadow: inset 0 -3px 0 var(--m-house);
 }
 /* the title is a plaque riding ON the border, never a row inside a box */
 .tp-head .plaque {
   position: absolute; left: 16px; top: 9px;
-  padding: 6px 20px 5px; background: linear-gradient(180deg, #a8783c, #6d4e26);
-  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 100%, 0 100%);
-  border-top: 1px solid #e8c98a; color: #f6ecd2;
-  font-family: 'Cinzel', serif; font-size: 11px; font-weight: 700; letter-spacing: .14em;
-  box-shadow: 0 3px 8px rgba(0,0,0,.45);
+  padding: 6px 20px 5px; background: var(--m-or);
+  clip-path: var(--m-plaque); color: var(--m-sable);
+  font-family: var(--m-f-cap); font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  box-shadow: inset 0 1px 0 var(--m-or-hi);
 }
 .tp-x {
   position: absolute; right: 8px; top: 5px; width: 20px; height: 20px;
   display: grid; place-items: center; cursor: pointer; font-size: 10px;
-  color: #f0e0bc; background: transparent; border: 1px solid rgba(240,224,188,.3);
+  color: var(--m-quiet); background: transparent; border: 1px solid var(--m-line);
+  transition: background var(--t-hover) var(--settle), color var(--t-hover) var(--settle);
 }
-.tp-x:hover { color: #fff; border-color: #e8c98a; }
+.tp-x:hover { color: var(--m-argent-hi); background: var(--m-gules); border-color: var(--m-gules-hi); }
 .tp-leaf { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 20px; }
 
 /* choosing which record, when there is more than one */
 .tp-pickers { padding: 26px 18px; display: flex; flex-direction: column; gap: 10px; }
 .tp-pick {
   display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; align-items: baseline;
-  padding: 12px 16px; cursor: pointer; text-align: left; color: #2a1c0d;
-  background: linear-gradient(176deg, #d8c49a, #c2ab7e);
-  border: 2px solid #3d2812;
-  box-shadow: inset 0 0 0 1px #c9a86a, 0 4px 10px rgba(0,0,0,.3);
+  padding: 12px 16px; cursor: pointer; text-align: left; color: var(--m-ink);
+  background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-vellum);
+  border: 2px solid var(--m-sable);
+  box-shadow: inset 4px 0 0 var(--m-rubric), 0 4px 10px rgba(0,0,0,.3);
+  transition: background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle);
 }
-.tp-pick:hover { background: linear-gradient(176deg, #e8d6ad, #cdb68a); }
-.tp-pick b { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 600; }
-.tp-pick i { grid-column: 1; font-family: 'Crimson Text', serif; font-size: 12px; opacity: .6; }
+/* on vellum the sweep is Or over ink: metal under colour, still lawful */
+.tp-pick:hover { background-position: 0 0; }
+.tp-pick b { font-family: var(--m-f-cap); font-size: 14px; font-weight: 600; }
+.tp-pick i { grid-column: 1; font-family: var(--m-f-hand); font-size: 12px; opacity: .6; }
 .tp-pick span {
-  grid-row: 1 / span 2; font-family: 'Cinzel', serif; font-size: 11px;
-  letter-spacing: .08em; opacity: .75;
+  grid-row: 1 / span 2; font-family: var(--m-f-tally); font-size: 14px; font-weight: 600;
+  letter-spacing: .06em; opacity: .75;
 }
 
 /* ── THE BIN: A THING ON THE TABLE ────────────────────────────
@@ -184,3 +371,82 @@ body.at-table .to-hall { display: block; }
   border: 2px solid #b84230; border-radius: 50%;
   box-shadow: 0 0 26px rgba(184,66,48,.6); pointer-events: none;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THE HERALD — 55-herald.js's two layers. Unscoped: they cover both
+   halves, and sit under only the loading screen (z 100000).
+══════════════════════════════════════════════════════════════ */
+#herald-gl { position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: 99990; pointer-events: none; display: none; }
+#herald-gl.on { display: block; }
+#herald { position: fixed; inset: 0; z-index: 99991; pointer-events: none; overflow: hidden; }
+/* nothing is clicked twice through a cloth that is still moving */
+#herald.wiping { pointer-events: auto; cursor: progress; }
+
+/* ── the cloth without WebGL: the same bands, drawn by CSS ── */
+#herald .hr-veil { position: absolute; inset: -30% -60%; transform: translateX(-130%);
+  background: linear-gradient(115deg, transparent 0 20%, var(--m-or) 20% 21.2%,
+    var(--m-house) 21.2% 29%, var(--m-sable) 29%); }
+#herald.nogl.wiping .hr-veil { animation: hr-veil-in .38s cubic-bezier(.5,0,.85,.4) forwards; }
+#herald.nogl.lifting .hr-veil { animation: hr-veil-out .56s var(--settle) forwards; }
+@keyframes hr-veil-in  { from { transform: translateX(-130%); } to { transform: translateX(-20%); } }
+@keyframes hr-veil-out { from { transform: translateX(-20%); }  to { transform: translateX(120%); } }
+
+/* ── the name of where you are going, while the cloth is across ── */
+#herald .hr-card { position: absolute; left: 50%; top: 50%; text-align: center; white-space: nowrap;
+  transform: translate(-50%, -50%) scale(.9); opacity: 0;
+  transition: opacity .18s var(--settle), transform .5s var(--pop); }
+#herald.carded .hr-card { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#herald .hr-card b { display: block; font-family: var(--m-f-mark); font-weight: 400;
+  font-size: clamp(52px, 7.4vw, 112px); line-height: 1; color: var(--m-argent-hi);
+  text-shadow: 0 4px 0 rgba(0,0,0,.6), 0 0 70px rgba(0,0,0,.85); }
+/* the lozenge rule again — the app's one ornament, under its names */
+#herald .hr-card b::after { content: ''; display: block; width: 340px; height: 13px; margin: 20px auto 12px;
+  background:
+    linear-gradient(45deg, transparent 35%, var(--m-or) 35% 65%, transparent 65%) center / 13px 13px no-repeat,
+    linear-gradient(90deg, transparent, var(--m-or) 36%, transparent 46%, transparent 54%, var(--m-or) 64%, transparent)
+      center / 100% 1px no-repeat; }
+#herald .hr-card i { font-family: var(--m-f-hand); font-style: italic; font-size: 23px;
+  color: var(--m-or-hi); letter-spacing: .03em; text-shadow: 0 2px 10px #000; }
+
+/* ── THE CRY: a Sable band slammed across on a bend ──
+   The hem is the tone (your livery unless the moment has its own colour)
+   with gilt outside it; the title carries a hard offset shadow in the same
+   tone — the one borrowed P5 gesture, in heraldic colours. */
+#herald .hr-cry { position: absolute; inset: 0; }
+/* absolutely placed and centred by hand: a grid will not centre an item
+   wider than itself, so a 160vw band started at the left edge and the
+   words ran off the right */
+#herald .hr-band { --tone: var(--m-house); position: absolute; left: -30vw; width: 160vw;
+  top: 50%; translate: 0 -50%; padding: 30px 0 26px;
+  text-align: center;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 17px, rgba(201,162,39,.08) 17px 18px),
+    repeating-linear-gradient(-45deg, transparent 0 17px, rgba(201,162,39,.08) 17px 18px),
+    var(--m-sable);
+  box-shadow: 0 -10px 0 var(--tone), 0 10px 0 var(--tone),
+              0 -14px 0 var(--m-or), 0 14px 0 var(--m-or),
+              0 34px 90px rgba(0,0,0,.75);
+  transform: rotate(-7deg);
+  animation: hr-band-in .38s var(--pop) both,
+             hr-band-out .34s cubic-bezier(.5,0,.85,.4) forwards;
+  animation-delay: 0s, calc(.38s + var(--hold, 900ms)); }
+@keyframes hr-band-in  { from { transform: rotate(-7deg) translateX(-105%) scaleY(.3); } }
+@keyframes hr-band-out { to { transform: rotate(-7deg) translateX(105%) scaleY(.5); opacity: .3; } }
+#herald .hr-title { display: inline-block; font-family: var(--m-f-cap); font-weight: 900;
+  font-size: clamp(46px, 7.4vw, 124px); line-height: 1; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--m-argent-hi);
+  text-shadow: .06em .06em 0 var(--tone), 0 0 40px rgba(0,0,0,.6);
+  animation: hr-slam .52s var(--pop) .06s both; }
+#herald .hr-title::first-letter { font-family: var(--m-f-mark); font-weight: 400; color: var(--m-or);
+  font-size: 1.32em; letter-spacing: .02em; text-transform: none; }
+@keyframes hr-slam { from { transform: scale(1.7) skewX(-16deg); opacity: 0; } }
+#herald .hr-sub { margin-top: 10px; font-family: var(--m-f-hand); font-style: italic;
+  font-size: clamp(18px, 1.9vw, 28px); color: var(--m-or-hi); letter-spacing: .03em;
+  animation: hr-rise .42s var(--settle) .2s both; }
+@keyframes hr-rise { from { transform: translateY(12px); opacity: 0; } }
+
+/* ── gilt: lozenges of gold leaf thrown off a seal ── */
+#herald .hr-sparks i { position: absolute; display: block; pointer-events: none;
+  background: linear-gradient(135deg, var(--m-or-hi), var(--m-or) 55%, var(--m-or-lo));
+  box-shadow: 0 0 7px rgba(236,210,122,.75); }

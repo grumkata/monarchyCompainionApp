@@ -173,6 +173,7 @@ const JS = [
   'src/js/40-combat-scene.js',   // model <-> battlefield
   'src/js/28-table-boot.js',
 
+  'src/js/55-herald.js',         // Blazon's motion: the bend, the cry, the gilt
   'src/js/42-shell.js',          // ── which half you are looking at ──
   'src/js/16-menu.js'            // last: it boots the hall
 ];
@@ -212,20 +213,35 @@ const LOADING = `
   <div class="boot-say">setting the table&hellip;</div>
 </div>
 <style>
+/* Blazon's first frame: Sable ground, the mark in Argent, the bar in Or on a
+   bend-cut track. The tokens are 20-shell.css's — that sheet is in <head>,
+   so they already resolve here. */
 #boot{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:18px;
-  background:radial-gradient(ellipse at 50% 38%,#241a10 0%,#0a0705 76%);
-  transition:opacity .55s ease;font-family:Georgia,'Times New Roman',serif}
+  background:radial-gradient(ellipse at 50% 38%,#241a10 0%,var(--m-sable-0,#0a0705) 76%);
+  transition:opacity .55s ease;font-family:var(--m-f-hand,Georgia,serif)}
 #boot.gone{opacity:0;pointer-events:none}
-.boot-mark{font-size:40px;color:#c9a227;opacity:.72;
+.boot-mark{font-size:40px;color:var(--m-or,#c9a227);opacity:.72;
   text-shadow:0 0 26px rgba(201,162,39,.35);animation:bootpulse 2.6s ease-in-out infinite}
-.boot-name{font-family:'UnifrakturMaguntia',Georgia,serif;font-size:52px;
-  color:#e8dfc8;letter-spacing:.02em;text-shadow:0 0 40px rgba(201,120,40,.35)}
-.boot-bar{width:236px;height:2px;background:rgba(232,223,200,.14);overflow:hidden}
+.boot-name{font-family:var(--m-f-mark,serif);font-size:56px;
+  color:var(--m-argent-hi,#e8dfc8);letter-spacing:.02em;text-shadow:0 0 40px rgba(201,120,40,.35)}
+.boot-bar{width:236px;height:6px;background:rgba(201,162,39,.14);overflow:hidden;
+  clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
 .boot-bar i{display:block;height:100%;width:0;
-  background:linear-gradient(90deg,#8a6a20,#e0c169);transition:width .25s ease}
-.boot-say{font-size:12px;font-style:italic;color:rgba(232,223,200,.42);
+  background:linear-gradient(90deg,var(--m-or-lo,#8a6a20),var(--m-or-hi,#e0c169));transition:width .25s ease}
+.boot-say{font-size:13px;font-style:italic;color:rgba(222,216,200,.46);
   letter-spacing:.04em}
+/* the mark resolves out of a blur and the lozenge rule draws out under it —
+   the same arrival the hall's lintel makes, so the first frame and the
+   second agree */
+.boot-name{position:relative;animation:bootname 1.1s cubic-bezier(.16,.84,.24,1) both}
+.boot-name::after{content:'';display:block;width:240px;height:11px;margin:14px auto 0;
+  background:
+    linear-gradient(45deg,transparent 35%,var(--m-or,#c9a227) 35% 65%,transparent 65%) center/11px 11px no-repeat,
+    linear-gradient(90deg,transparent,var(--m-or,#c9a227) 36%,transparent 46%,transparent 54%,var(--m-or,#c9a227) 64%,transparent) center/100% 1px no-repeat;
+  animation:bootrule .9s cubic-bezier(.16,.84,.24,1) .35s both}
+@keyframes bootname{from{opacity:0;letter-spacing:.24em;filter:blur(8px)}to{filter:blur(0)}}
+@keyframes bootrule{from{clip-path:inset(0 50%)}to{clip-path:inset(0 0)}}
 @keyframes bootpulse{0%,100%{opacity:.5}50%{opacity:.95}}
 @media (prefers-reduced-motion:reduce){.boot-mark{animation:none}}
 </style>
@@ -303,6 +319,23 @@ if (TEX_MAP) {
   }
 }
 
+/* ── THE LETTERS TRAVEL THE SAME WAY ──────────────────────────
+   20-shell.css asks for assets/fonts/*.woff2 after an installed copy and
+   before a Windows fallback, so a missing file costs the real letterforms
+   and nothing else. tools/fetch-fonts.js fills the folder. Copied, like the
+   textures, because a symlink does not survive packaging. */
+const FONT_DIR = path.join(__dirname, 'src/assets/fonts');
+let fonts = 0;
+{
+  const to = path.join(__dirname, 'dist/assets/fonts');
+  const have = fs.existsSync(FONT_DIR)
+    ? fs.readdirSync(FONT_DIR).filter(f => /\.woff2$/i.test(f)) : [];
+  if (have.length) fs.mkdirSync(to, { recursive: true });
+  if (fs.existsSync(to))
+    for (const f of fs.readdirSync(to)) if (!have.includes(f)) fs.unlinkSync(path.join(to, f));
+  for (const f of have) { fs.copyFileSync(path.join(FONT_DIR, f), path.join(to, f)); fonts++; }
+}
+
 console.log(`dist/monarchy.html  ${(html.length / 1024 / 1024).toFixed(2)} MB  ` +
             `(${CSS.length} css, ${JS.length} js)`);
 if (geoArrays) {
@@ -320,3 +353,7 @@ if (TEX_MAP) {
   console.log('  !! no src/assets/tex/manifest.json — every picture is inline. ' +
               'Run: python tools/bake-textures.py');
 }
+console.log(fonts
+  ? `dist/assets/fonts   ${fonts} font file(s)`
+  : '  .. no fonts in src/assets/fonts — the type falls back to Windows faces. ' +
+    'Run: node tools/fetch-fonts.js');

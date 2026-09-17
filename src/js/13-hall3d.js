@@ -271,18 +271,46 @@ void main(){
   vD = -mv.z;
   gl_Position = projectionMatrix * mv;
 }`;
+/* BLAZON, IN THE CLOTH ITSELF.
+   · WOVEN — warp and weft, so a banner reads as cloth up close.
+   · GOLD LEAF — the Or in a coat is METAL, so it is lit as metal: it takes a
+     specular off the fold and, every so often, a line of light runs down the
+     BEND (dexter chief to sinister base) across the gilt. Argent gets a
+     cooler, weaker sheen. The test for "is this Or" is the texture's own
+     colour: warm and bright, which Gules and Tenné are not.
+   · THE COUNTERCHANGE — pointing at a banner sends one bright sweep down the
+     same diagonal, over the whole cloth: the 3D twin of the Or band every
+     button in the app sweeps in (20-shell.css). `sweep` runs 0→1 once. */
 const FS = `
 uniform sampler2D map; uniform vec3 lightPos; uniform vec3 lightCol;
-uniform vec3 ambCol; uniform float lit;
+uniform vec3 ambCol; uniform float lit; uniform float t; uniform float ph;
+uniform float sweep;
 varying vec2 vUv; varying vec3 vN; varying float vW; varying float vD;
 void main(){
   vec4 c = texture2D(map, vUv);
   if (c.a < 0.45) discard;
+  vec3 N = normalize(vN);
   vec3 L = normalize(lightPos);
-  float d = max(dot(normalize(vN), L), 0.0);
-  vec3 col = c.rgb * (ambCol + lightCol * (0.30 + 0.85*d));
+  float d = max(dot(N, L), 0.0);
+  float weave = 0.93 + 0.07 * sin(vUv.x * 520.0) * sin(vUv.y * 1120.0);
+  vec3 col = c.rgb * weave * (ambCol + lightCol * (0.30 + 0.85*d));
   col *= 0.80 + 0.20*vW;                       /* the fold's own shading */
   col *= mix(1.0, 1.22, lit);                  /* the one you are pointing at */
+
+  float gold   = smoothstep(0.30, 0.45, c.r - c.b) * smoothstep(0.40, 0.55, c.g);
+  float silver = smoothstep(0.70, 0.82, min(c.r, min(c.g, c.b)));
+  vec3 Hv = normalize(L + vec3(0.0, 0.0, 1.0));
+  float spec = pow(max(dot(N, Hv), 0.0), 28.0);
+  float diag = vUv.x * 0.55 + (1.0 - vUv.y);   /* 0 at dexter chief */
+  float idle = mod(t * 0.16 + ph * 0.37, 4.2) - 1.0;
+  float band = smoothstep(0.10, 0.0, abs(diag - idle));
+  float hot  = smoothstep(0.18, 0.0, abs(diag - (sweep * 2.1 - 0.3)))
+             * step(0.001, sweep) * step(sweep, 0.999);
+  vec3 leaf = vec3(1.0, 0.86, 0.52) * lightCol;
+  col += leaf * gold * (spec * 0.9 + band * 0.55 + hot * 1.3);
+  col += vec3(0.85, 0.9, 1.0) * lightCol * silver * (spec * 0.35 + band * 0.22 + hot * 0.5);
+  col += leaf * hot * 0.17;
+
   float f = 1.0 - exp(-0.052*0.052*vD*vD);     /* into the dark with everything else */
   gl_FragColor = vec4(mix(col, vec3(0.02,0.028,0.045), f), 1.0);
 }`;
@@ -303,7 +331,8 @@ function banner(def, i, n){
       /* a banner nobody can take down hangs in shadow — it is not greyed out,
          it is simply not lit */
       lightCol:{value:new THREE.Color(def.dead ? 0x5a4c3c : 0xffb066)},
-      ambCol:{value:new THREE.Color(def.dead ? 0x0b0e16 : 0x141b2b)}, lit:{value:0} }
+      ambCol:{value:new THREE.Color(def.dead ? 0x0b0e16 : 0x141b2b)}, lit:{value:0},
+      sweep:{value:0} }
   });
   const m = new THREE.Mesh(geo, mat);
   m.position.set(-L.spread/2 + L.spread*(i/(n-1)),
@@ -328,6 +357,57 @@ function banner(def, i, n){
   return m;
 }
 
+/* ══ GILT IN THE AIR ═══════════════════════════════════════════
+   Dust, lit gold where it drifts through the torchlight: a few hundred
+   points, each moved entirely in the vertex shader so the CPU does nothing
+   per frame but set the clock. It is what makes the dark between the
+   torches read as air rather than as black. */
+const MOTE_VS = `
+attribute float seed; uniform float t; uniform float px; uniform float span;
+varying float vA;
+void main(){
+  vec3 p = position;
+  float s = seed * 6.2831;
+  p.x += sin(t * 0.21 + s * 3.0) * 0.35;
+  p.y = 0.3 + mod(position.y - 0.3 + t * 0.07 * (0.4 + seed), 6.2);
+  p.z += cos(t * 0.17 + s * 2.0) * 0.30;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  float d = -mv.z;
+  gl_PointSize = px * (1.6 + seed * 2.6) * (9.0 / max(d, 0.5));
+  vA = (0.30 + 0.70 * abs(sin(t * (0.7 + seed) + s * 5.0)))
+     * smoothstep(24.0, 7.0, d) * smoothstep(0.8, 2.4, d)
+     * (1.0 - smoothstep(span * 0.8, span, abs(p.x)));
+  gl_Position = projectionMatrix * mv;
+}`;
+const MOTE_FS = `
+varying float vA;
+void main(){
+  float r = length(gl_PointCoord - 0.5);
+  float a = smoothstep(0.5, 0.0, r) * vA * 0.8;
+  gl_FragColor = vec4(1.0, 0.78, 0.42, a);
+}`;
+function motes(){
+  const N = 240, span = L.built ? 2.8 : 5.6;
+  const pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++){
+    pos[i*3]   = (Math.random() - .5) * 2 * span;
+    pos[i*3+1] = 0.3 + Math.random() * 6.2;
+    pos[i*3+2] = -9 + Math.random() * 21;
+    seed[i] = Math.random();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('seed', new THREE.Float32BufferAttribute(seed, 1));
+  V.motes = new THREE.ShaderMaterial({
+    vertexShader:MOTE_VS, fragmentShader:MOTE_FS,
+    uniforms:{ t:{value:0}, px:{value:V.renderer.getPixelRatio()}, span:{value:span} },
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending
+  });
+  const pts = new THREE.Points(geo, V.motes);
+  pts.frustumCulled = false;
+  V.scene.add(pts);
+}
+
 /* ══ UP ═══════════════════════════════════════════════════════ */
 function init(canvas, defs, onPick){
   V.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -340,6 +420,7 @@ function init(canvas, defs, onPick){
   V.cam.position.set(L.cam[0], L.cam[1], L.cam[2]);
   materials(); hall(); light();
   defs.forEach((d, i) => banner(d, i, defs.length));
+  motes();
   resize();
   addEventListener('resize', resize);
   addEventListener('pointermove', e => {
@@ -401,11 +482,17 @@ function loop(ms){
     V.hot = hot;
     document.body.style.cursor = (hot >= 0 && !V.banners[hot].userData.def.dead)
       ? 'pointer' : 'default';
+    /* the counterchange runs down the cloth you have just pointed at */
+    if (hot >= 0 && !V.banners[hot].userData.def.dead) V.banners[hot].userData.sw = 0.0001;
   }
+  const dt = Math.min(0.05, t - (V.last || t)); V.last = t;
+  if (V.motes){ V.motes.uniforms.t.value = V.reduced ? 0 : t; }
 
   V.banners.forEach((m, i) => {
     const u = m.material.uniforms, d = m.userData;
     u.t.value = t;
+    if (d.sw) { d.sw = Math.min(1, d.sw + dt * 1.9); if (d.sw >= 1) d.sw = 0; }
+    u.sweep.value = d.sw || 0;
     const lag = i*0.26;
     const g = gust * Math.max(0, Math.sin((t - lag)*2.0));
     u.amp.value += ((V.hot === i ? 0.26 : 0.155) + g*0.34 - u.amp.value)*0.06;
