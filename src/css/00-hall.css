@@ -123,6 +123,13 @@ input{font:inherit;color:inherit;background:none;border:0;outline:0}
   padding-bottom:6px;border-bottom:2px solid var(--m-house)}
 #arms .who .nm.unset{font-family:var(--m-f-hand);font-style:italic;font-size:20px;
   color:var(--m-hush);border-bottom-color:var(--m-line)}
+/* your style, then your motto — the two optional lines under the name.
+   The style is the app's small-caps voice, the motto its written hand,
+   because one is a title and the other is something somebody said. */
+#arms .who .sty{margin-top:5px;font-family:var(--m-f-cap);font-size:10px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--m-or);opacity:.85}
+#arms .who .mot{margin-top:3px;font-family:var(--m-f-hand);font-style:italic;font-size:15px;
+  color:var(--m-quiet);max-width:280px}
 #arms .edit{margin-top:7px;font-size:9px;font-weight:700;letter-spacing:var(--m-track);
   text-transform:uppercase;color:transparent;transition:color .2s}
 #arms:hover .edit{color:var(--m-or)}
@@ -413,3 +420,237 @@ h2{animation:title-in .62s var(--pop) .16s both}
   font-weight:700;color:rgba(0,0,0,.55);pointer-events:none}
 .credit{margin:6px 0 0;font-family:var(--m-f-hand);font-style:italic;font-size:13px;
   color:rgba(244,239,226,.42)}
+
+/* ══ THE GRADE ═════════════════════════════════════════════════
+   The table has been graded since the tavern arrived — warm light against
+   cool shadow, halation, a desaturating falloff, and grain — and the hall
+   had only a vignette. Same recipe, same grain tile (.m-grain in
+   20-shell.css), aimed at the hall's own light: the torchlit banners at
+   the end of the corridor rather than a lamp over a table. */
+#hgrade, #hgrain{ position:fixed; inset:0; pointer-events:none; contain:strict }
+/* z:1 with #vig and after it in the markup, so the grade lies on the 3D and
+   UNDER #ui (z:2) — grain over a title is a smeared title */
+#hgrade{
+  z-index:1; mix-blend-mode:soft-light;
+  background:
+    radial-gradient(ellipse 38% 26% at 50% 40%,
+      rgba(255,206,142,.46) 0%, rgba(255,176,102,.18) 46%, transparent 74%),
+    radial-gradient(ellipse 72% 62% at 50% 44%,
+      transparent 28%, rgba(46,92,140,.38) 70%, rgba(24,54,96,.6) 100%),
+    radial-gradient(ellipse 92% 84% at 50% 48%,
+      transparent 50%, rgba(3,7,14,.5) 100%)}
+#hgrade::before{
+  content:'';position:absolute;inset:0;mix-blend-mode:overlay;
+  background:
+    radial-gradient(ellipse 50% 40% at 50% 42%, rgba(255,255,255,.14) 0%, rgba(128,128,128,0) 62%),
+    radial-gradient(ellipse 90% 82% at 50% 46%, rgba(128,128,128,0) 44%, rgba(0,0,0,.3) 100%)}
+#hgrade::after{
+  content:'';position:absolute;inset:0;mix-blend-mode:saturation;
+  background:radial-gradient(ellipse 66% 58% at 50% 44%,
+    rgba(128,128,128,0) 46%, rgba(128,128,128,.68) 100%)}
+#hgrain{
+  z-index:1; mix-blend-mode:overlay; opacity:.07; inset:-120px;
+  animation:grain-drift 1.05s steps(1,end) infinite; will-change:transform}
+@keyframes grain-drift{
+  0%{transform:translate3d(0,0,0)}      12%{transform:translate3d(-14px,7px,0)}
+  25%{transform:translate3d(9px,-12px,0)} 37%{transform:translate3d(-6px,-9px,0)}
+  50%{transform:translate3d(13px,4px,0)}  62%{transform:translate3d(-11px,11px,0)}
+  75%{transform:translate3d(5px,-6px,0)}  87%{transform:translate3d(-9px,-3px,0)}
+  100%{transform:translate3d(0,0,0)}}
+@media (prefers-reduced-motion:reduce){ #hgrain{ animation:none } }
+/* one switch for the whole thing, the twin of the table's (13-table-ui.css).
+   Settings drives it: 07-options.js puts .nograde on the body. */
+body.nograde #hgrade, body.nograde #hgrain{ display:none }
+
+
+/* ══ THE WORKBENCH ════════════════════════════════════
+   The flag maker grew from nine choices to about twenty, and one scrolling
+   column of all of them was worse than the small version. So it is a bench
+   with a row of pennons over it: one bench at a time, the thing you are
+   making beside it the whole while, and a tally on each pennon saying how
+   many of that bench's choices you have moved off plain. */
+.bench{min-width:0}
+.mk-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:18px}
+/* the same pennon as the table's chest and the orders panel: cut on the
+   bend at the right end, and it counterchanges into Or when it is the one
+   you are standing at */
+.mk-tab{display:flex;align-items:baseline;gap:7px;cursor:pointer;border:0;
+  font-family:var(--m-f-cap);font-size:10px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--m-text);padding:9px 20px 9px 14px;
+  clip-path:var(--m-pennon);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat,rgba(0,0,0,.30);
+  transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle)}
+.mk-tab:hover,.mk-tab.on{background-position:0 0;color:var(--m-sable)}
+.mk-tab i{font-style:normal;font-family:var(--m-f-tally);font-size:12px;
+  color:var(--m-or);opacity:.8}
+.mk-tab.on i,.mk-tab:hover i{color:var(--m-sable);opacity:.7}
+.mk-pane{min-height:340px}
+/* a find well sitting in the heading of the row it narrows */
+.mk-find{float:right;margin-top:-4px}
+.mk-find input{width:150px;padding:5px 9px;color:var(--m-argent-hi);
+  font-family:var(--m-f-hand);font-size:14px;background:rgba(0,0,0,.42);border:0;outline:none;
+  box-shadow:inset 0 0 0 1px var(--m-line);transition:box-shadow var(--t-hover) var(--settle)}
+.mk-find input:focus{box-shadow:inset 0 0 0 1px var(--m-or)}
+.mk-find input::placeholder{color:var(--m-hush);font-style:italic;text-transform:none;
+  letter-spacing:0}
+/* when a choice cannot apply, say so where the choice would have been —
+   an empty space reads as the app having lost something */
+.note{font-family:var(--m-f-hand);font-style:italic;font-size:15px;line-height:1.5;
+  color:rgba(244,239,226,.56);max-width:60ch;margin-top:2px}
+/* a fur is a pattern, not a colour, so its chip is the pattern */
+.chip.t .fur{position:absolute;inset:3px;display:block;overflow:hidden}
+.chip.t .fur svg{width:100%;height:100%;display:block}
+/* a hem is only legible as the banner it cuts */
+.swgrid.flags{grid-template-columns:repeat(auto-fill,minmax(68px,1fr))}
+.swgrid.flags .sw{aspect-ratio:auto;height:96px}
+.sw .flagwrap{display:grid;place-items:center;height:100%;padding:5px}
+.sw .flagwrap svg{width:auto;height:100%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+.chip.liv{padding:0;width:34px;height:34px;position:relative;border-width:2px}
+.chip.liv span{position:absolute;inset:3px}
+.chip.liv.on{box-shadow:0 0 0 2px var(--m-sable),0 0 0 4px var(--m-or)}
+/* the livery, shown in the livery */
+.liv-now{display:inline-block;margin-left:6px;padding:1px 10px;font-style:normal;
+  font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:uppercase;color:var(--m-argent-hi);background:var(--liv);
+  clip-path:var(--m-pennon)}
+
+/* ── the thing you are making, beside the bench ── */
+.prev-pair{display:flex;align-items:flex-start;gap:14px}
+.prev-pair svg{flex:1;min-width:0}
+.prev-flag{flex:0 0 auto;display:block;width:84px}
+.prev-flag svg{width:100%}
+.prev .card.pic .prev-pair{display:block}
+/* the coat written out: the blazon is the real heraldry and the drawing is
+   one reading of it, so the words go under the picture and not in a tooltip */
+.blazon{margin-top:14px;padding-top:12px;border-top:1px solid var(--m-line);
+  font-family:var(--m-f-hand);font-style:italic;font-size:16px;line-height:1.45;
+  color:var(--m-argent-hi)}
+.blazon:empty{display:none}
+
+/* ══ SETTINGS ════════════════════════════════════════
+   A block per subject, each headed the way the maker's rows are, and every
+   choice a row of pennons with all of its states in sight — the same rule
+   the orders panel at the table keeps: no dropdown, no checkbox, nothing
+   you have to open to find out what it says. */
+.setblk{margin-bottom:34px;max-width:780px}
+.setblk > h3{font-family:var(--m-f-cap);font-size:11px;font-weight:700;
+  letter-spacing:var(--m-track);text-transform:uppercase;color:var(--m-or);
+  margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid var(--m-line)}
+.opt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start;
+  padding:13px 0;border-bottom:1px solid rgba(255,214,150,.08)}
+.opt:last-child{border-bottom:0}
+.opt-say b{display:block;font-family:var(--m-f-cap);font-size:11px;font-weight:700;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--m-argent-hi);margin-bottom:5px}
+.opt-say em{display:block;font-family:var(--m-f-hand);font-style:italic;font-size:15px;
+  line-height:1.5;color:rgba(244,239,226,.58);max-width:56ch}
+.opt .chips{justify-content:flex-end}
+/* the one door that destroys something: Gules, and it says so twice */
+.num.bad{border-color:rgba(163,35,43,.6);color:var(--m-gules-hi)}
+.num.bad:hover{border-color:var(--m-gules);background:rgba(163,35,43,.22)}
+.num.bad.on{background:var(--m-gules);color:var(--m-argent-hi);border-color:var(--m-gules-hi)}
+/* who you are, with the coat beside it */
+.me-row{display:flex;gap:24px;align-items:flex-start}
+.me-arms{flex:0 0 auto;width:120px;filter:drop-shadow(0 8px 16px rgba(0,0,0,.6))}
+.me-arms svg,.me-arms img{width:100%;display:block}
+.me-fields{flex:1;min-width:0}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){
+  .maker{grid-template-columns:minmax(0,1fr)}
+  .prev{position:static}
+  .f2{grid-template-columns:1fr}
+  .opt{grid-template-columns:minmax(0,1fr)}
+  .opt .chips{justify-content:flex-start}
+}
+
+
+/* ══ THINGS ARRIVING ═══════════════════════════════════════════
+   grumkata: "add more transitions and animations to make ui and menus more
+   lively".
+
+   Two rules hold all of this together.
+
+   FIRST, EVERYTHING BELOW IS transform AND opacity ONLY. Those two are the
+   only properties the compositor can animate without going back to layout
+   and paint, so a dozen things arriving at once still costs one frame. An
+   entrance written with `height` or `top` would be the exact thing that
+   made the app feel laggy in the first place.
+
+   SECOND, IT ONLY HAPPENS ON AN ARRIVAL. `#screenbody.fresh` is set by
+   16-menu.js when a screen is genuinely raised and left off when the same
+   screen merely repaints — which the flag maker does on every single
+   tincture you press. Without that split, every swatch on the bench would
+   fly in again each time you changed a colour.
+
+   A system-level `prefers-reduced-motion` cuts every one of these to almost
+   nothing, in 20-shell.css, so none of it needs its own escape hatch. */
+@keyframes deal-up{ from{ opacity:0; transform:translateY(16px) } }
+@keyframes deal-side{ from{ opacity:0; transform:translateX(-22px) } }
+@keyframes turn-in{ from{ opacity:0; transform:translateX(18px) } }
+@keyframes pop-in{ from{ opacity:0; transform:scale(.88) } }
+
+/* ── settings: a block at a time, then its rows ── */
+#screenbody.fresh .setblk{ animation:deal-up .5s var(--pop) both }
+#screenbody.fresh .setblk:nth-of-type(2){ animation-delay:.06s }
+#screenbody.fresh .setblk:nth-of-type(3){ animation-delay:.12s }
+#screenbody.fresh .setblk:nth-of-type(4){ animation-delay:.18s }
+#screenbody.fresh .setblk:nth-of-type(5){ animation-delay:.24s }
+/* the BLOCK arrives, not every row in it. Animating each row as well meant
+   a dozen elements moving at once on a screen that is also being uncovered
+   by a cloth, and the cloth is the one that matters. */
+
+/* ── the flag maker: the pennons deal, the bench and the coat arrive ── */
+#screenbody.fresh .mk-tab{ animation:deal-up .42s var(--pop) both }
+#screenbody.fresh .mk-tab:nth-child(2){ animation-delay:.05s }
+#screenbody.fresh .mk-tab:nth-child(3){ animation-delay:.10s }
+#screenbody.fresh .mk-tab:nth-child(4){ animation-delay:.15s }
+#screenbody.fresh .mk-tab:nth-child(5){ animation-delay:.20s }
+#screenbody.fresh .mk-pane{ animation:deal-up .5s var(--pop) .1s both }
+#screenbody.fresh .prev .card{ animation:pop-in .55s var(--pop) .14s both }
+#screenbody.fresh .prev-flag{ animation:deal-up .6s var(--pop) .3s both }
+/* stepping to another bench turns the page rather than swapping it: set by
+   repaintMaker, on the pane alone, so nothing else on the screen moves */
+.mk-pane.turned{ animation:turn-in .34s var(--pop) both }
+
+/* ── who you are, on the settings screen ── */
+#screenbody.fresh .me-arms{ animation:pop-in .6s var(--pop) .08s both }
+
+/* ══ THINGS ANSWERING ══════════════════════════════════════════
+   Hover and press. A swatch is a picture of a choice, so it lifts toward
+   you and gilds rather than just changing its border colour — which is what
+   it did, and which at 46px is almost invisible. */
+.sw{ transition:border-color var(--t-hover) var(--settle),
+                box-shadow var(--t-hover) var(--settle),
+                transform var(--t-hover) var(--pop) }
+.sw:hover{ transform:translateY(-3px) scale(1.06); z-index:2;
+  box-shadow:0 6px 14px rgba(0,0,0,.55), 0 0 0 1px var(--m-or-hi) }
+.sw:active{ transform:translateY(0) scale(.98) }
+.sw.on{ transform:translateY(-1px) }
+.chip{ transition:border-color var(--t-hover) var(--settle),
+                  color var(--t-hover) var(--settle),
+                  transform var(--t-hover) var(--pop),
+                  box-shadow var(--t-hover) var(--settle) }
+.chip:hover{ transform:translateY(-2px) }
+.chip.t:hover{ box-shadow:0 4px 10px rgba(0,0,0,.5) }
+.num{ transition:background var(--t-hover) var(--settle),
+                 border-color var(--t-hover) var(--settle),
+                 color var(--t-hover) var(--settle),
+                 transform var(--t-hover) var(--pop) }
+.num:hover{ transform:translateY(-2px) }
+.mk-tab:hover{ transform:translateY(-2px) }
+.mk-tab{ transition:background-position var(--t-wipe) var(--settle),
+                    color var(--t-wipe) var(--settle),
+                    transform var(--t-hover) var(--pop) }
+/* a field you are writing in lights its own rule, drawn out from the left
+   rather than switched on */
+.f{ position:relative }
+.f input, .f textarea{ transition:box-shadow var(--t-hover) var(--settle) }
+.f input:focus, .f textarea:focus{ box-shadow:inset 0 -2px 0 var(--m-or) }
+/* a link-button's sweep already runs; give the press somewhere to go */
+.lk{ transition:background-position var(--t-wipe) var(--settle),
+                color var(--t-wipe) var(--settle),
+                transform var(--t-press) var(--snap) }
+.lk:hover{ transform:translateY(-1px) }
+/* a row on a roll lifts out of the stack under the pointer */
+.roll > .entry{ transition:transform var(--t-hover) var(--pop),
+                           box-shadow var(--t-hover) var(--settle) }
+.roll > .entry:hover{ transform:translateX(4px) }

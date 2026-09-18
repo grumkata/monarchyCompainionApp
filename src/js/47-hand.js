@@ -36,6 +36,35 @@
       battlefield's width cycles on the wheel and the board gets
       wider as you watch; a counter's side flips; an NPC's name,
       hit points and face are set in the maker beside it, live.
+
+   ── THE CASE (2026-09-17) ─────────────────────────────────────
+   grumkata: "the toolbox and all its menus where they currently
+   stand it cannot continue we need a proper professional redesign
+   that feels good and proper to use".
+
+   It was right in principle and bad to use: a small plank of kinds
+   at the bottom, and ABOVE it a separate tray that grew into a
+   brown slab covering the whole table, a hundred and fourteen 84px
+   tiles wrapped into a wall with the last row cut off, a web search
+   box in the corner and tabs the size of a footnote.
+
+   So the plank and the tray are ONE CASE now — the chest, open, at
+   your end of the table:
+
+     THE RAIL   down its left: the six kinds, each still drawn as a
+                real member of itself, each still keyed 1-6.
+     THE HEAD   what you are looking in, a find well, and the count.
+     THE PENNONS the library's own groups, as tabs you can hit.
+     THE GRID   the things themselves, big enough to recognise, with
+                their names under them, scrolling in a well that
+                cannot cut a row in half.
+     THE FOOT   what is in your hand, the variants it can still take,
+                and what the pointer will do next.
+
+   Everything the old bar was RIGHT about is kept: the kinds never
+   move, nothing in a kind slot is a label, the name of whatever you
+   point at appears once above the case, and taking one out puts it
+   in your hand over the wood rather than into a cart.
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
@@ -49,6 +78,7 @@ const esc = s => String(s == null ? '' : s)
 
 let bar = null, rack = null, slots = null, tip = null, tray = null, trayIn = null;
 let shelf = null, tabs = null, find = null, count = null;
+let what = null, heldEl = null, hint = null;
 let held = null;             /* { offer, variant, vi } */
 let kinds = [], sel = 0, openKind = null, opts = [];
 
@@ -59,17 +89,27 @@ function build() {
   bar.className = 'hb';
   bar.innerHTML =
     `<div class="hb-tip" id="hb-tip"></div>
-     <div class="hb-rack" id="hb-rack" hidden></div>
-     <div class="hb-tray" id="hb-tray" hidden>
-       <div class="hb-shelf" id="hb-shelf" hidden>
-         <div class="hb-tabs" id="hb-tabs"></div>
-         <label class="hb-find"><input id="hb-q" type="search" placeholder="Find\u2026"
-                                       autocomplete="off" spellcheck="false"></label>
-         <span class="hb-count" id="hb-count"></span>
+     <div class="hb-case" id="hb-case">
+       <div class="hb-rail" id="hb-slots"></div>
+       <div class="hb-main">
+         <div class="hb-head">
+           <span class="hb-what" id="hb-what">The Chest</span>
+           <label class="hb-find"><input id="hb-q" type="search" placeholder="Find\u2026"
+                                         autocomplete="off" spellcheck="false"></label>
+           <span class="hb-count" id="hb-count"></span>
+           <button class="hb-x" id="hb-x" title="Shut the chest  (Esc)">&#10005;</button>
+         </div>
+         <div class="hb-shelf" id="hb-shelf" hidden><div class="hb-tabs" id="hb-tabs"></div></div>
+         <div class="hb-tray" id="hb-tray" hidden>
+           <div class="hb-tray-in" id="hb-tray-in"></div>
+         </div>
+         <div class="hb-foot">
+           <div class="hb-held" id="hb-held"></div>
+           <div class="hb-rack" id="hb-rack" hidden></div>
+           <div class="hb-hint" id="hb-hint"></div>
+         </div>
        </div>
-       <div class="hb-tray-in" id="hb-tray-in"></div>
-     </div>
-     <div class="hb-row"><div class="hb-slots" id="hb-slots"></div></div>`;
+     </div>`;
   doc.body.appendChild(bar);
   rack   = bar.querySelector('#hb-rack');
   slots  = bar.querySelector('#hb-slots');
@@ -80,6 +120,12 @@ function build() {
   tabs   = bar.querySelector('#hb-tabs');
   find   = bar.querySelector('#hb-q');
   count  = bar.querySelector('#hb-count');
+  what   = bar.querySelector('#hb-what');
+  heldEl = bar.querySelector('#hb-held');
+  hint   = bar.querySelector('#hb-hint');
+  bar.querySelector('#hb-x').addEventListener('click', () => {
+    if (root.Toolbox) root.Toolbox.shut();
+  });
   /* typing in the box must never reach the table's own key handling — B
      would shut the chest under your fingers halfway through a word */
   find.addEventListener('keydown', e => {
@@ -108,6 +154,11 @@ function show(list, openId) {
   sel = 0; openKind = null;
   paintKinds(); shutTray();
   bar.classList.add('up');
+  /* the case opens ON something. An open chest showing nothing until you
+     press a second time was a step for nothing — the same complaint the
+     two-step tray was built to answer. */
+  if (!openId && kinds.length) { sel = 0; pickKind(kinds[0]); }
+  paintFoot();
   /* the bin comes up with its own tray already open — there is only one kind
      of thing in a bin and making you press it first is a step for nothing */
   if (openId) {
@@ -127,7 +178,7 @@ const isUp = () => !!bar && bar.classList.contains('up');
 function paintKinds() {
   slots.innerHTML = kinds.map((k, n) =>
     `<button class="hb-slot" data-n="${n}">
-       <span class="hb-fig">${F().html(k.fig, k.figv || {}, 62)}</span>
+       <span class="hb-fig">${F().html(k.fig, k.figv || {}, 64)}</span>
        <i class="hb-key">${n + 1}</i>
      </button>`).join('');
   slots.querySelectorAll('.hb-slot').forEach(b => {
@@ -151,7 +202,6 @@ function step(d) {
 /* ── the tray ── */
 function pickKind(k) {
   if (!k) return;
-  if (openKind && openKind.id === k.id) { shutTray(); return; }
   openKind = k;
   opts = root.Toolbox.options(k.id) || [];
   q = ''; gsel = '';
@@ -164,6 +214,8 @@ function shutTray() {
   openKind = null; opts = []; q = ''; gsel = '';
   if (tray) { tray.hidden = true; trayIn.innerHTML = ''; }
   if (shelf) shelf.hidden = true;
+  if (what) what.textContent = 'The Chest';
+  if (count) count.textContent = '';
   markSel();
 }
 
@@ -218,9 +270,10 @@ function paintTray(keepFocus) {
   const gs = groupsOf(opts);
   const browse = opts.length > SHELF_AT;
   tray.classList.toggle('browse', browse);
-  shelf.hidden = !browse;
+  shelf.hidden = !gs.length;
+  bar.classList.toggle('finding', browse);
 
-  if (browse) {
+  if (gs.length) {
     tabs.innerHTML = [{ id: '', name: 'All', n: opts.length }].concat(gs).map(g =>
       `<button class="hb-tab${g.id === gsel ? ' on' : ''}" data-g="${g.id}"
        >${esc(g.name)}<i>${g.n}</i></button>`).join('');
@@ -232,16 +285,21 @@ function paintTray(keepFocus) {
   }
 
   const list = shown();
-  if (browse) count.textContent = list.length + (list.length === 1 ? ' thing' : ' things');
+  if (what && openKind) what.textContent = openKind.name;
+  if (count) count.textContent = list.length
+    ? list.length + (list.length === 1 ? ' thing' : ' things') : '';
 
   /* A CUSTOM SLOT STILL SHOWS THE THING IT MAKES — an enemy counter for
      someone else, an empty picture for one off your machine — with a small
-     brass plus over it. A slot holding only a "+" is a menu item again. */
+     gilt plus over it, and NO NAME: the one written beside a drawing is the
+     caption this whole case exists to not have. Every other tile does get
+     its name, because a hundred and fourteen models are not all recognisable
+     on sight and the tip above the case only names one at a time. */
   trayIn.innerHTML = list.length ? list.map(o =>
     `<button class="hb-opt${o.custom ? ' custom' : ''}" data-id="${esc(optKey(o))}">
-       <span class="hb-fig">${F().html(o, o.v || {}, browse ? 84 : 54)}</span>
-       ${o.custom ? '<span class="hb-plus"></span>' : ''}
-       ${browse ? `<i class="hb-nm">${esc(o.name || '')}</i>` : ''}
+       <span class="hb-fig">${F().html(o, o.v || {}, 92)}</span>
+       ${o.custom ? '<span class="hb-plus"></span>'
+                  : `<i class="hb-nm">${esc(o.name || '')}</i>`}
      </button>`).join('')
     : `<p class="hb-nowt">Nothing here by that name.</p>`;
 
@@ -262,6 +320,29 @@ function refresh() { if (openKind) { opts = root.Toolbox.options(openKind.id) ||
 
 function say(t) { if (tip) { tip.textContent = t || ''; tip.classList.toggle('on', !!t); } }
 
+/* ══ THE FOOT ══════════════════════════════════════════════════
+   What is in your hand, and what the pointer will do with it. This used
+   to be nowhere: the only sign you were carrying something was the thing
+   itself following the pointer, and the only way to learn that the wheel
+   cycled a variant or that right-click put it back was to be told. */
+function paintFoot() {
+  if (!heldEl) return;
+  if (!held) {
+    heldEl.innerHTML = '';
+    heldEl.classList.remove('on');
+    if (hint) hint.textContent = 'Take one out — it goes into your hand';
+    return;
+  }
+  heldEl.classList.add('on');
+  heldEl.innerHTML =
+    `<span class="hb-fig">${F().html(held.offer, held.variant, 46)}</span>
+     <b>${esc(held.offer.name || '')}</b>`;
+  const def = F().variantsFor(held.offer);
+  if (hint) hint.innerHTML = 'Click the wood to set it down'
+    + (def && def.list ? ' &middot; wheel to change it' : '')
+    + ' &middot; right-click to put it back';
+}
+
 /* ══ VARIANTS, IN THE HAND ════════════════════════════════════ */
 function startVariant(o) {
   const d = F().variantsFor(o);
@@ -279,13 +360,14 @@ function cycle(d) {
   paintRack(); paintHeld();
 }
 function paintRack() {
+  paintFoot();
   if (!rack) return;
   const def = held && F().variantsFor(held.offer);
   if (!def || !def.list) { rack.hidden = true; rack.innerHTML = ''; return; }
   rack.hidden = false;
   rack.innerHTML = def.list.map((v, n) =>
     `<button class="hb-var${n === held.vi ? ' on' : ''}" data-v="${n}">
-       ${F().html(held.offer, Object.assign({}, held.variant, v), 54)}</button>`).join('');
+       ${F().html(held.offer, Object.assign({}, held.variant, v), 44)}</button>`).join('');
   rack.querySelectorAll('[data-v]').forEach(b =>
     b.addEventListener('click', () => {
       held.vi = +b.dataset.v;
@@ -416,7 +498,7 @@ function at(sx, sy) {
 
 const overBar = (x, y) => {
   if (!isUp()) return false;
-  for (const el of [tray, rack, bar.querySelector('.hb-row'),
+  for (const el of [bar.querySelector('.hb-case'),
                     root.TokenMaker && root.TokenMaker.el()]) {
     if (!el || el.hidden) continue;
     const r = el.getBoundingClientRect();
@@ -499,6 +581,8 @@ function mount() {
     }
     if (e.key === 'ArrowRight') { e.preventDefault(); held ? cycle(1)  : step(1); }
     if (e.key === 'ArrowLeft')  { e.preventDefault(); held ? cycle(-1) : step(-1); }
+    /* the one key a case full of things needs: go to the find well */
+    if (e.key === '/' && find && !find.hidden) { e.preventDefault(); find.focus(); find.select(); }
   });
 
   root.addEventListener('resize', () => { if (held) at(last.x, last.y); });

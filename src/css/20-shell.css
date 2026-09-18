@@ -241,7 +241,6 @@ button, [role="button"] { transition: transform var(--t-press) var(--snap); }
     transition-duration: .01ms !important;
   }
 }
-
 #hall-app, #table-app { position: fixed; inset: 0; }
 body.at-table #hall-app { display: none; }
 body.at-hall  #table-app { display: none; }
@@ -280,7 +279,7 @@ html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
    rides the edge, a layered frame, a patterned ground — not a
    flat panel with a hairline border.
 ══════════════════════════════════════════════════════════════ */
-.tp {
+#tp {
   position: fixed; right: 316px; top: 14px; bottom: 14px; width: min(720px, 52vw);
   z-index: 930; display: flex; flex-direction: column;
   /* vellum, with the faint lattice every record is ruled on */
@@ -293,9 +292,9 @@ html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
               0 26px 70px rgba(0,0,0,.6);
   color: var(--m-ink);
 }
-.tp[hidden] { display: none !important; }
+#tp[hidden] { display: none !important; }
 /* corner marks — four, at 3px inset, per the design language */
-.tp::before {
+#tp::before {
   content: ''; position: absolute; inset: 3px; pointer-events: none; z-index: 2;
   background:
     linear-gradient(var(--m-sable),var(--m-sable)) left top / 14px 2px no-repeat,
@@ -379,16 +378,54 @@ html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
 #herald-gl { position: fixed; inset: 0; width: 100vw; height: 100vh;
   z-index: 99990; pointer-events: none; display: none; }
 #herald-gl.on { display: block; }
-#herald { position: fixed; inset: 0; z-index: 99991; pointer-events: none; overflow: hidden; }
+/* ══ THE COVER IS NOT PART OF WHAT IT COVERS ══════════════════
+   grumkata: "its laggy because your putting them on the same layer so when
+   the table lags the loading screen lags even though the reason it exists is
+   to mask the lag".
+
+   That is the whole bug, stated better than any of my measurements managed.
+   A loading screen that shares a rendering fate with the thing it is loading
+   is not a loading screen, it is a second symptom.
+
+   `contain` is what separates them. `paint` means nothing inside this
+   element can affect anything outside it and nothing outside can invalidate
+   what is inside — so the table building itself underneath, adding props,
+   resizing canvases and repainting sixty thousand triangles, cannot dirty
+   one pixel of the cloth on top. `layout` and `style` stop the same traffic
+   going the other way. `will-change: transform` then asks for its own
+   compositor layer outright, rather than hoping a heuristic offers one.
+
+   Between them: the cover is painted once, into its own texture, and after
+   that the main thread can be as busy as it likes. */
+#herald { position: fixed; inset: 0; z-index: 99991; pointer-events: none;
+  overflow: hidden; contain: layout paint style; will-change: transform; }
 /* nothing is clicked twice through a cloth that is still moving */
 #herald.wiping { pointer-events: auto; cursor: progress; }
 
-/* ── the cloth without WebGL: the same bands, drawn by CSS ── */
+/* ── THE CLOTH. Drawn by CSS on purpose, not as a fallback: this is one
+   `transform` keyframe, so the compositor runs it on its own thread and it
+   keeps moving while the main thread is blocked by the very work the cloth
+   is covering. The shader version froze and then jump-cut, which is what
+   grumkata saw as the transition being "basically skipped". See 55-herald.js. */
 #herald .hr-veil { position: absolute; inset: -30% -60%; transform: translateX(-130%);
   background: linear-gradient(115deg, transparent 0 20%, var(--m-or) 20% 21.2%,
-    var(--m-house) 21.2% 29%, var(--m-sable) 29%); }
-#herald.nogl.wiping .hr-veil { animation: hr-veil-in .38s cubic-bezier(.5,0,.85,.4) forwards; }
-#herald.nogl.lifting .hr-veil { animation: hr-veil-out .56s var(--settle) forwards; }
+    var(--m-house) 21.2% 29%, var(--m-sable) 29%);
+  /* THE POINT OF THE WHOLE THING. Chrome only runs a transform animation on
+     the compositor when the element has its own layer, and it will not give
+     one to a huge clipped div on a hunch. Without this the cloth animates on
+     the main thread like everything else — measured: seventeen frames painted
+     during a 400ms block and two distinct pictures among them, which is a
+     freeze and a jump, which is what "basically skipped" looks like. */
+  will-change: transform; backface-visibility: hidden; z-index: 0; }
+/* AND EVERYTHING ELSE IN THE HERALD SITS ABOVE IT, said outright. Promoting
+   the cloth to its own compositor layer (the will-change above) is what lets
+   it keep moving while the main thread is blocked — and it also lifts it out
+   of the plain document paint order it used to share with its siblings, so
+   the title card went behind the cloth and the transition covered the screen
+   in silence. Painted once, found by looking at it. */
+#herald .hr-card, #herald .hr-cry, #herald .hr-sparks { z-index: 1; }
+#herald.wiping .hr-veil { animation: hr-veil-in .38s cubic-bezier(.5,0,.85,.4) forwards; }
+#herald.lifting .hr-veil { animation: hr-veil-out .56s var(--settle) forwards; }
 @keyframes hr-veil-in  { from { transform: translateX(-130%); } to { transform: translateX(-20%); } }
 @keyframes hr-veil-out { from { transform: translateX(-20%); }  to { transform: translateX(120%); } }
 
@@ -406,6 +443,24 @@ html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
     linear-gradient(45deg, transparent 35%, var(--m-or) 35% 65%, transparent 65%) center / 13px 13px no-repeat,
     linear-gradient(90deg, transparent, var(--m-or) 36%, transparent 46%, transparent 54%, var(--m-or) 64%, transparent)
       center / 100% 1px no-repeat; }
+/* ── AND ONE THING THAT NEVER STOPS ─────────────────────────
+   The same trick the boot screen uses, and for the same reason: a gilt
+   sweep on `transform` alone, which the compositor runs on its own thread
+   and keeps running while the main thread is blocked solid by the work
+   behind the cloth. It is the difference between a screen that is waiting
+   and a screen that has died — and on this side of the cover, those are the
+   only two things the player can tell apart. */
+#herald .hr-work { display: block; width: 260px; height: 3px; margin: 22px auto 0;
+  background: rgba(201,162,39,.16); overflow: hidden; position: relative;
+  opacity: 0; transition: opacity .2s var(--settle); }
+#herald.carded .hr-work { opacity: 1; }
+#herald .hr-work::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--m-or-hi), transparent);
+  transform: translateX(-100%); will-change: transform;
+  animation: hr-work 1.15s linear infinite; }
+@keyframes hr-work { to { transform: translateX(100%) } }
+@media (prefers-reduced-motion: reduce){ #herald .hr-work::after { animation: none } }
+
 #herald .hr-card i { font-family: var(--m-f-hand); font-style: italic; font-size: 23px;
   color: var(--m-or-hi); letter-spacing: .03em; text-shadow: 0 2px 10px #000; }
 
@@ -450,3 +505,55 @@ html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
 #herald .hr-sparks i { position: absolute; display: block; pointer-events: none;
   background: linear-gradient(135deg, var(--m-or-hi), var(--m-or) 55%, var(--m-or-lo));
   box-shadow: 0 0 7px rgba(236,210,122,.75); }
+
+/* ══════════════════════════════════════════════════════════════
+   THE SHEET ON THE WOOD (45-papers.js)
+
+   A record is a real prop on the table now. It wears the record's own
+   stylesheet — 01-sheet.css is scoped to `.tp`, which both the sheet and
+   the reading carry — so what lies on the wood is the actual leaf, at the
+   size a sheet of paper is on a table this big: legible as YOUR sheet,
+   unreadable as words, exactly like a character sheet across a table.
+══════════════════════════════════════════════════════════════ */
+.tp-paper { cursor: pointer; }
+/* A4 ON A TABLE MEASURED IN MILLIMETRES: 210 x 297, two units to the mm.
+   The record is LAID OUT at its natural 900px and then scaled down onto
+   the sheet, so what lies on the wood is the real record at the real size
+   of a piece of paper — small, legible as yours, not readable as words.
+   That is what picking it up is for (45-papers.js). */
+.tp-paper .tp-face {
+  width: 420px; height: 594px; overflow: hidden;
+  background: transparent; box-shadow: none;
+  /* the sheet is looked at out here, not written on: every field inside it
+     belongs to the reading, which is where the pointer can reach them */
+  pointer-events: none;
+}
+.tp-paper .tp-face > * {
+  width: 900px; transform: scale(0.4667); transform-origin: top left;
+}
+.tp-paper .deck { padding: 0; }
+.tp-paper:hover .tp-face { filter: brightness(1.06); }
+/* it lifts a little under the pointer, the way a sheet does when you go for it */
+.tp-paper .tp-face { transition: filter var(--t-hover) var(--settle); }
+
+/* the table goes quiet while you are reading */
+#tp-scrim {
+  position: fixed; inset: 0; z-index: 925; background: rgba(6,4,3,.55);
+  backdrop-filter: blur(1.5px);
+}
+#tp-scrim[hidden] { display: none !important; }
+#tp .tp-head { display: flex; align-items: center; }
+#tp .tp-x + .tp-x { right: 8px; }
+#tp .tp-head .tp-x:first-of-type { right: 34px; }
+
+/* ══ THE GRADE, IN BOTH ROOMS ══════════════════════════════════
+   The table was graded — warm pool against cool shadow, halation round
+   the lamp, a falloff that desaturates, and grain over the lot — and the
+   hall was not, which is most of why the two 3D scenes did not feel like
+   one app. The tile and the recipe live here now; each room supplies its
+   own light position. */
+.m-grain{
+  background-image:url(data:image/png;base64,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);
+  background-repeat:repeat;
+  background-size:96px 96px;
+}

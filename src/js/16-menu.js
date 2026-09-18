@@ -22,10 +22,15 @@ const S = {
 };
 let tables = S.get('tables', []);
 let chars  = S.get('chars',  []);
-let me     = Object.assign({ name:'', pic:'', arms:{
-  div:'plain', a:'sable', b:'argent', ord:'none', ordT:'or', chg:'', chgT:'or',
-  chgN:1, bord:false, bordT:'or' }},
-  S.get('me', {}));
+/* WHO YOU ARE, as against what you have. `style` is what follows your name
+   ("of the Red Marches"), `motto` the word under your arms — both optional,
+   both shown in the corner of the hall only once you have written them.
+   The coat itself is normalised through the engine, so a profile saved
+   before furs, lines and hems existed comes back with all of them at their
+   defaults rather than as undefined. */
+let me     = Object.assign({ name:'', pic:'', style:'', motto:'',
+  arms: Object.assign({}, H.DEFAULTS) }, S.get('me', {}));
+me.arms = H.norm(me.arms);
 const saveT = () => S.put('tables', tables);
 const saveC = () => S.put('chars', chars);
 const saveM = () => S.put('me', me);
@@ -122,7 +127,7 @@ function paint(){
 function go(v){ path.push(at); at = v; drawView(14); }
 /* a fork is not a place: swapping leaves nothing behind to come back to */
 function swap(v){ at = v; drawView(14); }
-function drawView(dy){ render(); paint();
+function drawView(dy){ render(true); paint();
   sbody.animate([{opacity:0,transform:'translateY('+dy+'px)'},{opacity:1,transform:'none'}],
     {duration:260, easing:'ease-out', fill:'both'}); }
 function backOne(){
@@ -148,7 +153,7 @@ function take(id){
   screen.dataset.house = H.TNAME[b.arms.a] || '';     /* up the edge, 00-hall.css */
   $('#device').innerHTML = H.ordinary(b.arms.ord, b.arms.ordT, 200, 400)
                          + H.charge(b.arms.chg, b.arms.chgT, 200, 400, b.arms.chgN);
-  render();
+  render(true);
   window.Hall.lock(true);
   screen.classList.add('on');
   fall();
@@ -167,7 +172,21 @@ function hang(){
   a.onfinish = () => { screen.classList.remove('on'); screen.style.clipPath = CLOTH_UP; };
   backBtn.style.display = 'none';
 }
-function render(){ sbody.innerHTML = (VIEW[at] || VIEW.set)(); if (AFTER[at]) AFTER[at](); }
+/* ARRIVING IS NOT THE SAME AS REDRAWING. Every view is rebuilt by setting
+   innerHTML, so every element in it is brand new every time — and a CSS
+   entrance animation on a brand new element runs. That is what you want the
+   first time a screen appears and emphatically not what you want when the
+   flag maker repaints because you pressed a tincture: the whole bench would
+   fly in again on every click.
+
+   So `fresh` is the difference, and it is a class rather than a timer:
+   00-hall.css hangs the entrances off `#screenbody.fresh`, a repaint leaves
+   the class off, and the same markup arrives or simply appears. */
+function render(fresh){
+  sbody.classList.toggle('fresh', !!fresh);
+  sbody.innerHTML = (VIEW[at] || VIEW.set)();
+  if (AFTER[at]) AFTER[at]();
+}
 
 /* ══ THE VIEWS ════════════════════════════════════════════════ */
 const VIEW = {}, AFTER = {};
@@ -481,28 +500,154 @@ VIEW.join = () => `
     <span class="cap">Send word<em>the sync layer is not built — the word is remembered</em></span>
   </div>`;
 
-/* ── settings ── */
-VIEW.set = () => `
+/* ══ SETTINGS ═══════════════════════════════════════
+   Five blocks, in the order you would actually want them: who you are,
+   how the app looks, where you sit, what it is holding for you, and what
+   it is. Every switch draws itself from 07-options.js's own description of
+   it — the title, the words under it and the names of its states all come
+   from there — so a new setting is one entry in that file and nothing here.
+
+   NO DROPDOWNS AND NO CHECKBOXES, the same rule the orders panel at the
+   table follows: a choice is a row of pennons with every option in sight.
+   A setting you have to open something to read is a setting nobody reads. */
+function optRow(k){
+  const d = window.Options.DEFS[k], v = window.Options.get(k);
+  return `<div class="opt">
+    <div class="opt-say"><b>${d.t}</b><em>${d.w}</em></div>
+    <div class="chips">${d.of.map(o =>
+      `<button class="num${v===o?' on':''}" data-opt="${k}" data-v="${o}">${d.say[o]}</button>`
+    ).join('')}</div>
+  </div>`;
+}
+const KB = n => n < 1024 ? n + ' bytes'
+  : n < 1048576 ? (n/1024).toFixed(1) + ' KB' : (n/1048576).toFixed(1) + ' MB';
+
+let forgetArmed = false;
+VIEW.set = () => {
+  const w = window.Options.weigh();
+  return `
   <h2>Settings</h2>
   <div class="lede">Your arms and your name are set from the hall itself — they are the
     first thing you see and the first thing anyone else does.</div>
   <div class="strip"></div>
-  <div class="f"><label>The name you answer to</label>
-    <input id="sname" maxlength="40" value="${esc(me.name)}" placeholder="type your name"></div>
-  <div class="row2"><button class="lk" data-do="arms">Change your arms</button></div>
-  <div class="empty" style="margin-top:34px">${tables.length} table${tables.length===1?'':'s'}
-    and ${chars.length} character${chars.length===1?'':'s'} kept in this browser.</div>`;
-AFTER.set = () => { const i = $('#sname');
-  if (i) i.addEventListener('input', () => { me.name = i.value; saveM(); paintArms(); }); };
 
-/* ══ THE FLAG MAKER ═══════════════════════════════════════════ */
+  <div class="setblk"><h3>You</h3>
+    <div class="me-row">
+      <div class="me-arms">${me.pic
+        ? `<img class="ownpic" src="${esc(me.pic)}" alt="the picture you uploaded">`
+        : H.armsSVG(me.arms, { shape:'shield', w:120, h:144, edge:5 })}</div>
+      <div class="me-fields">
+        <div class="f"><label>The name you answer to</label>
+          <input id="sname" maxlength="40" value="${esc(me.name)}"
+            placeholder="type your name"></div>
+        <div class="f2">
+          <div class="f"><label>Your style</label>
+            <input id="sstyle" maxlength="48" value="${esc(me.style||'')}"
+              placeholder="of the Red Marches"></div>
+          <div class="f"><label>Your motto</label>
+            <input id="smotto" maxlength="48" value="${esc(me.motto||'')}"
+              placeholder="Nothing without labour"></div>
+        </div>
+        <div class="row2"><button class="lk" data-do="arms">Change your arms</button></div>
+        <div class="blazon">${me.pic ? 'A picture of your own is what shows.'
+                                     : esc(H.blazonText(me.arms))}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="setblk"><h3>Look</h3>
+    ${Object.keys(window.Options.DEFS).map(optRow).join('')}
+  </div>
+
+  <div class="setblk"><h3>What is kept</h3>
+    <div class="opt">
+      <div class="opt-say"><b>${tables.length} table${tables.length===1?'':'s'},
+        ${chars.length} character${chars.length===1?'':'s'}</b>
+        <em>${w.keys} thing${w.keys===1?'':'s'} in this browser's own store,
+        about ${KB(w.bytes)}. Nothing leaves this machine.</em></div>
+      <div class="chips">
+        <button class="num" data-do="dumpall">Take a copy</button>
+        <button class="num${forgetArmed?' bad on':' bad'}" data-do="forgetall">${
+          forgetArmed ? 'Press again to forget it all' : 'Forget everything'}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="setblk"><h3>About</h3>
+    <div class="credit">Monarchy, running ${window.AppUpdate ? 'as an app' : 'in a browser'}.
+      Charges from game-icons.net, CC BY 3.0. Everything you make is kept in this
+      browser's own store and is never sent anywhere.</div>
+  </div>`;
+};
+/* the three written fields save as you type, the way the record does —
+   there is no seal on this screen because there is nothing to commit */
+AFTER.set = () => {
+  const live = (id, key, after) => { const i = $(id); if (!i) return;
+    i.addEventListener('input', () => { me[key] = i.value; saveM(); paintArms();
+      if (after) after(); }); };
+  live('#sname', 'name');
+  live('#sstyle', 'style');
+  live('#smotto', 'motto');
+};
+
+/* THE CLOTH BEHIND THE MAKER HAS TO BE DARK, WHATEVER THE COAT IS.
+   It used to be the field's own tincture straight out of the record, with
+   one hand-written exception for Sable. That held only while a field could
+   only be one of ten known colours. It can now be a metal, a fur, or any
+   colour the player typed in — and Argent, Or, Ermine or a picked pastel as
+   a full-screen background is a cream page with cream text on it, which is
+   what a field of Ermine actually did.
+
+   So the cloth is the LIVERY (which is a colour by construction — never a
+   metal, never Sable) with a ceiling put on how light it is allowed to be.
+   Same coat, same feel, and the words on it stay readable. */
+/* the tincture's name, run up the right edge of the cloth (00-hall.css).
+   A colour you typed in yourself has no name, and the full label for one
+   ("A colour of your own") is four words up the side of the screen. */
+const houseWord = A => H.named(A.a) ? H.tname(A.a) : 'Your own';
+function cloth(A){
+  const c = H.liveryOf(A) || (A && A.a === 'sable' ? '#3a3126' : H.TINCT.gules);
+  const m = /^#([0-9a-f]{6})$/i.exec(String(c).trim());
+  if (!m) return c;
+  const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, bl = n & 255;
+  const L = (0.2126*r + 0.7152*g + 0.0722*bl) / 255;
+  if (L <= 0.30) return c;
+  const k = 0.30 / L, h = v => ('0' + Math.round(Math.min(255, v*k)).toString(16)).slice(-2);
+  return '#' + h(r) + h(g) + h(bl);
+}
+
+/* ══ THE FLAG MAKER ═════════════════════════════════════
+   grumkata: "for custom banners it should be wayyy more customisable".
+
+   The coat has roughly forty times the number of possible forms it had —
+   furs, a line of partition on the field AND on the ordinary, up to six
+   charges ranged five ways, a compony bordure, six cuts of hem, an explicit
+   livery — and one scrolling column of every one of those at once is worse
+   than the small version was. So the maker is a WORKBENCH: a row of pennons
+   across the top, one bench at a time, and the thing you are making sitting
+   beside it the whole while.
+
+   Everything is still shown as the thing itself, drawn in the tinctures you
+   have already picked — a word is not a picture, and "per saltire nebuly"
+   means nothing at all until you see it. Every swatch redraws when any
+   choice changes. That is the point, and it is cheap.
+
+   Under the preview the coat is written out as a blazon. The written form
+   is the real heraldry and the drawing is one reading of it, so saying it
+   back to you in words is the app proving it understood what you built. */
 let draft = null;
+let mkTab = 'field';
+let chgQ = '';
 
-/* Everything you choose here is shown as the thing itself, drawn in the
-   tinctures you have already picked — a word is not a picture, and "per
-   saltire" means nothing until you see it. */
 const SW = 46;
-const swatch = inner => `<svg viewBox="0 0 ${SW} ${SW}">${inner}</svg>`;
+/* a swatch takes a DRAWING FUNCTION rather than a string, because a fur has
+   to register itself on the drawing's own context before the defs for it
+   can be written — and the defs go at the front of the same <svg> */
+function swatch(fn){
+  const c = H.ctx(SW);
+  const inner = typeof fn === 'function' ? fn(c) : fn;
+  return `<svg viewBox="0 0 ${SW} ${SW}">${H.defs(c)}${inner}</svg>`;
+}
 
 function pickRow(title, key, opts, draw, extra){
   return `<div class="mk"><h3>${title}</h3><div class="swgrid">
@@ -510,33 +655,141 @@ function pickRow(title, key, opts, draw, extra){
       data-arm="${key}" data-v="${k}" title="${opts[k]}">${draw(k)}</button>`).join('')}
   </div>${extra||''}</div>`;
 }
-/* a row of tinctures, ending in a colour of your own */
+/* a row of tinctures: the ten named ones, the six furs, and a colour of
+   your own. A fur is drawn as a fur — there is no colour that says ermine. */
 function tinctRow(title, key){
-  const own = !H.named(draft[key]);
-  return `<div class="mk"><h3>${title}</h3><div class="chips">
-    ${Object.keys(H.TINCT).map(k => `<button class="chip t${draft[key]===k?' on':''}"
-      data-arm="${key}" data-v="${k}" title="${H.TNAME[k]}">
-      <span style="background:${H.TINCT[k]}"></span></button>`).join('')}
-    <label class="chip t own${own?' on':''}" title="A colour of your own">
-      <span style="background:${own?draft[key]:'#8a8a8a'}"></span>
-      <input type="color" data-own="${key}" value="${own?draft[key]:'#8a8a8a'}">
-    </label>
-  </div></div>`;
+  const v = draft[key], own = !H.named(v);
+  const mine = own && /^#[0-9a-fA-F]{6}$/.test(String(v)) ? v : '#8a8a8a';
+  const chip = (k, inner) => `<button class="chip t${v===k?' on':''}"
+    data-arm="${key}" data-v="${k}" title="${H.tname(k)}">${inner}</button>`;
+  return `<div class="mk"><h3>${title}</h3>
+    <div class="chips">
+      ${Object.keys(H.TINCT).map(k =>
+        chip(k, `<span style="background:${H.TINCT[k]}"></span>`)).join('')}
+    </div>
+    <div class="chips" style="margin-top:6px">
+      ${Object.keys(H.FURS).map(k => chip(k, `<span class="fur">${
+        swatch(c => `<rect width="${SW}" height="${SW}" fill="${H.paint(k, c)}"/>`)
+      }</span>`)).join('')}
+      <label class="chip t own${own?' on':''}" title="A colour of your own">
+        <span style="background:${own?mine:'#8a8a8a'}"></span>
+        <input type="color" data-own="${key}" value="${mine}">
+      </label>
+    </div></div>`;
 }
-function chargeRow(){
+/* a line of partition only means something on a cut. Saying so is better
+   than hiding the row, which reads as the app having lost it. */
+function lineRow(title, key, lineable, draw, why){
+  if (!lineable) return `<div class="mk"><h3>${title}</h3>
+    <div class="note">${why}</div></div>`;
+  return pickRow(title, key, H.LINES, draw);
+}
+
+/* ── the benches ── */
+function paneField(){
+  return pickRow('The field', 'div', H.DIVISIONS,
+      k => swatch(c => H.field(k, draft.a, draft.b, SW, SW, draft.line, c)))
+    + lineRow('The line it is cut by', 'line', H.LINEABLE[draft.div],
+      k => swatch(c => H.field(draft.div, draft.a, draft.b, SW, SW, k, c)),
+      `A ${H.DIVISIONS[draft.div].toLowerCase()} field has no single cut across it to
+       dress. Choose a divided field — per pale, per fess, per bend, barry, paly —
+       and every line of partition opens up.`)
+    + tinctRow('First tincture', 'a')
+    + tinctRow('Second tincture', 'b');
+}
+function paneOrd(){
+  return pickRow('The ordinary', 'ord', H.ORDINARIES,
+      k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
+                  + H.ordinary(k, draft.ordT, SW, SW, draft.ordLine, c)))
+    + lineRow('Its edges', 'ordLine', H.ORD_LINEABLE[draft.ord],
+      k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
+                  + H.ordinary(draft.ord, draft.ordT, SW, SW, k, c)),
+      draft.ord === 'none'
+        ? 'Lay an ordinary over the field first and its edges can be cut any way you like.'
+        : `A ${H.ORDINARIES[draft.ord].replace(/^An? /,'').toLowerCase()} has no pair of
+           long straight edges to dress. A fess, a pale, a bend, a chief or a chevron does.`)
+    + tinctRow("The ordinary's tincture", 'ordT');
+}
+function paneCharge(){
   const L = H.chargeList();
+  const q = chgQ.trim().toLowerCase();
+  const keys = Object.keys(L).filter(k =>
+    !q || (L[k].n || k).toLowerCase().indexOf(q) >= 0);
   const N = n => `<button class="num${(draft.chgN||1)===n?' on':''}"
-    data-arm="chgN" data-v="${n}">${['','One','Two','Three'][n]}</button>`;
-  return `<div class="mk"><h3>The charge</h3>
+    data-arm="chgN" data-v="${n}">${['','One','Two','Three','Four','Five','Six'][n]}</button>`;
+  return `<div class="mk">
+    <h3>The charge <span class="mk-find"><input id="chgq" value="${esc(chgQ)}"
+      placeholder="find a charge" spellcheck="false"></span></h3>
     <div class="swgrid tall">
       <button class="sw${!draft.chg?' on':''}" data-arm="chg" data-v="" title="None">
         ${swatch(`<path d="M13,13 L33,33 M33,13 L13,33" stroke="rgba(255,246,226,.38)"
           stroke-width="3" fill="none"/>`)}</button>
-      ${Object.keys(L).map(k => `<button class="sw${draft.chg===k?' on':''}"
+      ${keys.map(k => `<button class="sw${draft.chg===k?' on':''}"
         data-arm="chg" data-v="${k}" title="${L[k].n}">
-        ${swatch(H.chargeAt(k, draft.chgT, SW, SW, SW/2, SW/2, SW*0.86))}</button>`).join('')}
+        ${swatch(c => H.chargeAt(k, draft.chgT, SW, SW, SW/2, SW/2, SW*0.86, c))}</button>`).join('')}
     </div>
-    <div class="chips" style="margin-top:9px">${N(1)}${N(2)}${N(3)}</div></div>`;
+    ${keys.length ? '' : '<div class="note">Nothing by that name.</div>'}
+  </div>
+  <div class="mk"><h3>How many</h3>
+    <div class="chips">${N(1)}${N(2)}${N(3)}${N(4)}${N(5)}${N(6)}</div></div>
+  ${draft.chgN > 1 ? pickRow('How they are ranged', 'chgA', H.ARRANGE,
+      k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
+           + H.charge(draft.chg || 'lion', draft.chgT, SW, SW, draft.chgN, k, c))) : ''}
+  ${tinctRow("The charge's tincture", 'chgT')}`;
+}
+function paneBord(){
+  return `<div class="mk"><h3>A bordure</h3><div class="chips">
+      ${Object.keys(H.BORDURES).map(k => `<button class="num${draft.bord===k?' on':''}"
+        data-arm="bord" data-v="${k}">${H.BORDURES[k]}</button>`).join('')}
+    </div>
+    <div class="note">Compony alternates your tincture with Argent all the way round,
+      the way a bordure compony is painted.</div></div>
+    ${draft.bord ? tinctRow("The bordure's tincture", 'bordT') : ''}`;
+}
+/* the cut of the foot of your banner, drawn as the banner it makes — and
+   the one colour the whole app then wears for you */
+function paneFlag(){
+  const flag = (k, w, h) => H.armsSVG(draft, { shape:'banner', w, h, hem:k, edge:2 });
+  const lv = H.liveryOf(draft) || 'var(--m-gules)';
+  const pick = (k, label, swatchCol, on) => `<button class="chip liv${on?' on':''}"
+    data-arm="livery" data-v="${k}" title="${label}">
+    <span style="background:${swatchCol}"></span></button>`;
+  const auto = H.liveryOf(Object.assign({}, draft, { livery:'' }));
+  return `<div class="mk"><h3>The cut of the hem</h3><div class="swgrid flags">
+      ${Object.keys(H.HEMS).map(k => `<button class="sw${(draft.hem||'swallow')===k?' on':''}"
+        data-arm="hem" data-v="${k}" title="${H.HEMS[k]}">
+        <span class="flagwrap">${flag(k, 34, 58)}</span></button>`).join('')}
+    </div>
+    <div class="note">This is the shape your banner is cut to — behind your chair at the
+      table, and in the hall.</div></div>
+  <div class="mk"><h3>Your livery</h3>
+    <div class="chips">
+      ${pick('', 'Taken from your arms', auto || 'var(--m-gules)', !draft.livery)}
+      ${Object.keys(H.TINCT).filter(t => !H.isMetal(t) && t !== 'sable').map(t =>
+        pick(t, H.TNAME[t], H.TINCT[t], draft.livery === t)).join('')}
+      <label class="chip t own${draft.livery && !H.named(draft.livery) ? ' on' : ''}"
+        title="A colour of your own">
+        <span style="background:${draft.livery && !H.named(draft.livery) ? draft.livery : '#8a8a8a'}"></span>
+        <input type="color" data-own="livery"
+          value="${/^#[0-9a-fA-F]{6}$/.test(String(draft.livery)) ? draft.livery : '#8a8a8a'}">
+      </label>
+    </div>
+    <div class="note">One colour out of the coat, and the whole app wears it: the band down
+      the chat, the edge of every slip, the line under your name. It has to be a colour and
+      not a metal — Or would vanish into the gilt and Sable into the panel.
+      <span class="liv-now" style="--liv:${lv}">This is yours.</span></div></div>`;
+}
+const PANES = { field:paneField, ord:paneOrd, chg:paneCharge, bord:paneBord, flag:paneFlag };
+const TABS = [['field','Field'], ['ord','Ordinary'], ['chg','Charge'],
+              ['bord','Border'], ['flag','Banner']];
+/* how many of this bench's choices are not the plain default — a tally on
+   the pennon, so you can see where you have been */
+function tabTally(k){
+  const D = H.DEFAULTS, n = ({
+    field: ['div','a','b','line'], ord: ['ord','ordT','ordLine'],
+    chg: ['chg','chgT','chgN','chgA'], bord: ['bord','bordT'], flag: ['hem','livery']
+  })[k].filter(f => draft[f] !== D[f]).length;
+  return n ? `<i>${n}</i>` : '';
 }
 
 VIEW.arms = () => `
@@ -544,63 +797,76 @@ VIEW.arms = () => `
   <div class="lede">Blazon them yourself, or bring a picture. Whatever you choose rides
     into every table you join.</div>
   <div class="strip"></div>
-  <div class="row2" style="margin-bottom:28px">
+  <div class="row2" style="margin-bottom:22px">
     <button class="lk" data-do="randomarms">Roll for it</button>
     <button class="lk" data-do="uploadarms">${me.pic ? 'Use a different picture' : 'Upload a picture instead'}</button>
     ${me.pic ? '<button class="lk bad" data-do="droppic">Drop the picture</button>' : ''}
   </div>
   <div class="maker">
-    <div>
-      ${pickRow('The field', 'div', H.DIVISIONS,
-        k => swatch(H.field(k, draft.a, draft.b, SW, SW)))}
-      ${tinctRow('First tincture', 'a')}
-      ${tinctRow('Second tincture', 'b')}
-      ${pickRow('The ordinary', 'ord', H.ORDINARIES,
-        k => swatch(`<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
-                    + H.ordinary(k, draft.ordT, SW, SW)))}
-      ${tinctRow("The ordinary's tincture", 'ordT')}
-      ${chargeRow()}
-      ${tinctRow("The charge's tincture", 'chgT')}
-      <div class="mk"><h3>A bordure</h3><div class="chips">
-        <button class="num${draft.bord?'':' on'}" data-arm="bord" data-v="">None</button>
-        <button class="num${draft.bord?' on':''}" data-arm="bord" data-v="1">A bordure</button>
-      </div></div>
-      ${draft.bord ? tinctRow("The bordure's tincture", 'bordT') : ''}
+    <div class="bench">
+      <div class="mk-tabs">${TABS.map(([k,n]) => `<button class="mk-tab${mkTab===k?' on':''}"
+        data-tab="${k}">${n}${tabTally(k)}</button>`).join('')}</div>
+      <div class="mk-pane">${(PANES[mkTab] || paneField)()}</div>
       <div class="credit">Charges from game-icons.net, CC BY 3.0</div>
     </div>
     <div class="prev">
       <div class="card${me.pic?' pic':''}">
-        <div id="prevArms">${me.pic
+        <div id="prevArms" class="prev-pair">${me.pic
           ? `<img class="ownpic" src="${esc(me.pic)}" alt="the picture you uploaded">`
-          : H.armsSVG(draft, {shape:'shield', w:200, h:240, edge:6})}</div>
+          : H.armsSVG(draft, {shape:'shield', w:200, h:240, edge:6})
+            + `<span class="prev-flag">${H.armsSVG(draft, {shape:'banner', w:84, h:176, edge:3})}</span>`}</div>
+        <div class="blazon">${me.pic ? '' : esc(H.blazonText(draft))}</div>
         <div class="warn" id="warn">${me.pic
-          ? 'Your own picture is in use. The blazon below is kept but not shown &#8212; drop the picture to go back to it.'
+          ? 'Your own picture is in use. The blazon is kept but not shown &#8212; drop the picture to go back to it.'
           : H.tinctureWarning(draft)}</div>
       </div>
-      <div class="f" style="margin-top:22px"><label>The name you answer to</label>
+      <div class="f" style="margin-top:20px"><label>The name you answer to</label>
         <input id="aname" maxlength="40" value="${esc(me.name)}" placeholder="type your name"></div>
+      <div class="f"><label>Your motto</label>
+        <input id="amotto" maxlength="48" value="${esc(me.motto||'')}"
+          placeholder="Nothing without labour"></div>
       <div class="sealrow" style="margin-bottom:0">
         <button class="seal" data-do="takearms"><span class="wax"></span><b>M</b></button>
         <span class="cap">Take these arms</span>
       </div>
     </div>
   </div>`;
+/* the name and the motto save as you write, so nothing is lost by pressing
+   a pennon mid-word and being redrawn */
+AFTER.arms = () => {
+  const live = (id, key) => { const i = $(id); if (!i) return;
+    i.addEventListener('input', () => { me[key] = i.value; saveM(); paintArms(); }); };
+  live('#aname', 'name'); live('#amotto', 'motto');
+  const q = $('#chgq');
+  if (q) q.addEventListener('input', () => { chgQ = q.value; repaintMaker('#chgq'); });
+};
 
-/* Every swatch on the sheet is drawn in the tinctures currently chosen, so
-   changing one colour redraws all of them. That is the point, and it is cheap. */
-function repaintMaker(){
-  screen.style.setProperty('--field', H.col(draft.a));
-  const nm = ($('#aname') || {}).value;
+/* Every swatch on the bench is drawn in the tinctures currently chosen, so
+   changing one colour redraws all of them. `keep` is the field that was
+   being typed in, put back afterwards with its caret where it was. */
+function repaintMaker(keep){
+  const tabbed = repaintMaker.tab !== mkTab;
+  repaintMaker.tab = mkTab;
+  screen.style.setProperty('--field', cloth(draft));
+  screen.dataset.house = houseWord(draft);
+  const held = keep && $(keep);
+  const val = held ? held.value : null, pos = held ? held.selectionStart : 0;
   const grid = document.querySelector('.swgrid.tall');
   const top = grid ? grid.scrollTop : 0;
   render();
-  if (nm != null && $('#aname')) $('#aname').value = nm;
+  const now = keep && $(keep);
+  if (now && val != null){ now.value = val; now.focus();
+    try { now.setSelectionRange(pos, pos); } catch (e) {} }
   const g2 = document.querySelector('.swgrid.tall');
   if (g2) g2.scrollTop = top;
+  /* stepping to another bench is a small arrival of its own: the pane
+     wipes, the rest of the screen does not move */
+  const pane = document.querySelector('.mk-pane');
+  if (tabbed && pane) pane.classList.add('turned');
 }
 
-/* ══ YOUR ARMS, IN THE HALL ═══════════════════════════════════ */
-/* THE SAME OUTLINE FOR ALL THREE STATES. No arms, an uploaded picture, and
+/* ══ YOUR ARMS, IN THE HALL ══════════════════════════════
+   THE SAME OUTLINE FOR ALL THREE STATES. No arms, an uploaded picture, and
    real heraldry used to be three different shields: the flat, straight-sided
    pentagon below was hand-copied as a CSS clip-path (once here, once in
    00-hall.css's .blank rule) while real arms went through H.armsSVG's
@@ -609,19 +875,26 @@ function repaintMaker(){
    cut-down, lesser version of the real thing rather than an empty version
    of the SAME shield. One shape now, driven from the one place that
    defines it (H.shieldPath), used inline for the two CSS-clipped states —
-   00-hall.css's .blank no longer carries its own clip-path at all. */
+   00-hall.css's .blank no longer carries its own clip-path at all.
+
+   Whether a coat has been BLAZONED is the engine's question, not this
+   file's: H.blazoned knows what an untouched record looks like. */
 function paintArms(){
   const s = $('#myshield'), n = $('#myname');
   const clip = "path('" + H.shieldPath(92, 110).replace(/\s+/g, ' ') + "')";
   s.innerHTML = me.pic
     ? `<img src="${esc(me.pic)}" alt="" style="clip-path:${clip};
         object-fit:cover;height:110px">`
-    : (me.arms && (me.arms.ord !== 'none' || me.arms.chg || me.arms.bord
-       || me.arms.div !== 'plain' || me.arms.a !== 'sable'))
+    : H.blazoned(me.arms)
       ? H.armsSVG(me.arms, { shape:'shield', w:184, h:220, edge:7 })
       : `<div class="blank" style="clip-path:${clip}">no arms<br>yet</div>`;
   n.textContent = me.name || 'unnamed';
   n.classList.toggle('unset', !me.name);
+  /* a style and a motto are both optional and both take up room when they
+     are empty, so each is hidden rather than left blank */
+  const st = $('#mystyle'), mo = $('#mymotto');
+  if (st){ st.textContent = me.style || ''; st.hidden = !me.style; }
+  if (mo){ mo.textContent = '“' + (me.motto || '') + '”'; mo.hidden = !me.motto; }
 }
 
 /* ══ CLICKS ═══════════════════════════════════════════════════ */
@@ -629,12 +902,12 @@ document.addEventListener('click', e => {
   const plate = e.target.closest('.plate[data-i]');
   const banner = plate && BANNERS[+plate.dataset.i];
   if (banner) return take(banner.id);
-  if (e.target.closest('#arms')){ draft = Object.assign({}, me.arms); at = 'arms';
-    screen.style.setProperty('--field', H.TINCT[me.arms.a] || '#2a2118');
-    if (me.arms.a === 'sable') screen.style.setProperty('--field', '#3a3126');
-    screen.dataset.house = (H.TNAME[me.arms.a] || '') ;
+  if (e.target.closest('#arms')){ draft = H.norm(me.arms); mkTab = 'field'; chgQ = ''; at = 'arms';
+    repaintMaker.tab = 'field';
+    screen.style.setProperty('--field', cloth(draft));
+    screen.dataset.house = houseWord(draft);
     $('#device').innerHTML = '';
-    render(); window.Hall.lock(true); screen.classList.add('on');
+    render(true); window.Hall.lock(true); screen.classList.add('on');
     fall();
     setTimeout(() => { if (at) window.Hall.sleep(true); }, 620);
     backBtn.style.display='flex'; return; }
@@ -661,11 +934,25 @@ document.addEventListener('click', e => {
     }
   }
 
+  /* which bench of the maker you are standing at */
+  const tab = e.target.closest('[data-tab]');
+  if (tab){ mkTab = tab.dataset.tab; return repaintMaker(); }
+
+  /* a switch on the settings screen. 07-options.js refuses anything that is
+     not one of that option's own states, so the value is not checked here. */
+  const opt = e.target.closest('[data-opt]');
+  if (opt){ window.Options.set(opt.dataset.opt, opt.dataset.v); return render(); }
+
   const arm = e.target.closest('[data-arm]');
   if (arm){
     const k = arm.dataset.arm, v = arm.dataset.v;
-    /* a count is a number and a bordure is a yes or a no; everything else is a name */
-    draft[k] = k === 'chgN' ? +v : k === 'bord' ? !!v : v;
+    /* a count is a number; everything else is a name, and an empty name is
+       a real answer — no bordure, no charge, livery taken from the coat */
+    draft[k] = k === 'chgN' ? +v : v;
+    /* changing the field or the ordinary can take its line of partition away
+       with it, and a line left set on something that cannot show it is a
+       setting you can neither see nor clear */
+    draft = H.norm(draft);
     return repaintMaker();
   }
 
@@ -684,11 +971,30 @@ document.addEventListener('click', e => {
     case 'open':       return openTable(row.dataset.id);
     case 'opensheet':  return openSheet(row.dataset.id);
     case 'join':       return sendWord();
-    case 'arms':       draft = Object.assign({}, me.arms); at='arms'; return render();
+    case 'arms':       draft = H.norm(me.arms); mkTab='field'; chgQ=''; at='arms';
+                       repaintMaker.tab = 'field'; return render(true);
     case 'uploadarms': return $('#pickP').click();
     case 'droppic':    me.pic=''; saveM(); paintArms(); render(); return toast('Picture dropped');
     case 'randomarms': return rollArms();
     case 'takearms':   return takeArms();
+    case 'dumpall':    download('monarchy-everything', window.Options.dump());
+                       return toast('A copy of everything is in your downloads');
+    /* TWO PRESSES, and the second one says what it is about to do. This is
+       the only door in the app that destroys something that cannot be got
+       back, so it does not get a one-click confirm dialog people dismiss
+       without reading — the button itself becomes the warning. */
+    case 'forgetall':
+      if (!forgetArmed){ forgetArmed = true; render();
+        setTimeout(() => { if (forgetArmed){ forgetArmed = false;
+          if (at === 'set') render(); } }, 6000);
+        return; }
+      forgetArmed = false;
+      window.Options.forget();
+      tables = []; chars = []; me = Object.assign({ name:'', pic:'', style:'', motto:'',
+        arms: Object.assign({}, H.DEFAULTS) });
+      paintArms(); if (window.Shell && window.Shell.livery) window.Shell.livery();
+      render();
+      return toast('Forgotten — this browser holds nothing of yours');
   }
   if (b.dataset.act && row) rowAct(b.dataset.act, row, b);
 });
@@ -901,9 +1207,11 @@ $('#pickP').addEventListener('change', function(){
    nothing sits on its own kind. */
 function rollArms(){ draft = H.roll(); repaintMaker(); }
 function takeArms(){
-  me.arms = Object.assign({}, draft);
+  me.arms = H.norm(draft);
   const n = ($('#aname') || {}).value;
   if (n != null) me.name = n.trim();
+  const m = ($('#amotto') || {}).value;
+  if (m != null) me.motto = m.trim();
   saveM(); paintArms();
   /* the chrome wears your livery (42-shell.js), so new arms re-dye it */
   if (window.Shell && window.Shell.livery) window.Shell.livery();

@@ -68,6 +68,12 @@ const YAW = -0.62;
       clips every highlight to a flat white plateau, which is exactly what
       "textures look flat" looks like. ACES filmic tone mapping rolls the
       top end off instead. */
+/* BLAZON IN 3D. Every material in this room goes through here: banded
+   light, the house ramp, and a gilt rim on anything with a fragment
+   normal (09-blazon3d.js). One line per material, so nothing about how
+   the room is built or lit had to change. */
+const B3 = (m, o) => (root.Blazon3D ? root.Blazon3D.cel(m, o) : m);
+
 let cv, renderer, scene, camera, W = 0, H = 0, OX = 0, OY = 0;
 let shadowLight = null, catcher = null;
 let chest = null, lidGroup = null, QS = null, QO = null;
@@ -81,6 +87,8 @@ function build() {
   doc.body.appendChild(cv);
 
   renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
+  /* shader links stay off the frame the player is watching (09-blazon3d.js) */
+  if (root.Blazon3D && root.Blazon3D.tune) root.Blazon3D.tune(renderer);
   dress(renderer);
   scene = new THREE.Scene();
   scene.environment = envFor(renderer);
@@ -177,6 +185,7 @@ function buildTable() {
   uCv = doc.getElementById('tglu');
   if (!uCv || typeof WOOD === 'undefined' || !WOOD.Table_Round_A) return;
   uRen = new THREE.WebGLRenderer({ canvas: uCv, alpha: true, antialias: true });
+  if (root.Blazon3D && root.Blazon3D.tune) root.Blazon3D.tune(uRen);
   dress(uRen);
   uScene = new THREE.Scene();
   uScene.add(new THREE.AmbientLight(0xffe6c8, 0.10));
@@ -199,7 +208,13 @@ function buildTable() {
      reverse: the things standing there are small, so a plane just behind
      their feet is exactly the surface they are standing on. */
   const body = new THREE.Group();
-  body.add(mesh(WOOD.Table_Round_A.prims, WOOD_TEX, DRESS.timber));
+  /* THE WOOD TAKES THE BANDING GENTLY. It is the biggest, smoothest,
+     nearest surface in the app and the only one carrying a soft shadow
+     across it — at the room's own settings the steps turned that shadow
+     into a torn silhouette. More bands, softer mix: the wood is stylised
+     without the shadow on it becoming a shape. */
+  body.add(mesh(WOOD.Table_Round_A.prims, WOOD_TEX, DRESS.timber,
+                { room: 'tavern', steps: 9, tint: 0.20, hard: 0.26, rim: 0.10 }));
   /* TOP SURFACE AT THE ORIGIN, not the model's middle: the plane the pieces
      live on IS the table top, so that is the part that has to line up. */
   /* it casts (onto the pieces layer it never reaches, harmlessly) but above
@@ -231,7 +246,10 @@ function buildTable() {
    to design around; it IS the design — you see the room when you have
    pulled back far enough to be sitting in it. */
 let roomGroup = null, overGroup = null, roomBuilt = false, seatedNow = false;
-const TABLE_M = 1.2;      /* the round table is about four feet across */
+/* the wood's real size is stated once, by 23-table3d.js, and read here —
+   two numbers that must agree and can drift apart is how the camera ended
+   up with its chin on the table */
+const TABLE_M = (root.Table3D && root.Table3D.TABLE_M) || 2.2;
 const FLOOR_Y = -0.75;    /* table top to floor, in metres */
 const WALL_H = 3.12;      /* the village kit's own wall height */
 /* ── HOW BIG THE ROOM CAN BE AND STILL BE SEEN ────────────────
@@ -433,11 +451,14 @@ function flushRoom(target, tag) {
        chest and the counters keep Standard, because they are close to
        the eye and their sheen is the thing that makes them read as
        objects. */
-    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
+    const mesh = new THREE.Mesh(g, B3(new THREE.MeshLambertMaterial({
       map: bk.t ? tex(bk.t, bk.book) : null,
       emissive: d.emis ? new THREE.Color().setRGB(d.emis[0], d.emis[1], d.emis[2])
                        : new THREE.Color(0, 0, 0),
-      color: new THREE.Color().setRGB(d.mul[0], d.mul[1], d.mul[2]) }));
+      color: new THREE.Color().setRGB(d.mul[0], d.mul[1], d.mul[2]) }),
+      /* scenery: banded and ramped, but no rim — an outline belongs to the
+         things on the table, not to the walls behind them */
+      { room: 'tavern', rim: 0, steps: 6, tint: 0.30, hard: 0.5 }));
     /* nothing in the room casts or receives: it is scenery, and one
        shadow map over sixty thousand triangles was a second cost as big
        as the draw calls */
@@ -558,6 +579,14 @@ function tickFire(t) {
   for (const m of emberMats) m.color.setRGB(1.0 * ek, 0.38 * ek, 0.13 * ek);
   if (moteField) { moteField.position.y = Math.sin(t * 0.11) * 0.06;
                    moteField.rotation.y = t * 0.008; }
+  /* the hangings take the hearth's own colour and the hearth's own breath,
+     so the room's cloth is lit by the room's fire */
+  for (const m of clothHangings) {
+    m.uniforms.t.value = t;
+    m.uniforms.lightCol.value.setRGB(1.0 * (0.62 + 0.30 * n),
+                                     0.66 * (0.62 + 0.30 * n),
+                                     0.38 * (0.62 + 0.30 * n));
+  }
 }
 
 /* ══ THE ROOM IS DATA ══════════════════════════════════════════
@@ -781,6 +810,46 @@ function buildRoom() {
   seatRoot = new THREE.Group();
   roomGroup.add(seatRoot);
   syncSeats();
+  houseBanner();
+}
+
+/* ══ WHOSE TABLE THIS IS ═══════════════════════════════════════
+   Your own arms, hung over the hearth on the far wall — the one thing in
+   the room every seat can see, which is exactly why an inn hangs its
+   colours there and not behind a chair. Your seat's banner is behind
+   YOUR head; this is the one you actually look at all evening.
+
+   Same cloth as the hall's banners (13-hall3d.js) and the seats', so it
+   waves in the same wind and takes the same firelight. */
+function houseBanner() {
+  if (!roomGroup || !root.Hall || !root.Hall.cloth || !root.Heraldry) return;
+  let src = '';
+  try {
+    const mine = root.Shell && root.Shell.arms && root.Shell.arms();
+    /* the hem is the player's own now — armsSVG takes it off the record
+       when it is not overridden here, so all that has to happen is to
+       stop overriding it (16-menu.js, the Banner bench) */
+    const svg = mine ? root.Heraldry.armsSVG(mine, { w: 220, h: 300 }) : '';
+    if (svg) src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  } catch (e) { return; }
+  if (!src) return;
+  const W = 0.62, H = 0.92;
+  const mat = root.Hall.cloth({ transparent: true, amp: 0.04, ph: 1.7, fogK: 0,
+    lightPos: new THREE.Vector3(0.05, 0.4, 1), lightCol: 0xffb066, ambCol: 0x181109 });
+  let hung = null;
+  waiting++;
+  mat.uniforms.map.value = new THREE.TextureLoader().load(src,
+    () => { if (hung) hung.visible = true; landed(); }, undefined, landed);
+  hung = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 8, 14), mat);
+  /* ON THE CHIMNEY BREAST, NOT ON THE WALL BEHIND IT. The fireplace is
+     1.78 deep and set into the far wall, so its front face stands about a
+     metre proud: a banner flat on the wall hangs INSIDE the masonry. And
+     low enough to be in the picture from a chair — the first one was at
+     2.34 and sat above the top of the frame. */
+  hung.position.set(0, FLOOR_Y + 1.44, -1.66);
+  hung.visible = false;
+  clothHangings.push(mat);
+  roomGroup.add(hung);
 }
 
 /* Read the plan and build it. Called again whenever the plan changes,
@@ -900,19 +969,65 @@ function layRoom() {
 
    They face the middle of the table, always — which is where you are.  */
 let seatRoot = null, seatSig = '';
-const SEAT_R = 1.34;          /* a person sits BACK from a table, not against it */
+/* A CHAIR GOES BEHIND THE PERSON IN IT. The eye sits at TABLE_M/2 + 0.42
+   (23-table3d.js); the chair is a little further out again, so your own is
+   behind your head and everyone else's is across the wood — not a ring of
+   chairs standing in front of you. */
+const SEAT_R = TABLE_M / 2 + 0.56;
 const SEAT_CHAIR = 0.78;      /* the pack's chair is 1.2m tall; a chair is 0.94 */
+/* every hanging in the tavern, so the fire can light them all */
+const clothHangings = [];
 function banner(seat) {
-  /* the seat's own image if it has one; the character's arms if not,
-     drawn by the hall's heraldry so a seat is never a blank rectangle */
+  /* the seat's own image if it has one; YOUR OWN ARMS if not — the hall
+     knows what you march under (42-shell.js), and a stranger's rolled
+     coat behind your chair was the app forgetting who you are. A random
+     roll is the last resort, so a seat is never a blank rectangle. */
+  /* YOUR arms hang at YOUR place, and nowhere else. Eight seats all
+     flying the same coat is not a table of eight houses, it is one
+     player's colours printed eight times — and an empty chair has no
+     house to fly. Everyone else's banner arrives with their seat once
+     there is somebody in it. */
   let src = seat.banner;
-  if (!src && root.Heraldry && root.Heraldry.roll) {
+  if (!src && seat.__mine && root.Heraldry) {
     try {
-      const svg = root.Heraldry.armsSVG(root.Heraldry.roll(), { w: 220, h: 300 });
-      src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+      const mine = root.Shell && root.Shell.arms && root.Shell.arms();
+      /* the hem is the player's own now — armsSVG takes it off the record
+       when it is not overridden here, so all that has to happen is to
+       stop overriding it (16-menu.js, the Banner bench) */
+    const svg = mine ? root.Heraldry.armsSVG(mine, { w: 220, h: 300 }) : '';
+      if (svg) src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
     } catch (e) { src = ''; }
   }
   if (!src) return null;
+
+  /* ── THE HALL'S OWN CLOTH, HUNG IN HERE ──────────────────────
+     grumkata: the two 3D scenes should "mix well with the style". They
+     did not: the hall's banners are real cloth — a travelling wave down
+     the weave, gold leaf on the Or that catches the light — and the
+     tavern's were flat planes in a Standard material. Same app, same
+     heraldry, two answers.
+
+     So this is the HALL's material (13-hall3d.js `cloth`), lit by the
+     fire instead of by a torch: tickFire() below pushes the hearth's own
+     colour into it every frame, so the banners breathe with the flames.
+     A few subdivisions only — these are 46cm of cloth across the room,
+     not six metres down a corridor. */
+  if (root.Hall && root.Hall.cloth) {
+    const W = 0.46, H = 0.68;
+    const mat = root.Hall.cloth({
+      transparent: true, amp: 0.035, ph: Math.random() * 6.28,
+      fogK: 0, lightPos: new THREE.Vector3(0.05, 0.45, 1),
+      lightCol: 0xffb066, ambCol: 0x181109
+    });
+    waiting++;
+    let hung = null;
+    mat.uniforms.map.value = new THREE.TextureLoader().load(src,
+      () => { if (hung) hung.visible = true; landed(); }, undefined, landed);
+    hung = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 8, 14), mat);
+    hung.visible = false;
+    clothHangings.push(mat);
+    return hung;
+  }
   /* STANDARD, NOT BASIC. A Basic material ignores every light in the
      room, so a banner painted in flat heraldic colour sat there glowing
      like a sticker pasted onto a dark photograph — brighter than the
@@ -960,7 +1075,8 @@ function buildSeat(seat) {
     ch.traverse(o => {
       if (!o.isMesh) return;
       const was = o.material;
-      o.material = new THREE.MeshLambertMaterial({ map: was.map, color: was.color });
+      o.material = B3(new THREE.MeshLambertMaterial({ map: was.map, color: was.color }),
+                      { room: 'tavern', rim: 0, steps: 6, tint: 0.30, hard: 0.5 });
       was.dispose();
       o.castShadow = false; o.receiveShadow = true;
     });
@@ -1039,10 +1155,13 @@ function syncSeats() {
   if (!seatRoot || !root.TableModel) return;
   const seats = root.TableModel.seats ? root.TableModel.seats() : [];
   const sig = seats.map(s => s.id + '|' + s.at + '|' + (s.face || '').length +
-                             '|' + (s.banner || '').length).join(',');
+                             '|' + (s.banner || '').length).join(',')
+            + '|me' + ((root.Shell && root.Shell.seat) ? root.Shell.seat() : 0);
   if (sig === seatSig) return;
   seatSig = sig;
   while (seatRoot.children.length) seatRoot.remove(seatRoot.children[0]);
+  const mineAt = (root.Shell && root.Shell.seat) ? root.Shell.seat() : 0;
+  seats.forEach((s, i) => { s.__mine = (i === mineAt); });
   for (const s of seats) {
     s.__a = (s.at || 0) * Math.PI / 180;        /* buildSeat needs the bearing */
     const g = buildSeat(s);
@@ -1706,7 +1825,7 @@ function allTexReady(g) {
   });
   return ok;
 }
-function mesh(prims, book, dress) {
+function mesh(prims, book, dress, cel) {
   dress = dress || DRESS.chest;
   const g = new THREE.Group();
   for (const p of prims) {
@@ -1754,7 +1873,7 @@ function mesh(prims, book, dress) {
        sampled against the room built in envFor(). Swapping this one
        material is most of the difference between "these look like
        objects" and "these look like drawings of objects". */
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = B3(new THREE.MeshStandardMaterial({
       map: p.t ? tex(p.t, book) : null,
       color: col,
       vertexColors: !!p.ao,
@@ -1764,7 +1883,8 @@ function mesh(prims, book, dress) {
       transparent: false,
       alphaTest: p.cut ? 0.5 : 0,
       /* foliage is a flat card whose SHAPE lives in the texture's alpha */
-      side: p.cut ? THREE.DoubleSide : THREE.FrontSide });
+      side: p.cut ? THREE.DoubleSide : THREE.FrontSide }),
+      cel || { room: 'tavern', steps: 6, tint: 0.24, hard: 0.5, rim: p.cut ? 0 : 0.16 });
     const m = new THREE.Mesh(geo, mat);
     m.castShadow = true; m.receiveShadow = true;
     g.add(m);
@@ -2355,6 +2475,14 @@ const HEARTBEAT = 2000;
 function frame(ts) {
   requestAnimationFrame(frame);
   if (!camera) return;
+  /* NOT WHILE YOU ARE LOOKING AT THE HALL. The room is built before anyone
+     asks for a table now (28-table-boot.js), which means this loop is alive
+     from about a second after the app opens — and without this line it
+     would spend the rest of your time in the hall measuring, standing and
+     drawing thirty-seven thousand triangles of a room nobody can see, in
+     the frames the hall and its screens need for their own animation.
+     One class check is the whole price of not doing that. */
+  if (!doc.body.classList.contains('at-table')) return;
 
   const busy = dirty > 0 || waiting > 0 || Math.abs(lidU - lidWant) > 0.001;
   if (!busy) {
@@ -2635,7 +2763,31 @@ root.__near = () => {
   return out;
 };
 
-root.TableGL = { build, setOpen, sync, thumb, bit, onTextures, invalidate, showRoom, lens, syncSeats,
+/* ══ WARMING THE ROOM ═══════════════════════════════════
+   Every material in here is compiled the first time something wearing it is
+   drawn — which is the first frame of the table, i.e. the frame the player
+   is watching, i.e. the hitch. `renderer.compile()` walks the scene and
+   builds every program up front instead, so it can be done somewhere
+   nobody is waiting: 28-table-boot.js runs it as its own step, under the
+   cloth, with a frame either side of it.
+
+   It is only half the fix. The other half is 09-blazon3d.js's `tune()`,
+   which stops three.js dragging each link back onto the main thread —
+   without that, moving the compile just moves the freeze. */
+function warm() {
+  try {
+    if (renderer && scene && camera) { renderer.compile(scene, camera); renderer.render(scene, camera); }
+    if (uRen && uScene && camera) { uRen.compile(uScene, camera); uRen.render(uScene, camera); }
+  } catch (e) { /* a room that will not pre-compile still draws normally */ }
+}
+/* Pre-UPLOADING the textures as well was tried here (traverse the scene,
+   renderer.initTexture on every map) and measured as nothing: the tavern's
+   albedos are fetched asynchronously and mostly are not there yet when the
+   room is warmed, so there was nothing to push. Left out rather than left
+   in, since code that claims to do something it does not is worse than the
+   half-second it was meant to save. */
+
+root.TableGL = { build, warm, setOpen, sync, thumb, bit, onTextures, invalidate, showRoom, lens, syncSeats,
   planRows, planKinds, setPlan, resetPlan, defaultPlan: () => TAVERN_PLAN.map(r => Object.assign({}, r)),
   stats: glStats,
   get frames() { return drawn; },

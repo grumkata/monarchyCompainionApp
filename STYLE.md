@@ -183,6 +183,52 @@ watching the DOM, so no other file's logic was changed.
 Reduced motion turns the Bend into a cut, and the global rule in
 `20-shell.css` makes every arrival instant.
 
+
+## 6⅓. What motion is allowed to cost
+
+Blazon has a lot of motion in it, and motion is the easiest thing in this app
+to make it feel slow. One rule covers nearly all of it:
+
+**Animate `transform` and `opacity`. Nothing else.** They are the only two
+properties the compositor can carry on its own, without going back through
+layout and paint. Everything else — `width`, `height`, `top`, `margin`,
+`filter` on a big element — costs a frame of the main thread each time it
+changes, which is precisely what people mean when they say an interface feels
+laggy.
+
+Three consequences worth knowing:
+
+- **Compositor animation keeps running while the main thread is blocked.**
+  That is why the loading screen's gilt sweep is a `translateX` keyframe: the
+  page is parsing twelve megabytes of script and *nothing* driven by
+  JavaScript can move, but that sweep does. The bar's own width cannot — it
+  is laid out — so it advances in steps, and the steps are weighted by the
+  bytes actually parsed so that a slow stretch looks slow instead of broken.
+- **An entrance must not fire on a repaint.** Every screen in the hall is
+  rebuilt by setting `innerHTML`, so every element is new every time and a
+  CSS entrance runs again. 16-menu.js marks `#screenbody.fresh` only when a
+  screen is genuinely raised; the entrances hang off that class. Without it
+  the flag maker's whole bench flies in on every tincture you press.
+- **A cover must not share a layer with what it covers.** This is the one
+  that cost three attempts. A loading screen exists to mask a freeze; if it
+  is drawn by the thread that is frozen, it freezes too and you have two
+  problems. `#herald` and `#boot` both carry `contain: layout paint style`
+  and `will-change: transform`, so they are painted once into their own
+  texture and nothing underneath can invalidate them — and each carries one
+  `transform` animation that keeps running while the page is dead. A cover
+  that is merely opaque is not enough: it must be *provably* still moving,
+  which is what `test/smooth.test.js` checks, with a control.
+- **There is no motion setting, on purpose.** One existed briefly and was
+  removed: a speed dial on a broken animation asks the player to manage a
+  problem that is the app's to solve. `prefers-reduced-motion` is honoured,
+  because that is a preference already expressed to the system.
+
+And the same rule applies to the 3D: work that can be done before anyone is
+waiting should be. The tavern is raised while you are still looking at the
+banners (`TableBoot.warm`), because the room is the same room whichever table
+you open — see PROJECT.md 3.17 for the numbers, including the attempt that
+made it worse.
+
 ## 6½. Layout — out of the box
 
 The user brief was to "cut free from the boxes". The rule is: **if a thing
@@ -197,9 +243,50 @@ can be heraldic furniture instead of a rectangle, it is.**
 | | the **roll on a bend**: each entry a step further right, up to ten | `.roll > .entry` + `--i` |
 | Hall | your name on a **scroll** | `#arms .who::before` |
 | Table | the chat is a **hanging with an embattled edge**: merlons with gilt caps | `-webkit-mask` on `.chatdock` |
+| | the chest opens into **one case** — rail of kinds, head, group pennons, grid, and a foot for what you hold — which collapses to that foot while you carry something | `47-hand.js`, `.hb-case` |
+| | a scene's options are a **dagged writ** of sealed orders | `.sc-opts` |
+| | a record is a **sheet lying on the wood** that rises to a reading | `45-papers.js`, `.tp-paper` |
 | | the dice are **lozengy**, the second row set in the notches of the first | a 9×3 half-cell grid; `clip-path` is also the hit area |
 | | **Roll is a wax seal**, the same wax as the hall's (`--m-wax`, `--m-wax-melt`) | `.droll` |
 | | the corner names **this table** in the mark's hand | `.hud.tl`, text set by `42-shell.js` |
+
+## 6⅔. Controls — a seal, a tally, a row of pennons
+
+No `<select>`, no checkbox, no number spinner anywhere at the table. Three
+controls cover every setting the app has (`26-scene-setup.js` builds all
+three; the orders, the make-a-scene warrant and the token maker share them):
+
+| Setting | Control | Why |
+|---|---|---|
+| a yes/no | **a wax seal** — a hatched matrix when open, poured wax when sealed, gilt thrown on the press | every commitment in Monarchy is a seal; an order is either sealed or it is not |
+| a number | **a tally** — the figure in a sunk well between two Or lozenges | it never needs a keyboard, and the lozenge is the app's own shape |
+| a choice | **a row of pennons** — every choice in sight at once, the flying one counterchanged, its meaning written under the label | a closed list hides the choices and, at 300px, ran out of the panel |
+
+A choice takes the whole row (label above, pennons below); yes/no and
+numbers sit label-left, control-right.
+
+## 6⅘. The 3D, and the size of things
+
+**Two units are one millimetre.** The table is 2.2 metres and 4400 units
+across, so every object on it is stated as the real thing: A4 is 420x594,
+a combat mat is 590mm, a counter is 42mm, a note is 100mm. If you are
+about to type a pixel number onto the wood, state the millimetres instead
+and multiply by `Table3D.MM`. `test/table.test.js` holds this.
+
+**The table is shared, not yours.** Places go evenly round 360° — up to
+eight — but a table starts with none: it must seat eight, not always show
+eight. The seated camera is measured from the table (`TABLE_M/2 + 0.42`),
+never typed. Which
+one is yours is local to your client (`Shell.seat()`); everything else
+about the table is the same object for everyone at it. Your things are
+laid at your place via `TableModel.seatSpot()`, turned the way you read
+them, and only your own seat flies your arms.
+
+**Both rooms are drawn, not rendered** (`09-blazon3d.js`): banded light on
+a perceptual curve, a Sable-blue → Tenné → Or ramp, and a gilt fresnel
+rim. Per-surface settings: scenery banded but not rimmed, pieces rimmed
+but barely tinted, the tabletop softly banded because it carries a
+shadow.
 
 ## 6¾. Shaders
 
@@ -207,6 +294,8 @@ can be heraldic furniture instead of a rectangle, it is.**
 |---|---|---|
 | Banner cloth (FS) | `13-hall3d.js` | Woven threads. Gold leaf: Or pixels, detected by colour, take a specular and a periodic line of light down the bend, and Argent a cooler sheen. Pointing at a banner sends one counterchange sweep down its diagonal, the 3D twin of the UI hover. |
 | Gilt dust (VS+FS) | `13-hall3d.js` | 240 points moved entirely on the GPU, drifting upward through the torchlight and flickering. |
+| Cel + ramp + rim | `09-blazon3d.js` | Every material in both rooms, patched with `onBeforeCompile` so three.js keeps its own lighting. Banding on a perceptual curve (never onto zero), a three-tincture ramp, a gilt fresnel edge. |
+| Tavern hangings | `27-table-gl.js` | The same `Hall.cloth`, hung behind every seat and lit by the hearth: `tickFire()` pushes the fire's colour into each banner every frame, so the room's cloth breathes with the room's fire. A seat with no banner of its own wears your arms. |
 | The Bend + Splendour (FS) | `55-herald.js` | One full-screen triangle, drawn at no more than 1280 px wide, with two modes: <br>• **the cloth:** dancetty edge, livery band, gilt edge, diaper lattice, weave and grain <br>• **the sun in splendour:** 22 rays, alternating straight and rayonny |
 
 ## 7. Livery
@@ -217,22 +306,92 @@ the colour primary buttons counterchange into. It comes from **your own
 arms**, so each player's app is dressed in their house colours.
 
 `src/js/42-shell.js` sets it on `<html>` at start-up and whenever arms are
-taken (`Shell.livery()`). Which tincture of a coat becomes the livery is
-decided by `houseTincture(arms, H)`, which is **left for grumkata to write**.
-The choices it has to make:
+taken (`Shell.livery()`). Which tincture becomes the livery is decided by
+`Heraldry.liveryOf(arms)` — with the coat, because the coat knows.
 
-- **The field (`arms.a`)** is the obvious pick: it's most of the shield. It
-  can be a metal, though, and a metal livery disappears beside Or plaques.
-- **Fall back to `arms.b`** (the second tincture of a divided field) when the
-  field is a metal? Then an Or/Gules coat still gives Gules.
-- **Sable is a colour, but it's also the chrome.** A Sable livery is
-  invisible on a Sable panel, so skip it too, or fall through to the next
+**You can just say.** The Banner bench of the flag maker has a livery slot,
+and anything picked there wins outright. Everything below is only what
+happens when it is left on *taken from your arms*.
+
+The order is outward from the most personal choice: **the charge you march
+under**, then the ordinary, then the bordure, then `b`, then the field. The
+first of those that is *fit to be a livery* wins, and fitness is one rule:
+
+- **It has to be a colour.** Or and Argent vanish beside the gilt plaques;
+  Sable vanishes into the panel it is drawn on. All three are skipped.
+- **A fur gives up its spots** if those are a colour, and its ground
+  otherwise — so Vair liveries Azure and Ermine falls through to the next
   tincture.
-- **Picked-your-own colours** (`'#rrggbb'`) can be anything. `inkFor()`
-  already switches the ink to Sable for pale ones. Decide whether to allow
-  them at all.
-- **No arms yet** (the default is a plain Sable field) → return `null` and the
-  livery stays Gules.
+- **Picked-your-own colours are yours** and are taken as given. `inkFor()`
+  switches the ink on top to Sable when one is too pale for Argent.
+- **A coat with no colour in it at all** (the default plain Sable field)
+  returns `null`, and the livery stays Gules.
+
+The same rule keeps the maker readable, for the same reason: `cloth()` in
+`16-menu.js` dresses the screen behind the bench in the livery rather than
+in `arms.a`, with a ceiling on how light it is allowed to be. A field of
+Ermine as a full-screen background is a cream page with cream text on it.
+
+## 7½. The coat, and everything in it
+
+`12-heraldry.js` draws one record and every banner in the app comes out of
+it. What that record can hold:
+
+| slot | what it is | how many |
+|---|---|---|
+| `div` + `a`, `b` | the field and its two tinctures | 17 divisions |
+| `line` | the line the division is CUT by | 8, on the 9 divisions that are a cut |
+| `ord` + `ordT`, `ordLine` | the ordinary over it, and its edges | 14 × 8 |
+| `chg` + `chgT`, `chgN`, `chgA` | the charge, how many, how ranged | 47 × 6 × 5 |
+| `bord` + `bordT` | none, plain, or compony | 3 |
+| `hem` | the cut of your banner's foot | 6 |
+| `livery` | the colour the app wears, or taken from the coat | |
+
+Three things about it are worth knowing before touching it:
+
+- **A tincture slot holds three kinds of thing**: one of the ten named
+  tinctures, one of the six **furs** (Ermine, Ermines, Erminois, Pean, Vair,
+  Potent), or a raw `#rrggbb`. `col()` reduces any of them to one colour;
+  `paint(t, ctx)` gives a fur its pattern instead.
+- **A fur needs a context.** An SVG pattern needs an id, the maker puts
+  thirty-odd swatches on one page, and a duplicate id resolves to whichever
+  the document holds first — at whatever scale *that* one was built for. So
+  every drawing calls `ctx(W)`, fills register on it, and `defs(ctx)` writes
+  out only the patterns actually asked for. Never hand-write a pattern id.
+- **`norm()` is the only thing that knows what an absent field means.** Every
+  slot past `b` arrived after people already had arms saved, so `armsSVG`
+  norms its input and a coat saved before furs existed draws exactly as it
+  drew. Add a slot by adding a default there and nowhere else.
+
+And the coat can say itself: `blazonText(A)` writes it out as a sentence
+("Per pale wavy Ermine and Gules, a fess wavy Or, three lions Or in pale, a
+bordure compony Azure"), which is what sits under the maker's preview. The
+written blazon is the real heraldry and the drawing is one reading of it, so
+saying it back is the app proving it understood what was built.
+
+## 7¾. Settings
+
+`src/js/07-options.js`. Three switches, and they are the three that change
+what the app **is** rather than what is in it: `cel` (off / softened / full),
+`grade` (the film grade and grain), `motion` (full / calm).
+
+Each one describes itself — title, the sentence under it, the name of every
+state — and the settings screen is drawn from those descriptions, so a new
+setting is one entry in `DEFS` plus one line of `apply()` and it appears on
+the screen with its own words. **No dropdowns and no checkboxes**, the same
+rule the orders panel keeps (§6⅔): a choice is a row of pennons with every
+state in sight.
+
+Two traps it already avoids:
+
+- **`calm` goes on `<html>`, not `<body>`.** `tools/scope-css.js` merges any
+  selector starting `body` into the sheet's own scope, so a `body.calm` rule
+  would come out of the build as `body.at-hall.calm` — half a setting. `html`
+  is left alone on purpose.
+- **`cel` cannot recompile shaders.** `Blazon3D.strength()` holds the
+  `uCelAmt` uniform of every patched material and scales it by what that
+  material was *built* with, so "softened" softens everything by the same
+  proportion instead of flattening the strong ones down to the weak.
 
 ## 8. Adding something new
 
@@ -263,6 +422,9 @@ Honest gaps, roughly in order of how much they'd help:
 - **The combat sheet's top bar and selection bar** (`.topbar`, `.selbar`)
   still use the mat's bronze band rather than chrome. They're printed on the
   mat, so that's defensible, but they're the next candidates.
+- **The grade is shared now** (`.m-grain` plus each room's own grade layer),
+  which was the single biggest thing making the hall and the tavern look
+  like two different apps. The field below is still the odd one out.
 - **The field has no cry of its own yet.** The Cry works over it, but a
   heraldic grade for the field's world (see above) would make the two feel
   like one place.

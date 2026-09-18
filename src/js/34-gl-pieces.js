@@ -46,6 +46,7 @@ Object.assign(cv.style,{position:'fixed',inset:'0',zIndex:900,pointerEvents:'non
 document.body.appendChild(cv);
 
 const renderer = new THREE.WebGLRenderer({canvas:cv, alpha:true, antialias:true});
+if (window.Blazon3D && window.Blazon3D.tune) window.Blazon3D.tune(renderer);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
@@ -239,10 +240,16 @@ function matShield(mono, c){
 function matSolid(hex, rough, env){
   if (env === undefined) env = .55;
   const k = hex+'|'+rough+'|'+env;
-  return sideMat[k] || (sideMat[k] = new THREE.MeshStandardMaterial(
+  /* BLAZON: a piece is banded and rimmed like everything else in the room,
+     but only lightly TINTED — a counter's colour is which side it is on,
+     and pulling that toward the house ramp would blur ally into enemy. */
+  return sideMat[k] || (sideMat[k] = B3(new THREE.MeshStandardMaterial(
     {color:new THREE.Color(hex).convertSRGBToLinear(),
-     roughness:rough, metalness:.06, envMapIntensity:env}));
+     roughness:rough, metalness:.06, envMapIntensity:env}),
+    { room:'tavern', steps:5, tint:0.18, rim:0.24 }));
 }
+const B3 = (m, o) => (window.Blazon3D ? window.Blazon3D.cel(m, o) : m);
+
 /* pure specular, black albedo, added over the print — this is the plastic */
 function glossMat(){
   return new THREE.MeshStandardMaterial({color:0x000000, roughness:.38, metalness:0,
@@ -463,9 +470,10 @@ function buildDie(kind){
   const asset = DICE_ASSETS[String(kind)];
   if (asset){
     const geo = geoFrom(asset);
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = B3(new THREE.MeshStandardMaterial({
       map: diceTexture(DICE_TEX[asset.t]),
-      roughness: .38, metalness: kind === 'coin' ? .55 : .04, envMapIntensity: 1.0});
+      roughness: .38, metalness: kind === 'coin' ? .55 : .04, envMapIntensity: 1.0}),
+      { room:'tavern', steps:5, tint:0.16, rim:0.26 });
     group.add(new THREE.Mesh(geo, mat));
 
     if (kind === 'coin'){
@@ -540,7 +548,7 @@ function buildDie(kind){
 const rolling = [];
 let diceAnchor = null, restClock = 0, simAcc = 0;
 
-const G       = 2600;   // table units / s², tuned to the tray, not to Earth
+const G       = 4400;   // table units / s², tuned to the tray, not to Earth
 const BOUNCE  = 0.42;   // how much of the fall comes back
 const SLIDE   = 0.86;   // speed kept through a real impact
 const IMPACT  = 90;     // below this, contact is resting — NOT a bounce

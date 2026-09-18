@@ -45,7 +45,9 @@ let open_ = false;
    thin air). The old corner positions were written for a square slab and put
    the chest 1541 units out — off the edge. These two sit ~990 out, on the
    left side of the wood, top and bottom, with room for their own footprint. */
-const CHEST_AT = { x: 600, y: 600, size: 320 };
+/* in millimetres of a 2.2m table: a 230mm chest, standing well inside the
+   rim on the left, clear of the eight places round it */
+const CHEST_AT = { x: 1020, y: 1020, size: 230 * 2 };
 /* THE BIN IS ON THE TABLE. grumkata: "take the bin and remove it from being
    stuck to the screen instead imbed it into the table just like the chest
    bottom left is prefrable". It was screen-fixed because a bin pinned to the
@@ -54,7 +56,7 @@ const CHEST_AT = { x: 600, y: 600, size: 320 };
    (23-table3d.js inBounds), so the wood, and everything locked to it, stays
    reachable. It is the same real model over the same invisible anchor; only
    the anchor moved, from the screen's corner to the table's. */
-const BIN_AT = { x: 600, y: 2000, size: 260 };
+const BIN_AT = { x: 1020, y: 3380, size: 190 * 2 };
 
 const MARKS = { scene:'◈', token:'●', note:'✎', art:'❖', model:'♢', page:'☰', sheet:'☷' };
 const label = t => t.kind === 'scene'
@@ -304,12 +306,16 @@ function binned() { return []; }
 function open() {
   if (open_ || !T().mayUseBox()) return;
   open_ = true;
+  /* the table's own corner stands down while the case is open — see
+     13-table-ui.css; the two share the bottom band */
+  doc.body.classList.add('chest-open');
   if (root.TableGL) root.TableGL.setOpen(true);
   if (root.Hand) root.Hand.show(KINDS());
 }
 
 function shut() {
   open_ = false;
+  doc.body.classList.remove('chest-open');
   if (root.TableGL) root.TableGL.setOpen(false);
   if (root.Hand) { root.Hand.drop(); root.Hand.hide(); }
 }

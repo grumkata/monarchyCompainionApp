@@ -438,98 +438,86 @@
    the furniture they stand in.
 ══════════════════════════════════════════════════════════════ */
 .hb{
-  position:fixed; left:0; right:300px; bottom:20px; z-index:1200;
-  display:flex; flex-direction:column; align-items:center; gap:8px;
+  position:fixed; left:18px; right:318px; bottom:16px; z-index:1200;
+  display:flex; flex-direction:column; align-items:flex-start; gap:9px;
   pointer-events:none;
-  transform:translateY(150%); opacity:0;
-  transition:transform .3s cubic-bezier(.16,1.1,.3,1), opacity .2s;
+  transform:translateY(22px); opacity:0;
+  transition:transform .34s var(--pop), opacity .2s var(--settle);
 }
-/* NEVER pointer-events:auto on .hb itself. It is a full-width strip across
-   the bottom of the viewport, and turning the strip on swallowed the bin,
-   which sits in the same band at the right-hand end. Only the children — all
-   of them centred and narrow — may take a pointer. */
+/* NEVER pointer-events:auto on .hb itself. It is a strip across the bottom
+   of the viewport, and turning the strip on swallowed the bin, which sits
+   in the same band at the right-hand end. Only its children take a pointer. */
 .hb.up{ transform:none; opacity:1; }
 .hb.up > *{ pointer-events:auto; }
 
-/* the name of the thing you are pointing at, and nothing else */
-/* BLAZON: the name is a pennon, Or on Sable, that unfurls from the left
-   when you point at something — the same bend-cut the whole app uses,
-   so even the one word a hotbar needs is in the house style. */
+/* the name of the thing you are pointing at, on a pennon over the case */
 .hb-tip{
   font-family:var(--m-f-cap); font-size:11px; font-weight:700;
   letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or);
   background:var(--m-sable); padding:0 30px 0 16px;
   clip-path:polygon(0 0,100% 0,calc(100% - 10px) 50%,100% 100%,0 100%);
   box-shadow:inset 4px 0 0 var(--m-house);
-  height:26px; line-height:26px;
+  height:26px; line-height:26px; margin-left:4px;
   opacity:0; transform:scaleX(.6); transform-origin:left center;
   transition:opacity .12s var(--settle), transform var(--t-wipe) var(--pop);
 }
 .hb-tip:empty{ visibility:hidden; }
 .hb-tip.on{ opacity:1; transform:none; }
 
-/* ── the variants, floating over the bar ─────────────────────
-   What you may choose WHILE HOLDING IT. Same figure, drawn each way,
-   so cycling the battlefield's width makes the board wider in front
-   of you instead of asking for a number in a dialog. */
-.hb-rack{
-  display:flex; gap:6px; padding:6px;
-  background:linear-gradient(180deg,rgba(30,21,12,.94),rgba(16,11,6,.94));
-  box-shadow:inset 0 1px 0 rgba(255,224,172,.2), 0 14px 34px rgba(0,0,0,.7),
-             0 0 0 1px #4a3418;
-}
-.hb-rack[hidden]{ display:none !important; }
-.hb-var{
-  position:relative; width:60px; height:60px; padding:0; cursor:pointer;
-  background:radial-gradient(ellipse at 50% 18%,#3b2c19,#1a1209 78%);
-  border:1px solid #4a3418; transition:.12s;
-}
-.hb-var:hover{ border-color:var(--m-or); }
-.hb-var.on{
-  border-color:var(--m-or-hi);
-  box-shadow:inset 0 0 0 1px rgba(201,162,39,.55), 0 0 16px rgba(201,162,39,.35);
-}
-
-/* ── the plank ── */
-.hb-row{ display:flex; align-items:stretch; gap:0; max-width:calc(100% - 360px); }
-.hb-slots{
-  display:flex; gap:0; padding:7px;
+/* ══ THE CASE ══════════════════════════════════════════════════
+   One piece of furniture: the rail of kinds, the head, the pennons, the
+   grid, and the foot that says what is in your hand. Blazon's Sable and
+   gilt, because this is chrome — the things standing IN it are the only
+   colour it has. */
+.hb-case{
+  display:flex; align-items:stretch; width:100%; max-width:1120px;
+  height:min(54vh, 470px); position:relative;
   background:
-    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 6px),
-    linear-gradient(178deg,#6b431e 0%,#4a2d13 58%,#2b1a0a 100%);
-  box-shadow:inset 0 2px 0 rgba(255,214,158,.26), inset 0 -3px 0 rgba(0,0,0,.5),
-             0 20px 44px rgba(0,0,0,.72), 0 0 0 1px #1a1008;
+    var(--m-marks),
+    repeating-linear-gradient(45deg,transparent 0 16px,rgba(201,162,39,.045) 16px 17px),
+    repeating-linear-gradient(-45deg,transparent 0 16px,rgba(201,162,39,.045) 16px 17px),
+    linear-gradient(176deg,var(--m-sable-2),var(--m-sable) 62%);
+  box-shadow:var(--m-frame), var(--m-lift);
 }
-/* the brass end-caps that make it a made thing and not a div */
-.hb-page{
-  width:26px; padding:0; cursor:pointer; border:0;
-  background:linear-gradient(178deg,#8a6c33,#4a3418 62%,#241708);
-  box-shadow:inset 0 2px 0 rgba(255,224,172,.34), inset 0 -3px 0 rgba(0,0,0,.5),
-             0 20px 44px rgba(0,0,0,.6);
-  display:grid; place-items:center;
-}
-.hb-page[hidden]{ display:none !important; }
-.hb-page span{
-  display:block; width:7px; height:7px;
-  border-top:2px solid #f0d9a4; border-right:2px solid #f0d9a4;
-}
-.hb-page[data-page="-1"] span{ transform:rotate(-135deg) translate(-1px,-1px); }
-.hb-page[data-page="1"]  span{ transform:rotate(45deg) translate(-1px,-1px); }
-.hb-page:disabled{ opacity:.3; cursor:default; }
-.hb-page:not(:disabled):hover span{ border-color:#fff2d4; }
+.hb.up .hb-case{ animation:case-open .38s var(--pop) both; }
+@keyframes case-open{ from{ opacity:0; transform:translateY(26px) scaleY(.92);
+  transform-origin:bottom center } }
 
-/* ── a slot: sunken, with the object standing in it ── */
-.hb-slot{
-  position:relative; flex:0 0 auto; width:76px; height:76px; padding:0;
-  cursor:pointer; border:1px solid rgba(0,0,0,.55);
-  background:radial-gradient(ellipse at 50% 14%,#3b2c19,#161008 82%);
-  box-shadow:inset 0 3px 8px rgba(0,0,0,.7), inset 0 -1px 0 rgba(255,214,158,.12);
-  transition:.11s;
+/* ── THE RAIL: the six kinds, and they never move ── */
+.hb-rail{
+  flex:0 0 auto; width:108px; display:flex; flex-direction:column; gap:3px;
+  padding:10px 9px; background:rgba(11,9,7,.5);
+  box-shadow:inset -1px 0 0 var(--m-line);
 }
-.hb-slot + .hb-slot{ border-left-color:rgba(255,214,158,.12); }
-/* opening the chest DEALS the plank: each slot's object springs up in turn,
-   and a tray's options do the same, faster. `translate`, not transform, so
-   the hover lift on .hb-fig is untouched. */
+.hb-slot{
+  position:relative; flex:1 1 0; min-height:52px; padding:0; cursor:pointer;
+  border:0; background:var(--m-sable-2);
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.16);
+  transition:background var(--t-hover) var(--settle),
+             box-shadow var(--t-hover) var(--settle);
+}
+.hb-fig{ position:absolute; inset:0; display:block;
+  transition:transform .14s var(--pop); }
+.hb-slot:hover{ background:var(--m-sable-3);
+  box-shadow:inset 0 0 0 1px var(--m-line-hi); }
+.hb-slot:hover .hb-fig{ transform:translateY(-3px) scale(1.06); }
+/* the kind you are looking in: a gilt bezel and a bend of your livery in
+   its corner — the drawing keeps its own colours, so the tile is marked
+   round its edge rather than flooded */
+.hb-slot.on{
+  background:
+    linear-gradient(135deg,var(--m-house) 0 14px,transparent 14.5px),
+    var(--m-sable-3);
+  box-shadow:inset 0 0 0 1px var(--m-or), 0 0 18px rgba(201,162,39,.22);
+}
+.hb-slot.on .hb-fig{ transform:translateY(-2px) scale(1.04); }
+.hb-key{
+  position:absolute; right:4px; bottom:2px; font-style:normal;
+  font-family:var(--m-f-tally); font-size:12px; font-weight:600;
+  color:rgba(222,216,200,.34); pointer-events:none;
+}
+.hb-slot.on .hb-key{ color:var(--m-or); }
+/* opening the chest deals the rail */
 .hb.up .hb-slot .hb-fig{ animation:slot-up .44s var(--pop) both; }
 .hb.up .hb-slot:nth-child(2) .hb-fig{ animation-delay:.05s }
 .hb.up .hb-slot:nth-child(3) .hb-fig{ animation-delay:.10s }
@@ -537,33 +525,144 @@
 .hb.up .hb-slot:nth-child(5) .hb-fig{ animation-delay:.20s }
 .hb.up .hb-slot:nth-child(6) .hb-fig{ animation-delay:.25s }
 .hb.up .hb-slot:nth-child(n+7) .hb-fig{ animation-delay:.30s }
-.hb-tray:not([hidden]) .hb-opt .hb-fig{ animation:slot-up .34s var(--pop) both; }
 @keyframes slot-up{ from{ opacity:0; translate:0 22px; scale:.6; } }
-.hb-fig{
-  position:absolute; inset:0; display:block;
-  transition:transform .12s cubic-bezier(.2,.9,.3,1);
+
+/* ── THE HEAD ── */
+.hb-main{ flex:1; min-width:0; display:flex; flex-direction:column; padding:12px 14px 10px; }
+.hb-head{ flex:0 0 auto; display:flex; align-items:center; gap:12px; padding-bottom:9px; }
+.hb-what{
+  flex:1; min-width:0; font-family:var(--m-f-cap); font-size:13px; font-weight:700;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.hb-slot:hover{ background:radial-gradient(ellipse at 50% 14%,#4d3a20,#1c1409 82%); }
-.hb-slot:hover .hb-fig{ transform:translateY(-4px) scale(1.06); }
-/* the one you have selected, the way a hotbar marks it: a bezel that
-   stands PROUD of the plank, not a coloured border */
-/* …and the bezel is Or, with a bend of your livery across its corner — the
-   slot is counterchanged the way every chosen thing in the app is */
-.hb-slot.on{
-  border-color:var(--m-or-hi);
-  background:
-    linear-gradient(135deg,var(--m-house) 0 13px,transparent 13.5px),
-    radial-gradient(ellipse at 50% 14%,#4d3a20,#161008 82%);
-  box-shadow:inset 0 0 0 1px rgba(201,162,39,.55), inset 0 3px 8px rgba(0,0,0,.5),
-             0 0 20px rgba(201,162,39,.4);
+.hb-find{ flex:0 0 auto; display:none; }
+.hb.finding .hb-find{ display:block; }
+.hb-find input{
+  width:190px; padding:7px 10px; color:var(--m-argent-hi); font-family:var(--m-f-hand);
+  font-size:14px; background:var(--m-sable-0); border:0; outline:none;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 4px rgba(0,0,0,.6);
+  transition:box-shadow var(--t-hover) var(--settle);
 }
-.hb-slot.on .hb-fig{ transform:translateY(-3px) scale(1.05); }
-.hb-key{
-  position:absolute; right:3px; bottom:1px; font-style:normal;
-  font-family:var(--m-f-tally); font-size:12px; font-weight:600;
-  color:rgba(222,216,200,.34); pointer-events:none;
+.hb-find input:focus{ box-shadow:inset 0 0 0 1px var(--m-or), inset 0 2px 4px rgba(0,0,0,.6); }
+.hb-find input::placeholder{ color:var(--m-hush); font-style:italic; }
+.hb-count{
+  flex:0 0 auto; font-family:var(--m-f-tally); font-size:14px; font-weight:600;
+  letter-spacing:.04em; color:var(--m-quiet); min-width:74px; text-align:right;
 }
-.hb-slot.on .hb-key{ color:var(--m-or); }
+.hb-x{
+  flex:0 0 auto; width:26px; height:26px; display:grid; place-items:center; cursor:pointer;
+  font-size:11px; color:var(--m-quiet); border:0; background:transparent;
+  box-shadow:inset 0 0 0 1px var(--m-line);
+  transition:background var(--t-hover) var(--settle), color var(--t-hover) var(--settle);
+}
+.hb-x:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
+
+/* ── THE PENNONS: the library's own groups ── */
+.hb-shelf{ flex:0 0 auto; padding-bottom:9px; }
+.hb-shelf[hidden]{ display:none !important; }
+.hb-tabs{ display:flex; gap:5px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+.hb-tabs::-webkit-scrollbar{ height:0 }
+.hb-tab{
+  flex:0 0 auto; display:flex; align-items:baseline; gap:6px; cursor:pointer;
+  font-family:var(--m-f-cap); font-size:9.5px; font-weight:700; letter-spacing:.13em;
+  text-transform:uppercase; color:var(--m-text); padding:7px 16px 7px 12px; border:0;
+  clip-path:polygon(0 0,100% 0,calc(100% - 7px) 50%,100% 100%,0 100%);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle);
+}
+.hb-tab i{ font-style:normal; font-family:var(--m-f-tally); font-size:12px; opacity:.6; }
+.hb-tab:hover, .hb-tab.on{ background-position:0 0; color:var(--m-sable); }
+.hb-tab.on i{ opacity:.75 }
+
+/* ── THE GRID ── */
+.hb-tray{ flex:1 1 auto; min-height:0; display:flex; }
+.hb-tray[hidden]{ display:none !important; }
+.hb-tray-in{
+  flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(118px, 1fr));
+  align-content:start; gap:6px; padding:2px 6px 2px 2px;
+}
+.hb-tray-in::-webkit-scrollbar{ width:8px }
+.hb-tray-in::-webkit-scrollbar-track{ background:rgba(0,0,0,.45) }
+.hb-tray-in::-webkit-scrollbar-thumb{ background:var(--m-or-lo) }
+.hb-opt{
+  position:relative; height:142px; padding:0; cursor:pointer; border:0;
+  display:flex; flex-direction:column;
+  background:var(--m-sable-2); box-shadow:inset 0 0 0 1px rgba(201,162,39,.14);
+  transition:background var(--t-hover) var(--settle),
+             box-shadow var(--t-hover) var(--settle), transform var(--t-press) var(--snap);
+}
+.hb-opt .hb-fig{ position:relative; inset:auto; flex:1; min-height:0; }
+.hb-opt:hover{ background:var(--m-sable-3); box-shadow:inset 0 0 0 1px var(--m-or); }
+.hb-opt:hover .hb-fig{ transform:translateY(-3px) scale(1.06); }
+.hb-opt:active{ transform:translateY(1px); }
+.hb-tray:not([hidden]) .hb-opt .hb-fig{ animation:slot-up .34s var(--pop) both; }
+.hb-nm{
+  display:block; flex:0 0 auto; padding:3px 6px 6px; font-style:normal;
+  font-family:var(--m-f-cap); font-size:9px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--m-quiet); text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.hb-opt:hover .hb-nm{ color:var(--m-or-hi); }
+/* the tile that MAKES one: a gilt plus, and no name — see 47-hand.js */
+.hb-opt.custom{ box-shadow:inset 0 0 0 1px var(--m-line); }
+.hb-plus{
+  position:absolute; right:5px; bottom:5px; width:19px; height:19px;
+  background:var(--m-or); clip-path:var(--m-lozenge);
+}
+.hb-plus::before, .hb-plus::after{ content:''; position:absolute; background:var(--m-sable); }
+.hb-plus::before{ left:5px; right:5px; top:8.5px; height:2px }
+.hb-plus::after{ top:5px; bottom:5px; left:8.5px; width:2px }
+.hb-nowt{
+  grid-column:1 / -1; margin:0; padding:30px 0; text-align:center;
+  font-family:var(--m-f-hand); font-style:italic; font-size:15px; color:var(--m-hush);
+}
+
+/* ── THE FOOT: what is in your hand ── */
+.hb-foot{
+  flex:0 0 auto; display:flex; align-items:center; gap:14px; min-height:44px;
+  margin-top:9px; padding-top:9px; box-shadow:inset 0 1px 0 var(--m-line);
+}
+.hb-held{ display:flex; align-items:center; gap:9px; min-width:0; }
+.hb-held.on{ padding:4px 14px 4px 4px; background:var(--m-sable-0);
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 3px 0 0 var(--m-house); }
+.hb-held .hb-fig{ position:relative; inset:auto; width:40px; height:40px; flex:0 0 auto; }
+.hb-held b{ font-family:var(--m-f-cap); font-size:10px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--m-or);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hb-rack{ display:flex; gap:5px; flex:0 0 auto; }
+.hb-rack[hidden]{ display:none !important; }
+.hb-var{
+  position:relative; width:46px; height:46px; padding:0; cursor:pointer; border:0;
+  background:var(--m-sable-2); box-shadow:inset 0 0 0 1px rgba(201,162,39,.16);
+  transition:box-shadow var(--t-hover) var(--settle), transform var(--t-press) var(--snap);
+}
+.hb-var:hover{ box-shadow:inset 0 0 0 1px var(--m-or); }
+.hb-var.on{ box-shadow:inset 0 0 0 2px var(--m-or), 0 0 14px rgba(201,162,39,.3); }
+.hb-hint{
+  margin-left:auto; flex:0 1 auto; font-family:var(--m-f-hand); font-style:italic;
+  font-size:13px; color:var(--m-hush); text-align:right;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* ── AND IT GETS OUT OF YOUR WAY ──────────────────────────────
+   The case is a browsing surface and it is big, which is right until the
+   moment you are carrying something: then it is standing on the wood you
+   are trying to put the thing DOWN on. So taking one out collapses the
+   case to its foot — what is in your hand, what it can still be, and what
+   the pointer will do — and dropping it (right-click, Escape) brings the
+   whole case back. You are either looking for a thing or placing one. */
+body.holding .hb-rail,
+body.holding .hb-head,
+body.holding .hb-shelf,
+body.holding .hb-tray{ display:none !important; }
+body.holding .hb-case{
+  width:auto; max-width:none; height:auto; min-height:0;
+  animation:none; padding:0 14px;
+}
+body.holding .hb-foot{ margin-top:0; padding:8px 0; box-shadow:none; }
+body.holding .hb-tip{ display:none; }
+
 
 /* ══════════════════════════════════════════════════════════════
    WHAT YOU ARE HOLDING
@@ -951,106 +1050,148 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 
 
 /* ══════════════════════════════════════════════════════════════
-   THE GM'S OWN CONTROLS, MADE OF SOMETHING
+   STANDING ORDERS — the GM's own end, as a writ
 
-   The last thing on this screen that still looked like a settings
-   dialog: a dark rounded panel with two web toggles and a <select>,
-   floating over an oak table in a lamplit room. Everything else on
-   the table is now an object, so this has to be one too — a small
-   control board propped at the edge of the table, oak with brass
-   furniture, the switches real levers in real slots, the numbers
-   stamped into brass. Nothing about what it DOES changes; this is
-   entirely how it is made.
+   It was a small brass control board with a web checkbox, a number
+   spinner and a <select> that ran out of its own panel. It is a
+   hanging writ now: Sable, gilt-framed, DAGGED along the bottom hem
+   like a banner, with three controls that are objects rather than
+   widgets — a seal, a tally, a row of pennons (26-scene-setup.js).
 
    It stays on your own end. Only the GM sees it, which is why it is
    at the screen edge and not on the wood.
 ══════════════════════════════════════════════════════════════ */
 .sc-opts{
-  width:302px !important; top:78px !important;
+  width:322px !important; top:74px !important;
+  padding:0 0 16px !important; border:0 !important;
   background:
-    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 7px),
-    linear-gradient(176deg,#5e4222 0%,#3a2712 52%,#241708 100%) !important;
-  border:0 !important;
-  box-shadow:
-    inset 0 2px 0 rgba(255,224,172,.3), inset 0 -3px 0 rgba(0,0,0,.6),
-    inset 0 0 0 1px #1a1008,
-    -3px 0 0 #8a6c33, 3px 0 0 #8a6c33,          /* the brass side bands */
-    0 26px 54px rgba(0,0,0,.72) !important;
+    var(--m-marks),
+    repeating-linear-gradient(45deg,transparent 0 15px,rgba(201,162,39,.05) 15px 16px),
+    repeating-linear-gradient(-45deg,transparent 0 15px,rgba(201,162,39,.05) 15px 16px),
+    linear-gradient(176deg,var(--m-sable-2),var(--m-sable) 70%) !important;
+  box-shadow:var(--m-frame) !important;
+  /* DAGGED: the hem is cut into points, the way a banner's is. A clip-path
+     takes the outer shadow with it, which is right — a hanging has no
+     drop shadow of its own, it has the wall behind it. */
+  clip-path:polygon(0 0,100% 0,
+    100% calc(100% - 13px), 93.75% 100%, 87.5% calc(100% - 13px),
+    81.25% 100%, 75% calc(100% - 13px), 68.75% 100%, 62.5% calc(100% - 13px),
+    56.25% 100%, 50% calc(100% - 13px), 43.75% 100%, 37.5% calc(100% - 13px),
+    31.25% 100%, 25% calc(100% - 13px), 18.75% 100%, 12.5% calc(100% - 13px),
+    6.25% 100%, 0 calc(100% - 13px));
 }
-/* BLAZON: the brass cap is Or leaf now — the same metal as every plaque —
-   with your livery as the rule beneath it */
+.sc-opts[hidden]{ display:none !important; }
+/* the head is Or leaf with your livery as its rule, and the scene's mark */
 .sc-opts-head{
   background:linear-gradient(180deg,var(--m-or-hi) 0%,var(--m-or) 46%,var(--m-or-lo) 100%) !important;
-  color:var(--m-sable) !important;
+  color:var(--m-sable) !important; align-items:center !important;
   box-shadow:inset 0 2px 0 rgba(255,244,214,.55), inset 0 -3px 0 var(--m-house);
-  padding:9px 12px 11px !important;
+  padding:10px 12px 12px !important;
 }
-.sc-opts-head b{ color:var(--m-sable); font-family:var(--m-f-cap); letter-spacing:.12em;
-  text-transform:uppercase; text-shadow:0 1px 0 rgba(255,244,214,.45); }
-.sc-opts-head i{ color:rgba(23,19,16,.66) !important; font-family:var(--m-f-hand); }
+.sc-opts-head .sc-mark{ font-size:17px; color:var(--m-sable); opacity:.8 }
+.sc-opts-head b{ color:var(--m-sable); font-family:var(--m-f-cap); font-size:11px;
+  letter-spacing:.12em; text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(255,244,214,.45); }
+.sc-opts-head i{ color:rgba(23,19,16,.66) !important; font-family:var(--m-f-hand);
+  font-size:11.5px; }
 .sc-opts-x{
-  color:#2a1c0a !important; background:rgba(0,0,0,.14) !important;
-  border:1px solid rgba(36,23,8,.4) !important;
+  width:22px !important; height:22px !important; color:var(--m-sable) !important;
+  background:rgba(0,0,0,.14) !important; border:0 !important;
+  box-shadow:inset 0 0 0 1px rgba(23,19,16,.4); cursor:pointer;
 }
-.sc-opts-x:hover{ color:#000 !important; background:rgba(255,240,200,.35) !important; }
+.sc-opts-x:hover{ background:var(--m-gules) !important; color:var(--m-argent-hi) !important; }
 
-/* an engraved score between the rows, not a 1px web rule */
+.sc-opts-body{ padding:2px 0 !important; }
 .sc-opt{
+  display:flex; align-items:center; gap:12px; padding:12px 14px !important;
   border-bottom:0 !important;
-  box-shadow:0 1px 0 rgba(0,0,0,.55), 0 2px 0 rgba(255,224,172,.09);
-  padding:11px 12px !important;
+  box-shadow:0 1px 0 rgba(0,0,0,.5), 0 2px 0 rgba(201,162,39,.07);
 }
 .sc-opt:last-child{ box-shadow:none; }
-.sc-opt-text b{ color:var(--m-or-hi) !important; font-family:var(--m-f-cap); letter-spacing:.06em; }
-.sc-opt-text i{ color:var(--m-quiet) !important; font-family:var(--m-f-hand); font-size:12px; }
-
-/* ── a real toggle: a brass lever in a sunk slot ── */
-.sc-switch{ width:44px !important; height:22px !important; }
-.sc-slide{
-  background:linear-gradient(180deg,#150e06,#2c1e0e) !important;
-  border:0 !important;
-  box-shadow:inset 0 2px 5px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,224,172,.14),
-             0 1px 0 rgba(255,224,172,.12) !important;
+/* a choice takes the whole row: label over its pennons */
+.sc-opt.wide{ flex-direction:column; align-items:stretch; gap:9px; }
+.sc-opt-text b{
+  display:block; font-family:var(--m-f-cap) !important; font-size:10px !important;
+  font-weight:700; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--m-or-hi) !important;
 }
-.sc-slide::after{
-  left:3px !important; top:3px !important; width:16px !important; height:16px !important;
-  background:linear-gradient(180deg,#e0bd74,#8a6a2c 60%,#5c421a) !important;
-  box-shadow:inset 0 1px 0 rgba(255,244,214,.7), 0 2px 4px rgba(0,0,0,.7) !important;
-  transition:left .15s cubic-bezier(.2,.9,.3,1), background .15s !important;
-}
-.sc-switch input:checked + .sc-slide{
-  background:linear-gradient(180deg,#3a2a10,#1e1406) !important;
-  box-shadow:inset 0 2px 5px rgba(0,0,0,.8), 0 0 14px rgba(216,178,104,.35) !important;
-}
-.sc-switch input:checked + .sc-slide::after{
-  left:25px !important;
-  background:linear-gradient(180deg,var(--m-or-hi),var(--m-or) 58%,var(--m-or-lo)) !important;
-}
-/* on is a colour you can read from across the table, not just a lever
-   that moved: the slot fills with your livery */
-.sc-switch input:checked + .sc-slide{
-  background:linear-gradient(180deg,var(--m-house),var(--m-sable)) !important;
+.sc-opt-text i{
+  display:block; margin-top:3px; font-family:var(--m-f-hand) !important;
+  font-size:12px !important; font-style:italic; line-height:1.35;
+  color:var(--m-quiet) !important; opacity:1 !important;
 }
 
-/* ── a number stamped into brass ── */
+/* ── A YES IS A SEAL ── */
+.sc-seal{
+  flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:4px;
+  width:62px; padding:0; border:0; background:none; cursor:pointer;
+}
+.sc-wax{
+  width:42px; height:42px; display:block; clip-path:var(--m-wax);
+  background:var(--m-sable-0); box-shadow:inset 0 0 0 1px var(--m-line);
+  transition:transform .16s var(--pop), background .16s var(--settle);
+}
+/* an unsealed order is an empty matrix waiting for wax */
+.sc-seal:not(.on) .sc-wax{ background:repeating-linear-gradient(45deg,
+  rgba(201,162,39,.10) 0 4px, transparent 4px 9px), var(--m-sable-0); }
+.sc-seal.on .sc-wax{ background:var(--m-wax-melt);
+  box-shadow:0 3px 9px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,200,180,.35); }
+.sc-seal b{
+  font-family:var(--m-f-cap); font-size:7.5px; font-weight:700; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--m-hush);
+}
+.sc-seal.on b{ color:var(--m-or); }
+/* the warrant's own seal is wax ALREADY — it is not a yes-or-no, it is the
+   press that commits the scene, so it looks like the hall's seal */
+.sc-seal.go .sc-wax{ width:52px; height:52px; background:var(--m-wax-melt);
+  box-shadow:0 4px 10px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,200,180,.35); }
+.sc-seal.go{ width:auto; padding:0 6px; }
+.sc-seal.go b{ color:var(--m-or-hi); font-size:8.5px; }
+.sc-seal:hover .sc-wax{ transform:scale(1.07) rotate(-4deg); }
+.sc-seal:active .sc-wax{ transform:scale(.92) rotate(-1deg);
+  transition-duration:var(--t-press); transition-timing-function:var(--snap); }
+
+/* ── A NUMBER IS A TALLY ── */
+.sc-tally{ flex:0 0 auto; display:flex; align-items:center; gap:5px; }
+.sc-step{
+  width:26px; height:26px; flex:0 0 auto; padding:0; border:0; cursor:pointer;
+  clip-path:var(--m-lozenge); background:var(--m-or); color:var(--m-sable);
+  font-family:var(--m-f-tally); font-size:15px; font-weight:700; line-height:26px;
+  text-align:center; transition:transform var(--t-press) var(--snap), background .14s;
+}
+.sc-step:hover{ background:var(--m-or-hi); }
+.sc-step:active{ transform:scale(.88); }
 .sc-opt .sc-num{
-  color:#241708 !important;
-  background:linear-gradient(180deg,#c8a45a,#8a6a2c) !important;
-  border:0 !important;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,240,200,.5),
-             0 1px 0 rgba(255,240,200,.16) !important;
-  padding:4px 0 !important; text-shadow:0 1px 0 rgba(255,240,200,.4) !important;
+  flex:0 0 58px !important; width:58px !important; text-align:center; padding:5px 0 !important;
+  font-family:var(--m-f-tally) !important; font-size:19px !important; font-weight:600;
+  color:var(--m-or) !important; background:var(--m-sable-0) !important; border:0 !important;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 5px rgba(0,0,0,.7) !important;
+  text-shadow:none !important;
 }
-.sc-opt .sc-pick{
-  color:#f0d9a4 !important;
-  background:linear-gradient(180deg,#2c1e0e,#170f06) !important;
-  border:1px solid #6b5227 !important; padding:5px 6px !important;
-  box-shadow:inset 0 1px 0 rgba(255,224,172,.14) !important;
+.sc-num::-webkit-inner-spin-button, .sc-num::-webkit-outer-spin-button{
+  -webkit-appearance:none; margin:0; }
+.sc-num{ -moz-appearance:textfield; }
+.sc-opt .sc-num:focus{ box-shadow:inset 0 0 0 1px var(--m-or), inset 0 2px 5px rgba(0,0,0,.7) !important; }
+
+/* ── A CHOICE IS A ROW OF PENNONS ── */
+.sc-choice{ display:flex; flex-wrap:wrap; gap:4px; }
+.sc-pen{
+  flex:1 1 auto; padding:8px 14px 8px 11px; cursor:pointer; border:0;
+  font-family:var(--m-f-cap); font-size:9px; font-weight:700; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--m-text); text-align:left;
+  clip-path:polygon(0 0,100% 0,calc(100% - 7px) 50%,100% 100%,0 100%);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.16);
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle);
 }
+.sc-pen:hover, .sc-pen.on{ background-position:0 0; color:var(--m-sable); }
+
 .sc-opts-none, .sc-opts-foot{
-  color:rgba(232,223,200,.4) !important; border-top:0 !important;
-  box-shadow:0 -1px 0 rgba(0,0,0,.5), 0 -2px 0 rgba(255,224,172,.08);
+  font-family:var(--m-f-hand) !important; font-style:italic; font-size:12px !important;
+  color:var(--m-hush) !important; border-top:0 !important; padding:10px 14px 4px !important;
+  box-shadow:0 -1px 0 rgba(0,0,0,.5), 0 -2px 0 rgba(201,162,39,.07);
 }
+
 
 /* ══════════════════════════════════════════════════════════════
    THE TRAY — the options of whatever kind you reached for
@@ -1061,139 +1202,110 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
    Same materials, one size down, because it is what is inside the
    thing rather than the thing.
 ══════════════════════════════════════════════════════════════ */
-/* wide, but never wide enough to reach the bin in the same bottom band */
-.hb-tray{
-  max-width:min(880px, calc(100vw - 470px));
-  padding:8px;
-  background:
-    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 6px),
-    linear-gradient(178deg,#4a2d13 0%,#301c0a 62%,#1c1006 100%);
-  box-shadow:inset 0 2px 0 rgba(255,214,158,.22), inset 0 -3px 0 rgba(0,0,0,.55),
-             0 18px 42px rgba(0,0,0,.7), 0 0 0 1px #1a1008;
-}
-.hb-tray[hidden]{ display:none !important; }
-.hb-tray-in{
-  display:flex; flex-wrap:wrap; gap:4px; justify-content:center;
-  max-height:212px; overflow-y:auto; overscroll-behavior:contain;
-}
-.hb-tray-in::-webkit-scrollbar{ width:7px }
-.hb-tray-in::-webkit-scrollbar-track{ background:rgba(0,0,0,.4) }
-.hb-tray-in::-webkit-scrollbar-thumb{ background:#6b5227 }
-.hb-opt{
-  position:relative; flex:0 0 auto; width:66px; height:66px; padding:0; cursor:pointer;
-  border:1px solid rgba(0,0,0,.55);
-  background:radial-gradient(ellipse at 50% 14%,#3b2c19,#161008 82%);
-  box-shadow:inset 0 3px 7px rgba(0,0,0,.65), inset 0 -1px 0 rgba(255,214,158,.1);
-  transition:.11s;
-}
-.hb-opt .hb-fig{ position:absolute; inset:0; display:block;
-  transition:transform .12s cubic-bezier(.2,.9,.3,1); }
-.hb-opt:hover{ background:radial-gradient(ellipse at 50% 14%,#4d3a20,#1c1409 82%);
-  border-color:var(--m-or); }
-.hb-opt:hover .hb-fig{ transform:translateY(-3px) scale(1.07); }
-/* the brass plus on a slot that makes a new one */
-.hb-plus{
-  position:absolute; right:2px; bottom:2px; width:17px; height:17px;
-  background:linear-gradient(180deg,#e0bd74,#8a6a2c);
-  box-shadow:inset 0 1px 0 rgba(255,244,214,.7), 0 2px 4px rgba(0,0,0,.65);
-  pointer-events:none;
-}
-.hb-plus::before, .hb-plus::after{
-  content:''; position:absolute; background:#241708;
-}
-.hb-plus::before{ left:3px; right:3px; top:7.5px; height:2px }
-.hb-plus::after{ top:3px; bottom:3px; left:7.5px; width:2px }
-.hb-opt.custom{ border-style:dashed; border-color:rgba(216,178,104,.5) }
+
 
 /* ══════════════════════════════════════════════════════════════
    WHAT A COUNTER IS — set beside the counter, while you hold it
+
+   The last of the table's menus to still be a form: a web number box, a
+   pair of coloured radio dots and three little tab buttons. Same three
+   controls as the orders now (26-scene-setup.js) — wells, tallies and
+   pennons — in the same Sable and gilt. The two lozenges that pick a side
+   are Azure and Gules, which is what the mat paints ally and enemy.
 ══════════════════════════════════════════════════════════════ */
 .tk-make{
-  position:fixed; right:320px; bottom:200px; z-index:1300; width:266px;
+  position:fixed; right:320px; bottom:200px; z-index:1300; width:286px;
   background:
-    repeating-linear-gradient(91deg,rgba(0,0,0,.10) 0 1px,transparent 1px 7px),
-    linear-gradient(176deg,#5e4222 0%,#3a2712 52%,#241708 100%);
-  box-shadow:inset 0 2px 0 rgba(255,224,172,.3), inset 0 -3px 0 rgba(0,0,0,.6),
-             inset 0 0 0 1px #1a1008, -3px 0 0 #8a6c33, 3px 0 0 #8a6c33,
-             0 26px 54px rgba(0,0,0,.72);
-  color:#e8dfc8;
+    var(--m-marks),
+    repeating-linear-gradient(45deg,transparent 0 15px,rgba(201,162,39,.05) 15px 16px),
+    linear-gradient(176deg,var(--m-sable-2),var(--m-sable) 70%);
+  box-shadow:var(--m-frame), var(--m-lift);
+  color:var(--m-text);
 }
 .tk-make[hidden]{ display:none !important; }
 .tk-make-head{
-  display:flex; align-items:center; gap:9px; padding:9px 10px;
-  background:linear-gradient(180deg,#c19a4c 0%,#8a6a2c 44%,#4e3714 100%);
-  box-shadow:inset 0 2px 0 rgba(255,240,200,.6), inset 0 -2px 0 rgba(0,0,0,.5);
+  display:flex; align-items:center; gap:9px; padding:9px 10px 11px;
+  background:linear-gradient(180deg,var(--m-or-hi) 0%,var(--m-or) 46%,var(--m-or-lo) 100%);
+  box-shadow:inset 0 2px 0 rgba(255,244,214,.55), inset 0 -3px 0 var(--m-house);
 }
 .tk-make-fig{ position:relative; flex:0 0 auto; width:52px; height:52px; display:block }
 .tk-make-head input{
-  flex:1; min-width:0; font-family:'Cinzel',serif; font-size:13px; font-weight:700;
-  letter-spacing:.04em; color:#1c1208; background:rgba(255,240,200,.28);
-  border:0; border-bottom:2px solid rgba(36,23,8,.5); outline:0; padding:4px 6px;
-  border-radius:0;
+  flex:1; min-width:0; font-family:var(--m-f-cap); font-size:13px; font-weight:700;
+  letter-spacing:.04em; color:var(--m-sable); background:rgba(23,19,16,.12);
+  border:0; outline:0; padding:6px 8px; border-radius:0;
+  box-shadow:inset 0 0 0 1px rgba(23,19,16,.25);
 }
-.tk-make-head input[readonly]{ background:transparent; border-bottom-color:transparent }
+.tk-make-head input::placeholder{ color:rgba(23,19,16,.5); font-style:italic }
+.tk-make-head input[readonly]{ background:transparent; box-shadow:none }
 .tk-make-x{
   flex:0 0 auto; width:22px; height:22px; display:grid; place-items:center; font-size:11px;
-  color:#2a1c0a; background:rgba(0,0,0,.14); border:1px solid rgba(36,23,8,.4);
-  cursor:pointer;
+  color:var(--m-sable); background:rgba(0,0,0,.14); border:0;
+  box-shadow:inset 0 0 0 1px rgba(23,19,16,.4); cursor:pointer;
 }
-.tk-make-x:hover{ background:rgba(255,240,200,.4) }
-.tk-make-body{ padding:4px 10px 10px }
-.tk-row{ display:flex; align-items:center; gap:9px; padding:8px 0;
-  box-shadow:0 1px 0 rgba(0,0,0,.5), 0 2px 0 rgba(255,224,172,.08) }
+.tk-make-x:hover{ background:var(--m-gules); color:var(--m-argent-hi) }
+.tk-make-body{ padding:4px 12px 12px }
+.tk-row{ display:flex; align-items:center; gap:10px; padding:10px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.5), 0 2px 0 rgba(201,162,39,.07) }
 .tk-row:last-child{ box-shadow:none }
 .tk-row.col{ display:block }
-.tk-lbl{ flex:0 0 74px; font-family:'Cinzel',serif; font-size:9px; font-weight:700;
-  letter-spacing:.16em; text-transform:uppercase; color:#e8c98a }
-.tk-row.col .tk-lbl{ display:block; margin-bottom:6px }
-.tk-note{ font-family:'Crimson Text',serif; font-style:italic; font-size:11px;
-  color:rgba(232,223,200,.42) }
-.tk-sides{ display:flex; gap:7px }
-.tk-pip{ width:22px; height:22px; border-radius:50%; cursor:pointer;
-  border:2px solid #3f2c0e; padding:0;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 4px rgba(0,0,0,.6) }
-.tk-pip.al{ background:radial-gradient(circle at 38% 30%,#a8ccf2,#25507f) }
-.tk-pip.en{ background:radial-gradient(circle at 38% 30%,#f0a48c,#8c2c18) }
-.tk-pip.on{ border-color:#f0d9a4; box-shadow:inset 0 1px 0 rgba(255,255,255,.4),
-  0 0 12px rgba(216,178,104,.6) }
+.tk-lbl{ flex:0 0 74px; font-family:var(--m-f-cap); font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--m-or-hi) }
+.tk-row.col .tk-lbl{ display:block; margin-bottom:7px }
+.tk-note{ font-family:var(--m-f-hand); font-style:italic; font-size:12px;
+  color:var(--m-hush) }
+/* the side is a lozenge in that side's own tincture */
+.tk-sides{ display:flex; gap:8px }
+.tk-pip{ width:26px; height:26px; border-radius:0; cursor:pointer; border:0; padding:0;
+  clip-path:var(--m-lozenge); transition:transform var(--t-press) var(--snap) }
+.tk-pip.al{ background:var(--m-azure) }
+.tk-pip.en{ background:var(--m-gules) }
+.tk-pip:hover{ transform:scale(1.12) }
+.tk-pip.on{ box-shadow:0 0 0 2px var(--m-or), 0 0 14px rgba(201,162,39,.45) }
 .tk-make input[type=number].tk-f-max{
-  flex:0 0 62px; width:62px; text-align:center;
-  font-family:'Cinzel',serif; font-size:14px; font-weight:700; color:#241708;
-  background:linear-gradient(180deg,#c8a45a,#8a6a2c); border:0; outline:0; border-radius:0;
-  padding:4px 0; box-shadow:inset 0 2px 4px rgba(0,0,0,.45),
-    inset 0 -1px 0 rgba(255,240,200,.5);
+  flex:0 0 66px; width:66px; text-align:center;
+  font-family:var(--m-f-tally); font-size:19px; font-weight:600; color:var(--m-or);
+  background:var(--m-sable-0); border:0; outline:0; border-radius:0; padding:5px 0;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 5px rgba(0,0,0,.7);
 }
-.tk-sizes{ display:flex; gap:3px }
-.tk-size{ font-family:'Cinzel',serif; font-size:8.5px; font-weight:700;
-  letter-spacing:.12em; text-transform:uppercase; padding:6px 8px; cursor:pointer;
-  color:rgba(232,223,200,.7); background:rgba(0,0,0,.3);
-  border:1px solid rgba(232,201,138,.26); border-radius:0 }
-.tk-size:hover{ color:#fff6e2; border-color:#d8b268 }
-.tk-size.on{ color:#1c1409; background:#d8b268; border-color:#d8b268 }
+.tk-make input[type=number].tk-f-max::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+.tk-sizes{ display:flex; gap:4px }
+.tk-size{ font-family:var(--m-f-cap); font-size:8.5px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; padding:7px 13px 7px 9px; cursor:pointer;
+  color:var(--m-text); border:0; border-radius:0;
+  clip-path:polygon(0 0,100% 0,calc(100% - 6px) 50%,100% 100%,0 100%);
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.16);
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle) }
+.tk-size:hover, .tk-size.on{ background-position:0 0; color:var(--m-sable) }
 .tk-size:disabled{ opacity:.35; cursor:default }
-.tk-faces{ display:flex; flex-wrap:wrap; gap:3px; max-height:126px; overflow-y:auto;
-  padding:3px; background:rgba(0,0,0,.28);
-  box-shadow:inset 0 2px 5px rgba(0,0,0,.6) }
-.tk-faces::-webkit-scrollbar{ width:6px }
-.tk-faces::-webkit-scrollbar-thumb{ background:#6b5227 }
-.tk-face{ position:relative; width:38px; height:38px; padding:0; cursor:pointer;
-  background:radial-gradient(ellipse at 50% 20%,#3b2c19,#161008 84%);
-  border:1px solid rgba(0,0,0,.5) }
-.tk-face:hover{ border-color:#d8b268 }
-.tk-face.on{ border-color:#f0c274; box-shadow:0 0 10px rgba(216,178,104,.5) }
-.tk-face.none::after{ content:''; position:absolute; left:8px; right:8px; top:17px;
-  height:2px; background:rgba(232,201,138,.4); transform:rotate(-38deg) }
+.tk-faces{ display:flex; flex-wrap:wrap; gap:4px; max-height:132px; overflow-y:auto;
+  padding:4px; background:var(--m-sable-0);
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 5px rgba(0,0,0,.6) }
+.tk-faces::-webkit-scrollbar{ width:7px }
+.tk-faces::-webkit-scrollbar-track{ background:rgba(0,0,0,.45) }
+.tk-faces::-webkit-scrollbar-thumb{ background:var(--m-or-lo) }
+.tk-face{ position:relative; width:40px; height:40px; padding:0; cursor:pointer;
+  background:var(--m-sable-2); border:0;
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.14);
+  transition:box-shadow var(--t-hover) var(--settle) }
+.tk-face:hover{ box-shadow:inset 0 0 0 1px var(--m-or) }
+.tk-face.on{ box-shadow:inset 0 0 0 2px var(--m-or), 0 0 12px rgba(201,162,39,.4) }
+.tk-face.none::after{ content:''; position:absolute; left:8px; right:8px; top:18px;
+  height:2px; background:var(--m-line-hi); transform:rotate(-38deg) }
 .tk-face.own .tk-plus{ position:absolute; inset:11px;
-  background:linear-gradient(180deg,#e0bd74,#8a6a2c) }
+  background:var(--m-or); clip-path:var(--m-lozenge) }
 .tk-face.own .tk-plus::before, .tk-face.own .tk-plus::after{
-  content:''; position:absolute; background:#241708 }
-.tk-face.own .tk-plus::before{ left:3px; right:3px; top:7px; height:2px }
-.tk-face.own .tk-plus::after{ top:3px; bottom:3px; left:7px; width:2px }
+  content:''; position:absolute; background:var(--m-sable) }
+.tk-face.own .tk-plus::before{ left:4px; right:4px; top:8px; height:2px }
+.tk-face.own .tk-plus::after{ top:4px; bottom:4px; left:8px; width:2px }
 .tk-make textarea{
-  width:100%; font-family:'Crimson Text',serif; font-size:13px; line-height:1.4;
-  color:#f0e3c4; background:rgba(0,0,0,.3); border:1px solid rgba(232,201,138,.24);
-  outline:0; padding:6px 8px; resize:vertical; border-radius:0;
+  width:100%; font-family:var(--m-f-hand); font-size:13.5px; line-height:1.4;
+  color:var(--m-argent-hi); background:var(--m-sable-0); border:0;
+  outline:0; padding:8px 10px; resize:vertical; border-radius:0;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 4px rgba(0,0,0,.6);
 }
+.tk-make textarea:focus{ box-shadow:inset 0 0 0 1px var(--m-or), inset 0 2px 4px rgba(0,0,0,.6) }
+
 
 /* ══════════════════════════════════════════════════════════════
    A COUNTER WITH A FACE, AND A MODEL THAT IS REALLY THERE
@@ -1348,64 +1460,7 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
    the library's own groups as tabs, a box to type in, and tiles big enough to
    BE the picture rather than a smear of it, each with its name under it.
 ══════════════════════════════════════════════════════════════ */
-.hb-shelf{
-  display:flex; align-items:center; gap:8px; padding:0 2px 8px;
-  border-bottom:1px solid rgba(255,214,158,.14); margin-bottom:8px;
-}
-.hb-shelf[hidden]{ display:none !important; }
-.hb-tabs{ display:flex; gap:4px; flex:1; min-width:0; overflow-x:auto;
-  scrollbar-width:none; }
-.hb-tabs::-webkit-scrollbar{ height:0 }
-.hb-tab{
-  flex:0 0 auto; display:flex; align-items:baseline; gap:5px; cursor:pointer;
-  font-family:'Cinzel',serif; font-size:10px; font-weight:700; letter-spacing:.11em;
-  text-transform:uppercase; color:#d8c49a; padding:5px 10px;
-  background:linear-gradient(178deg,#3b2c19,#1e1509); border:1px solid #4a3418;
-  box-shadow:inset 0 1px 0 rgba(255,224,172,.18);
-}
-.hb-tab i{ font-style:normal; font-size:9px; opacity:.55; }
-.hb-tab:hover{ border-color:#d8b268; color:#f6e6c0; }
-.hb-tab.on{ color:#1c1409; background:linear-gradient(178deg,#e0c286,#a8873f);
-  border-color:#f0d9a4; box-shadow:inset 0 1px 0 rgba(255,255,255,.45); }
-.hb-tab.on i{ opacity:.65 }
-.hb-find{ flex:0 0 auto; display:block; }
-.hb-find input{
-  width:172px; padding:6px 9px; color:#f4e8cc; font-family:'Crimson Text',serif;
-  font-size:13px; background:rgba(0,0,0,.42); border:1px solid #4a3418; outline:none;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
-}
-.hb-find input:focus{ border-color:#d8b268; }
-.hb-find input::placeholder{ color:rgba(240,217,164,.4); font-style:italic; }
-.hb-count{
-  flex:0 0 auto; font-family:'Cinzel',serif; font-size:9px; letter-spacing:.13em;
-  text-transform:uppercase; color:rgba(240,217,164,.5); min-width:62px; text-align:right;
-}
-.hb-nowt{
-  margin:0; padding:26px 0; width:100%; text-align:center;
-  font-family:'Crimson Text',serif; font-style:italic; font-size:14px;
-  color:rgba(240,217,164,.45);
-}
 
-/* ── the shelf's own tray: wider, taller, and it does not crop ── */
-.hb-tray.browse{ max-width:min(1120px, calc(100vw - 380px)); }
-.hb-tray.browse .hb-tray-in{
-  /* THE OLD CEILING WAS 212px, which is three rows of the old tile and is
-     where "some of it can be cutoff" came from. Height is asked of the
-     viewport now, so a taller screen shows more and a short one still
-     scrolls rather than hiding the bottom row behind the edge. */
-  max-height:min(46vh, 420px); align-content:flex-start; gap:6px; padding:2px;
-}
-.hb-tray.browse .hb-opt{
-  width:104px; height:124px; display:flex; flex-direction:column;
-}
-.hb-tray.browse .hb-opt .hb-fig{ position:relative; inset:auto; flex:1; min-height:0; }
-.hb-nm{
-  display:block; flex:0 0 auto; padding:3px 5px 5px; font-style:normal;
-  font-family:'Crimson Text',serif; font-size:11px; line-height:1.15;
-  color:rgba(240,224,196,.82); text-align:center;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-.hb-tray.browse .hb-opt:hover .hb-nm{ color:#fff2d4; }
 
 /* A COUNTER IN A SLOT IS A PHOTOGRAPH OF THE PIECE — no rim, no plinth
    colour, nothing the disc drew when it was a letter in a circle. The piece's
@@ -1576,7 +1631,7 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
   /* the tile is drawn over a box larger than the screen so the layer can be
      moved by transform without ever showing an edge */
   inset:-120px;
-  background-image:url(data:image/png;base64,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);
+  /* the tile itself is .m-grain in 20-shell.css — the hall wears it too */
   background-repeat:repeat;
   background-size:96px 96px;
   animation:grain-drift 1.05s steps(1,end) infinite;
@@ -1692,3 +1747,58 @@ body.nograde #grade, body.nograde #grain{ display:none }
 #room-ed button:not(.re-x):hover{ color:#fff6e2; border-color:#d8b268 }
 #room-ed .re-foot button{ flex:1 1 auto }
 #room-ed #re-del:hover{ color:#ffb9a4; border-color:#c9743e }
+
+/* ── THE CORNER GETS OUT OF THE WAY ───────────────────────────
+   The case stands in the same bottom band as the table's own HUD: the
+   hint at bottom left and the zoom/theme/fit controls at bottom right
+   both sat UNDER it (the HUD is z 2000, the case 1200), so the corner
+   text printed straight over the chest. While the chest is open the
+   hint stands down and the controls step up over the case's head. */
+body.chest-open .hud.tl{ opacity:0; pointer-events:none; }
+body.chest-open .hud.br{ transform:translateY(calc(-1 * min(54vh, 470px) - 26px)); }
+.hud.tl, .hud.br{ transition:opacity var(--t-move) var(--settle),
+                              transform var(--t-move) var(--settle); }
+
+/* ── THE WARRANT'S OWN FIELDS ─────────────────────────────────
+   The make-a-scene dialog uses the same three controls as the orders, but
+   its fields inherit `.sc-field input{width:100%}` from the light-mode
+   block above — which stretched a two-digit tally the width of the panel.
+   These give it the same wells, tallies and pennons the writ has. */
+#sc-make .sc-box{
+  background:
+    var(--m-marks),
+    repeating-linear-gradient(45deg,transparent 0 15px,rgba(201,162,39,.05) 15px 16px),
+    linear-gradient(176deg,var(--m-sable-2),var(--m-sable) 70%) !important;
+  box-shadow:var(--m-frame), var(--m-lift) !important; border:0 !important;
+}
+#sc-make .sc-head{
+  background:linear-gradient(180deg,var(--m-or-hi) 0%,var(--m-or) 46%,var(--m-or-lo) 100%) !important;
+  color:var(--m-sable) !important;
+  box-shadow:inset 0 2px 0 rgba(255,244,214,.55), inset 0 -3px 0 var(--m-house) !important;
+  align-items:center;
+}
+#sc-make .sc-head h3{ font-family:var(--m-f-cap); font-size:12px; letter-spacing:.16em;
+  color:var(--m-sable); flex:1; }
+#sc-make .sc-mark{ color:var(--m-sable); opacity:.8 }
+#sc-make .sc-lbl{ color:var(--m-or-hi) !important; font-family:var(--m-f-cap);
+  letter-spacing:.2em; }
+#sc-make .sc-field input[type=text], #sc-make .sc-field input:not(.sc-num){
+  width:100%; padding:9px 11px; border:0 !important; border-radius:0;
+  font-family:var(--m-f-hand); font-size:15px; color:var(--m-argent-hi) !important;
+  background:var(--m-sable-0) !important;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 4px rgba(0,0,0,.6) !important;
+}
+#sc-make .sc-field input:focus{
+  box-shadow:inset 0 0 0 1px var(--m-or), inset 0 2px 4px rgba(0,0,0,.6) !important; }
+#sc-make .sc-tally{ display:flex; align-items:center; gap:6px; }
+#sc-make .sc-tally .sc-num{
+  flex:0 0 74px !important; width:74px !important; text-align:center; padding:6px 0 !important;
+  font-family:var(--m-f-tally) !important; font-size:20px !important; font-weight:600;
+  color:var(--m-or) !important; background:var(--m-sable-0) !important;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 5px rgba(0,0,0,.7) !important;
+}
+#sc-make .sc-hint, #sc-make .sc-blurb, #sc-make .sc-later, #sc-make .sc-fixed{
+  font-family:var(--m-f-hand) !important; color:var(--m-quiet) !important; }
+#sc-make .sc-fixed b{ font-family:var(--m-f-tally); font-size:15px; color:var(--m-or); }
+/* one choice should not stretch the width of the panel */
+.sc-choice .sc-pen{ flex:0 1 auto; min-width:104px; }

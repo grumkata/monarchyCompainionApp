@@ -16,6 +16,29 @@
    Neither panel is an object on the wood. There is no private half
    of the table; the only things that differ per person are their
    own menus and papers, and these are menus.
+
+   ── STANDING ORDERS (2026-09-17) ──────────────────────────────
+   grumkata: "we also need to redo the options entirely".
+
+   They were a web form wearing brass: a checkbox, a number spinner
+   and a <select> whose chosen line ("Move freely") ran out of the
+   panel. None of those three controls belongs at this table, and a
+   native dropdown cannot be styled into one that does.
+
+   So there are three controls now, and each is a thing rather than
+   a widget:
+
+     A YES IS A SEAL.   Fog of war is either sealed or it is not.
+                        Pressing it stamps wax and throws gilt.
+     A NUMBER IS A TALLY. Struck down or up by a lozenge on each
+                        side, so mana never needs a keyboard.
+     A CHOICE IS A ROW OF PENNONS. Every choice is visible at once,
+                        with what it means written under the one
+                        that is flying. Nothing is hidden behind a
+                        closed list.
+
+   The same three build the make-a-scene warrant, so setting a scene
+   up and running it are visibly the same kind of act.
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
@@ -68,7 +91,8 @@ function paintMake() {
     `<div class="sc-scrim" data-sc="cancel"></div>
      <div class="sc-box" role="dialog" aria-modal="true">
        <div class="sc-head"><span class="sc-mark">${def.mark}</span>
-         <h3>Make a ${esc(def.name.toLowerCase())} scene</h3></div>
+         <h3>A ${esc(def.name.toLowerCase())} scene</h3>
+         <button class="sc-opts-x" data-sc="cancel" title="Never mind">&#10005;</button></div>
        <div class="sc-blurb">${esc(def.blurb)}</div>
        <div class="sc-body">
          ${def.setup.map(f => field(f, draft[f.key])).join('')}
@@ -84,9 +108,16 @@ function paintMake() {
        } — stay to hand once it is on the table.</div>
        <div class="sc-foot">
          <button class="sc-btn" data-sc="cancel">Cancel</button>
-         <button class="sc-btn go" data-sc="ok">Put it on the table</button>
+         <button class="sc-seal go" data-sc="ok" title="Seal it and set it down">
+           <span class="sc-wax"></span><b>Set it down</b></button>
        </div>
      </div>`;
+
+  /* a warrant's own pennons and tallies, same controls as the orders */
+  wireControls(shell(), (key, v) => {
+    draft[key] = v;
+    paintMake();
+  }, k => draft[k]);
 
   shell().querySelectorAll('[data-setup]').forEach(el => {
     el.addEventListener('input', () => {
@@ -124,17 +155,61 @@ function paintMake() {
   });
 }
 
+/* ══ THE THREE CONTROLS ═══════════════════════════════════════
+   A seal, a tally, a row of pennons. Written once and used by both
+   panels. `key` is what changed and `set` is told about it. */
+function seal(key, on, attr) {
+  return `<button type="button" class="sc-seal${on ? ' on' : ''}" ${attr}="${key}"
+     role="switch" aria-checked="${on ? 'true' : 'false'}"
+     title="${on ? 'Sealed — press to break it' : 'Press to seal it'}">
+     <span class="sc-wax"></span><b>${on ? 'Sealed' : 'Open'}</b></button>`;
+}
+function tally(key, val, min, max, attr) {
+  return `<span class="sc-tally">
+    <button type="button" class="sc-step" data-step="-1" data-for="${key}">&minus;</button>
+    <input class="sc-num" type="number" ${attr}="${key}" value="${esc(val)}"
+      min="${min == null ? 0 : min}" max="${max == null ? 999 : max}">
+    <button type="button" class="sc-step" data-step="1" data-for="${key}">+</button>
+  </span>`;
+}
+function pennons(key, val, choices, attr) {
+  return `<span class="sc-choice">${choices.map(c =>
+    `<button type="button" class="sc-pen${c[0] === val ? ' on' : ''}"
+       ${attr}="${key}" data-val="${esc(c[0])}">${esc(c[1])}</button>`).join('')}</span>`;
+}
+
+/* every seal, tally and pennon in `el`, wired to one setter */
+function wireControls(el, set, get) {
+  el.querySelectorAll('[data-val]').forEach(b =>
+    b.addEventListener('click', () => set(b.dataset.opt || b.dataset.setup, b.dataset.val)));
+  el.querySelectorAll('.sc-seal[data-opt],.sc-seal[data-setup]').forEach(b =>
+    b.addEventListener('click', () => {
+      const k = b.dataset.opt || b.dataset.setup;
+      if (root.Herald) root.Herald.burstOn(b, 12);
+      set(k, !get(k));
+    }));
+  el.querySelectorAll('.sc-step').forEach(b =>
+    b.addEventListener('click', () => {
+      const k = b.dataset.for;
+      const inp = el.querySelector(`.sc-num[data-opt="${k}"],.sc-num[data-setup="${k}"]`);
+      if (!inp) return;
+      const lo = +inp.min, hi = +inp.max;
+      const v = Math.max(lo, Math.min(hi, (parseInt(inp.value, 10) || 0) + (+b.dataset.step)));
+      set(k, v);
+    }));
+  el.querySelectorAll('.sc-num').forEach(inp =>
+    inp.addEventListener('change', () =>
+      set(inp.dataset.opt || inp.dataset.setup, inp.value)));
+}
+
 function field(f, val) {
   const id = 'setup-' + f.key;
   let control;
   if (f.type === 'number') {
-    control = `<input id="${id}" data-setup="${f.key}" type="number"
-       min="${f.min}" max="${f.max}" value="${esc(val)}">`;
+    control = tally(f.key, val, f.min, f.max, 'data-setup');
   } else if (f.type === 'model') {
     const list = (C().MODELS[f.from] || []);
-    control = `<select id="${id}" data-setup="${f.key}">${
-      list.map(m => `<option value="${esc(m.id)}"${m.id === val ? ' selected' : ''}>${
-        esc(m.name)}</option>`).join('')}</select>`;
+    control = pennons(f.key, val, list.map(m => [m.id, m.name, m.note]), 'data-setup');
   } else if (f.type === 'image') {
     /* A PICTURE COMES OFF YOUR MACHINE, NOT OFF A URL.
        This was a text box asking you to paste a link — in an app that
@@ -222,45 +297,41 @@ function showOptions(sceneId, ask) {
        <div><b>${esc(s.name)}</b><i>${esc(def.name)} · ${
          def.setup.map(f => esc(f.label.toLowerCase()) + ' ' +
            esc(String(s.setup[f.key] || '—'))).join(' · ')}</i></div>
-       <button class="sc-opts-x" title="Close">✕</button>
+       <button class="sc-opts-x" title="Close">&#10005;</button>
      </div>
      ${def.options.length ? `<div class="sc-opts-body">${
         def.options.map(k => optRow(k, C().OPTIONS[k], s.options[k])).join('')
       }</div>` : `<div class="sc-opts-none">This scene has nothing to set. It is a backdrop.</div>`}
-     <div class="sc-opts-foot">Only you see this panel.</div>`;
+     <div class="sc-opts-foot">Only you see these orders.</div>`;
 
   p.querySelector('.sc-opts-x').addEventListener('click', () => {
     dismissed = sceneId; p.hidden = true;
   });
-  p.querySelectorAll('[data-opt]').forEach(el => {
-    el.addEventListener('change', () => {
-      const k = el.dataset.opt;
-      const v = el.type === 'checkbox' ? el.checked : el.value;
-      T().setOption(sceneId, k, v);
-      showOptions(sceneId, true);
-    });
-  });
+  wireControls(p, (k, v) => {
+    T().setOption(sceneId, k, v);
+    showOptions(sceneId, true);
+  }, k => T().get(sceneId).options[k]);
 }
 
 function optRow(key, def, val) {
-  let control;
-  if (def.type === 'bool') {
-    control = `<label class="sc-switch">
-      <input type="checkbox" data-opt="${key}"${val ? ' checked' : ''}>
-      <span class="sc-slide"></span></label>`;
-  } else if (def.type === 'number') {
-    control = `<input class="sc-num" type="number" data-opt="${key}"
-       min="${def.min}" max="${def.max}" value="${esc(val)}">`;
-  } else {
-    control = `<select class="sc-pick" data-opt="${key}">${
-      def.choices.map(c => `<option value="${c[0]}"${c[0] === val ? ' selected' : ''}>${
-        esc(c[1])}</option>`).join('')}</select>`;
-  }
   const chosen = def.type === 'choice' && def.choices.find(c => c[0] === val);
+  /* A CHOICE TAKES THE WHOLE ROW. Three pennons beside a label is how the
+     old <select> ran out of the panel; under it, they fit and all three can
+     be read at once. */
+  if (def.type === 'choice') {
+    return `<div class="sc-opt wide">
+      <div class="sc-opt-text"><b>${esc(def.label)}</b>
+        <i>${esc(chosen ? chosen[2] : def.hint)}</i></div>
+      ${pennons(key, val, def.choices, 'data-opt')}
+    </div>`;
+  }
+  const control = def.type === 'bool'
+    ? seal(key, !!val, 'data-opt')
+    : tally(key, val, def.min, def.max, 'data-opt');
   return `<div class="sc-opt">
     <div class="sc-opt-text">
       <b>${esc(def.label)}</b>
-      <i>${esc(chosen ? chosen[2] : def.hint)}</i>
+      <i>${esc(def.hint)}</i>
     </div>
     ${control}
   </div>`;

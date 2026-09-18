@@ -30,10 +30,15 @@ let uidn = 0;
 const uid = p => p + Date.now().toString(36) + (++uidn).toString(36) +
                  Math.random().toString(36).slice(2, 5);
 
+/* the wood, in its own units — 23-table3d.js owns these, but the model
+   has to answer "where is that seat" without reaching into the view */
+const TW = 4400, TH = 4400;
+
 function blankTable(id) {
   return {
     id: id || 'table',
     version: 1,
+    units: TW,       /* the size of the wood these coordinates are in */
     things: [],      /* everything on the wood */
     bin: [],         /* what was taken off it, newest first */
     active: null,    /* the one scene being run */
@@ -245,6 +250,49 @@ const T = {
         }
       }
     } catch (e) {}
+    let fixed = false;
+    /* ── AND THE EIGHT I ALREADY PUT IN YOUR SAVES COME OUT ───
+       Taking the code out was not enough: a table that had been opened
+       while it was there has the eight chairs written into its own save
+       file, so it kept showing them. They are identifiable — the only
+       seats ever created with a plain index for an id, the default name
+       and nothing else on them — so they are swept out once, on load. A
+       chair somebody actually pulled up has an id from addSeat() and a
+       name, and is left exactly where it is. */
+    if (Array.isArray(this.state.seats) && this.state.seats.length) {
+      const mine = s => /^seat-[0-7]$/.test(s.id) && s.name === 'Empty chair'
+                        && !s.face && !s.banner;
+      if (this.state.seats.length === 8 && this.state.seats.every(mine)) {
+        this.state.seats = [];
+        fixed = true;
+      }
+    }
+
+    /* NO CHAIRS UNLESS SOMEBODY PULLS ONE UP. A new table came with
+       eight empty chairs round it for a while, on the reasoning that the
+       app is for eight players — but "it must SEAT eight" is not "it must
+       always show eight", and a table nobody has joined ringed with empty
+       furniture is clutter round the only thing you are trying to look
+       at. Seats arrive when someone takes one. */
+    /* ── AND IT MAY BE AN OLD ONE ─────────────────────────────
+       The wood went from 2600 units to 4400 when the table became a real
+       2.2 metres (23-table3d.js). A table saved before that has all its
+       things in the old space, tucked into the top-left half of the new
+       one. Scale them once, on the way in, and mark it done. */
+    if (this.state.units !== TW) {
+      const k = TW / (this.state.units || 2600);
+      if (k !== 1) this.state.things.forEach(t => {
+        ['x', 'y', 'w', 'h'].forEach(f => { if (typeof t[f] === 'number') t[f] = Math.round(t[f] * k); });
+      });
+      this.state.units = TW;
+      fixed = true;
+    }
+    /* A MIGRATION THAT DOES NOT WRITE ITSELF DOWN IS NOT A MIGRATION. Both
+       of the fixes above only touched the copy in memory, so the save on
+       disk still said eight chairs and old coordinates until something
+       else happened to write — which, on a table you open and look at, may
+       be never. Put it back the moment it is mended. */
+    if (fixed) this.save();
     /* a fresh table is a fresh history — you cannot undo into the last one */
     this._past.length = 0; this._future.length = 0;
     this._group = null; this._depth = 0; this._quiet = false;
@@ -291,6 +339,7 @@ const T = {
      dragged, binned, put in a scene, stacked. A seat is where somebody
      sits — it has no z, it cannot be picked up, and the bin would make
      no sense of it. Same table, same save, its own list. */
+  TW: TW, TH: TH, R: TW / 2,
   seats() { return (this.state.seats || []).slice(); },
   seat(id) { return (this.state.seats || []).find(s => s.id === id) || null; },
 
@@ -324,21 +373,38 @@ const T = {
     this.changed('seats');
     return true;
   },
-  /* One place is special: the near side of the table is YOURS, because
-     that is where the camera sits when you lean back. So the seats are
-     dealt round from the far side and the gap is left at 180. */
+  /* ══ EVERYONE SITS ROUND IT ══════════════════════════════════
+     This used to deal every chair onto a 108-degree arc on the FAR side
+     and leave the near third empty, "because that is where the camera
+     sits when you lean back". That is a table with one person at it and
+     an audience opposite.
+
+     grumkata: "you are treating the table like its a personal space when
+     really its a shared space between players and gm — with the final
+     release each user at the table will physically be at the table."
+
+     So the places go all the way round, evenly, and none of them is the
+     app's own. Seat 0 is at 180 — the near side — because that is where
+     THIS client's camera sits, and every other client will turn the same
+     table until their own place is at the bottom of their screen. Which
+     seat is yours is a local choice (42-shell.js), not a property of the
+     table: the table is the same object for everybody at it. */
   spaceSeats() {
     const list = this.state.seats || [];
     const n = list.length;
     if (!n) return;
-    /* 220, not 300. Three hundred degrees put the outer two chairs at
-       plus and minus 150 — which is beside and slightly behind your own
-       shoulder, so you saw them edge-on and the table looked surrounded
-       rather than sat at. Everyone goes on the far arc; the near third
-       of the table is yours. */
-    const span = 108;
-    for (let i = 0; i < n; i++)
-      list[i].at = n === 1 ? 0 : -span / 2 + span * (i / (n - 1));
+    for (let i = 0; i < n; i++) list[i].at = -180 + 360 * (i / n);
+  },
+  /* where a seat is on the wood: the point in front of that chair, and
+     which way up a paper laid there should be. `r` is 0 at the near side,
+     so your own place reads square to you and everyone else's is turned
+     as far as they are sitting round. */
+  seatSpot(seat, radius) {
+    const a = ((seat && seat.at) || 0) * Math.PI / 180;
+    const R = radius == null ? this.R * 0.76 : radius;
+    return { x: this.TW / 2 + Math.sin(a) * R,
+             y: this.TH / 2 - Math.cos(a) * R,
+             r: (((seat && seat.at) || 0) - 180) };
   },
   scenes() { return this.state.things.filter(t => t.kind === 'scene'); },
   activeScene() { return this.get(this.state.active); },

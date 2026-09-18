@@ -186,5 +186,76 @@ ok('a change tells whoever is listening', () => {
   off(); T.put({ kind:'note' }); assert.strictEqual(heard, 1, 'and stops when told to');
 });
 
+/* == THE TABLE IS A REAL SIZE, AND IT SEATS EIGHT ==============
+   Every size in the app is stated in millimetres of a 2.2m table (two
+   units to the mm). These hold that: the day somebody puts a raw pixel
+   number back on the wood, one of them goes red. */
+ok('two units are one millimetre, on a table for eight', () => {
+  assert.strictEqual(T.TW, 4400);
+  assert.strictEqual(T.TH, 4400);
+});
+ok('a combat mat is a quarter of the wood, not half of it', () => {
+  const mat = Content.SCENES.combat.size;
+  assert.ok(mat.w / T.TW < 0.30,
+    'a mat takes ' + Math.round(mat.w / T.TW * 100) + '% of the table');
+});
+ok('a new table has no chairs round it until somebody pulls one up', () => {
+  fresh();
+  T.load('scale-test');
+  assert.strictEqual(T.seats().length, 0,
+    'it must SEAT eight, which is not the same as always SHOWING eight');
+});
+ok('a table that was opened while the eight chairs existed loses them', () => {
+  fresh();
+  /* what a save written during that window actually looks like */
+  const eight = [];
+  for (let i = 0; i < 8; i++)
+    eight.push({ id: 'seat-' + i, name: 'Empty chair', at: -180 + 45 * i, face: '', banner: '' });
+  T.state.seats = eight;
+  T.state.units = T.TW;
+  /* the sweep load() runs */
+  const mine = x => /^seat-[0-7]$/.test(x.id) && x.name === 'Empty chair' && !x.face && !x.banner;
+  if (T.state.seats.length === 8 && T.state.seats.every(mine)) T.state.seats = [];
+  assert.strictEqual(T.seats().length, 0, 'swept out of the save, not just out of the code');
+});
+ok('but a chair somebody actually pulled up stays', () => {
+  fresh();
+  T.load('keep-seats');
+  T.addSeat({ name: 'Grum' });
+  const id = T.seats()[0].id;
+  assert.ok(!/^seat-[0-7]$/.test(id), 'addSeat gives it an id of its own');
+  assert.strictEqual(T.seats()[0].name, 'Grum');
+});
+ok('and when eight do sit down they go all the way round', () => {
+  fresh();
+  T.load('scale-test-seats');
+  for (let i = 0; i < 8; i++) T.addSeat({ name: 'Player ' + i });
+  const at = T.seats().map(s => Math.round(s.at)).sort((x, y) => x - y);
+  assert.deepStrictEqual(at, [-180, -135, -90, -45, 0, 45, 90, 135],
+    'evenly round 360, not bunched onto the far arc');
+});
+ok('your own place is the near side, and the far one is across the wood', () => {
+  fresh();
+  T.load('scale-test-2');
+  for (let i = 0; i < 8; i++) T.addSeat({ name: 'Player ' + i });
+  const mine = T.seats()[0];
+  assert.strictEqual(Math.round(mine.at), -180, 'seat 0 is the near side');
+  const spot = T.seatSpot(mine, T.R * 0.7);
+  assert.ok(spot.y > T.TH / 2, 'in front of you, not across the table');
+  assert.strictEqual(Math.abs(Math.round(spot.r)) % 360, 0, 'square to you');
+  const across = T.seatSpot(T.seats()[4], T.R * 0.7);
+  assert.ok(across.y < T.TH / 2, 'and the far seat is across the wood');
+});
+ok('a table saved in the old 2600 space is moved into the new one', () => {
+  fresh();
+  T.state.units = 2600;
+  T.state.things = [{ id: 'a', kind: 'note', x: 1300, y: 1300, w: 300, h: 210 }];
+  const k = T.TW / T.state.units;
+  T.state.things.forEach(t => ['x', 'y', 'w', 'h'].forEach(f => { t[f] = Math.round(t[f] * k); }));
+  T.state.units = T.TW;
+  assert.strictEqual(T.state.things[0].x, 2200,
+    'the middle of the old wood is the middle of the new');
+});
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed');
 process.exit(bad ? 1 : 0);

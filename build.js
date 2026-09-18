@@ -116,15 +116,20 @@ const CSS = [
   ['src/css/00-hall.css',    'body.at-hall'],
   /* the record is needed in both places: the hall keeps the roster and the
      table opens the same record as a paper on your own end */
-  ['src/css/01-sheet.css',   ['body.at-hall', '#tp']],
+  /* `.tp` and not `#tp`: a record is TWO elements now — the sheet lying on
+     the wood and the reading that rises off it (45-papers.js) — and both
+     wear the record's own stylesheet */
+  ['src/css/01-sheet.css',   ['body.at-hall', '.tp']],
   ['src/css/12-combat.css',  'body.at-table'],
   ['src/css/13-table-ui.css','body.at-table']
 ];
 
 const JS = [
   'src/js/29-role.js',           // which side of the table you are
+  'src/js/07-options.js',        // what you have asked the app to be; read by 09 below
   'src/js/00-three.js',          // vendor
   'src/js/00-geo-runtime.js',    // reads the packed vertices; needs THREE, precedes every pack
+  'src/js/09-blazon3d.js',       // Blazon in 3D: banded light, the house ramp, a gilt rim
   'src/js/01-castle-assets.js',  // Castle Pack, baked by tools/bake_castle.py
   'src/js/02-charge-assets.js',  // heraldic charges (game-icons.net, CC BY 3.0)
   'src/js/20-chest-asset.js',    // AnimatedChest, baked by tools/bake_chest.py
@@ -201,34 +206,86 @@ const body =
    through the parse the browser actually is — it moves in the same jerky
    way the work does, pausing on the big asset files, because that is what
    is happening. */
-const tail = JS.map((f, i) =>
-  `<script>\n/* ${path.basename(f)} */\n${repack(unpicture(R(f)), f)}\n</script>\n` +
-  `<script>window.__boot&&__boot(${i + 1},${JS.length})</script>`).join('\n');
+/* THE MARKER SAYS BYTES, NOT FILES. It used to tick `i+1 of 52`, which made
+   every script worth the same — and they are not remotely: the tavern pack
+   is a thousand times the size of 29-role.js. So the bar ran in even little
+   steps and then sat perfectly still for two seconds on one of the big ones,
+   which is the exact shape of a hang. Weighting each tick by the bytes
+   actually parsed makes the bar's speed match the pause, so a slow stretch
+   LOOKS slow instead of looking broken. */
+const bodies = JS.map(f => repack(unpicture(R(f)), f));
+const jsBytes = bodies.reduce((a, b) => a + b.length, 0);
+let jsSeen = 0;
+const tail = bodies.map((src, i) => {
+  jsSeen += src.length;
+  return `<script>\n/* ${path.basename(JS[i])} */\n${src}\n</script>\n` +
+         `<script>window.__boot&&__boot(${jsSeen},${jsBytes})</script>`;
+}).join('\n');
 
 const LOADING = `
 <div id="boot">
-  <div class="boot-mark">&#9876;</div>
-  <div class="boot-name">Monarchy</div>
-  <div class="boot-bar"><i></i></div>
-  <div class="boot-say">setting the table&hellip;</div>
+  <div class="boot-in">
+    <div class="boot-mark">&#9876;</div>
+    <div class="boot-name">Monarchy</div>
+    <div class="boot-bar"><i></i><u></u></div>
+    <div class="boot-say">setting the table&hellip;</div>
+  </div>
 </div>
 <style>
 /* Blazon's first frame: Sable ground, the mark in Argent, the bar in Or on a
    bend-cut track. The tokens are 20-shell.css's — that sheet is in <head>,
-   so they already resolve here. */
-#boot{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:18px;
+   so they already resolve here.
+
+   ══ WHAT CAN MOVE WHILE THE PAGE IS BUSY ══════════════════════
+   Almost nothing, and that is the whole design problem here. This screen is
+   up because the browser is parsing twelve megabytes of script, which blocks
+   the main thread — so anything driven by JavaScript, or by a CSS property
+   that needs layout or paint, is frozen for the entire time it matters.
+
+   What DOES keep running is animation the compositor can do by itself:
+   transform and opacity, on their own layers. So the two things that move
+   continuously here — the shimmer sweeping the bar (translateX) and the
+   mark's pulse (opacity) — are both compositor-only, and they carry on
+   through a two-second parse freeze. The bar's own width cannot: it is laid
+   out, so it advances in steps, one per script. That is why the steps are
+   weighted by bytes and eased over a long curve: they are the one part that
+   has to look deliberate rather than smooth. */
+/* the same isolation as the Bend's cover, for the same reason: this is up
+   because the page is busy, so it must not share a layer with the page */
+#boot{contain:layout paint style;will-change:transform;
+  position:fixed;inset:0;z-index:100000;display:flex;
+  align-items:center;justify-content:center;
   background:radial-gradient(ellipse at 50% 38%,#241a10 0%,var(--m-sable-0,#0a0705) 76%);
-  transition:opacity .55s ease;font-family:var(--m-f-hand,Georgia,serif)}
+  font-family:var(--m-f-hand,Georgia,serif);
+  transition:opacity .5s ease}
+.boot-in{display:flex;flex-direction:column;align-items:center;gap:18px;
+  will-change:transform,opacity;
+  transition:transform .62s cubic-bezier(.5,0,.85,.4),opacity .42s ease}
+/* the screen lifts the way the Bend's cloth does rather than just fading:
+   the same exit, so the first thing the app does and everything after it
+   agree about how a cover comes off */
 #boot.gone{opacity:0;pointer-events:none}
+#boot.gone .boot-in{transform:translateY(-26px) scale(.97);opacity:0}
 .boot-mark{font-size:40px;color:var(--m-or,#c9a227);opacity:.72;
-  text-shadow:0 0 26px rgba(201,162,39,.35);animation:bootpulse 2.6s ease-in-out infinite}
+  text-shadow:0 0 26px rgba(201,162,39,.35);
+  animation:bootpulse 2.6s ease-in-out infinite;will-change:opacity}
 .boot-name{font-family:var(--m-f-mark,serif);font-size:56px;
   color:var(--m-argent-hi,#e8dfc8);letter-spacing:.02em;text-shadow:0 0 40px rgba(201,120,40,.35)}
-.boot-bar{width:236px;height:6px;background:rgba(201,162,39,.14);overflow:hidden;
-  clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
+.boot-bar{position:relative;width:236px;height:6px;background:rgba(201,162,39,.14);
+  overflow:hidden;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
 .boot-bar i{display:block;height:100%;width:0;
-  background:linear-gradient(90deg,var(--m-or-lo,#8a6a20),var(--m-or-hi,#e0c169));transition:width .25s ease}
+  background:linear-gradient(90deg,var(--m-or-lo,#8a6a20),var(--m-or-hi,#e0c169));
+  /* a long, late-settling curve, so a big script's jump glides in instead of
+     snapping — and so two ticks close together read as one movement */
+  transition:width .7s cubic-bezier(.16,.84,.24,1)}
+/* THE ONE THING THAT NEVER STOPS. A gilt sweep running the length of the
+   track on transform alone, so the compositor keeps drawing it even while
+   the main thread is parsing and the bar itself cannot move. */
+.boot-bar u{position:absolute;inset:0;display:block;
+  background:linear-gradient(90deg,transparent,rgba(255,236,190,.5),transparent);
+  transform:translateX(-100%);will-change:transform;
+  animation:bootsweep 1.5s linear infinite}
+@keyframes bootsweep{to{transform:translateX(100%)}}
 .boot-say{font-size:13px;font-style:italic;color:rgba(222,216,200,.46);
   letter-spacing:.04em}
 /* the mark resolves out of a blur and the lozenge rule draws out under it —
@@ -243,7 +300,10 @@ const LOADING = `
 @keyframes bootname{from{opacity:0;letter-spacing:.24em;filter:blur(8px)}to{filter:blur(0)}}
 @keyframes bootrule{from{clip-path:inset(0 50%)}to{clip-path:inset(0 0)}}
 @keyframes bootpulse{0%,100%{opacity:.5}50%{opacity:.95}}
-@media (prefers-reduced-motion:reduce){.boot-mark{animation:none}}
+@media (prefers-reduced-motion:reduce){
+  .boot-mark,.boot-bar u{animation:none}
+  .boot-bar u{opacity:0}
+}
 </style>
 <script>
 (function(){
@@ -251,12 +311,18 @@ const LOADING = `
      seconds tells you nothing and reads as a hang. */
   var SAY = [[0,'setting the table\\u2026'],[.34,'lighting the hearth\\u2026'],
              [.62,'pouring the drink\\u2026'],[.85,'laying out the pieces\\u2026']];
-  var bar, say, seen = 0;
+  var bar, say, shown = 0;
+  /* n and of are BYTES parsed, not files done (see the marker in build.js) */
   window.__boot = function(n, of){
     bar = bar || document.querySelector('#boot .boot-bar i');
     say = say || document.querySelector('#boot .boot-say');
-    var u = n / of; seen = u;
-    if (bar) bar.style.width = (u * 100).toFixed(1) + '%';
+    var u = of ? n / of : 0;
+    /* never backwards, and never quite full until the page really is: the
+       last few per cent belong to the styles resolving and the first paint,
+       which happen after the final script and are not nothing */
+    u = Math.max(shown, Math.min(u, 1) * 0.94);
+    shown = u;
+    if (bar) bar.style.width = (u * 100).toFixed(2) + '%';
     if (say) for (var i = SAY.length - 1; i >= 0; i--)
       if (u >= SAY[i][0]) { say.innerHTML = SAY[i][1]; break; }
   };
@@ -266,9 +332,15 @@ const LOADING = `
   function done(){
     var b = document.getElementById('boot');
     if (!b) return;
+    var i = b.querySelector('.boot-bar i');
+    if (i) i.style.width = '100%';
     requestAnimationFrame(function(){ requestAnimationFrame(function(){
-      b.classList.add('gone');
-      setTimeout(function(){ b.remove(); }, 700);
+      /* a beat on a full bar before it lifts — a bar that vanishes at 94%
+         reads as having given up rather than finished */
+      setTimeout(function(){
+        b.classList.add('gone');
+        setTimeout(function(){ b.remove(); }, 700);
+      }, 180);
     }); });
   }
   if (document.readyState === 'complete') done();

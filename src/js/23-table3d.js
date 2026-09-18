@@ -32,7 +32,26 @@
    it — so the middle of the space is the middle of the table, which a circle
    very much has and a 2900x2000 rectangle did not. Everything that positions
    a piece still works in these units; only what you SEE changed. */
-const TW = 2600, TH = 2600, TILT3D = 22, SLAB_TH = 82;
+/* ══ THE TABLE IS A REAL SIZE, AND TWO UNITS ARE A MILLIMETRE ══
+   grumkata: "everything is too big on the table, a scene takes up most of
+   the room, same with placing any paper... we should be able to hold an 8
+   player campaign no problem".
+
+   The fault was one number. The wood was 2600 units across and modelled as
+   1.2m — a four-foot tavern table — so a combat mat at 1180 units was 545mm
+   and took 45% of it, and a character sheet came out 41cm wide. Nothing
+   could be laid at eight places because the table was never big enough for
+   eight people's things.
+
+   So the table is what a table for eight actually is: 2.2 metres, and 4400
+   units across it. That makes TWO UNITS EXACTLY ONE MILLIMETRE, which is
+   the whole point — every size in this app can now be stated in millimetres
+   and checked against the real object. A4 is 420x594. A 28mm base is 56.
+   The combat mat is 590mm, a quarter of the wood, with room round it for
+   eight players' papers. 27-table-gl.js's TABLE_M is the same 2.2. */
+const MM = 2;                                   /* units per millimetre */
+const TW = 4400, TH = 4400, TILT3D = 22, SLAB_TH = 82;
+const TABLE_M = TW / (MM * 1000);               /* the wood, in metres: 2.2 */
 const CX = TW / 2, CY = TH / 2, RAD = TW / 2;
 /* #vp's own perspective, mirrored here because screenToTable has to invert it.
    These two numbers are also in the stylesheet and in the piece layer; all
@@ -103,9 +122,13 @@ function eyeLocal() {
   const t = TILT * Math.PI / 180, c = Math.cos(t), sn = Math.sin(t);
   return { x: vx - CX, y: vy * c + vz * sn - CY, z: -vy * sn + vz * c };
 }
-/* 27-table-gl.js calls the table 1.2m across, so half of it is what one
-   table radius is worth and RAD units buy that many metres. */
-const TABLE_M_HALF = 0.6;
+/* HALF THE WOOD, IN METRES — AND IT IS THE WOOD'S OWN HALF.
+   This said 0.6 with a comment that the table was 1.2m across. The table
+   became 2.2m and this did not, so every metre in this file bought 3667
+   units instead of 2000 — the seat solve put the eye nearly twice as far
+   out as it asked for, which is what "the camera is still fucked up" was
+   looking at. Derived now, so it cannot be left behind again. */
+const TABLE_M_HALF = TABLE_M / 2;
 const U_PER_M = RAD / TABLE_M_HALF;
 root.__eye = () => { const e = eyeLocal();
   return { back: e.y / U_PER_M, up: e.z / U_PER_M, side: e.x / U_PER_M }; };
@@ -279,7 +302,16 @@ function aimMarks() {
    Model anchors are left alone: a chest is a real object standing on the
    board's normal, it is already the right way up, and tipping its anchor
    would drag the model with it. */
-const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b/;
+/* ── AND THE BOARD NEVER STANDS UP ────────────────────────
+   A standee is a piece you look AT. A scene is the ground the pieces are
+   standing ON — hinging a 1180-unit battlefield up off its near edge as
+   you lean back turns the table into a wall with a map nailed to it,
+   which is what "scenes are standing up" was. The wood does not hinge and
+   neither does anything printed on it: scenes (t3-scene) and the running
+   combat sheet (#combat-prop, a scene that predates the class) lie flat
+   at every angle. The tokens standing on them still stand. */
+const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b/;
+const flatAlways = p => STANDS_ALONE.test(p.className) || p.id === 'combat-prop';
 /* ── A PIECE THAT HAS JUST LANDED ─────────────────────────
    The squash itself is in 12-combat.css; this only fires it, because CSS
    has no selector for "stopped being dragged a moment ago" — :active is
@@ -309,7 +341,7 @@ function placeProp(p) {
     `translate3d(${p.dataset.x || 0}px,${p.dataset.y || 0}px,${p.dataset.z || 8}px) ` +
     `rotate(${p.dataset.r || 0}deg)`;
   const u = camU;
-  if (!u || STANDS_ALONE.test(p.className)) { p.style.transform = base; return; }
+  if (!u || flatAlways(p)) { p.style.transform = base; return; }
   /* hinged about the edge nearest you, so the foot of the card stays where
      it was put and the face comes up to meet the eye */
   const h = p.offsetHeight || 0;
@@ -369,6 +401,11 @@ function fitTable() {
   T.x += (VW - r.width) / 2 - (r.left - vr.left);
   T.y += (VH - (r.height + eh())) / 2 - (r.top - vr.top);
   apply();
+  /* THIS IS WHAT "THE WHOLE TABLE ON SCREEN" ACTUALLY MEASURES TO, so it
+     is also where the wheel stops and the chair starts. Written down every
+     time the table is fitted, because it depends on the size of the window
+     as well as the size of the wood. */
+  ZOOM_MIN = T.k;
 }
 
 /* Fit the camera so a given prop is fully in view, WITHOUT laying the table
@@ -481,7 +518,13 @@ function glideTilt(to) {
    when you leaned too far, so the very gesture that sat you down would,
    a notch later, throw you out. There is no threshold here and nothing
    to be thrown out of. */
-const ZOOM_MIN  = 0.30;    /* the whole table on screen; past here you lean */
+/* THE WHOLE TABLE ON SCREEN; PAST HERE YOU LEAN — and that is a MEASURED
+   zoom, not a constant. At 0.30 (tuned when the wood was 2600 units) a
+   4400-unit table fits at about 0.19, so the floor of the zoom sat above
+   the fit: you could never pull back far enough to see the whole table,
+   and the first notch of wheel-out threw you into the chair instead.
+   fitTable() writes the real one here every time it measures. */
+let ZOOM_MIN = 0.19;
 const TILT_FAR  = 78;      /* how far your head comes down */
 const LENS_NEAR = 2400;
 
@@ -497,8 +540,15 @@ const LENS_NEAR = 2400;
    how far back you are and how high your eye is — and the lens and the
    offset are SOLVED for it. Change these two numbers and you move your
    chair; nothing else needs touching, and whatever comes out is honest. */
-const EYE_BACK = 1.24;     /* metres from the middle of the wood */
-const EYE_UP   = 0.62;     /* metres above the top of it */
+/* ── AND THEY ARE MEASURED FROM THE TABLE, NOT TYPED ──────────
+   These were 1.24 and 0.62, which sat you 0.64m clear of the edge of a
+   1.2m table. The table became 2.2m and these did not move — so the same
+   1.24m put your eye 14cm from the rim, chin on the wood, INSIDE the ring
+   of chairs, which is what "you fucked up the camera and spammed chairs"
+   was looking at. Stated against the table's own radius now, so widening
+   the table moves your chair back with it. */
+const EYE_BACK = TABLE_M / 2 + 0.42; /* a hand's reach clear of the edge */
+const EYE_UP   = 0.70;               /* metres above the top of it */
 
 let lean = 0, seatDrop = 0, camU = 0;
 function viewU() { return lock ? 0 : lean; }
@@ -1099,7 +1149,7 @@ function wire() {
         lean = Math.max(0, lean - 0.11); seatCam(); apply(); return;
       }
     }
-    const floor = lock ? .18 : ZOOM_MIN;
+    const floor = lock ? ZOOM_MIN * 0.6 : ZOOM_MIN;
     const k = Math.min(lock ? 5.2 : 1.8, Math.max(floor, T.k * (inward ? 1.10 : 1 / 1.10)));
     const vr = vp.getBoundingClientRect();
     const px = e.clientX - vr.left, py = e.clientY - vr.top;
@@ -1220,7 +1270,7 @@ function middle() {
            y: Math.round((vp.clientHeight / 2 - T.y) / (T.k * c)) };
 }
 
-root.Table3D = { mount, fit: fitTable, frame, place: placeProp, middle,
+root.Table3D = { mount, fit: fitTable, frame, place: placeProp, middle, MM, TABLE_M,
                  screenToTable, TW, TH, get tiltDeg() { return TILT; }, get k() { return T.k; },
                  lockIn, unlock, get tilt() { return TILT; } };
 

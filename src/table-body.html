@@ -13,7 +13,8 @@
      shadows fall on, and the thing you grab to pan. It is round and almost
      transparent, and the wood you can see through it is the model.
 
-     Square coordinate space (2600 x 2600) with the table inscribed in it, so
+     Square coordinate space (4400 x 4400 — two units to the millimetre, see
+     23-table3d.js) with the table inscribed in it, so
      "the middle" is the middle and a circle has an obvious centre. -->
 <div id="vp">
   <!-- THREE LAYERS, IN DEPTH ORDER, and they have to be three.
@@ -37,11 +38,11 @@
   <div id="tblu"></div>
   <canvas id="tglu"></canvas>
   <div id="tbl">
-  <div class="slab round" style="width:2600px;height:2600px"></div>
+  <div class="slab round" style="width:4400px;height:4400px"></div>
   <!-- the two ends of the horizontal diameter: the GL layer measures these to
        put the model exactly where the plane is, at exactly its size -->
-  <div class="tmark" id="tm-l" data-x="0" data-y="1300" data-z="0"></div>
-  <div class="tmark" id="tm-r" data-x="2600" data-y="1300" data-z="0"></div>
+  <div class="tmark" id="tm-l" data-x="0" data-y="2200" data-z="0"></div>
+  <div class="tmark" id="tm-r" data-x="4400" data-y="2200" data-z="0"></div>
 
   <!-- WHERE DICE LAND, AND NOTHING MORE. grumkata: "the dice tray is
        unneccary" — and it was: a slab of felt furniture bolted to the wood
@@ -89,7 +90,7 @@
        paints in a single pass. Only the grain needs its own, because
        overlay is a different operator from soft-light. -->
   <div id="grade" aria-hidden="true"></div>
-  <div id="grain" aria-hidden="true"></div>
+  <div id="grain" class="m-grain" aria-hidden="true"></div>
 </div>
 
 <div class="hud tl">The Table<em>drag the wood to pan &middot; wheel to zoom &middot; drag a piece to move it &middot; click to select &middot; <b>Alt</b>+wheel to resize &middot; arrows nudge &middot; <b>Del</b> bins &middot; <b>Ctrl+Z</b> undoes</em></div>

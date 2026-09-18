@@ -2,6 +2,10 @@
 
 <canvas id="hall"></canvas>
 <div id="vig"></div>
+<!-- the same grade the table wears (20-shell.css .m-grain, 00-hall.css), so
+     the two 3D rooms are lit and toned by the same hand -->
+<div id="hgrade" aria-hidden="true"></div>
+<div id="hgrain" class="m-grain" aria-hidden="true"></div>
 
 <div id="ui">
   <header id="lintel"><h1>Monarchy</h1><div class="rule"></div>
@@ -11,6 +15,10 @@
     <div class="who">
       <div class="lab">You march as</div>
       <div class="nm unset" id="myname">unnamed</div>
+      <!-- your style and your motto, both empty until you write them:
+           paintArms() hides each one rather than leaving a gap -->
+      <div class="sty" id="mystyle" hidden></div>
+      <div class="mot" id="mymotto" hidden></div>
       <div class="edit">click to blazon or upload</div>
     </div>
   </div>

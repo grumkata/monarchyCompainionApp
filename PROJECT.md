@@ -95,6 +95,7 @@ test/
   handling.test.js         ← picking things up and putting them down
   tincture.test.js         ← the chrome's palette still IS the banners' palette (see 3.13)
   herald.test.js           ← the Bend still lands a table; turns and natural 20s are still cried
+  case.test.js             ← the chest's case, the orders' three controls, the paper on the wood
 
 STYLE.md                  ← Blazon, the look of the app: the rules behind 20-shell.css's tokens
 
@@ -861,6 +862,443 @@ the full reference.** In short:
     the CSS only showed `.show`.
   - Vert moved `#2c6b41` → `#2b6940` so Argent on it passes AA.
 
+### 3.14 The table overhauled: the case, the orders, the paper (2026-09-17)
+
+grumkata: *"the toolbox and all its menus where they currently stand it
+cannot continue... we also need to redo the options entirely and also redo
+how paper is so its actually physically on the table."* Three rebuilds, all
+in `STYLE.md`'s vocabulary.
+
+**THE CASE** (`47-hand.js`, `13-table-ui.css`). The plank of kinds and the
+tray above it are one piece of furniture now: a rail of the six kinds down
+the left (still drawn as real members, still keyed 1-6, still no labels), a
+head that names what you are looking in with a find well and a count, the
+library's groups as pennons, a scrolling grid of tiles big enough to
+recognise with their names under them, and a foot that says what is in your
+hand, what it can still be, and what the pointer will do next.
+
+- **It opens ON something** - the first kind, rather than an empty box.
+- **It collapses to its foot while you carry something**, because a
+  browsing surface standing on the wood you are trying to place on is the
+  old problem in a new shape. Dropping brings it back. (This is also what
+  fixed placing a piece under it - see table-ui.test.js.)
+- `/` goes to the find well; the count never lies; nothing is cut off.
+- The table's own corner (`.hud`) stands down while the chest is open -
+  they share the bottom band.
+
+**THE ORDERS** (`26-scene-setup.js`). The options panel was a checkbox, a
+number spinner and a `<select>` that ran out of its own panel. There are
+three controls now and each is an object: **a yes is a seal** (pressing it
+stamps wax and throws gilt), **a number is a tally** (a lozenge either
+side), **a choice is a row of pennons** (all of them in sight, with what
+the chosen one means written under the label). The same three build the
+make-a-scene warrant and the token maker, so setting a scene up, running it
+and building a counter are the same kind of act. The panel itself is a
+writ: Sable, gilt-framed, dagged along the bottom hem.
+
+**THE PAPER** (`45-papers.js`). A record was a panel bolted to the screen
+edge. It is two things now, and they are the same record: **the sheet** - a
+real `.prop` lying on the wood at your end, which pans, tilts and zooms
+with the table and can be shoved about - and **the reading**, which rises
+off it on a press (a FLIP from the sheet's own rect) to full size where it
+can be written on. Escape, the scrim or the X puts it back down; the other
+mark takes it off the table. `01-sheet.css` is scoped to `.tp` rather than
+`#tp` so both wear the record's own stylesheet.
+
+**THE TWO ROOMS, BLENDED** (`13-hall3d.js`, `27-table-gl.js`, `00-hall.css`).
+
+- The hall's banner shader is a factory (`Hall.cloth`) and the tavern hangs
+  it: the seat banners are real cloth now, with the wind, the weave and the
+  gold leaf, lit by the hearth - `tickFire()` pushes the fire's own colour
+  into them every frame.
+- A seat with no banner of its own wears **your arms** (`Shell.arms()`),
+  not a stranger's rolled coat.
+- **The grade is shared.** The table has been graded since the tavern
+  arrived; the hall had only a vignette. The grain tile is `.m-grain` in
+  `20-shell.css` and the hall has its own `#hgrade`/`#hgrain`, aimed at its
+  own light and sitting under `#ui` so no title is ever grained.
+
+### 3.15 The real size, the shared table, and Blazon in 3D (2026-09-17)
+
+grumkata: *"everything is too big on the table, a scene takes up most of
+the room, same with placing any paper... we should be able to hold an 8
+player campaign no problem"*, *"you are treating the table like its a
+personal space when really its a shared space between players and gm —
+with the final release each user at the table will physically be at the
+table"*, and, for the third time, *"stylize the physical 3d environment"*.
+
+**TWO UNITS ARE ONE MILLIMETRE.** The fault behind every scale complaint
+was one number: the wood was 2600 units across and modelled as 1.2m, a four-foot tavern table. So a combat mat at 1180 units
+was 545mm — 45% of the table — and a character sheet came out 41cm wide.
+The table is now what a table for eight actually is: **2.2 metres, 4400
+units**, which makes two units exactly one millimetre and lets every size
+in the app be stated as the real object:
+
+| Thing | Was | Now |
+|---|---|---|
+| the wood | 2600 units / 1.2 m | 4400 units / 2.2 m |
+| a combat mat | 545 mm, 45% of the table | 590 mm, 27% |
+| a character sheet | 415 mm | **A4** — 210 x 297 mm (420 x 594) |
+| a counter | 81 mm | 42 mm (a heroic-scale standee) |
+| a note | 138 mm | 100 mm |
+| a page | 138 x 157 mm | A5 |
+
+`Table3D.MM` is the conversion and `test/table.test.js` holds the sizes.
+**The seated camera is measured from the table too** — `EYE_BACK` is
+`TABLE_M / 2 + 0.42` and the chairs sit a little further out again. It was
+a typed 1.24m, which was a comfortable 0.64m clear of a 1.2m table's edge
+and 14cm from a 2.2m one: chin on the wood, inside the ring of chairs.
+Two numbers that have to agree and can drift apart is exactly how that
+happens, so `TABLE_M` is now stated once, by 23-table3d.js, and read by
+the room.
+A table saved in the old space is scaled into the new one once, on load
+(`state.units`).
+
+**THE TABLE IS SHARED.** `spaceSeats()` used to deal every chair onto a
+108-degree arc on the far side and keep the near third for "you". That is
+a table with one person at it and an audience opposite. The places go all
+the way round now, evenly. A new table still comes with NO chairs — it
+must SEAT eight, which is not the same as always SHOWING eight, and a
+table nobody has joined ringed with empty furniture is clutter round the
+only thing you are looking at. Which
+seat is yours is a LOCAL choice (`Shell.seat()`, localStorage) rather
+than a property of the table, because the table is the same object for
+everyone at it; each client turns up with its own place at the bottom of
+its own screen. Your record is laid at your place
+(`TableModel.seatSpot()`), turned the way you would read it, and only
+YOUR seat flies your arms — eight chairs all wearing one coat was one
+player's colours printed eight times.
+
+**BLAZON IN 3D** (`09-blazon3d.js`). Every material in both rooms is
+patched through one function, with `onBeforeCompile` so three.js keeps
+its own lighting and a Lambert stays a Lambert:
+
+- **BANDED** — the lit result is quantised into a few steps, so the rooms
+  read as painted rather than rendered. On a perceptual curve, each band
+  sitting at its own middle, mixed back over the original: a straight
+  `floor(L*steps)` put everything under 1/steps at black, which in a fire-
+  lit box is most of the picture, and tore the walls into hard shapes.
+- **RAMPED** — each band is pulled toward a three-colour ramp from the
+  tinctures (Sable-blue shadow, Tenné mid, Or light). The texture's own
+  hue survives; the two rooms just agree about what colour light is.
+- **GILT RIM** — a fresnel edge in Or on anything with a fragment normal,
+  which is a drawn outline without a second pass.
+
+Settings are per surface: scenery is banded but never rimmed, pieces are
+rimmed but barely tinted (a counter's colour is which side it is on), and
+the tabletop gets nine soft bands because it is the one big smooth
+surface carrying a shadow — at the room's settings that shadow became a
+torn silhouette.
+
+---
+
+### 3.16 The coat, the banner, the profile and Settings (2026-09-18)
+
+grumkata: *"rework the banner/profile system also add basic settings in the
+settings system. for custom banners it should be wayyy more customisable."*
+
+**The engine** (`src/js/12-heraldry.js`). The arms record went from ten slots
+to sixteen, and everything new has a default that `norm()` supplies — which
+is what lets a coat saved before any of this exist draw byte-identically
+today (checked in `test/blazon.test.js`).
+
+- **Furs.** Ermine, Ermines, Erminois, Pean, Vair and Potent, as real SVG
+  `<pattern>`s rather than approximated colours. A tincture slot now holds a
+  named tincture, a fur, or a raw hex.
+- **Lines of partition.** Wavy, nebuly, engrailed, invected, indented,
+  dancetty and embattled, applied both to the field's division (`line`, on
+  the nine divisions that are a cut) and separately to the ordinary's edges
+  (`ordLine`, on the nine ordinaries with long straight edges). One
+  `line(ax,ay,bx,by,kind,…)` builds them all: everything is done on the
+  chord, with `u` along it and `p` across, so a wavy per bend and a wavy per
+  fess are the same code. Engrailed and invected are cubics with handles
+  standing `4r/3` off the chord — a half-circle to within a rounding error,
+  and unlike an arc command it has no sweep flag to get backwards.
+- **Charges:** one to six, ranged five ways (as they fall, in pale, in fess,
+  in bend, in orle) instead of one to three in fixed places.
+- **Bordures:** none, plain, or **compony** — which is the same stroke twice,
+  the second one dashed, so the two tinctures alternate round the edge for
+  the price of one attribute.
+- **Hems:** square, rounded, swallow-tailed, dagged, gonfalon, pennon — and
+  the hem is on the record now, so `27-table-gl.js` stopped forcing
+  `hem:'swallow'` and the banner behind your chair is the one you cut.
+- **`blazonText(A)`** writes the coat out as a sentence. The written blazon
+  is the real heraldry and the drawing is one reading of it, so the maker
+  says it back under the preview.
+- **`liveryOf(A)`** answers the `houseTincture()` TODO that `42-shell.js` has
+  been carrying since 3.13 — see `STYLE.md` §7.
+
+**Why furs need a context.** An SVG pattern needs an id; the maker puts
+thirty-odd inline swatch `<svg>`s on one page; a duplicate id resolves to
+whichever the *document* holds first, at whatever scale that one was built
+for. So every drawing calls `ctx(W)`, which mints an id suffix and a tile
+size; fills register themselves on it; `defs(ctx)` writes out only the
+patterns actually asked for. Callers using no furs pay nothing.
+
+**The maker is a workbench now.** The coat has roughly forty times the number
+of forms it had, and one scrolling column of all of them was worse than the
+small version. Five benches behind a row of pennons — Field, Ordinary,
+Charge, Border, Banner — each pennon carrying a tally of how many of its
+choices are off the default; the thing you are making sits beside them the
+whole while, drawn twice (the shield and the banner) with the blazon in words
+underneath. A choice that cannot apply (a line of partition on a chequy
+field) **says so where it would have been**, because an empty space reads as
+the app having lost it. The charge bench has a find well; 47 charges is more
+than a grid.
+
+**The profile** gained a **style** ("of the Red Marches") and a **motto**,
+both optional, both shown in the hall's bottom-left corner only once written,
+both saving as you type.
+
+**One real bug found on the way.** The cloth behind the maker was the field's
+own tincture, with one hand-written exception for Sable. That held only while
+a field could only be one of ten known colours. A field of Ermine made the
+whole screen cream, with cream text on it. `cloth()` in `16-menu.js` now
+dresses it in the livery — which is a colour by construction — with a ceiling
+on how light it is allowed to be.
+
+**Settings** (new `src/js/07-options.js`, loaded before `09-blazon3d.js`).
+Three switches, each describing itself so the screen draws from the store:
+**Stylised 3D** (off / softened / full), **Film grade** (the grade and grain,
+both halves), **Motion** (full / calm). Plus which of the eight chairs is
+yours, a copy of everything as a file, and a two-press *forget everything*
+that only removes keys this app wrote. No dropdown, no checkbox, no radio —
+the same rule the orders panel keeps.
+
+Two traps avoided: `calm` goes on `<html>`, because `tools/scope-css.js`
+merges anything starting `body` into the sheet's own scope and `body.calm`
+would have shipped as `body.at-hall.calm`; and the cel setting cannot
+recompile shaders, so `Blazon3D.strength()` holds each patched material's
+`uCelAmt` and scales it by what that material was *built* with.
+
+**Verified:** new `test/blazon.test.js`, 29 checks, in `npm test`. Most of it
+is the same shape of check repeated — every option in a list must draw
+differently from every other option in that list — because an unwired line,
+hem or arrangement silently falls through to the default and nobody compares
+a nebuly per pale with an engrailed one side by side.
+
+---
+
+### 3.17 Smoothness: the walk into a table, and the loading screen (2026-09-18)
+
+grumkata: *"make the loading screens smoother and transitions smoother as
+sometimes they are laggy especially going from menu to table also add more
+transitions and animations to make ui and menus more lively."*
+
+**Measured before touched, and the first measurement was wrong.** A CPU
+profile of the menu→table beat under the browser tests put 16.6 of 18.7
+seconds in `(program)` with `getProgramInfoLog` beneath it — shader linking.
+That is true of the software renderer the tests use, which compiles shaders
+on the CPU, and it is *not* true of a real machine. Re-measured through
+Electron against this machine's actual GPU (AMD, D3D11), the same flag was
+inside run-to-run noise. Two conclusions, both kept in the code as comments:
+**the browser tests cannot measure this**, and the fix had to be found again.
+
+**What the real numbers said.** Opening a table was ~1.9s with two freezes,
+the worst ~640ms. Of that, the JS was ~320ms and all of it was the same three
+calls: `Table3D.mount`, `TableGL.build`, `TableGL.warm` — the viewport, sixty
+thousand triangles of tavern, and its shaders. **None of those read
+`TableModel`**: the room is the same room whichever table you open.
+
+**So the room is raised before anyone asks for one.** `TableBoot.warm()`
+(28-table-boot.js) does the three heavy calls; 42-shell.js asks for it on an
+idle callback 1.4s after the hall settles. Walking into a table is then just
+`TableModel.load` + `TableProps.mount` + `Toolbox.mount` — about a
+millisecond and a half.
+
+| walking into a table | before | after |
+|---|---|---|
+| openTable resolves | 1931 / 1916 ms | 1471 / 1466 ms |
+| stutters over 60ms | 2 | 1 |
+| total time not drawing | 1024 / 729 ms | 238 / 215 ms |
+| worst single freeze | 647 / 638 ms | 238 / 215 ms |
+
+The hall pays nothing for it: 157 frames in 2.6s, zero stutters, worst frame
+18ms, with the room going up behind it.
+
+**What did NOT work, recorded so it is not tried again.** The first attempt
+ran the boot a piece per frame under the cloth, reasoning that the browser
+cannot draw during a synchronous call. On the real GPU it was **worse** —
+981ms frozen against 449ms, five stutters instead of two — because each piece
+still blocked and the frames between them only added waiting. Moving work is
+worth more than slicing it.
+
+**The cover now waits for the work.** `Herald.wipe`'s hold was a flat 300ms,
+so when `mid` took longer the cloth had already been told to lift and
+uncovered onto a half-built room. `mid` may now return a promise; the cover
+holds for at least the hold and at most a 9s ceiling. `swap()` returns one,
+and fits the camera *while still covered*.
+
+**`Blazon3D.tune()`** turns three.js's `checkShaderErrors` off, which stops
+each `linkProgram` being dragged back onto the watched frame by the
+`getProgramInfoLog` on the next line. It measured as noise on this GPU and
+matters where linking is slow; because the cost is that a broken shader
+fails silently, it is a switch — `monarchy.shaderlog` in localStorage or
+`?shaderlog` on the URL brings the checks back.
+
+**The loading screen.** Its marker counted *files*, so every script was worth
+the same — and 00-three.js is a thousand times 29-role.js. The bar ticked
+evenly and then sat still for two seconds, which is the exact shape of a
+hang. It is weighted by **bytes parsed** now, so its speed matches the pause:
+the steps run 0.2% → 14.4% → ... → 59.6% → 76.3% where the big packs are. It
+also gained the one thing that can move while the main thread is blocked — a
+gilt sweep on `transform` alone, which the compositor keeps drawing through
+the whole parse — and it lifts like the Bend's cloth instead of just fading.
+
+**And more life in the menus.** Settings blocks and their rows deal in, the
+maker's pennons deal and its bench turns when you step to another one, the
+coat pops in, and swatches, chips, pennons and roll rows lift under the
+pointer. All of it is transform and opacity only, and all of it is gated on
+`#screenbody.fresh` — a class 16-menu.js sets when a screen is genuinely
+raised and leaves off when it merely repaints, without which the whole bench
+would fly in again every time you pressed a tincture. Settings → Motion →
+Calm switches the lot off.
+
+**Verified:** new `test/smooth.test.js`, 16 checks, in `npm test` — including
+that the camera still fits and seats identically, since raising the room
+early means `fitTable()` now runs against a `display:none` viewport, which is
+the exact shape of the bug that has broken this camera twice.
+
+---
+
+### 3.18 Undoing 3.17: what that change actually cost (2026-09-18)
+
+grumkata, on 3.17 as shipped: *"its even laggier and less smooth and animated
+then before the transition when entering a table is laggy and basically
+skipped because of the lag same for most transitions."*
+
+He was right, and 3.17's measurements were not wrong so much as **aimed at
+the wrong case**. Every number in that entry was taken on a table opened
+AFTER the room had been raised. Nobody opens a table that way. You load the
+app, you take a banner down, you pick a table — and on a slower machine that
+is over before the room has gone up. **The cold path was never measured**,
+and the cold path is what everybody actually walks.
+
+Four things in 3.17 made it worse, all of them on that path:
+
+1. **`boot()` called `warm()`**, so linking every shader in the room and
+   drawing one frame of it — the single most expensive thing in the app — was
+   added to the click, a bill the old code never charged. `raiseRoom(false)`
+   now leaves the compiling for the idle path.
+2. **`swap()` fitted the camera inside the Bend's `mid`**, where the cover's
+   animation is stopped for the whole of it. `fitTable()` walks every prop on
+   the wood: 152ms of frozen cloth. Back to a timeout.
+3. **`requestIdleCallback(warm, { timeout: 2600 })`** was the wrong tool.
+   That timeout does not mean "when idle, or give up", it means "fire ANYWAY
+   after this long" — so on a machine that is never idle it is a guaranteed
+   300ms block dropped at an arbitrary moment, and the arbitrary moment was
+   often the transition it existed to protect. It now waits for two frames
+   that actually came in under 60ms with nothing on screen and the pointer
+   off the banners, and settles for whatever is going after four seconds of
+   WALL TIME — the first version of that fallback counted frames, which on a
+   machine drawing one every 200ms is forty-eight seconds, so the machines
+   that most needed it were the only ones that never got it.
+4. **The room's render loop ran in the hall.** `TableGL.build()` ends with
+   `requestAnimationFrame(frame)`, so from a second after launch the app was
+   measuring and drawing a tavern nobody could see, in the frames the hall's
+   own screens needed. One `at-table` check at the top of `frame()`; measured
+   after: zero draws in three seconds of standing in the hall.
+
+**And the thing 3.17 should have found and did not.** The Bend's cover was
+the WebGL bend, drawn a frame at a time from `requestAnimationFrame` — which
+runs on the main thread. A cover whose whole job is to hide the busiest
+moment in the app cannot be driven by the thread that is busy: it freezes for
+as long as the work takes and then arrives at its end state in one jump,
+because every frame it owed came due at once. That is not a slow animation,
+it is a **cut**, which is exactly the word grumkata used. The cover is the CSS
+veil now (`.hr-veil`, one `transform` keyframe, `will-change: transform`) on
+every machine, not just ones without WebGL. The shader stays for the Cry,
+which fires when nothing else is happening.
+
+**A third measurement failure, recorded because it is the pattern.** An
+attempt to prove the CSS veil composited — block the main thread for 400ms,
+count offscreen `paint` events and their distinct pixels — reported it
+frozen. That is an artifact: Electron's offscreen rendering produces frames
+through the main thread, so it cannot show compositor-only animation by
+construction. The software renderer lied about shader linking in 3.17, the
+warm-path-only benchmark lied about the transition, and this lied about
+compositing. **Three for three.** The lesson is not "measure more", it is
+that a harness has to be shown capable of detecting the thing before its
+answer means anything.
+
+**Settings → Motion gained Swift**, between Full and Calm: the same
+transitions at about 55% of their length. That is not a workaround dressed as
+a feature — a shorter animation has fewer frames to drop, so on a machine
+that drops frames it is far likelier to play the whole way through instead of
+freezing and jumping. It scales in one place: `Options.pace()` for the
+JavaScript durations (the Bend's three phases, the hall's cloth), and a
+re-declaration of the `--t-*` tokens under `html.swift` for every CSS
+transition in the app at once.
+
+---
+
+### 3.19 The cover is not part of what it covers (2026-09-18)
+
+grumkata, after two failed attempts at this: *"do you even know what a
+transition is its the loading screen between opening a table and getting to
+the table its laggy because your putting them on the same layer so when the
+table lags the loading screen lags even though the reason it exsists is to
+mask the lag that is the problem remove the motion setteings and the player
+chair settinsg and actually fix the loading screens and transitions."*
+
+That is the bug, stated better than any measurement in 3.17 or 3.18 managed.
+**A loading screen that shares a rendering fate with the thing it is loading
+is not a loading screen. It is a second symptom.** Both earlier attempts
+treated the work — move it earlier, slice it smaller, shorten the animation
+— and none of them touched the actual fault, which is that the cover was
+being drawn by the same blocked main thread as the table underneath it.
+
+**Three things fix it, and they are all about separation.**
+
+1. **The cover gets its own compositor layer, with a wall round it.**
+   `#herald { contain: layout paint style; will-change: transform; }`.
+   `paint` containment means nothing outside can invalidate what is inside —
+   so the table building itself underneath, adding props, resizing canvases
+   and rasterising sixty thousand triangles, cannot dirty one pixel of the
+   cloth on top. `will-change` asks for the layer outright instead of hoping
+   a heuristic offers one. The boot screen gets the same treatment.
+2. **The cover is PAINTED before the work starts.** Adding a class does not
+   put anything on screen; the pixels change at the next frame, and `mid`
+   blocks the thread that would have drawn it. So `add('carded')` followed by
+   `mid()` on the next line meant the card was never once painted before the
+   freeze — the loading screen arrived at the END of the load. There are two
+   animation frames between them now (`rafTwice`): one for style and layout,
+   one that is actually composited.
+3. **Something on it keeps moving.** A gilt sweep under the title card, on
+   `transform` alone, which the compositor runs on its own thread and keeps
+   running while the main thread is blocked solid. Same trick as the boot
+   screen's bar. On this side of a cover, "waiting" and "dead" are the only
+   two things a player can tell apart.
+
+**Removed, at his instruction:** the Motion setting (Full / Swift / Calm) and
+the seat picker. The Motion setting was an apology dressed as a feature — a
+speed dial on a broken animation, asking the player to manage a problem that
+was the app's to solve. `prefers-reduced-motion` is still honoured, because
+that is a preference the player has already expressed to their own system.
+The seat is still `Shell.seat()`; it simply has no screen.
+
+**And the measurement discipline that was missing the whole time.** Every
+wrong turn on this problem came from a harness that could only ever say yes:
+
+| harness | what it claimed | why it was incapable |
+|---|---|---|
+| software renderer (3.17) | 16.6s of 18.7 in shader linking | compiles shaders on the CPU; cannot defer anything |
+| the benchmark (3.17) | 3× smoother | only ever opened a table that was already warm |
+| offscreen Electron (3.18) | the cover is frozen | produces frames *through* the main thread |
+| JPEG frame hashing (3.19) | the cover keeps moving | counted re-encoding noise as movement; "passed" with no cover on screen |
+
+`test/smooth.test.js` therefore ends with a test that **carries its own
+control**. It blocks the main thread for 600ms twice — once with nothing
+composited on screen, once with the cover up — and reads lossless frames from
+the browser compositor, which keeps producing them when the page cannot. The
+control must FREEZE (1 distinct frame) or the positive result is not allowed
+to pass. Measured: control 1 frame, cover 9. The film grade is switched off
+for both halves, because the hall's grain is itself a composited animation
+and would otherwise be the thing reported as movement.
+
+A harness is worth nothing until it has been shown able to report the
+failure. That rule is now at the top of that file.
+
 ---
 
 ## 4. Game system summary (content, not code)
@@ -1049,6 +1487,12 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-18 | **The cover is not part of what it covers** (3.19). grumkata, after two failed attempts: the loading screen *"is laggy because your putting them on the same layer so when the table lags the loading screen lags even though the reason it exsists is to mask the lag"*. Exactly right, and neither earlier attempt had touched it — both treated the work instead of the coupling.<br>- **`#herald` now has `contain: layout paint style` and its own compositor layer**, so the table building underneath cannot dirty a pixel of the cloth on top. Same for the boot screen.<br>- **The cover is painted before the work begins** — two animation frames between raising the card and calling `mid()`, because adding a class paints nothing and `mid` blocks the thread that would have drawn it. The loading screen used to arrive at the end of the load.<br>- **A gilt sweep under the title card**, on `transform` alone, so something is visibly alive while the thread is dead.<br>- **Removed at his instruction:** the Motion setting and the seat picker. A speed dial on a broken animation is an apology, not a fix; `prefers-reduced-motion` is still honoured.<br>- **The test now carries its own control:** block the thread 600ms with and without the cover, read lossless frames from the browser compositor, and refuse to pass unless the control froze. Measured 1 frame against 9. Four harnesses in a row had told me what I wanted to hear — a software renderer, a warm-only benchmark, an offscreen window, and JPEG noise. |
+| 2026-09-18 | **Undoing 3.17: what that change actually cost** (3.18). grumkata: 3.17 shipped *"even laggier and less smooth"*, with the table transition *"basically skipped"*. He was right — every number in 3.17 was taken on a table opened AFTER the room was raised, and **nobody opens a table that way**. On the cold path the change had added the shader compile to the click, moved a 152ms `fitTable()` inside the Bend's frozen `mid`, scheduled the pre-warm with a `requestIdleCallback` timeout that fires *anyway* (often mid-transition), and left the tavern's render loop running behind the hall. All four undone or fixed; the room now draws zero times while you are in the hall.<br>- **And the thing 3.17 missed:** the cover was a WebGL bend driven by `requestAnimationFrame` — i.e. by the main thread, the one thing guaranteed to be blocked at the moment a cover exists to hide. It is the CSS veil now (one `transform` keyframe, `will-change`), on every machine. An animation that freezes and then arrives is a cut, not a slow animation.<br>- **Settings → Motion gained Swift**, between Full and Calm: the same transitions at ~55% length, scaled from one number (`Options.pace()` plus the `--t-*` tokens under `html.swift`). Fewer frames to drop is fewer frames to miss.<br>- **Third measurement failure in a row, recorded as a pattern:** the software renderer lied about shader linking, the warm-only benchmark lied about the transition, and offscreen Electron lied about compositing (it produces frames through the main thread, so it cannot detect compositor animation at all). A harness has to be shown capable of detecting the thing before its answer means anything. |
+| 2026-09-18 | **Smoothness: the walk into a table, and the loading screen** (3.17).<br>- **Measured first, and the first measurement lied.** A profile under the browser tests blamed shader linking (16.6s of 18.7 in `(program)`); re-measured through Electron on the real GPU that flag was inside noise. Both facts are now comments in the code — the software renderer cannot measure this.<br>- **The room is raised before anyone asks for a table.** `Table3D.mount` + `TableGL.build` + `TableGL.warm` do not read `TableModel`, so 42-shell.js asks for them on an idle callback while you are still in the hall. Opening a table is then ~1.5ms of work: **worst freeze 640ms → 225ms, total not-drawing 870ms → 225ms**, with the hall still at 60fps and zero stutters while it happens.<br>- **What did not work, kept in the file so it is not retried:** running the boot a piece per frame was *worse* on real hardware (981ms frozen vs 449ms). Moving work beats slicing it.<br>- **The Bend's cover waits for the work** instead of a flat 300ms, so it no longer uncovers a half-built room; the camera is fitted while still covered.<br>- **The loading bar is weighted by bytes parsed**, not by files counted, so its speed matches the pause instead of ticking evenly and then freezing; it gained a compositor-only gilt sweep that keeps moving through the parse, and it lifts like the Bend rather than fading.<br>- **More life in the menus:** settings blocks and rows deal in, the maker's bench turns, swatches and pennons lift — transform and opacity only, gated on `#screenbody.fresh` so nothing re-animates on a repaint, and all of it off under Motion → Calm.<br>- New `test/smooth.test.js` (16 checks) in `npm test`, including that the camera still fits and seats identically now that `fitTable()` first runs against a hidden viewport. |
+| 2026-09-18 | **The coat, the banner, the profile and Settings** (3.16).<br>- **The arms record went from 10 slots to 16:** six **furs** as real SVG patterns, eight **lines of partition** on the field's division *and* separately on the ordinary's edges, one to six charges ranged five ways, a **compony** bordure, and six cuts of **hem** — which `27-table-gl.js` now takes off the record instead of forcing `swallow`. `norm()` supplies every new default, so a coat saved before any of this draws byte-identically.<br>- **`liveryOf()` closes the `houseTincture()` TODO** left open since 3.13, and the maker has an explicit livery slot that outranks it.<br>- **`blazonText()`** writes the coat out as a sentence under the preview.<br>- **The maker is a workbench:** five benches behind tallied pennons, the shield and the banner drawn side by side, a find well for the 47 charges, and a choice that cannot apply says so where it would have been.<br>- **The profile** gained a style and a motto, shown in the hall's corner once written.<br>- **Settings** (new `07-options.js`): stylised 3D off/softened/full, film grade, motion full/calm, which chair is yours, a copy of everything, and a two-press forget. No dropdown or checkbox anywhere.<br>- **Bug found on the way:** the cloth behind the maker was the field's raw tincture, so a field of Ermine made the screen cream with cream text on it; it is the livery with a lightness ceiling now.<br>- New `test/blazon.test.js` (29 checks) in `npm test`. |
+| 2026-09-17 | **The real size, the shared table, and Blazon in 3D** (3.15).<br>- **Scale:** the wood is 4400 units for a 2.2m table, so two units are one millimetre and every size is the real object — a combat mat is 27% of the table instead of 45%, a character sheet is A4, a counter is 42mm. Old tables are migrated on load.<br>- **Shared:** seats go all the way round (a new table still starts with none), which place is yours is a local choice, your record lies at your place turned the way you read it, and only your own seat flies your arms.<br>- **3D:** new `09-blazon3d.js` patches every material in both rooms — banded light on a perceptual curve, a three-colour tincture ramp, and a gilt fresnel rim — so the tavern and the hall are drawn the way the UI is.<br>- 5 new checks in `test/table.test.js`; full suite green. |
+| 2026-09-17 | **The table overhauled: the case, the orders, the paper, and the two rooms blended** (3.14).<br>- **The case:** the toolbox's plank and tray became one piece of furniture - kind rail, head with find and count, group pennons, a grid of tiles with names, and a foot that says what is in your hand. It opens on a kind and collapses to its foot while you carry something, which is also what fixed placing a piece under it.<br>- **The orders:** no `<select>`, no checkbox, no spinner anywhere - a yes is a wax seal, a number is a tally between two lozenges, a choice is a row of pennons. The same three controls build the make-a-scene warrant and the token maker; the panel is a dagged writ.<br>- **The paper:** a record is a real prop lying on the wood that rises to a reading on a press (FLIP from its own rect) and goes back down where it came from. `01-sheet.css` is now scoped to `.tp`, so the sheet and the reading share it.<br>- **The 3D:** `Hall.cloth` is a factory and the tavern's seat banners are the hall's own cloth, lit by the hearth; a seat with no banner wears your arms; and the hall gained the table's film grade (shared grain tile).<br>- **New `test/case.test.js`** (16 checks) in `npm test`; full suite 145 green. |
 | 2026-09-17 | **Blazon, second pass: motion, shaders, and out of the box** (3.13; `STYLE.md` §6–6¾).<br>• **The Herald** (new `55-herald.js`, loaded before `42-shell.js`): **the Bend**, a WebGL shader wipe between hall and table under which the table now boots; **the Cry**, P5-style proclamations for rounds, phases and natural 20s/1s, hooked by `MutationObserver` so `32-combat-app.js` and `39-dice.js` are untouched; and **gilt bursts** off seals.<br>• **Hall shaders:** banner gold leaf, weave and hover sweep, plus GPU gilt dust.<br>• **Layout:** swallowtail cloth fall, full-field bend, drifting device, vertical tincture name, bleeding title ribbons, stepped rolls, name scroll, embattled chat hanging, lozengy dice, wax-seal Roll, and a named HUD corner.<br>• **Arrivals:** the lintel resolves in and glints every 9 s, plates are hung in turn, chat lines slide in, totals are stamped, toolbox slots are dealt, and the loading screen matches the lintel.<br>• **One bug found in my own watcher and fixed:** the visibility observer nulled the turn state its sibling had just read, so the first End Turn after placing a fight was silent.<br>• **New `test/herald.test.js`** (10 checks), now in `npm test`.<br>**Verified:** full `npm test` green; every new moment photographed mid-motion through the offscreen gallery. |
 | 2026-09-17 | **Blazon: one look for the whole app** (see 3.13 and the new `STYLE.md`). **Problem:** the app was four visual dialects, no web font had ever been loaded (205 rules asking for Cinzel or Crimson Text all got Times New Roman), and there were ~460 unique hex literals, with at least three different golds. **The system:** heraldry used as a graphic system.<br>• **Palette:** `20-shell.css` gains `--m-*` tokens that are `12-heraldry.js`'s `TINCT` exactly, and new `test/tincture.test.js` (now in `npm test`) keeps them identical and holds Argent-on-colour to 4.5:1. Its first run caught Vert at 4.49, so Vert moved two steps darker.<br>• **Type:** `@font-face` aliases give every existing family name a real face on any Windows 10/11 machine today, and the bundled woff2 files are used once `tools/fetch-fonts.js` has been run (not run here: downloading needs the owner's go-ahead). `build.js` copies `src/assets/fonts` like the textures, and the loading screen now uses the tokens.<br>• **Restyled onto the tokens:** the table's chat dock and dice roller (from flat parchment to Sable chrome), HUD buttons, the back-to-hall pennon, papers, toasts (both halves), the hotbar name tag (now a pennon) and selected slot, the GM board's cap and switches, the scene dialog's buttons, and the selection ring. In the hall: the lintel (lozenge rule), plates (counterchanged in their own banner's tincture via a per-plate `--house` from `16-menu.js`), illuminated `h2` initials, the bend strip, Back, fields, `.lk`, the roll, flag-maker "on" states and the update card. In the record: tabs, title rule, doors and the scribe bar.<br>• **Mat tokens re-pointed:** `12-combat.css` sends enemy → Gules, ally → Azure and its fonts → the shared voices.<br>• **Livery:** `42-shell.js` gains `Shell.livery()`, which dyes the chrome's accent from the player's arms. Choosing the tincture, `houseTincture()`, is left as a TODO for grumkata.<br>• **Bugs fixed on the way:** two corrupted token lines in `12-combat.css`, `.to-hall`'s missing padding, and papers toasts that could never show.<br>**Verified:** `npm test` all green (tincture 17, geometry, 23 + 60 + 11 + 25). All 15 screens were photographed before and after through an offscreen-rendered Electron window: `tools/shot.js`'s hidden window never advances the Web Animations clock, so the hall's cloth-drop was frozen at frame 0 in every capture of a hall view. |
 | 2026-09-15 | **In-app update UI**, on the hall rather than in Settings — grumkata's correction after a first pass put it there. `electron/preload.js` (new: this app had no preload before) exposes `window.AppUpdate` over `contextBridge`, `electron/updater.js` now pushes a status object on every electron-updater event, and `#update-card` in `menu-body.html` shows itself only for `state:'downloaded'` — a small top-right popup with "Restart & update" (calls `quitAndInstall()`) and "Later" (dismisses for the session; the update installs on the next quit regardless). Verified with a fake preload standing in for the real one, so a `'downloaded'` push could be fired without an actual GitHub release to test against — screenshotted showing correctly on the bare hall, clear of the banners and `#arms`. Full `npm test` (119/119) green throughout. See 3.12. |

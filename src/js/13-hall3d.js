@@ -33,13 +33,18 @@ function texture(dataURL, rep){
   return t;
 }
 let MAT;
+/* BLAZON IN 3D — the same banding, ramp and gilt rim the tavern wears
+   (09-blazon3d.js), on the hall's own light: a cold night with torches
+   down it rather than a fire in a box. This is what makes the two rooms
+   look like one app. */
+const B3 = (m, o) => (root.Blazon3D ? root.Blazon3D.cel(m, o) : m);
 function materials(){
   const C = root.CASTLE;
   MAT = {
-    Walls: new THREE.MeshStandardMaterial({ map:texture(C.tex.Walls), color:0x585a5e,
-             roughness:.97, metalness:.02 }),
-    Iron:  new THREE.MeshStandardMaterial({ map:texture(C.tex.Iron), color:0x6a6a70,
-             roughness:.55, metalness:.75 }),
+    Walls: B3(new THREE.MeshStandardMaterial({ map:texture(C.tex.Walls), color:0x585a5e,
+             roughness:.97, metalness:.02 }), { room:'hall', steps:6, tint:0.30, hard:0.5, rim:0.10 }),
+    Iron:  B3(new THREE.MeshStandardMaterial({ map:texture(C.tex.Iron), color:0x6a6a70,
+             roughness:.55, metalness:.75 }), { room:'hall', steps:6, tint:0.22, hard:0.5, rim:0.24 }),
     Glass_window: new THREE.MeshStandardMaterial({ map:texture(C.tex.Window_1),
              color:0xffbe74, roughness:.35, emissive:0xff9a38, emissiveIntensity:.45 })
   };
@@ -119,8 +124,8 @@ function hall(){
      flagstones at this scale and takes the torchlight properly */
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(48, 90),
-    new THREE.MeshStandardMaterial({ map:texture(root.CASTLE.tex.Walls, [12, 22]),
-      color:0x322e27, roughness:1 }));
+    B3(new THREE.MeshStandardMaterial({ map:texture(root.CASTLE.tex.Walls, [12, 22]),
+      color:0x322e27, roughness:1 }), { room:'hall', steps:6, tint:0.30, hard:0.5, rim:0 }));
   floor.rotation.x = -R; floor.position.z = -18;
   V.scene.add(floor);
 
@@ -284,7 +289,7 @@ void main(){
 const FS = `
 uniform sampler2D map; uniform vec3 lightPos; uniform vec3 lightCol;
 uniform vec3 ambCol; uniform float lit; uniform float t; uniform float ph;
-uniform float sweep;
+uniform float sweep; uniform float fogK; uniform vec3 fogCol;
 varying vec2 vUv; varying vec3 vN; varying float vW; varying float vD;
 void main(){
   vec4 c = texture2D(map, vUv);
@@ -311,9 +316,38 @@ void main(){
   col += vec3(0.85, 0.9, 1.0) * lightCol * silver * (spec * 0.35 + band * 0.22 + hot * 0.5);
   col += leaf * hot * 0.17;
 
-  float f = 1.0 - exp(-0.052*0.052*vD*vD);     /* into the dark with everything else */
-  gl_FragColor = vec4(mix(col, vec3(0.02,0.028,0.045), f), 1.0);
+  float f = 1.0 - exp(-fogK*fogK*vD*vD);       /* into the dark with everything else */
+  gl_FragColor = vec4(mix(col, fogCol, f), 1.0);
 }`;
+
+/* ══ THE SAME CLOTH, ANYWHERE ══════════════════════════════════
+   The tavern hangs a banner behind every seat, and they were flat planes
+   in a Standard material while the hall's were real cloth with a wind in
+   them and gold leaf that catches the light. Two answers to one question,
+   in the two rooms this app has.
+
+   So the material is a factory now, and 27-table-gl.js hangs the HALL's
+   cloth in the tavern: same wave, same weave, same leaf, lit by the fire
+   instead of by a torch. Everything that differs between the two rooms is
+   a uniform — the light's colour and direction, the ambient, how quickly
+   the dark takes it (`fogK`, because the tavern is measured in metres and
+   the hall in tens of them).                                            */
+function cloth(o){
+  o = o || {};
+  return new THREE.ShaderMaterial({
+    vertexShader:VS, fragmentShader:FS, side:THREE.DoubleSide,
+    transparent:!!o.transparent,
+    uniforms:{
+      t:{value:0}, amp:{value:o.amp == null ? 0.12 : o.amp}, ph:{value:o.ph || 0},
+      map:{value:o.map || null}, lit:{value:0}, sweep:{value:0},
+      lightPos:{value:o.lightPos || new THREE.Vector3(-.6,.55,1)},
+      lightCol:{value:new THREE.Color(o.lightCol == null ? 0xffb066 : o.lightCol)},
+      ambCol:{value:new THREE.Color(o.ambCol == null ? 0x141b2b : o.ambCol)},
+      fogK:{value:o.fogK == null ? 0.052 : o.fogK},
+      fogCol:{value:new THREE.Color(o.fogCol == null ? 0x050708 : o.fogCol)}
+    }
+  });
+}
 
 function banner(def, i, n){
   const W = def.w || L.bw, H = (def.h || 2.5) * (L.built ? 0.80 : 1);
@@ -332,7 +366,8 @@ function banner(def, i, n){
          it is simply not lit */
       lightCol:{value:new THREE.Color(def.dead ? 0x5a4c3c : 0xffb066)},
       ambCol:{value:new THREE.Color(def.dead ? 0x0b0e16 : 0x141b2b)}, lit:{value:0},
-      sweep:{value:0} }
+      sweep:{value:0}, fogK:{value:0.052},
+      fogCol:{value:new THREE.Color(0x050708)} }
   });
   const m = new THREE.Mesh(geo, mat);
   m.position.set(-L.spread/2 + L.spread*(i/(n-1)),
@@ -413,6 +448,7 @@ function init(canvas, defs, onPick){
   V.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   V.onPick = onPick;
   V.renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+  if (window.Blazon3D && window.Blazon3D.tune) window.Blazon3D.tune(V.renderer);
   V.renderer.setPixelRatio(Math.min(devicePixelRatio||1, 1.75));
   V.renderer.outputEncoding = THREE.sRGBEncoding;
   V.scene = new THREE.Scene();
@@ -531,5 +567,5 @@ function lock(on){
 /* the cloth falls over the hall and covers it completely, so once the fall has
    finished there is nothing to draw until it lifts again */
 function sleep(on){ V.asleep = !!on; }
-root.Hall = { init, project, hot, setTexture, lock, sleep };
+root.Hall = { init, project, hot, setTexture, lock, sleep, cloth };
 })(window);

@@ -29,10 +29,20 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     await pg.evaluate(() => window.Herald.busy
       && document.body.classList.contains('at-hall')
       && document.getElementById('herald').classList.contains('wiping')));
-  await wait(560);
+  /* the switch happens when the cloth is across, which is a timer and not
+     a frame — but on a busy page that timer lands late, so wait for it */
   T('under the cloth, the table is raised and its name is on the card',
-    await pg.evaluate(() => document.body.classList.contains('at-table')
-      && document.querySelector('#herald .hr-card b').textContent === 'The Ashen Road'));
+    await pg.evaluate(() => new Promise(r => {
+      const t0 = Date.now();
+      const tick = () => {
+        const card = document.querySelector('#herald .hr-card b');
+        if (document.body.classList.contains('at-table') && card
+            && card.textContent === 'The Ashen Road') return r(true);
+        if (Date.now() - t0 > 8000) return r(false);
+        setTimeout(tick, 60);
+      };
+      tick();
+    })));
   T('and the corner of the table says which table it is', await pg.evaluate(() =>
     /The Ashen Road/.test(document.querySelector('.hud.tl').textContent)));
   /* the hold only starts once the table has finished booting — that is what
@@ -57,18 +67,31 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     const t = document.querySelector('#herald .hr-band .hr-title');
     return t ? t.textContent : '';
   });
+  /* A CRY IS ANNOUNCED WHEN THE PAGE GETS ROUND TO IT. Every wait in here
+     is on the words appearing, not on a number of milliseconds — under
+     software GL this page is slow enough that any fixed wait is a coin
+     toss, and a flaky test is worse than no test. */
+  const criesOut = re => pg.evaluate(src => new Promise(r => {
+    const rx = new RegExp(src, 'i');
+    const t0 = Date.now();
+    const tick = () => {
+      const t = document.querySelector('#herald .hr-band .hr-title');
+      if (t && rx.test(t.textContent)) return r(true);
+      if (Date.now() - t0 > 8000) return r(false);
+      setTimeout(tick, 80);
+    };
+    tick();
+  }), re);
   T('putting a fight down is not a turn — nothing is cried', (await band()) === '');
   await pg.evaluate(() => document.getElementById('endturn').click());
-  await wait(200);
-  T('End Turn cries whose turn it now is', /Allies Act/i.test(await band()));
+  T('End Turn cries whose turn it now is', await criesOut('Allies Act'));
   await wait(1900);
   await pg.evaluate(() => { document.getElementById('endturn').click();
                             document.getElementById('endturn').click(); });
-  await wait(200);
-  const first = await band();
-  T('and turning the round cries the round', /Enemies Act|Round 02/i.test(first));
-  await wait(1700);
-  T('one cry waits for another rather than talking over it', /Round 02/i.test(await band()));
+  T('and turning the round cries the round', await criesOut('Enemies Act|Round 02'));
+  /* the second cry starts when the first has finished, and how long that
+     takes depends on how busy the page is — wait for it, not for a clock */
+  T('one cry waits for another rather than talking over it', await criesOut('Round 02'));
   await wait(1800);
 
   /* ══ THE CRY, ON THE DICE ══════════════════════════════════ */
@@ -78,8 +101,7 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     d.innerHTML = '<b>GM</b><span class="rdice"><i class="hi">20</i></span><span class="rtot">20</span>';
     document.getElementById('chat-body').appendChild(d);
   });
-  await wait(200);
-  T('a natural twenty in the log is cried as Fortune', /Fortune/i.test(await band()));
+  T('a natural twenty in the log is cried as Fortune', await criesOut('Fortune'));
 
   console.log('\n' + ok.length + ' passed, ' + bad.length + ' failed');
   await b.close();

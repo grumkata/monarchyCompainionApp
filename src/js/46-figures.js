@@ -374,13 +374,17 @@ function sizeOf(o, v) {
     const d = C && C.SCENES[o.scene];
     return d && d.size ? { w: d.size.w, h: d.size.h } : { w: 1000, h: 700 };
   }
-  /* A COUNTER IS A PIECE YOU PICK UP. At 150x182 on a table 2600 across it
-     was a thumbnail — grumkata: "tokens dont look 3d", and a thing too small
-     to have a silhouette cannot look like anything. This is roughly a
-     miniature's real footprint against a table this size. */
-  if (k === 'token') return { w: (v && v.entKind === 'form') ? 330 : 176, h: 212 };
-  if (k === 'note')  return { w: 300, h: 210 };
-  if (k === 'page')  return { w: 300, h: 340 };
+  /* ── IN MILLIMETRES, BECAUSE THE TABLE IS A REAL SIZE ──────
+     Two units are one millimetre (23-table3d.js). Every size below is the
+     real object: a counter is a 55mm standee on a 40mm base — heroic scale,
+     bigger than a 28mm mini so it still has a silhouette across a 2.2m
+     table, but a PIECE rather than the 81mm slab it used to be; a formation
+     is a 90mm block; a note is a 100mm square of paper; a page is A5. */
+  const mm = 2;
+  if (k === 'token') return (v && v.entKind === 'form')
+    ? { w: 90 * mm, h: 70 * mm } : { w: 42 * mm, h: 58 * mm };
+  if (k === 'note')  return { w: 100 * mm, h: 100 * mm };
+  if (k === 'page')  return { w: 148 * mm, h: 210 * mm };
 
   /* ── A PICTURE ARRIVES AT ITS OWN PROPORTIONS ──────────────
      "artwork not autofitting to the image". 49-pictures.js decoded it on the
@@ -388,9 +392,9 @@ function sizeOf(o, v) {
      that shape — not a 420x320 slot that every picture is squeezed into. */
   if (k === 'art') {
     const P = root.Pictures;
-    if (v && v.w && v.h && P) return P.fit(v.w, v.h, 520);
+    if (v && v.w && v.h && P) return P.fit(v.w, v.h, 150 * 2);   /* 150mm on its long edge */
     /* a library entry that is a vector has no pixels to measure */
-    return { w: 380, h: 380 };
+    return { w: 120 * 2, h: 120 * 2 };
   }
 
   /* a model stands as wide on the wood as its own entry says it does —

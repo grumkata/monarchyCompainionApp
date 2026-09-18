@@ -39,7 +39,10 @@
 const reduced = () => root.matchMedia &&
   root.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
-const easeIn  = t => t * t;          /* quad: the cloth must be moving from the first frame */
+/* "once this is really on screen". One frame is style and layout; the frame
+   after it is the one the compositor has actually drawn. */
+const rafTwice = fn => root.requestAnimationFrame(
+  () => root.requestAnimationFrame(fn));
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 
 /* a token's colour as 0..1 rgb. Custom properties come back from
@@ -228,7 +231,8 @@ function hostUp() {
   host = doc.createElement('div');
   host.id = 'herald';
   host.setAttribute('aria-live', 'polite');
-  host.innerHTML = '<div class="hr-veil"></div><div class="hr-card"><b></b><i></i></div>' +
+  host.innerHTML = '<div class="hr-veil"></div>' +
+                   '<div class="hr-card"><b></b><i></i><u class="hr-work"></u></div>' +
                    '<div class="hr-cry"></div><div class="hr-sparks"></div>';
   doc.body.appendChild(host);
   return host;
@@ -238,7 +242,39 @@ function hostUp() {
    `mid` runs when the screen is fully covered. Its TIMING is set by
    setTimeout, not by animation frames, so a slow or hidden page still
    switches on time — the picture is decoration, the switch is not. */
-const COVER = 380, HOLD = 300, UNCOVER = 560;
+/* THE HOLD IS NOT A GUESS ANY MORE. It used to be a flat 300ms, and when
+   `mid` took longer than that — which walking into a table always does —
+   the cloth had already been told to lift before the table had finished
+   standing up, so it uncovered onto a half-built room. If `mid` hands back
+   a promise, the cover waits for it: at LEAST the hold, so a fast switch
+   still reads as a deliberate beat rather than a flicker, and at most the
+   ceiling, so a promise that never settles cannot strand the player behind
+   a curtain. 28-table-boot.js is what makes that wait bearable — it runs
+   the boot a piece per frame, so the cloth keeps moving while we wait. */
+/* ══ WHY THE COVER IS CSS AND NOT THE SHADER ═══════════════════
+   grumkata: the transition "is laggy and basically skipped".
+
+   It was drawn by the GL bend above — a shader, a frame at a time, from
+   requestAnimationFrame. That is the problem, and it is not a problem of
+   speed. rAF runs ON THE MAIN THREAD. The whole point of this cloth is to
+   cover the moment the app is busiest, and the moment the app is busiest is
+   exactly the moment the main thread cannot give rAF a frame — so the cover
+   would start, freeze solid for as long as the work took, and then arrive
+   at its end state in one jump, because every frame it owed had come due at
+   once. An animation that freezes and then arrives is not a slow animation.
+   It is a cut, which is precisely the word for what was seen.
+
+   The CSS veil underneath it (20-shell.css, `.hr-veil`) never had that
+   problem: it is one `transform: translateX` keyframe, which the compositor
+   runs on its own thread and keeps running while the main thread is blocked
+   solid. It was only ever a fallback for machines without WebGL. It is the
+   cover now, on every machine, for the same reason a handbrake is not
+   optional. The same bend, the same gilt edge, the same house colour — it
+   simply cannot be stopped by the work it exists to hide.
+
+   The shader stays where it still earns its place: behind a proclamation
+   (the Cry below), which fires when nothing else is happening. */
+const COVER = 380, HOLD = 300, UNCOVER = 560, CEILING = 6000;
 let wiping = null;
 function wipe(mid, o) {
   o = o || {};
@@ -246,42 +282,48 @@ function wipe(mid, o) {
   if (wiping) { wiping.mid = mid; wiping.o = o; return wiping.done; }  /* latest wins */
   const job = wiping = { mid, o };
   const h = hostUp();
-  const g = glUp();
   h.classList.add('wiping');
-  if (!g) h.classList.add('nogl');
-  if (canvas) canvas.classList.add('on');
-
-  let phase = 'cover', t0 = performance.now(), raf = 0;
-  const frame = now => {
-    const e = now - t0;
-    if (phase === 'cover')     draw(0, easeIn(clamp01(e / COVER)), 1, 0);
-    else if (phase === 'hold') draw(0, 1, 1, easeOut(clamp01(e / HOLD)));
-    else                       draw(0, easeOut(clamp01(e / UNCOVER)), -1,
-                                    1 - clamp01(e / (UNCOVER * 0.5)));
-    raf = root.requestAnimationFrame(frame);
-  };
-  if (g) raf = root.requestAnimationFrame(frame);
 
   job.done = new Promise(res => {
     setTimeout(() => {
-      phase = 'hold'; t0 = performance.now();
       const card = h.querySelector('.hr-card');
       card.querySelector('b').textContent = job.o.title || '';
       card.querySelector('i').textContent = job.o.sub || '';
       h.classList.add('carded');
-      try { job.mid(); } catch (e) { console.error(e); }
-      setTimeout(() => {
-        phase = 'off'; t0 = performance.now();
+      /* ══ AND ONLY THEN THE WORK ══════════════════════════════
+         Adding a class does not put anything on screen. The pixels change at
+         the next frame, and `mid` blocks the thread that would have drawn
+         it — so calling mid() on the line after add('carded') meant the card
+         was never once painted before the freeze, and its fade-in played
+         AFTER the work instead of during it. The loading screen arrived at
+         the end of the load.
+
+         Two frames, then the work. The first gives style and layout their
+         turn; the second is the one that is actually composited. After that
+         the cover is genuinely on screen and can be frozen with impunity,
+         which is the entire job it was hired for. */
+      rafTwice(() => {
+      let work;
+      try { work = job.mid(); } catch (e) { console.error(e); }
+      const ready = (work && typeof work.then === 'function')
+        ? work.catch(e => { console.error(e); })
+        : Promise.resolve();
+      let lifted = false;
+      const lift = () => {
+        if (lifted) return;
+        lifted = true; clearTimeout(guard);
         h.classList.remove('carded');
         h.classList.add('lifting');
         setTimeout(() => {
-          root.cancelAnimationFrame(raf); clear();
-          if (canvas) canvas.classList.remove('on');
-          h.classList.remove('wiping', 'lifting', 'nogl');
+          h.classList.remove('wiping', 'lifting');
           wiping = null;
           res();
         }, UNCOVER + 40);
-      }, HOLD);
+      };
+      /* and never behind the curtain for ever, whatever `mid` does */
+      const guard = setTimeout(lift, CEILING);
+      Promise.all([ready, new Promise(r => setTimeout(r, HOLD))]).then(lift);
+      });
     }, COVER);
   });
   return job.done;

@@ -67,6 +67,7 @@ Object.assign(cv.style,{position:'fixed',inset:'0',zIndex:880,pointerEvents:'non
 document.body.appendChild(cv);
 
 const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
+if (window.Blazon3D && window.Blazon3D.tune) window.Blazon3D.tune(renderer);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.outputEncoding = THREE.sRGBEncoding;
 /* The two settings that do most of the work. Without tone mapping the colours
