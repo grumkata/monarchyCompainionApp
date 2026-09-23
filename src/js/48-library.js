@@ -93,7 +93,19 @@ function chargePack() {
 /* ── ADD A PACK HERE ──────────────────────────────────────────
    One function per pack, returning { id, name, items } or null when
    whatever it reads is not loaded. That is the whole contract.   */
-const ART_PACKS = [spritePack, chargePack];
+/* chargePack is deliberately NOT in here. grumkata: "when selcting images
+   dont show charges fro obvious reasons" -- and the obvious reason is that a
+   charge is not a picture. It is a single-colour vector glyph drawn to be
+   stamped on a shield by the flag maker, which is the one place it belongs
+   and the one place it still appears (12-heraldry.js reads window.CHARGES
+   directly and never came through here). Offered as table art it is two
+   hundred silhouettes cluttering the shelf you go to for a portrait or a
+   map, and every one of them is the wrong tool.
+
+   The function stays, because the pack is correctly written and the seam is
+   the point of this file: put it back in this array and the shelf has it
+   again. */
+const ART_PACKS = [spritePack];
 
 let ownCache = null;
 function own() {
@@ -242,16 +254,37 @@ function woodPack() {
 function bitsPack() {
   const B = G('BITS'); if (!B) return [];
   const T = G('BITS_TEX');
+  /* ── WHAT THE PACK CALLS THEM, AND WHAT A PERSON CALLS THEM ──
+     This read `NAME[bits[0]]` and fell back to the raw first word, which was
+     fine while the only pieces baked in were meeples, pawns, standards,
+     discs and the stand. The pack's character pieces are `tile_knight_blue`
+     and `tile_skeleton_brute`, so that rule called all of them "tile" and
+     threw the character away -- and `pawn_B_blue` came out as "Pawn, blue",
+     the same name pawn_A already had. */
   const NAME = { meeple: 'Meeple', pawn: 'Pawn', flag: 'Standard',
-                 token: 'Disc', playerstand: 'Stand' };
+                 token: 'Disc', playerstand: 'Stand', tile: 'Tile' };
+  /* the four heroes and the skeletons, which the pack files under `tile_` */
+  const WHO = { knight: 'Knight', mage: 'Mage', rogue: 'Rogue',
+                barbarian: 'Barbarian', skeleton: 'Skeleton' };
+  const COL = /^(blue|red|green|yellow|white|brown|purple|black)$/;
+  const nameOf = k => {
+    const p = k.split('_');
+    const col = COL.test(p[p.length - 1]) ? p.pop() : '';
+    let base;
+    if (p[0] === 'tile' && WHO[p[1]])
+      /* tile_skeleton_brute -> "Skeleton, brute" */
+      base = WHO[p[1]] + (p[2] ? ', ' + p[2] : '');
+    else if (p[0] === 'pawn' && /^[A-Z]$/.test(p[1] || ''))
+      /* two different pawn shapes ship in this pack and both come in four
+         colours, so the shape has to survive into the name */
+      base = 'Pawn ' + p[1];
+    else base = NAME[p[0]] || p[0];
+    return col ? base + ', ' + col : base;
+  };
   return Object.keys(B).map(k => {
-    const bits = k.split('_');
-    const base = NAME[bits[0]] || bits[0];
-    const col = bits[bits.length - 1];
     const sz = B[k].size || [1, 1, 1];
     return { id: 'bit:' + k,
-             name: /^(blue|red|green|yellow)$/.test(col)
-                   ? base + ', ' + col : base,
+             name: nameOf(k),
              foot: Math.max(Math.round(Math.max(sz[0], sz[2]) * 190), 110),
              dress: 'bits',
              prims: B[k].prims, tex: T, pack: 'Pieces' };

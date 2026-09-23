@@ -215,10 +215,16 @@ const keepb = (act, id) =>
    Who they are and what they have left, in one band at the head
    of the record — the same three pools the table shows beside
    your hand, so the sheet and the board agree on sight.        */
+/* who they are, in one line. Pulled out of plate() because repaintNumbers
+   has to build the same string while you are typing, and two copies of it
+   would drift the first time somebody added a field. */
+function whoLine(r){
+  return [r.who.rank, r.who.species && ('a ' + r.who.species),
+          r.who.culture && ('of ' + r.who.culture)].filter(Boolean).join(' · ');
+}
 function plate(r){
   const d = derived(r);
-  const line = [r.who.rank, r.who.species && ('a ' + r.who.species),
-                r.who.culture && ('of ' + r.who.culture)].filter(Boolean).join(' · ');
+  const line = whoLine(r);
   return `<div class="rec-plate">
     <button class="pl-face${r.who.face?' has':''}" data-s="pic" data-a="face"
         title="${r.who.face?'change the face':'set a face'}">
@@ -670,6 +676,21 @@ function repaintNumbers(r, root){
     if (e.tagName === 'INPUT') e.value = v; else e.textContent = v; };
   put('d-hp',d.hp); put('d-st',d.st); put('d-str',d.str); put('d-av',d.av); put('d-res',d.res);
   put('w-av',d.av); put('w-name',wornName(r));
+
+  /* -- AND THE PLATE, WHICH IS THE PART YOU WATCH ----------------
+     grumkata: "i need to leave and rejoin the sheet for the top part to be
+     updated". The leaf deliberately does not re-render while you write --
+     that is what keeps the caret where you put it -- and this function is
+     the whole of what does change. It knew about the pools and the worn
+     line and not about the name, so typing a name updated every number on
+     the sheet except the one thing you were actually looking at.
+
+     innerHTML rather than textContent because both of these fall back to
+     an <em> when they are empty, and setting text would print the tag. */
+  const pn = root.querySelector('.pl-name');
+  if (pn) pn.innerHTML = esc(r.who.name) || '<em>an unnamed hand</em>';
+  const pl = root.querySelector('.pl-line');
+  if (pl) pl.innerHTML = esc(whoLine(r)) || '<em>not yet said who they are</em>';
   /* the struck letter follows whatever the table calls that coin */
   COINS.forEach(([k,dflt]) => {
     const b = root.querySelector('.cb-coin.' + k + ' .cb-boss b');

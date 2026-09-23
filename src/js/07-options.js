@@ -37,7 +37,16 @@ const KEY = 'monarchy.opts.v1';
    ones are per-table and are matched, not compared. */
 const KEYS = ['monarchy.opts.v1', 'monarchy.me.v1', 'monarchy.tables.v3',
   'monarchy.chars.v2', 'monarchy.seat.v1', 'monarchy.papers.at',
-  'monarchy.presets.v1', 'monarchy.art.v1', 'monarchy.tavern.v3',
+  'monarchy.presets.v1', 'monarchy.art.v1',
+  /* BOTH GENERATIONS OF THE ROOM. The layout key carries a generation so
+     that shipping a new tavern retires the saves that predate it
+     (27-table-gl.js roomPlan), which means this list grows a line every
+     time the room changes rather than swapping one. v3 stays so that
+     "forget everything" still clears it off a machine that has been
+     running this app since before the layout moved; without it the old
+     save would sit there for ever, forgotten by the app and not by the
+     browser. */
+  'monarchy.tavern.v3', 'monarchy.tavern.v4',
   'monarchy.character'];
 const PREFIX = /^monarchy\.table\./;
 

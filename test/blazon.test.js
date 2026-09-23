@@ -220,8 +220,17 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       return ids[0] !== ids[1];
     }));
 
-  T('and the words under it change with it', await pg.evaluate(() =>
-    /vair/i.test(document.querySelector('.blazon').textContent)));
+  /* THE WORDS ARE NOT PRINTED UNDER THE SHIELD ANY MORE. grumkata: "the
+     text saying per fes sable and argent... is still there and has not been
+     removed yet" -- being told in herald's language what you are already
+     looking at is a caption on a photograph.
+
+     The blazon itself is not gone: it is still the model's own account of a
+     coat and still has to track one, which is what this now asks. It goes
+     to Heraldry rather than to the DOM because that is where the claim
+     lives now. */
+  T('and the words for it still follow the coat', await pg.evaluate(() =>
+    /vair/i.test(Heraldry.blazonText({ div:'plain', a:'vair', b:'argent' }))));
 
   /* THIS USED TO CHECK THE OPPOSITE. A choice that could not apply was
      replaced by a paragraph explaining why — and grumkata: "remove all the

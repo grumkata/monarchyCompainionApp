@@ -472,22 +472,43 @@ function lightRoom() {
   /* the floor of the exposure. Hemisphere rather than ambient, because it
      varies with the surface normal — a ceiling joist and a floorboard are
      not then the same flat grey. */
-  roomGroup.add(new THREE.HemisphereLight(0x1b2436, 0x120c07, 0.13));
+  /* THE FLOOR OF THE EXPOSURE, which is now the whole of it. Hemisphere
+     rather than ambient, because it varies with the surface normal -- a
+     ceiling joist and a floorboard are not then the same flat grey.
+
+     It was 0.13, which was a floor underneath four warm point lights. With
+     those gone this is the only thing lighting the room, so it has to be
+     turned up to something that reads on its own: a cool sky above, a warm
+     bounce off the boards below, no flicker in either. These three numbers
+     are the room's entire exposure now -- if it wants to be darker, warmer
+     or cooler, this is the one line to touch. */
+  roomGroup.add(new THREE.HemisphereLight(0x9aa4bb, 0x4a3b2a, 0.95));
 
   hearth = new THREE.Group();
   hearth.position.set(0, FLOOR_Y + 0.55, -RZ + 0.55);
   roomGroup.add(hearth);
 
-  fireCore = lamp(new THREE.PointLight(0xff8a2e, 3.4, 5.2, 2.0), 5.2);
-  fireCore.position.set(0, 0, 0.15);
+  /* -- NO LIGHT COMES OUT OF THE FIRE ---------------------------
+     grumkata: "remove the light from the fireplace and candelabras its
+     adding weird lighting".
 
-  fireBath = lamp(new THREE.PointLight(0xff6f26, 1.15, 11.0, 1.35), 11.0);
+     It was. A point light sitting in the hearth throws a hard falloff
+     across a room this small, so the far wall was hot, the near half was
+     nearly black, and everything between them moved as the flame
+     guttered -- which reads as the ROOM flickering rather than the fire.
+     Worse, it lit the table and everything standing on it from below and
+     behind, which is why pieces on the near side looked wrong in ways
+     that were hard to put a name to.
 
-  /* The spot out of the fireplace mouth is gone too — with no shadow to
-     carry it was a third light doing what the core already did. Four
-     lights in the room now: sky, hearth core, hearth bath, moon. */
-  fireSpill = fireCore;
-  hearth.add(fireCore, fireBath);
+     The FLAMES stay. They are additive glow sprites and emissive material,
+     so there is still a fire in the fireplace; it simply no longer
+     pretends to be the room's light source. That job belongs entirely to
+     the sky term below now, which is even, does not flicker, and does not
+     care which side of the room you are on.
+
+     Left null on purpose rather than deleted: tickFire() returns early on
+     fireCore, so one check stops the whole flicker loop, candles and all. */
+  fireSpill = fireCore = fireBath = null;
 
   /* candles: small reach, no shadows, and each one gets its own phase in
      tickFire — two candles guttering in step is instantly fake */
@@ -496,13 +517,10 @@ function lightRoom() {
      no visible work that the glow sprites were not already doing for
      free. The sprites stay — you see the flames; you do not see which
      of them is a real light. */
-  candleLights = [[0, 0.42, 0]]
-    .map(p => {
-      const l = lamp(new THREE.PointLight(0xffb46b, 0.62, 2.9, 2.0), 2.9);
-      l.position.set(p[0], p[1], p[2]);
-      roomGroup.add(l);
-      return l;
-    });
+  /* and none out of the candles either, for the same reason and with the
+     same exception: every candle and candelabra keeps its glow sprite, so
+     they still read as lit. */
+  candleLights = [];
 
   /* ── AND ONE LAMP THAT IS ACTUALLY A LIGHT ───────────────
      The hearth is on the far wall, so everything on the near half of the
@@ -512,9 +530,9 @@ function lightRoom() {
      and it is the difference between a room and a stage with one lamp
      pointed at it. */
   /* on the dresser, where there is now a candelabra for it to come from */
-  const wall = lamp(new THREE.PointLight(0xffa14e, 1.35, 4.6, 2.0), 4.6);
-  wall.position.set(2.45, FLOOR_Y + 2.40, -1.24);
-  roomGroup.add(wall);
+  /* The dresser candelabra's light goes with the rest of them: it was the
+     same trick -- one warm point pretending to be a room -- and it made the
+     right-hand wall a visibly different scene from the left-hand one. */
 
   /* THE ONE COLD SOURCE, through the windows on the back wall */
   const moon = new THREE.DirectionalLight(0x5d7cb4, 0.17);
@@ -609,158 +627,96 @@ function tickFire(t) {
    a plank across the screen. Everything marked `over` fades out as you
    come down over the wood and returns as you sit back. */
 const TAVERN_PLAN = [
-  /* ── the shell ───────────────────────────────────────────────
+  /* ── the shell ────────────────────────────────────────────
      A wall module is 2m wide and 3.12 tall and its slab sits from -0.31
      to +0.10 of its own row, so a wall placed at 3 has its INNER FACE at
      2.90. That is the number everything else is measured against: the
      room you can actually stand in is 5.8 by 5.8. */
   { k:'floor' },
-  { k:'ceil'  },
+  { k:'ceil' },
   { p:'R', m:'Wall_Plaster_Window_Wide_Round', x:-2, y:0, z:-3, r:0 },
-  /* plain plaster, because the firebox is open at the back and this is the
-     wall you look at through the flames — a timber grid there reads as the
-     outside of the building seen through a hole in it */
-  { p:'R', m:'Wall_Plaster_Straight',          x: 0, y:0, z:-3, r:0 },
-  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x: 2, y:0, z:-3, r:0 },
-  { p:'R', m:'Wall_Plaster_WoodGrid',   x:-2, y:0, z:3, r:180 },
-  { p:'R', m:'Wall_Plaster_Door_Round', x: 0, y:0, z:3, r:180 },
-  { p:'R', m:'Wall_Plaster_WoodGrid',   x: 2, y:0, z:3, r:180 },
+  { p:'R', m:'Wall_Plaster_Straight', x:0, y:0, z:-3, r:0 },
+  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x:2, y:0, z:-3, r:0 },
+  { p:'R', m:'Wall_Plaster_WoodGrid', x:-2, y:0, z:3, r:180 },
+  { p:'R', m:'Wall_Plaster_Door_Round', x:0, y:0, z:3, r:180 },
+  { p:'R', m:'Wall_Plaster_WoodGrid', x:2, y:0, z:3, r:180 },
   { p:'R', m:'Wall_Plaster_WoodGrid', x:-3, y:0, z:-2, r:90 },
-  { p:'R', m:'Wall_Plaster_Straight', x:-3, y:0, z: 0, r:90 },
-  { p:'R', m:'Wall_Plaster_WoodGrid', x:-3, y:0, z: 2, r:90 },
-  { p:'R', m:'Wall_Plaster_WoodGrid',          x: 3, y:0, z:-2, r:-90 },
-  { p:'R', m:'Wall_Plaster_Straight',          x: 3, y:0, z: 0, r:-90 },
-  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x: 3, y:0, z: 2, r:-90 },
+  { p:'R', m:'Wall_Plaster_Straight', x:-3, y:0, z:0, r:90 },
+  { p:'R', m:'Wall_Plaster_WoodGrid', x:-3, y:0, z:2, r:90 },
+  { p:'R', m:'Wall_Plaster_WoodGrid', x:3, y:0, z:-2, r:-90 },
+  { p:'R', m:'Wall_Plaster_Straight', x:3, y:0, z:0, r:-90 },
+  { p:'R', m:'Wall_Plaster_Window_Wide_Round', x:3, y:0, z:2, r:-90 },
+  /* the four corners, which close the box */
   { p:'R', m:'Corner_Interior_Big', x:-3, y:0, z:-3, r:0 },
-  { p:'R', m:'Corner_Interior_Big', x: 3, y:0, z:-3, r:-90 },
-  { p:'R', m:'Corner_Interior_Big', x: 3, y:0, z: 3, r:180 },
-  { p:'R', m:'Corner_Interior_Big', x:-3, y:0, z: 3, r:90 },
-
-  /* A WINDOW FRAME GOES IN A WINDOW. There were three frames and four
-     holes, one of the frames was screwed to a solid wall, and all three
-     sat at y:1.15 — which is on top of the sill height the model already
-     carries, so they stood three quarters of a metre proud of the roof.
-     One frame per hole, at y:0, where the model puts itself. */
+  { p:'R', m:'Corner_Interior_Big', x:3, y:0, z:-3, r:-90 },
+  { p:'R', m:'Corner_Interior_Big', x:3, y:0, z:3, r:180 },
+  { p:'R', m:'Corner_Interior_Big', x:-3, y:0, z:3, r:90 },
+  /* glazing and the door leaf, set into the openings cut above */
   { p:'R', m:'Window_Wide_Round1', x:-2, y:0, z:-3, r:0 },
-  { p:'R', m:'Window_Wide_Round1', x: 2, y:0, z:-3, r:0 },
-  { p:'R', m:'Window_Wide_Round1', x: 3, y:0, z: 2, r:-90 },
+  { p:'R', m:'Window_Wide_Round1', x:2, y:0, z:-3, r:0 },
+  { p:'R', m:'Window_Wide_Round1', x:3, y:0, z:2, r:-90 },
   { p:'R', m:'Door_2_Round', x:0, y:0, z:2.95, r:180 },
-
-  /* ── the roof you sit under ──────────────────────────────────
-     Roof_Log is a ten-metre beam whose geometry starts 3.85 up its own
-     axis, so at y:2.92 the "rafters" were sitting at 2.90 to 3.16 — above
-     a ceiling at 2.37, in the dark outside the room, drawn every frame and
-     visible never. Dropped to where a rafter goes, thinned, turned to run
-     ACROSS the room, and braced into the side walls the way one is. */
+  /* ── overhead ─────────────────────────────────────────────
+     Everything marked `over` fades out as you come down over the wood and
+     returns as you sit back — a beam at two metres, seen from above, is a
+     plank across the screen. */
   { p:'R', m:'Roof_Log', x:0, y:2.18, z:-2.2, r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
-  { p:'R', m:'Roof_Log', x:0, y:2.18, z: 0,   r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
-  { p:'R', m:'Roof_Log', x:0, y:2.18, z: 2.2, r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
-  /* a brace goes UNDER the rafter it holds up, so these share the rafters'
-     depths and stand off the ends of the wall furniture rather than through it */
-  { p:'R', m:'Prop_Support', x:-2.9, y:0.20, z:-2.2, r: 90, sx:1, sy:1, sz:0.5, over:1 },
-  { p:'R', m:'Prop_Support', x: 2.9, y:0.20, z:-2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
-  { p:'R', m:'Prop_Support', x:-2.9, y:0.20, z: 2.2, r: 90, sx:1, sy:1, sz:0.5, over:1 },
-  { p:'R', m:'Prop_Support', x: 2.9, y:0.20, z: 2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
-
-  /* ── the hearth, dead ahead, the only bright thing ───────────
-     Set INTO the wall rather than standing in front of it. The model is
-     1.78 deep and the strip of floor between the far wall and the players'
-     chairs is 1.15, so a fireplace that stands proud of the wall stands in
-     somebody's lap. Its back goes through a solid wall, which nobody can
-     see, and what is left in the room is a chimney breast. */
+  { p:'R', m:'Roof_Log', x:0, y:2.18, z:0, r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
+  { p:'R', m:'Roof_Log', x:0, y:2.18, z:2.2, r:90, sx:0.16, sy:0.16, sz:0.6, over:1 },
+  { p:'R', m:'Prop_Support', x:-2.9, y:0.2, z:-2.2, r:90, sx:1, sy:1, sz:0.5, over:1 },
+  { p:'R', m:'Prop_Support', x:2.9, y:0.2, z:-2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
+  { p:'R', m:'Prop_Support', x:-2.9, y:0.2, z:2.2, r:90, sx:1, sy:1, sz:0.5, over:1 },
+  { p:'R', m:'Prop_Support', x:2.9, y:0.2, z:2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
+  /* ── the hearth, dead ahead ─────────────────────────────── */
   { p:'T', m:'Fireplace', x:0, y:0, z:-2.62, r:0 },
-  /* Over the middle of the fire and small enough to be a pot rather than a
-     bath — it stood off to one side at 0.6 scale with its rim inside the
-     masonry, which is the one place a cauldron must not be. */
-  { p:'T', m:'Cauldron',  x:0, y:0.02, z:-2.24, r:0, s:0.45 },
-  /* THE FIREWOOD WAS TWO LOOSE STICKS lying on the hearth floor, which
-     reads as litter rather than as fuel. Firewood by a hearth is a STACK:
-     six split lengths crossed in pairs the way you actually pile them,
-     clear of the chimney breast and against the wall. */
-  { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.70, r:90, s:1 },
+  { p:'T', m:'Cauldron', x:0, y:0.02, z:-2.24, r:0, s:0.45 },
+  { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.7, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.58, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.46, r:90, s:1 },
   { p:'T', m:'FireLog', x:-2.01, y:0.125, z:-2.64, r:90, s:1 },
   { p:'T', m:'FireLog', x:-2.01, y:0.125, z:-2.52, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.97, y:0.205, z:-2.58, r:90, s:1 },
-  { p:'T', m:'CandleStand', x:-1.38, y:0,    z:-2.55, r:0 },
-  { p:'T', m:'Candle',      x:-1.38, y:0.61, z:-2.55, r:0 },
-  { p:'T', m:'CandleStand', x: 1.45, y:0,    z:-2.62, r:0 },
-  { p:'T', m:'Candle',      x: 1.45, y:0.61, z:-2.62, r:0 },
-
-  /* ── the bar, down the left wall ─────────────────────────────
-     The counter is 1.0 deep, which is the whole of the strip, so its front
-     edge lands at -1.90 and the stools have to stand off the ends where
-     the room is wider — a stool at the middle of the counter would be
-     1.35 from the middle of the table, i.e. inside the chairs. */
-  { p:'T', m:'TableLong', x:-2.40, y:0, z:-1.24, r:90 },
-  { p:'T', m:'TableLong', x:-2.40, y:0, z: 1.24, r:90 },
-  /* DOWN, onto the bar they belong to. A Rack is a plank on two corbels,
-     and at 1.90 it hung near enough to the roof that from a chair, looking
-     up, its silhouette was a seat on two legs — grumkata: "it looks like
-     there is a chair in the ceiling". Brought down to just clear of the
-     bottles on the counter, where it reads as the shelf behind a bar. */
+  /* the candles either side of it. lightCandles() finds these by model
+     name (WICKS) and stands a flame on top of whatever height the row
+     sits at, so moving one here moves its flame with it. */
+  { p:'T', m:'CandleStand', x:-1.38, y:0, z:-2.55, r:0 },
+  { p:'T', m:'Candle', x:-1.38, y:0.61, z:-2.55, r:0 },
+  { p:'T', m:'CandleStand', x:1.45, y:0, z:-2.62, r:0 },
+  { p:'T', m:'Candle', x:1.45, y:0.61, z:-2.62, r:0 },
+  /* ── the long wall, left: two tables and what is laid on them ── */
+  { p:'T', m:'TableLong', x:-2.4, y:0, z:-1.24, r:90 },
+  { p:'T', m:'TableLong', x:-2.4, y:0, z:1.24, r:90 },
   { p:'T', m:'Rack', x:-2.88, y:1.62, z:-1.05, r:90 },
-  { p:'T', m:'Rack', x:-2.88, y:1.62, z: 1.05, r:90 },
+  { p:'T', m:'Rack', x:-2.88, y:1.62, z:1.05, r:90 },
   { p:'T', m:'BarStool', x:-1.62, y:0, z:-2.08, r:16 },
   { p:'T', m:'BarStool', x:-1.62, y:0, z:-1.32, r:4 },
-  { p:'T', m:'BarStool', x:-1.62, y:0, z: 1.32, r:-9 },
-  { p:'T', m:'BarStool', x:-1.62, y:0, z: 2.08, r:-21 },
-  /* on the counter — top is 0.85 up, so everything that stands on it is y:0.85 */
-  { p:'T', m:'Jug',        x:-2.30, y:0.85, z:-1.72, r:34, s:0.7 },
+  { p:'T', m:'BarStool', x:-1.62, y:0, z:1.32, r:-9 },
+  { p:'T', m:'BarStool', x:-1.62, y:0, z:2.08, r:-21 },
+  { p:'T', m:'Jug', x:-2.3, y:0.85, z:-1.72, r:34, s:0.7 },
   { p:'T', m:'BottleLong', x:-2.62, y:0.85, z:-1.42, r:0, s:0.8 },
-  { p:'T', m:'BottleLong', x:-2.60, y:0.85, z:-1.22, r:40, s:0.8 },
-  { p:'T', m:'BottleShort',x:-2.63, y:0.85, z:-0.98, r:0, s:0.8 },
-  { p:'T', m:'CupMetal',   x:-2.22, y:0.85, z:-0.70, r:61, s:0.65 },
-  { p:'T', m:'CupMetal',   x:-2.34, y:0.85, z:-0.44, r:-30, s:0.65 },
-  { p:'T', m:'Candelabra', x:-2.52, y:0.85, z: 0.05, r:0, s:0.6 },
-  { p:'T', m:'Plate',      x:-2.26, y:0.85, z: 0.62, r:0, s:0.8 },
-  { p:'T', m:'Cheese',     x:-2.30, y:0.88, z: 0.62, r:17, s:0.45 },
-  { p:'T', m:'Bowl',       x:-2.34, y:0.85, z: 1.42, r:0, s:0.8 },
-  { p:'T', m:'Apple',      x:-2.34, y:0.93, z: 1.42, r:0, s:1 },
-  { p:'T', m:'Apple',      x:-2.28, y:0.92, z: 1.48, r:40, s:1 },
-  { p:'T', m:'CupCeramic', x:-2.20, y:0.85, z: 1.86, r:-52, s:0.8 },
-
-  /* ── the right side is NOT the left side ─────────────────────
-     grumkata: "it still has symmetry but it's still kinda mid". A tavern
-     is not laid out in pairs, so this wall gets the things a bar does not
-     have: the dresser, a bench with a stool pulled up to it, a barrel
-     waiting to be tapped. */
+  { p:'T', m:'BottleLong', x:-2.6, y:0.85, z:-1.22, r:40, s:0.8 },
+  { p:'T', m:'BottleShort', x:-2.63, y:0.85, z:-0.98, r:0, s:0.8 },
+  { p:'T', m:'CupMetal', x:-2.22, y:0.85, z:-0.7, r:61, s:0.65 },
+  { p:'T', m:'CupMetal', x:-2.34, y:0.85, z:-0.44, r:-30, s:0.65 },
+  { p:'T', m:'Candelabra', x:-2.52, y:0.85, z:0.05, r:0, s:0.6 },
+  { p:'T', m:'Plate', x:-2.26, y:0.85, z:0.62, r:0, s:0.8 },
+  { p:'T', m:'Cheese', x:-2.3, y:0.88, z:0.62, r:17, s:0.45 },
+  { p:'T', m:'Bowl', x:-2.34, y:0.85, z:1.42, r:0, s:0.8 },
+  { p:'T', m:'Apple', x:-2.34, y:0.93, z:1.42, r:0, s:1 },
+  { p:'T', m:'Apple', x:-2.28, y:0.92, z:1.48, r:40, s:1 },
+  { p:'T', m:'CupCeramic', x:-2.2, y:0.85, z:1.86, r:-52, s:0.8 },
+  /* ── the right-hand side: pantry, bench, barrel ────────── */
   { p:'T', m:'Pantry', x:2.62, y:0, z:-1.24, r:-90 },
-  { p:'T', m:'Bench',  x:2.74, y:0, z: 0.92, r:-90, s:0.8 },
-  { p:'T', m:'Stool',  x:2.12, y:0, z: 0.66, r:-64, s:0.75 },
+  { p:'T', m:'Bench', x:2.74, y:0, z:0.92, r:-90, s:0.8 },
+  { p:'T', m:'Stool', x:2.12, y:0, z:0.66, r:-64, s:0.75 },
   { p:'T', m:'CupMetal', x:2.12, y:0.42, z:0.66, r:24, s:0.65 },
-  { p:'T', m:'BarrelStand', x:2.42, y:0,    z:-2.44, r:0, s:0.8 },
-  { p:'T', m:'Barrel',      x:2.42, y:0.16, z:-2.44, r:0, s:0.8 },
-
-  /* ── the near wall: the way out, and what gets dumped by it ── */
-  { p:'T', m:'Bench',     x:-1.55, y:0, z: 2.72, r:180, s:0.8 },
-  { p:'T', m:'Barrel',    x: 1.42, y:0, z: 2.44, r:0, s:0.8 },
-  { p:'T', m:'FlourSack', x: 2.34, y:0,    z: 2.44, r:24, s:1 },
-  { p:'T', m:'FlourSack', x: 2.30, y:0.20, z: 2.36, r:-38, s:1 },
-
-  /* No rug. It was the one prop in here trying to be a feature, it is
-     almost entirely hidden by the table anyway, and grumkata is right that
-     a bear skin in a common room is a bit much. Bare boards. */
-
-  /* ── light you can see ───────────────────────────────────────
-     Every one of these is a thing the lighting rig is coming FROM. They
-     sit at 1.5 to 1.9 above the floor, which is eye height standing and
-     above the head of anyone sitting — a wall lamp at table height is a
-     lamp you knock over. */
-  /* NO WALL SCONCES. The Lamp model is a two-armed bracket that reads as a
-     small candelabra, and hung at head-and-a-half on bare plaster, glowing,
-     with its fixing plate edge-on and invisible, every one of them looked
-     like a candelabra stuck to the wall in mid-air — grumkata: "get rid of
-     the candelbras floating on the shelves". They are gone. Light in this
-     room now always comes off something that is standing on something. */
-  { p:'T', m:'Candelabra', d:'glow', x: 2.55, y:1.50, z:-1.24, r:-90, s:0.6 },
-  /* NO CHANDELIER. It hung over the middle of the table and it is the one
-     thing grumkata took out when he was given the layout to edit — "a
-     floating chair or something above the table", which a wheel of candle
-     arms seen from underneath is a fair description of. This row is his
-     answer, not a guess of mine: the shipped layout is now the one he sent
-     back, and the only line it differs by is this one being gone. */
+  { p:'T', m:'BarrelStand', x:2.42, y:0, z:-2.44, r:0, s:0.8 },
+  { p:'T', m:'Barrel', x:2.42, y:0.16, z:-2.44, r:0, s:0.8 },
+  /* ── and the near corner, behind you ──────────────────── */
+  { p:'T', m:'Bench', x:-1.55, y:0, z:2.72, r:180, s:0.8 },
+  { p:'T', m:'Barrel', x:1.42, y:0, z:2.44, r:0, s:0.8 },
+  { p:'T', m:'FlourSack', x:2.34, y:0, z:2.44, r:24, s:1 },
+  { p:'T', m:'FlourSack', x:2.3, y:0.2, z:2.36, r:-38, s:1 },
 ];
 
 
@@ -773,7 +729,7 @@ const TAVERN_PLAN = [
    anyone holding a save from before the fix never sees it, and reports the
    same fault again. The key carries the layout's generation, so shipping a
    change to the room retires the saves that predate it. */
-const PLAN_KEY = 'monarchy.tavern.v3';
+const PLAN_KEY = 'monarchy.tavern.v4';
 let planCache = null;
 function roomPlan() {
   if (planCache) return planCache;
@@ -1332,9 +1288,17 @@ function fire() {
            Basic takes no light at all, which is the honest description
            of a coal: its brightness is its own and tickFire sets it
            directly, so it glows and breathes and never clips. */
-        o.material = new THREE.MeshBasicMaterial({
-          map: o.material.map, color: 0xff6a22, toneMapped: false });
-        emberMats.push(o.material);
+        /* -- AND NOW A COAL IS JUST A LOG -----------------------
+           It was Basic and unlit precisely so it could be brighter than
+           the room and breathe on tickFire's clock. That is a light, in
+           every way that matters to somebody looking at the screen, so it
+           goes with the rest of them: an ordinary lit material, taking
+           the sky term like every other piece of timber in the room.
+
+           Not pushed to emberMats either, so tickFire has nothing left to
+           animate even if something ever calls it again. */
+        o.material = new THREE.MeshLambertMaterial({
+          map: o.material.map, color: 0x6b5a4c });
       });
       g.position.set(p[0], FLOOR_Y + 0.05 + p[1], -RZ + 0.62 + p[2]);
       g.rotation.y = Math.random() * 3;
@@ -1342,14 +1306,11 @@ function fire() {
       roomGroup.add(g);
     }
   }
-  /* the fire itself, and the halo that makes it feel like it is giving
-     something off rather than sitting there */
-  const f = glow(0xffa14e, 1.15);
-  f.position.set(0, FLOOR_Y + 0.30, -RZ + 0.60);
-  roomGroup.add(f);
-  const f2 = glow(0xffd9a0, 0.42);
-  f2.position.set(0, FLOOR_Y + 0.22, -RZ + 0.58);
-  roomGroup.add(f2);
+  /* THE HALO IS GONE TOO. Two additive sprites over the hearth, and they
+     were the single brightest thing in the picture -- the thing you would
+     point at if somebody asked you to point at the light from the
+     fireplace. Removing the point lights and leaving these was answering
+     the letter of "remove the light" and not the sense of it. */
 
   /* ── A CHANDELIER IS LIT, IF THERE IS ONE ────────────────
      Six flames round the rim and a small warm light in the middle of
@@ -1366,27 +1327,20 @@ function fire() {
   if (overGroup) {
     chandelier = new THREE.Group();
     chandelier.visible = false;
-    for (let i = 0; i < 6; i++) {
-      const a = i * Math.PI / 3;
-      const c = glow(0xffc078, 0.13);
-      c.position.set(Math.cos(a) * 0.26, 0.07, Math.sin(a) * 0.26);
-      chandelier.add(c);
-    }
-    const ch = lamp(new THREE.PointLight(0xffb066, 0.5, 3.2, 2.0), 3.2);
-    ch.position.set(0, 0, 0);
-    chandelier.add(ch);
+    /* six flames and a lamp in the middle of them, both gone for the same
+       reason as the hearth's. The wheel itself still hangs if a layout
+       asks for one; it is simply not alight. (The layout in the file does
+       not ask for one, so this is dark code until somebody adds it back
+       in the room editor.) */
     overGroup.add(chandelier);
     aimChandelier(roomPlan());        /* and once now, since layRoom ran first */
   }
 
-  /* the pool the plan draws its flames from — made once, placed by
-     lightCandles() whenever the layout is built */
+  /* NO FLAMES ON THE CANDLES. The pool is left empty rather than deleted:
+     lightCandles() walks it and stops at flamePool.length, so an empty
+     pool is a room with unlit candles in it and no other change anywhere.
+     Put the loop back and every candlestick in the layout lights again. */
   flamePool = [];
-  for (let i = 0; i < 16; i++) {
-    const c = glow(0xffc078, 0.13);
-    c.visible = false; c.userData.flame = 1;
-    roomGroup.add(c); flamePool.push(c);
-  }
   lightCandles(roomPlan());
 
   /* The one flame that isn't a room fitting: the candle standing on the
@@ -1394,11 +1348,11 @@ function fire() {
      lightCandles() puts its flame wherever the row moved to — hard-coded
      heights are exactly how you end up with a light hanging in clear air
      after someone edits the room. */
-  {
-    const c = glow(0xffc078, 0.14);
-    c.position.set(0, 0.46, 0);
-    roomGroup.add(c);
-  }
+  /* GONE WITH THE LIGHTS. There was no candle under it -- just a flame
+     hanging over the middle of the wood -- and while it had its own point
+     light that read as a candle you had not looked at closely. With the
+     light removed it is an orange smear sitting exactly where pieces go.
+     One glow() call to put it back if it is ever wanted. */
 
   /* ── DUST ─────────────────────────────────────────────────
      Two hundred points, and the best atmosphere-per-byte in the whole
@@ -2021,7 +1975,23 @@ function sizeCam() {
      the far wall fell straight out the back of the frustum. Widened to
      hold it; the ratio is still modest enough that the depth buffer has
      no trouble separating a cup from the table it stands on. */
-  camera = new THREE.PerspectiveCamera(fov, W / H, 60, PERSP + 26000);
+  /* -- AND THE NEAR PLANE TRAVELS WITH THE LENS -----------------
+     grumkata: "when you zoom in too much you see through the table and
+     floor boards which is a big nono".
+
+     It was a flat 60, while the camera's distance from the wood is PERSP
+     and PERSP is not flat: leaning in shortens it to 260. The floor runs
+     underneath the camera and out towards you, so at a short lens the
+     nearest boards -- and the near lip of the table itself -- crossed a
+     near plane that had not moved with them, and were clipped away. You
+     saw through the wood into the room beneath it.
+
+     Tied to the lens instead, at PERSP/40. That is exactly 60 at the
+     default 2400, so nothing changes at a normal zoom and the depth buffer
+     keeps the separation it has today between a cup and the table it
+     stands on; it is about 6 when you are leaning right in, which is where
+     the clipping was. */
+  camera = new THREE.PerspectiveCamera(fov, W / H, Math.max(4, PERSP / 40), PERSP + 26000);
   /* THE EYE SITS ON THE VANISHING POINT, and where that is on the screen is
      what aim() works out. Everything in this layer is measured in screen
      pixels off the DOM, so world (0,0,0) IS the vanishing point on the

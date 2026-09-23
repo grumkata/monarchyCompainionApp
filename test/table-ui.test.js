@@ -243,13 +243,29 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
           && o[o.length - 2].custom === 'npc' && o[o.length - 1].custom === 'form';
     }));
 
-  T('the art tray is the art inside the app, and ends in one off your machine',
+  T('the art tray is the pictures inside the app, and ends in one off your machine',
     await pg.evaluate(() => {
       const o = window.Toolbox.options('art');
-      return o.length > 10 && o.some(x => /^art:sprite:/.test(x.id))
-          && o.some(x => /^art:charge:/.test(x.id))
+      /* The bound was > 10 and that was two hundred charges holding it up.
+         With them gone the whole of the art baked into this app is the five
+         figures in 36-sprite-assets.js, so the honest assertion is that the
+         sprite pack is all there and the custom picture still ends the tray.
+         If that reads as a thin shelf, it is -- and it was just as thin
+         before, under a heap of shield glyphs. */
+      const sprites = o.filter(x => /^art:sprite:/.test(x.id));
+      return sprites.length === 5
           && o[o.length - 1].custom === 'picture';
     }));
+
+  /* grumkata: "when selcting images dont show charges fro obvious reasons".
+     A charge is a one-colour vector glyph for stamping on a shield, not a
+     picture to put on the wood -- and there are two hundred of them, so
+     offering them here buried the handful of things you actually came for.
+     They are still what the flag maker draws with (12-heraldry.js reads
+     window.CHARGES straight, and never came through the library). */
+  T('and a heraldic charge is not offered as a picture',
+    await pg.evaluate(() => !window.Toolbox.options('art')
+        .some(x => /^art:charge:/.test(x.id))));
 
   T('and the models tray is the assets that were already baked in',
     await pg.evaluate(() => {

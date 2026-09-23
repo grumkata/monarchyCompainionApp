@@ -666,10 +666,43 @@ function paneYou(){
           <input id="sname" maxlength="40" value="${esc(me.name)}"
             placeholder="type your name"></div>
         <div class="row2"><button class="lk" data-do="arms">Change your arms</button></div>
-        <div class="blazon">${me.pic ? 'A picture of your own is what shows.'
-                                     : esc(H.blazonText(me.arms))}</div>
       </div>
-    </div>`;
+    </div>
+    ${readyMade()}`;
+}
+
+/* ── SOMEBODY TO BE, WITHOUT GOING AND FINDING A FILE ─────
+   grumkata: "it is not easier to change your avatar so that wanst done".
+
+   It was not. The only door to a likeness was `uploadbody`, which opens a
+   file picker -- so having a figure at your seat meant owning a picture of
+   one, cropping it, and knowing where you put it. Everybody who did not
+   have one to hand sat behind an empty chair.
+
+   The app already ships painted figures, and a seat's standee is fed the
+   same thing either way: `me.body` is a data URI and buildSeat() puts it on
+   a card. So the library's own figures are offered here, one click each,
+   beside the upload that was already there. Nothing new is stored and
+   nothing new is drawn -- this is a door onto a picture the app was already
+   carrying.
+
+   Read fresh each render rather than captured, because Library.art grows
+   when you add your own, and anything you have added is a likeness you can
+   pick too. */
+function readyMade(){
+  const L = window.Library;
+  if (!L || !L.art || !L.art.all) return '';
+  /* the tall ones: a likeness is a standing figure, and a map or a device
+     laid flat makes a very strange person */
+  const figs = (L.art.all() || []).filter(a => a && a.src && a.tall);
+  if (!figs.length) return '';
+  return `<div class="me-ready">
+    <label>or be one of these</label>
+    <div class="me-figs">${figs.map(a => `<button
+      class="me-fig${me.body === a.src ? ' on' : ''}"
+      data-do="pickbody" data-v="${esc(a.id)}" title="${esc(a.name || '')}">
+      <img src="${esc(a.src)}" alt="${esc(a.name || '')}"></button>`).join('')}</div>
+  </div>`;
 }
 
 function paneLook(){
@@ -843,12 +876,36 @@ function pickRow(title, key, opts, draw, extra){
   </div>${extra||''}</div>`;
 }
 /* a row of tinctures: the ten named ones, the six furs, and a colour of
-   your own. A fur is drawn as a fur — there is no colour that says ermine. */
-function tinctRow(title, key){
+   your own. A fur is drawn as a fur — there is no colour that says ermine.
+
+   ── AND WHICH OF THEM WILL LOOK WRONG ─────────────────
+   grumkata: "most banners made with the creator look ass for some reason".
+
+   The reason is a thousand years old and the app already knew it: the rule
+   of tincture, never colour on colour and never metal on metal. Sable on
+   gules is mud; argent on or is a smudge. It is the single thing that
+   separates arms that read across a field from arms that do not.
+
+   But it was only said AFTERWARDS, as a line of advice under the finished
+   shield — by which point you have already picked the thing, looked at it,
+   decided heraldry is not for you and moved on. So it is said HERE instead,
+   where the choice is: anything that would clash with what it is being laid
+   over is dimmed, in the row, before you click it.
+
+   Dimmed, not removed. The rule has exceptions old enough to have names,
+   and `base` is null wherever the question does not arise — a field with
+   nothing over it, a divided field under an ordinary — so a row with no
+   opinion shows none. */
+function tinctRow(title, key, base){
   const v = draft[key], own = !H.named(v);
   const mine = own && /^#[0-9a-fA-F]{6}$/.test(String(v)) ? v : '#8a8a8a';
-  const chip = (k, inner) => `<button class="chip t${v===k?' on':''}"
-    data-arm="${key}" data-v="${k}" title="${H.tname(k)}">${inner}</button>`;
+  /* furs are exempt, and always were; a colour of your own is not something
+     the app has any business having an opinion about */
+  const clash = k => !!base && H.named(k) && H.named(base)
+    && !H.isFur(k) && !H.isFur(base) && H.isMetal(k) === H.isMetal(base);
+  const chip = (k, inner) => `<button class="chip t${v===k?' on':''}${clash(k)?' clash':''}"
+    data-arm="${key}" data-v="${k}" title="${H.tname(k)}${clash(k)
+      ? ' \u2014 against the rule of tincture, on ' + H.tname(base) : ''}">${inner}</button>`;
   return `<div class="mk"><h3>${title}</h3>
     <div class="chips">
       ${Object.keys(H.TINCT).map(k =>
@@ -881,8 +938,10 @@ function paneField(){
       k => swatch(c => H.field(k, draft.a, draft.b, SW, SW, draft.line, c)))
     + lineRow('The line it is cut by', 'line', H.LINEABLE[draft.div],
       k => swatch(c => H.field(draft.div, draft.a, draft.b, SW, SW, k, c)))
+    /* the field itself is laid over nothing, so it has no wrong answer.
+       The second tincture is only on show once the field is cut. */
     + tinctRow('First tincture', 'a')
-    + tinctRow('Second tincture', 'b');
+    + tinctRow('Second tincture', 'b', draft.div !== 'plain' ? draft.a : null);
 }
 function paneOrd(){
   return pickRow('The ordinary', 'ord', H.ORDINARIES,
@@ -895,7 +954,10 @@ function paneOrd(){
         ? 'Lay an ordinary over the field first and its edges can be cut any way you like.'
         : `A ${H.ORDINARIES[draft.ord].replace(/^An? /,'').toLowerCase()} has no pair of
            long straight edges to dress. A fess, a pale, a bend, a chief or a chevron does.`)
-    + tinctRow("The ordinary's tincture", 'ordT');
+    /* an ordinary lies straight on the field, so it answers to it — but
+       only a PLAIN field, which is the same condition tinctureWarning uses */
+    + tinctRow("The ordinary's tincture", 'ordT',
+               draft.div === 'plain' ? draft.a : null);
 }
 function paneCharge(){
   const L = H.chargeList();
@@ -922,7 +984,8 @@ function paneCharge(){
   ${draft.chgN > 1 ? pickRow('How they are ranged', 'chgA', H.ARRANGE,
       k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
            + H.charge(draft.chg || 'lion', draft.chgT, SW, SW, draft.chgN, k, c))) : ''}
-  ${tinctRow("The charge's tincture", 'chgT')}`;
+  ${tinctRow("The charge's tincture", 'chgT',
+      draft.div === 'plain' && draft.ord === 'none' ? draft.a : null)}`;
 }
 function paneBord(){
   return `<div class="mk"><h3>A bordure</h3><div class="chips">
@@ -930,7 +993,8 @@ function paneBord(){
         data-arm="bord" data-v="${k}">${H.BORDURES[k]}</button>`).join('')}
     </div>
     </div>
-    ${draft.bord ? tinctRow("The bordure's tincture", 'bordT') : ''}`;
+    ${draft.bord ? tinctRow("The bordure's tincture", 'bordT',
+        draft.div === 'plain' ? draft.a : null) : ''}`;
 }
 /* the cut of the foot of your banner, drawn as the banner it makes — and
    the one colour the whole app then wears for you */
@@ -986,7 +1050,6 @@ VIEW.arms = () => `
       <div class="mk-tabs">${TABS.map(([k,n]) => `<button class="mk-tab${mkTab===k?' on':''}"
         data-tab="${k}">${n}${tabTally(k)}</button>`).join('')}</div>
       <div class="mk-pane">${(PANES[mkTab] || paneField)()}</div>
-      <div class="credit">Charges from game-icons.net, CC BY 3.0</div>
     </div>
     <div class="prev">
       <div class="card${me.pic?' pic':''}">
@@ -994,10 +1057,20 @@ VIEW.arms = () => `
           ? `<img class="ownpic" src="${esc(me.pic)}" alt="the picture you uploaded">`
           : H.armsSVG(draft, {shape:'shield', w:200, h:240, edge:6})
             + `<span class="prev-flag">${H.armsSVG(draft, {shape:'banner', w:84, h:176, edge:3})}</span>`}</div>
-        <div class="blazon">${me.pic ? '' : esc(H.blazonText(draft))}</div>
-        <div class="warn" id="warn">${me.pic
-          ? 'Your own picture is in use. The blazon is kept but not shown &#8212; drop the picture to go back to it.'
-          : H.tinctureWarning(draft)}</div>
+        <!-- NO WRITTEN BLAZON, AND NO ADVICE LINE. grumkata: "the text
+             saying per fes sable and argent... is still there". Both lines
+             lived here: the blazon spelling the coat out in herald's
+             language, and under it a sentence of tincture advice.
+
+             Neither earns its place. You are looking at the shield; being
+             told in Norman French what you can see is a caption on a
+             photograph. And the advice is now in the swatches themselves
+             (tinctRow) where the choice actually happens, which is both
+             earlier and quieter than a sentence appearing after the fact.
+
+             H.blazonText and H.tinctureWarning are both still exported and
+             still tested -- this is the view dropping them, not the model
+             losing them. -->
       </div>
       <div class="f" style="margin-top:20px"><label>The name you answer to</label>
         <input id="aname" maxlength="40" value="${esc(me.name)}" placeholder="type your name"></div>
@@ -1150,6 +1223,19 @@ document.addEventListener('click', e => {
                        repaintMaker.tab = 'field'; return render(true);
     case 'uploadarms': return $('#pickP').click();
     case 'uploadbody': return $('#pickB').click();
+    case 'pickbody': {
+      /* BY ID, NOT BY THE PICTURE ITSELF. The figures that ship with the
+         app are relative paths into assets/tex and would sit in an
+         attribute quite happily -- but anything you add yourself through
+         Library.art.add is a data URI of a few hundred kilobytes, and that
+         would go into the markup on every render of this screen. Looking it
+         up keeps both cases the same size. */
+      const a = window.Library && window.Library.art.get(b.dataset.v);
+      if (!a || !a.src) return;
+      me.body = a.src; saveM(); render();
+      if (window.Session && window.Session.live) window.Session.refresh();
+      return toast('That is you, at the table');
+    }
     case 'dropbody':   me.body=''; saveM(); render();
                        if (window.Session && window.Session.live) window.Session.refresh();
                        return toast('Likeness dropped');

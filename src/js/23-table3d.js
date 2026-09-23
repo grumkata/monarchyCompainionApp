@@ -130,6 +130,26 @@ function eyeLocal() {
    looking at. Derived now, so it cannot be left behind again. */
 const TABLE_M_HALF = TABLE_M / 2;
 const U_PER_M = RAD / TABLE_M_HALF;
+
+/* ── HOW CLOSE THE EYE MAY GET TO THE WOOD ──────────────
+   grumkata: "when you zoom in too much you see through the table and floor
+   boards which is a big nono", and then again, because the first answer was
+   the wrong one.
+
+   The first answer widened the GL near plane, and the near plane WAS
+   clipping — but it was clipping because of this, not instead of it. Look
+   at eyeLocal(): vy and vz are both divided by T.k, so the eye's height
+   above the wood is a constant over the zoom. Every notch inward halves
+   your distance to the table, asymptotically, and there was no floor under
+   it at all — only a ceiling on T.k itself, which is not the same thing,
+   because how close 5.2 puts you depends on the tilt and where you have
+   panned to.
+
+   So the limit is written where the problem is: in METRES ABOVE THE WOOD.
+   Eighteen centimetres is close enough to read a card lying flat and far
+   enough that the surface, its lip and everything standing on it are all
+   still in front of you rather than around you. */
+const EYE_FLOOR_M = 0.18;
 root.__eye = () => { const e = eyeLocal();
   return { back: e.y / U_PER_M, up: e.z / U_PER_M, side: e.x / U_PER_M }; };
 
@@ -1153,7 +1173,18 @@ function wire() {
     const k = Math.min(lock ? 5.2 : 1.8, Math.max(floor, T.k * (inward ? 1.10 : 1 / 1.10)));
     const vr = vp.getBoundingClientRect();
     const px = e.clientX - vr.left, py = e.clientY - vr.top;
+    const was = { x: T.x, y: T.y, k: T.k };
     T.x = px - (px - T.x) * (k / T.k); T.y = py - (py - T.y) * (k / T.k); T.k = k;
+    /* AND NOT INTO THE WOOD. Tried, then measured, then taken back if it
+       put the eye under the floor -- rather than solved for, because the
+       pan correction two lines up moves T.y in the same breath and the
+       closed form for "the largest k that keeps the eye above h" has to
+       account for it. Asking eyeLocal() afterwards is one call and it is
+       the same answer the renderer will use. */
+    if (inward && eyeLocal().z < EYE_FLOOR_M * U_PER_M) {
+      T.x = was.x; T.y = was.y; T.k = was.k;
+      return;
+    }
     apply();
     /* zooming out about a corner walks the table off screen just as surely
        as dragging does, so the same rule applies after a wheel */

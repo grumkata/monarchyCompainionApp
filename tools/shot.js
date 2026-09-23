@@ -49,7 +49,13 @@ const VIEWS = {
   table: 'true',
   chest: 'Table3D.frame(document.getElementById("tb-anchor"))',
   box:   'Toolbox.open()',
-  bar:   'Hand && Hand.show && Hand.show()'
+  bar:   'Hand && Hand.show && Hand.show()',
+  /* leaning right in, at the shortest lens the view allows. This is the
+     view that catches anything clipped by the near plane: the floor runs
+     under the camera and out towards you, so a near plane that does not
+     travel with the lens cuts the nearest boards and the near lip of the
+     table away and you see straight through the wood. */
+  lean:  'TableGL.lens(260)'
 };
 /* Views that stay in the hall and open one of its cloths. Kept apart from
    VIEWS because they must NOT walk into a table first. */
