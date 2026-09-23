@@ -1525,6 +1525,15 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 }
 .cl.said .stxt{ color:var(--m-text); font-size:14px; }
 .cl.said.emote{ font-style:italic; }
+/* THE GM IS NOT LOUDER, THEY ARE MARKED. Same size, same weight — a gilt
+   rule down the edge, the way a marginal hand marks a passage. At a table
+   you can tell who is running it without them shouting. */
+.cl.said.gm{ box-shadow:inset 2px 0 0 var(--m-or); padding-left:9px; }
+.cl.said.gm > b{ color:var(--m-or); }
+/* the table noticing something, rather than anybody saying it */
+.cl.note{ padding:3px 0 3px 9px; }
+.cl.note .stxt{ font-family:var(--m-f-hand); font-style:italic; font-size:13px;
+  color:var(--m-hush); }
 .cl.said.emote .stxt{ color:var(--m-quiet); }
 .cl.said.emote .stxt b{
   font-style:normal; font-family:var(--m-f-cap); font-size:9px;

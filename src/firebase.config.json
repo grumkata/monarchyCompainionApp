@@ -1,0 +1,10 @@
+{
+  "_comment": "The Firebase project this app's tables go through. See MULTIPLAYER.md. A Firebase WEB config is not a secret and cannot be made one: this is an app that ships as an .exe, so whatever it needs to reach the database is in the binary on every player's machine. Google publish these in their own sample code. What protects the data is the Realtime Database RULES and Anonymous auth, not this file. If the rules are open, this URL is open, and the repository is public.",
+  "apiKey": "AIzaSyAlcAPvg9pBUD6oax2u-sqGOvamCct4IYs",
+  "authDomain": "monarchy-companion.firebaseapp.com",
+  "databaseURL": "https://monarchy-companion-default-rtdb.firebaseio.com",
+  "projectId": "monarchy-companion",
+  "storageBucket": "monarchy-companion.firebasestorage.app",
+  "messagingSenderId": "632244770803",
+  "appId": "1:632244770803:web:a21824788754ce5729e486"
+}

@@ -127,6 +127,17 @@ const CSS = [
 const JS = [
   'src/js/29-role.js',           // which side of the table you are
   'src/js/07-options.js',        // what you have asked the app to be; read by 09 below
+  /* ── the multiplayer layer ──
+     The Firebase compat SDKs are inlined from node_modules the same way
+     three.js is: this app is ONE file and always has been, and a CDN tag
+     would mean a table that cannot be hosted on a venue's guest wifi
+     until gstatic answers. 337KB against a 4.5MB page. */
+  'node_modules/firebase/firebase-app-compat.js',
+  'node_modules/firebase/firebase-auth-compat.js',
+  'node_modules/firebase/firebase-database-compat.js',
+  'src/js/04-ring.js',           // who sits where, and why everyone agrees
+  'src/js/05-net.js',            // the wire: firebase, or this machine
+  'src/js/06-session.js',        // hosting, joining, presence, chat
   'src/js/00-three.js',          // vendor
   'src/js/00-geo-runtime.js',    // reads the packed vertices; needs THREE, precedes every pack
   'src/js/09-blazon3d.js',       // Blazon in 3D: banded light, the house ramp, a gilt rim
@@ -179,9 +190,41 @@ const JS = [
   'src/js/28-table-boot.js',
 
   'src/js/55-herald.js',         // Blazon's motion: the bend, the cry, the gilt
+  'src/js/57-chat-net.js',       // the dock, when there are other people in it
+  'src/js/58-sheets-net.js',     // the sheets somebody pulled onto the wood
+  'src/js/59-table-menu.js',     // the table's one menu: Esc, or the mark
+  'src/js/60-board-net.js',      // the same wood, for everyone at it
   'src/js/42-shell.js',          // ── which half you are looking at ──
   'src/js/16-menu.js'            // last: it boots the hall
 ];
+
+/* ══ THE FIREBASE PROJECT, IF THERE IS ONE ══════════════════════
+   src/firebase.config.json, put on the page as window.__FIREBASE_CONFIG__
+   before any script runs, which is where 05-net.js looks for it. Absent is
+   not an error: the app falls back to sharing a table between windows on
+   one machine, and says so on the Join screen.
+
+   A WEB CONFIG IS NOT A SECRET AND CANNOT BE MADE ONE. This ships as an
+   .exe; whatever it needs to reach the database is in the binary on every
+   player's machine, and no amount of build-time cleverness changes that.
+   Google publish these in their own documentation. What protects the data
+   is the database RULES (MULTIPLAYER.md) — baking the config in is not the
+   risk, leaving the rules open is.
+
+   `_comment` is stripped so the page does not carry a paragraph of prose in
+   a global, and so 05-net.js's `apiKey` check is the only thing that
+   decides whether a config counts. */
+let fbTag = '';
+try {
+  const raw = JSON.parse(R('src/firebase.config.json'));
+  delete raw._comment;
+  if (raw.apiKey && raw.databaseURL)
+    fbTag = '<script>window.__FIREBASE_CONFIG__=' + JSON.stringify(raw) + ';</script>';
+  else
+    console.log('  .. src/firebase.config.json has no apiKey/databaseURL — local tables only');
+} catch (e) {
+  console.log('  .. no src/firebase.config.json — tables are shared on this machine only');
+}
 
 const head = CSS.map(([f, sel]) => {
   const css = R(f);
@@ -356,6 +399,7 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Monarchy</title>
+${fbTag}
 ${head}
 </head>
 <body class="at-hall">

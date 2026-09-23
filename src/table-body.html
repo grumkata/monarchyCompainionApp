@@ -93,8 +93,13 @@
   <div id="grain" class="m-grain" aria-hidden="true"></div>
 </div>
 
-<div class="hud tl">The Table<em>drag the wood to pan &middot; wheel to zoom &middot; drag a piece to move it &middot; click to select &middot; <b>Alt</b>+wheel to resize &middot; arrows nudge &middot; <b>Del</b> bins &middot; <b>Ctrl+Z</b> undoes</em></div>
-<div class="hud br"><span class="zl" id="zl">100%</span><button id="theme">Theme</button><button id="fit">Fit table</button></div>
+<!-- The table's name, and nothing else. The paragraph of keyboard hints
+     that used to live here was a manual printed on the wall: everything in
+     it is discoverable by doing it, and none of it belonged on screen for
+     the whole of every session. Theme and Fit moved into the menu
+     (59-table-menu.js), which is where decisions about this table live. -->
+<div class="hud tl">The Table</div>
+<div class="hud br"><span class="zl" id="zl">100%</span></div>
 <aside class="chatdock">
   <div class="plaque">Chat</div>
   <div class="cb" id="chat-body"></div>

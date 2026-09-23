@@ -1,14 +1,14 @@
 {
   "name": "monarchy",
   "version": "1.0.0",
-  "description": "Monarchy \u2014 TTRPG character companion & table",
+  "description": "Monarchy — TTRPG character companion & table",
   "main": "electron/main.js",
   "private": true,
   "scripts": {
     "build:html": "node build.js",
     "start": "npm run build:html && electron .",
     "dist": "npm run build:html && electron-builder",
-    "test": "node build.js && node test/tincture.test.js && node test/blazon.test.js && node test/smooth.test.js && node test/geometry.test.js && node test/table.test.js && node test/table-ui.test.js && node test/join.test.js && node test/handling.test.js && node test/herald.test.js && node test/case.test.js",
+    "test": "node build.js && node test/tincture.test.js && node test/session.test.js && node test/blazon.test.js && node test/smooth.test.js && node test/geometry.test.js && node test/table.test.js && node test/table-ui.test.js && node test/join.test.js && node test/handling.test.js && node test/herald.test.js && node test/case.test.js",
     "test:ui": "node build.js && node test/table-ui.test.js"
   },
   "devDependencies": {
@@ -65,6 +65,7 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "firebase": "^12.19.0"
   }
 }

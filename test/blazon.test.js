@@ -223,18 +223,20 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   T('and the words under it change with it', await pg.evaluate(() =>
     /vair/i.test(document.querySelector('.blazon').textContent)));
 
-  T('a choice that cannot apply says so where it would have been',
+  /* THIS USED TO CHECK THE OPPOSITE. A choice that could not apply was
+     replaced by a paragraph explaining why — and grumkata: "remove all the
+     extrenous explanation text its unproffesional". He is right: a row for
+     dressing a cut, on a field that has no cut, has no business being on
+     screen at all, with or without an apology attached. */
+  T('a choice that cannot apply is not on screen at all',
     await pg.evaluate(async () => {
-      /* a checky field has no single cut, so the line row has nothing to
-         offer. An empty space there reads as the app having lost it. */
       document.querySelector('[data-arm="div"][data-v="checky"]').click();
       await new Promise(r => setTimeout(r, 220));
       const gone = document.querySelectorAll('[data-arm="line"]').length === 0;
-      const said = [...document.querySelectorAll('.mk-pane .note')]
-        .some(n => /divided field/i.test(n.textContent));
+      const quiet = document.querySelectorAll('.mk-pane .note').length === 0;
       document.querySelector('[data-arm="div"][data-v="perPale"]').click();
       await new Promise(r => setTimeout(r, 220));
-      return gone && said && document.querySelectorAll('[data-arm="line"]').length > 1;
+      return gone && quiet && document.querySelectorAll('[data-arm="line"]').length > 1;
     }));
 
   T('the find well narrows the charges and keeps your caret',
@@ -261,28 +263,21 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       press('[data-arm="livery"][data-v="murrey"]'); await new Promise(r => setTimeout(r, 200));
       const n = document.getElementById('aname');
       n.value = 'Aldric'; n.dispatchEvent(new Event('input', { bubbles: true }));
-      const m = document.getElementById('amotto');
-      m.value = 'By the wood'; m.dispatchEvent(new Event('input', { bubbles: true }));
       press('[data-do="takearms"]');
       await new Promise(r => setTimeout(r, 700));
       const me = JSON.parse(localStorage.getItem('monarchy.me.v1'));
       return me.arms.hem === 'gonfalon' && me.arms.livery === 'murrey'
-        && me.arms.a === 'vair' && me.name === 'Aldric' && me.motto === 'By the wood';
+        && me.arms.a === 'vair' && me.name === 'Aldric';
     }));
 
   T('and the chrome is wearing it', await pg.evaluate(() =>
     document.documentElement.style.getPropertyValue('--m-house')
       === window.Heraldry.TINCT.murrey));
 
-  T('your motto and your style show in the corner only once written',
-    await pg.evaluate(async () => {
-      const mo = document.getElementById('mymotto'), st = document.getElementById('mystyle');
-      const shown = !mo.hidden && /By the wood/.test(mo.textContent) && st.hidden;
-      window.Menu.me().style = 'of the Red Marches';
-      window.Menu.me().motto = '';
-      /* paintArms is what the corner is drawn by; reach it the way the app does */
-      document.getElementById('smotto');
-      return shown;
+  T('your name shows in the corner of the hall',
+    await pg.evaluate(() => {
+      const n = document.getElementById('myname');
+      return !!n && n.textContent === 'Aldric' && !n.classList.contains('unset');
     }));
 
   /* ══ SETTINGS ══════════════════════════════════════════════ */
@@ -296,16 +291,41 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
           && !p.querySelector('input[type=radio]');
     }));
 
-  T('every switch the store describes is on the screen, with all its states',
-    await pg.evaluate(() => {
-      const D = window.Options.DEFS;
-      return Object.keys(D).every(k => {
-        const pens = document.querySelectorAll('[data-opt="' + k + '"]');
-        return pens.length === D[k].of.length
-          && document.querySelectorAll('[data-opt="' + k + '"].on').length === 1;
-      });
-    }));
+  /* \u2550\u2550 ONE PLACE AT A TIME \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+     grumkata: "dont cram everything on one screen ffs". So Settings is a
+     list of places and one pane, and these have to walk to the pane they
+     are about \u2014 which is the better test anyway, because everything on
+     that screen now depends on the walking working. */
+  const goTo = async place => {
+    await pg.evaluate(p => document.querySelector('[data-set="' + p + '"]').click(), place);
+    await wait(260);
+  };
 
+  T('Settings is a list of places, showing one of them',
+    await pg.evaluate(() => document.querySelectorAll('.setnav-i').length >= 6
+      && document.querySelectorAll('.setpane').length === 1));
+
+  T('every switch the store describes is on its own page, with all its states',
+    await (async () => {
+      const groups = await pg.evaluate(() => window.Options.groups().map(g => g.name));
+      const where = { 'Display': 'look', 'The table': 'table' };
+      for (const g of groups) {
+        if (!where[g]) return false;
+        await goTo(where[g]);
+        const ok = await pg.evaluate(name => {
+          const D = window.Options.DEFS;
+          return Object.keys(D).filter(k => (D[k].g || '') === name).every(k => {
+            const pens = document.querySelectorAll('[data-opt="' + k + '"]');
+            return pens.length === D[k].of.length
+              && document.querySelectorAll('[data-opt="' + k + '"].on').length === 1;
+          });
+        }, g);
+        if (!ok) return false;
+      }
+      return true;
+    })());
+
+  await goTo('look');
   T('the film grade switch reaches the document, not just the store',
     await pg.evaluate(async () => {
       document.querySelector('[data-opt="grade"][data-v="off"]').click();
@@ -317,6 +337,18 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       return off && !document.body.classList.contains('nograde');
     }));
 
+  await goTo('table');
+  T('and a table switch reaches the table it is about',
+    await pg.evaluate(async () => {
+      document.querySelector('[data-opt="snap"][data-v="off"]').click();
+      await new Promise(r => setTimeout(r, 180));
+      const loose = window.TableModel.GRID === 0;
+      document.querySelector('[data-opt="snap"][data-v="on"]').click();
+      await new Promise(r => setTimeout(r, 180));
+      return loose && window.TableModel.GRID === 20;
+    }));
+  await goTo('look');
+
   T('turning the stylising off turns it off in the shaders too',
     await pg.evaluate(async () => {
       document.querySelector('[data-opt="cel"][data-v="off"]').click();
@@ -324,6 +356,7 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       return window.Options.celAmt() === 0;
     }));
 
+  await goTo('data');
   T('forgetting everything takes two presses, and the first destroys nothing',
     await pg.evaluate(async () => {
       document.querySelector('[data-do="forgetall"]').click();

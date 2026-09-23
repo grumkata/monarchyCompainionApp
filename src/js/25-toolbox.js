@@ -327,8 +327,21 @@ function refill() { if (root.Hand && root.Hand.isUp()) root.Hand.refresh(); }
    `x,y` is the point on the wood you let go of it. `v` is what you chose
    while you were holding it — the battlefield's width, the picture, which
    side the counter is on. */
+/* ── AND A CHARACTER PUT ON THE WOOD IS AT THE TABLE ──────────
+   grumkata: "people should be able to connect ANNY number of charcter
+   sheets to a table by pulling it there". Pulling one there IS this: you
+   take it out of the chest and put it down. So there is no second gesture
+   to learn and no "share" button — placing a character at a live table
+   brings its sheet with it, and everybody else can then make a counter of
+   it, open it as paper on the wood, and watch it change. */
+function alsoBring(i) {
+  if (!i || i.kind !== 'token' || !i.char) return;
+  if (root.SheetsNet) root.SheetsNet.bring(i.char);
+}
+
 function take(i, x, y, v) {
   v = v || {};
+  alsoBring(i);
   if (i.act === 'unbin') { T().unbin(i.ref); refill(); return; }
   const at = (x == null)
     ? (root.Table3D ? root.Table3D.middle() : { x: 1200, y: 780 })

@@ -46,14 +46,25 @@ const PREFIX = /^monarchy\.table\./;
    itself from this: a new option is one entry here and one line of
    apply(), and it appears on the screen with its own words. */
 const DEFS = {
-  cel: { d: 'full', of: ['off', 'soft', 'full'],
-         t: 'Stylised 3D',
-         w: 'The banded light, the house ramp and the gilt edge on every model. Off is plain lighting.',
-         say: { off: 'Off', soft: 'Softened', full: 'Full' } },
-  grade: { d: 'on', of: ['off', 'on'],
-         t: 'Film grade',
-         w: 'Warm light against cool shadow, a falloff at the edges, and moving grain over the lot.',
-         say: { off: 'Off', on: 'On' } }
+  /* ── DISPLAY ── */
+  cel:   { g: 'Display', d: 'full', of: ['off', 'soft', 'full'],
+           t: 'Stylised 3D', say: { off: 'Off', soft: 'Softened', full: 'Full' } },
+  grade: { g: 'Display', d: 'on', of: ['off', 'on'],
+           t: 'Film grade', say: { off: 'Off', on: 'On' } },
+  /* Chromium scales the whole document, canvases included, and every 3D
+     layer here already re-measures on resize — so this is one property
+     rather than a font-size scheme that would miss half the app. */
+  scale: { g: 'Display', d: '100', of: ['90', '100', '110', '125', '150'],
+           t: 'Interface size',
+           say: { '90': '90%', '100': '100%', '110': '110%', '125': '125%', '150': '150%' } },
+
+  /* ── THE TABLE ── */
+  snap:  { g: 'The table', d: 'on', of: ['off', 'on'],
+           t: 'Snap to the grid', say: { off: 'Off', on: 'On' } },
+  dice:  { g: 'The table', d: 'on', of: ['off', 'on'],
+           t: 'Throw dice on the wood', say: { off: 'Off', on: 'On' } },
+  bin:   { g: 'The table', d: 'off', of: ['off', 'on'],
+           t: 'Ask before binning', say: { off: 'Off', on: 'On' } }
 };
 
 let vals = read();
@@ -83,6 +94,14 @@ function apply() {
   const b = doc.body;
   if (b) b.classList.toggle('nograde', vals.grade === 'off');
   if (root.Blazon3D && root.Blazon3D.strength) root.Blazon3D.strength(celAmt());
+  /* the whole document, canvases and all. Every 3D layer in this app already
+     listens for resize and re-measures, which is what makes this safe to do
+     with one property instead of a font scheme that would miss the wood. */
+  try { doc.documentElement.style.zoom = (+vals.scale / 100) || 1; } catch (e) {}
+  /* the grid a piece lands on. 0 is "wherever you put it", which is what
+     Shift already does per-drag (23-table3d.js) — this is that, kept. */
+  if (root.TableModel) root.TableModel.GRID = (vals.snap === 'on') ? 20 : 0;
+  root.dispatchEvent(new CustomEvent('monarchy:opts-applied'));
 }
 
 function set(k, v) {
@@ -146,7 +165,20 @@ function forget() {
   return doomed.length;
 }
 
-root.Options = { DEFS, KEYS, get, set, next, all, apply, reset,
+/* the groups, in the order they are declared, so the screen is laid out by
+   this file rather than by a second list somewhere else that can drift */
+function groups() {
+  const out = [];
+  Object.keys(DEFS).forEach(k => {
+    const g = DEFS[k].g || 'Look';
+    let row = out.find(x => x.name === g);
+    if (!row) out.push(row = { name: g, keys: [] });
+    row.keys.push(k);
+  });
+  return out;
+}
+
+root.Options = { DEFS, KEYS, groups, get, set, next, all, apply, reset,
                  celAmt, dump, weigh, forget, say: (k, v) => DEFS[k].say[v] };
 
 if (doc.body) apply();

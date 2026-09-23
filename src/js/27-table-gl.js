@@ -810,7 +810,10 @@ function buildRoom() {
   seatRoot = new THREE.Group();
   roomGroup.add(seatRoot);
   syncSeats();
-  houseBanner();
+  /* houseBanner() used to hang YOUR arms over the hearth — directly ahead
+     of the one seat the camera sits in, which is the one place they should
+     never be. grumkata: "my banner should be behind me and only visible to
+     others looking at me". It is, at your seat, where buildSeat puts it. */
 }
 
 /* ══ WHOSE TABLE THIS IS ═══════════════════════════════════════
@@ -1090,7 +1093,61 @@ function buildSeat(seat) {
     g.add(ch);
   }
 
-  if (seat.face) {
+  /* ══ THE PERSON IN THE CHAIR ═════════════════════════════
+     grumkata: "each player gets a fullbody image so that when you look
+     around in table view you can see them in order".
+
+     A LIKENESS AND A FACE ARE DIFFERENT HEIGHTS. A face is a bust and
+     belongs at sitting height above the chair; a full-length cutout has
+     feet and belongs ON THE FLOOR, or it is a person hovering. So the two
+     are not the same code with a different picture — `body` stands, `face`
+     sits, and a seat with both shows the body, because that is the one
+     that was chosen for this. */
+  /* ══ AND IT TURNS TO FACE YOU ═══════════════════════════════
+     A standee is a flat card. Pointed at the middle of the table it is
+     right from the one seat the camera happens to be in and wrong from
+     everywhere else — and seen from above, which is how this table is
+     normally looked at, it is EDGE ON and vanishes completely. That is why
+     the chairs read as empty: the people were there the whole time, a
+     sixteenth of a millimetre wide.
+
+     So the card is billboarded: every frame it turns about its own upright
+     axis to face the camera, which is exactly what a cardboard cut-out at a
+     real table does when you walk round it. Only about Y — tilting it back
+     as you lean down would make a person lie over. */
+  if (seat.body) {
+    /* PAINTED LIGHTLY, so a person at the table is lit by the same room
+       without their face being repainted by it. A standee is somebody's
+       character art; the room may fall on it, but the room does not get to
+       recolour it. Hence the low dye and the near-untouched chroma. */
+    const mat = B3(new THREE.MeshStandardMaterial({ side: THREE.DoubleSide,
+                     transparent: true, alphaTest: 0.02, roughness: 0.94,
+                     metalness: 0, envMapIntensity: 0.3 }),
+                   { room: 'tavern', rim: 0, tint: 0.14 });
+    waiting++;
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 1.62), mat);
+    card.visible = false;
+    mat.map = new THREE.TextureLoader().load(seat.body, t => {
+      card.visible = true;
+      /* A PERSON IS A HEIGHT, NOT A WIDTH. Everything else in this file
+         takes its width from the layout and lets the picture decide the
+         height; a human figure is the other way round, because people are
+         all roughly 1.7m and are all different widths. Sizing a standee by
+         width makes a photograph taken in landscape into a giant. */
+      const im = t.image, ar = im && im.width ? im.width / im.height : 0.4;
+      const h = 1.66, w = Math.max(0.28, Math.min(1.1, h * ar));
+      card.geometry.dispose();
+      card.geometry = new THREE.PlaneGeometry(w, h);
+      card.position.set(0, FLOOR_Y + h / 2, 0.06);
+      /* the shared one: it also releases anything waiting on the room's
+         textures, which a local `waiting--` would have silently skipped */
+      landed();
+    }, undefined, landed);
+    mat.map.encoding = THREE.sRGBEncoding;
+    card.position.set(0, FLOOR_Y + 0.83, 0.06);
+    card.userData.faceMe = true;
+    g.add(card);
+  } else if (seat.face) {
     /* and the same for a face: a person across the table is lit by the
        same hearth as the table is, or they read as a cut-out pasted on */
     const mat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, transparent: true,
@@ -1151,17 +1208,71 @@ function buildSeat(seat) {
   return g;
 }
 
+/* ══ WHO IS ACTUALLY AT THE TABLE ══════════════════════════
+   Two sources, and which one is in use is not a setting, it is whether
+   anybody else is here:
+
+     LIVE      a GM is hosting and people have joined. The seats ARE the
+               people — one per person, placed by 04-ring.js, which every
+               client runs with its own uid so each of us is at our own
+               near side and yet we all agree who is beside whom.
+
+     ALONE     no session. The seats are whatever the local save holds,
+               exactly as before, so a table still works on a plane.
+
+   Nothing downstream changes. buildSeat is handed the same shape either
+   way: a name, a bearing, a likeness, a coat of arms, and whether it is
+   yours. */
+function seatsNow() {
+  const S = root.Session;
+  if (S && S.live) {
+    return S.seating().map(m => ({
+      id: 'live-' + m.uid,
+      name: m.name || 'Someone',
+      at: m.at,
+      body: m.body || '',
+      face: m.pic || '',
+      /* their own coat, drawn here rather than sent as a picture: the
+         record is two hundred bytes and the drawing is this client's job */
+      banner: (m.arms && root.Heraldry)
+        ? root.Heraldry.armsURL(m.arms, { w: 220, h: 300 }) : '',
+      __mine: !!m.mine, __uid: m.uid, __role: m.role
+    }));
+  }
+  return root.TableModel.seats ? root.TableModel.seats() : [];
+}
+
+/* every standee turns to the camera, about its upright axis only. The seat
+   group is already rotated to its bearing, so what each card needs is the
+   DIFFERENCE between that bearing and the one the camera is on. */
+const _sv = new THREE.Vector3();
+function faceSeats() {
+  if (!seatRoot || !camera) return;
+  for (const g of seatRoot.children) {
+    for (const c of g.children) {
+      if (!c.userData.faceMe) continue;
+      c.getWorldPosition(_sv);
+      _sv.subVectors(camera.position, _sv);
+      c.rotation.y = Math.atan2(_sv.x, _sv.z) - g.rotation.y;
+    }
+  }
+}
+
 function syncSeats() {
   if (!seatRoot || !root.TableModel) return;
-  const seats = root.TableModel.seats ? root.TableModel.seats() : [];
+  const live = !!(root.Session && root.Session.live);
+  const seats = seatsNow();
   const sig = seats.map(s => s.id + '|' + s.at + '|' + (s.face || '').length +
-                             '|' + (s.banner || '').length).join(',')
-            + '|me' + ((root.Shell && root.Shell.seat) ? root.Shell.seat() : 0);
+                             '|' + (s.body || '').length +
+                             '|' + (s.banner || '').length + '|' + (s.__mine ? 1 : 0)).join(',')
+            + (live ? '|live' : '|me' + ((root.Shell && root.Shell.seat) ? root.Shell.seat() : 0));
   if (sig === seatSig) return;
   seatSig = sig;
   while (seatRoot.children.length) seatRoot.remove(seatRoot.children[0]);
-  const mineAt = (root.Shell && root.Shell.seat) ? root.Shell.seat() : 0;
-  seats.forEach((s, i) => { s.__mine = (i === mineAt); });
+  if (!live) {
+    const mineAt = (root.Shell && root.Shell.seat) ? root.Shell.seat() : 0;
+    seats.forEach((s, i) => { s.__mine = (i === mineAt); });
+  }
   for (const s of seats) {
     s.__a = (s.at || 0) * Math.PI / 180;        /* buildSeat needs the bearing */
     const g = buildSeat(s);
@@ -2504,6 +2615,7 @@ function frame(ts) {
   }
 
   syncStandees();
+  faceSeats();
 
   const a = doc.getElementById('tb-anchor');
   const vp = doc.getElementById('vp');
@@ -2654,6 +2766,37 @@ function glStats() {
            roomLights: lit.length };
 }
 root.__glStats = glStats;
+
+/* WHAT IS ACTUALLY AT EACH SEAT, in metres, for looking at a table that is
+   drawn wrong. Everything here is a question about the scene graph rather
+   than about the picture, which is the difference between knowing the
+   standee is missing and thinking it might be dark. */
+root.__seats = () => {
+  if (!seatRoot) return { seatRoot: null };
+  /* IN METRES. roomGroup is scaled by pixels-per-metre (PX) so the room
+     lives in the table's own pixel space — measuring in world units gives
+     numbers in the hundreds and reads like a catastrophe when nothing is
+     wrong. Everything below is divided back down. */
+  const PXs = roomGroup ? roomGroup.scale.x : 1;
+  const V = new THREE.Vector3(), B = new THREE.Box3();
+  const floorY = roomGroup ? roomGroup.position.y + FLOOR_Y * PXs : 0;
+  return {
+    px: +PXs.toFixed(1),
+    count: seatRoot.children.length,
+    seats: seatRoot.children.map(g => ({
+      at: +(Math.atan2(g.position.x, -g.position.z) * 180 / Math.PI).toFixed(0),
+      r: +Math.hypot(g.position.x, g.position.z).toFixed(2),
+      parts: g.children.map(n => {
+        B.setFromObject(n);
+        const sz = B.getSize(new THREE.Vector3());
+        n.getWorldPosition(V);
+        return { vis: n.visible,
+                 w: +(sz.x / PXs).toFixed(2), h: +(sz.y / PXs).toFixed(2),
+                 aboveFloor: +((V.y - floorY) / PXs).toFixed(2) };
+      })
+    }))
+  };
+};
 /* every flame that is currently alight, and where. A light burning in
    clear air is the one room bug that looks like magic rather than a
    mistake, so it should be one call to check for. */
@@ -2786,6 +2929,12 @@ function warm() {
    room is warmed, so there was nothing to push. Left out rather than left
    in, since code that claims to do something it does not is worse than the
    half-second it was meant to save. */
+
+/* somebody arrived, somebody left, somebody changed their likeness: the
+   ring has moved and the chairs have to follow it. The signature check in
+   syncSeats means a session event that changed nothing costs one string
+   compare, so this can be as noisy as the wire is. */
+root.addEventListener('monarchy:session', () => { seatSig = ''; syncSeats(); });
 
 root.TableGL = { build, warm, setOpen, sync, thumb, bit, onTextures, invalidate, showRoom, lens, syncSeats,
   planRows, planKinds, setPlan, resetPlan, defaultPlan: () => TAVERN_PLAN.map(r => Object.assign({}, r)),

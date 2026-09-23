@@ -568,7 +568,16 @@ const T = {
      Ctrl+Z can put it back. Losing a whole combat scene because you let go
      two inches wide of where you meant to should not end an evening. A
      keystroke is not a user interface.                                    */
+  /* Settings → The table → Ask before binning. Off by default, because Ctrl+Z
+     already undoes it and a confirm on every one of forty pieces an evening
+     is worse than the mistake it prevents — but it is a real preference for
+     anybody running a table they cannot afford to fumble. */
   bin(id) {
+    if (root.Options && root.Options.get('bin') === 'on') {
+      const t = this.get(id);
+      const what = (t && (t.name || t.kind)) || 'that';
+      if (!root.confirm('Bin ' + what + '?')) return false;
+    }
     const i = this.state.things.findIndex(t => t.id === id);
     if (i < 0) return false;
     const t = this.state.things.splice(i, 1)[0];

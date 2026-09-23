@@ -1,0 +1,48 @@
+{
+  "rules": {
+    "tables": {
+      "$word": {
+        ".read": "auth != null",
+
+        ".write": "auth != null && data.child('meta').child('host').val() === auth.uid",
+
+        "meta": {
+          ".write": "auth != null && (!data.exists() || data.child('host').val() === auth.uid)",
+          ".validate": "newData.child('host').val() === auth.uid"
+        },
+
+        "seats": {
+          "$uid": {
+            ".write": "auth != null && $uid === auth.uid",
+            ".validate": "newData.isNumber()"
+          }
+        },
+
+        "who": {
+          "$uid": {
+            ".write": "auth != null && $uid === auth.uid",
+            ".validate": "newData.child('uid').val() === auth.uid"
+          }
+        },
+
+        "chat": {
+          "$msg": {
+            ".write": "auth != null && !data.exists()",
+            ".validate": "newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 4000"
+          }
+        },
+
+        "board": {
+          ".write": "auth != null && root.child('tables').child($word).child('meta').child('live').val() === true"
+        },
+
+        "sheets": {
+          "$id": {
+            ".write": "auth != null && (!data.exists() || data.child('by').val() === auth.uid)",
+            ".validate": "newData.child('by').val() === (data.exists() ? data.child('by').val() : auth.uid)"
+          }
+        }
+      }
+    }
+  }
+}

@@ -85,6 +85,10 @@ function tableDice(res){
   return list;
 }
 
+/* do thrown dice land on the wood? Settings → The table. `quiet` in the
+   roll text still overrides it for a single throw. */
+const onWood = () => !(window.Options && window.Options.get('dice') === 'off');
+
 /* ── chat ── */
 /* WHO. This was hardcoded to 'GM' or the string 'Sir Aldric' — the demo
    fixture's character — so every roll anyone ever made in chat was signed
@@ -109,11 +113,19 @@ function say(res){
     return `<i class="${nat.trim()}">${r}</i>`;
   }).join('') + (t.mod ? `<u>${t.mod > 0 ? '+' : ''}${t.mod}</u>` : '')).join('');
 
-  const d = document.createElement('div');
-  d.className = 'cl roll';
-  d.innerHTML = `<b>${esc(who)}</b><span class="rspec">${esc(spec)}</span>`
+  const html = `<b>${esc(who)}</b><span class="rspec">${esc(spec)}</span>`
     + `<span class="rdice">${chips}</span>`
     + (anyNum ? `<span class="rtot">${totalOf(res)}</span>` : '');
+  /* THE NUMBERS ARE DECIDED ONCE, BY WHOEVER ROLLED. The dice on the wood
+     are this client's own toy; eleven clients each throwing their own would
+     be eleven different answers to one roll. What goes on the wire is the
+     line that was drawn here, and it comes back to this screen the same way
+     it reaches theirs. 57-chat-net.js filters it on arrival, because by then
+     it is markup from a machine nobody controls. */
+  if (atTable()) { window.Session.talk(html, 'roll'); return; }
+  const d = document.createElement('div');
+  d.className = 'cl roll';
+  d.innerHTML = html;
   const cb = document.getElementById('chat-body');
   cb.appendChild(d); cb.scrollTop = cb.scrollHeight;
 }
@@ -156,7 +168,11 @@ function build(){
     `<div class="dpool empty" id="dpool"></div>` +
     `<div class="drow">` +
       `<label class="dmod">Mod<input id="dmod" type="number" value="0" step="1"></label>` +
-      `<label class="dtog"><input type="checkbox" id="dtable" checked><span>On the table</span></label>` +
+      /* THE CHECKBOX WENT TO SETTINGS. It was one more control loose in a
+         corner, and "do dice land on the wood" is a preference you set once
+         rather than a thing you decide per roll. `quiet` in the roll text
+         still overrides it for one throw, which is the per-roll answer. */
+      '' +
       `<button class="dclear" id="dclear">Clear</button>` +
       `<button class="droll" id="droll">Roll</button></div>`;
   dock.insertBefore(bar, dock.querySelector('.cin'));
@@ -190,7 +206,7 @@ function build(){
     }
     const res = rollTerms(terms);
     say(res);
-    if (document.getElementById('dtable').checked && window.GLDice)
+    if (onWood() && window.GLDice)
       window.GLDice.spawn(tableDice(res));
   };
   /* the tray is a control, not the table — never start a pan from it */
@@ -202,10 +218,26 @@ function build(){
    A line of speech, in the same dock the rolls land in, so the two
    read as one conversation. Emotes with a leading /me, because that
    is the one bit of chat grammar everyone already knows.        */
+/* ══ WHERE A LINE GOES ═══════════════════════════════════
+   Alone, onto your own screen. At a live table, to the table — and back
+   from it like everybody else's, so there is one copy of the conversation
+   and no way for yours to drift from theirs.
+
+   THIS HAS TO BE HERE, at the source. The first attempt wrapped
+   `window.Dice.talk` from another file and it never ran once: the chat box
+   calls the LOCAL `talk`, and reassigning a property on the exports object
+   does nothing to a closure that was captured when this module loaded.
+   Exported functions are a copy of the reference, not a hook. */
+const atTable = () => !!(window.Session && window.Session.live);
+
 function talk(text){
+  const t = String(text || '').trim(); if (!t) return false;
+  if (atTable()) {
+    window.Session.talk(t, /^\/me\s+/i.test(t) ? 'emote' : 'say');
+    return true;
+  }
   const cb = document.getElementById('chat-body');
   if (!cb) return false;
-  const t = String(text || '').trim(); if (!t) return false;
   const emote = /^\/me\s+/i.test(t);
   const body = emote ? t.replace(/^\/me\s+/i, '') : t;
   const d = document.createElement('div');

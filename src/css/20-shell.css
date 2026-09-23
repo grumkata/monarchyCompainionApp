@@ -251,25 +251,114 @@ body.at-hall  #table-app { display: none; }
 body.at-hall #gl, body.at-hall #gl2, body.at-hall #tgl { display: none !important; }
 
 /* the way back, on the table */
-/* Sable chrome with the counterchange, and a pennon cut on its right end so
-   it reads as pointing back the way you came.
-   `html body` because 12-combat.css opens with `*{padding:0}`, scoped to
-   `body.at-table *` — two points of specificity to a bare class's one, and
-   this sheet loads first, so this button had been drawn with no padding at
-   all since the shell was split. */
-html body .to-hall {
-  position: fixed; left: 17px; top: 15px; z-index: 940; display: none;
-  font-family: var(--m-f-cap); font-size: 9.5px; font-weight: 700;
-  letter-spacing: var(--m-track); text-transform: uppercase; cursor: pointer;
-  color: var(--m-text); border: 0; padding: 10px 26px 10px 14px;
-  background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable);
+/* ══ THE TABLE'S MENU ═════════════════════════════════════
+   grumkata: "the table needs a real menu not random buttons all over the
+   place [...] make it an escape key and menu button in the top left that
+   THEN brings you to menu".
+
+   There was a Back pennon in one corner and a Theme and a Fit in the other.
+   Three buttons, three corners, no relationship between them, and the one
+   decision that mattered — hosting — was not on this screen at all. Now
+   there is a mark in the top left, Escape opens it, and everything that is
+   a decision about this table is behind it.
+
+   The mark is three bars, which is the one icon nobody has to be taught.
+   `html body` because 12-combat.css opens with `*{padding:0}` scoped to
+   `body.at-table *`, which outranks a bare class. */
+html body .tm-open {
+  position: fixed; left: 16px; top: 14px; z-index: 941; display: none;
+  width: 42px; height: 38px; padding: 0; border: 0; cursor: pointer;
+  flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  background: var(--m-marks), var(--m-sable);
+  box-shadow: inset 0 0 0 1px var(--m-line), var(--m-lift);
   clip-path: var(--m-pennon);
-  box-shadow: inset 3px 0 0 var(--m-house), inset 0 0 0 1px var(--m-line);
-  transition: background-position var(--t-wipe) var(--settle),
-              color var(--t-wipe) var(--settle), transform var(--t-press) var(--snap);
+  transition: box-shadow var(--t-hover) var(--settle);
 }
-html body.at-table .to-hall { display: block; }
-html body .to-hall:hover { background-position: 0 0; color: var(--m-sable); }
+html body.at-table .tm-open { display: flex; }
+html body .tm-open i {
+  display: block; width: 17px; height: 2px; background: var(--m-or);
+  transition: width var(--t-hover) var(--settle), background var(--t-hover) var(--settle);
+}
+html body .tm-open:hover { box-shadow: inset 0 0 0 1px var(--m-or), var(--m-lift); }
+html body .tm-open:hover i:nth-child(2) { width: 11px; }
+html body.menuing .tm-open i { background: var(--m-argent-hi); }
+
+/* the menu itself: a scrim you can shut it on, and one card */
+html body .tmenu {
+  position: fixed; inset: 0; z-index: 1400; display: flex;
+  align-items: flex-start; justify-content: flex-start;
+  padding: 62px 0 0 16px; background: rgba(6,4,3,.52);
+  animation: tm-in .16s var(--settle);
+}
+html body .tmenu[hidden] { display: none; }
+@keyframes tm-in { from { opacity: 0 } }
+html body .tm-card {
+  width: 306px; padding: 0 0 6px;
+  background: var(--m-marks), linear-gradient(176deg, var(--m-sable-2), var(--m-sable) 64%);
+  box-shadow: var(--m-frame), var(--m-lift);
+  animation: tm-card .22s var(--pop) both;
+}
+@keyframes tm-card { from { opacity: 0; transform: translateY(-10px) } }
+
+html body .tm-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 14px 16px 10px; box-shadow: inset 0 -1px 0 var(--m-line);
+}
+html body .tm-head b {
+  font-family: var(--m-f-mark); font-weight: 400; font-size: 25px; line-height: 1;
+  color: var(--m-argent-hi);
+}
+/* the word is the thing somebody in the room is waiting for you to read
+   out, so it is set like a thing to be read out */
+html body .tm-word {
+  font-family: var(--m-f-cap); font-size: 15px; font-weight: 700;
+  letter-spacing: .26em; color: var(--m-sable); background: var(--m-or);
+  padding: 3px 4px 3px 10px; clip-path: var(--m-pennon);
+}
+html body .tm-who {
+  padding: 8px 16px 2px; font-family: var(--m-f-cap); font-size: 9px;
+  font-weight: 700; letter-spacing: var(--m-track); text-transform: uppercase;
+  color: var(--m-quiet);
+}
+html body .tm-rows { padding: 8px 8px 0; }
+html body .tm-row {
+  display: block; width: 100%; text-align: left; cursor: pointer; border: 0;
+  padding: 11px 14px; background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat,
+                                 transparent;
+  transition: background-position var(--t-wipe) var(--settle),
+              color var(--t-wipe) var(--settle);
+}
+/* THE LABEL IS THE BUTTON. It used to be a <span> inside it, and when the
+   sub-notes were stripped out the span went with them — leaving every row
+   inheriting the button default, which is black, on a Sable card. The type
+   lives on the button itself now, so there is nothing left to fall off. */
+html body .tm-row {
+  font-family: var(--m-f-cap); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--m-text);
+}
+/* the one row that is the reason you opened the card */
+html body .tm-row.is-or { color: var(--m-or); }
+html body .tm-row.is-gules { color: var(--m-gules-hi); }
+html body .tm-row:hover { background-position: 0 0; color: var(--m-sable); }
+html body .tm-row.is-gules:hover {
+  background: var(--m-gules); color: var(--m-argent-hi);
+}
+/* an answer to the button you just pressed, next to that button — not
+   thrown across the screen in 124px type, which is what it used to be */
+html body .tm-note {
+  margin: 10px 14px 2px; padding: 9px 11px;
+  font-family: var(--m-f-hand); font-style: italic; font-size: 14px;
+  line-height: 1.45; color: var(--m-text);
+  background: rgba(0,0,0,.34); box-shadow: inset 3px 0 0 var(--m-or);
+}
+html body .tm-note.bad { color: var(--m-gules-hi); box-shadow: inset 3px 0 0 var(--m-gules); }
+html body .tm-row.busy { opacity: .5; pointer-events: none; }
+html body .tm-say {
+  margin: 10px 16px 6px; padding-top: 10px; box-shadow: inset 0 1px 0 var(--m-line);
+  font-family: var(--m-f-hand); font-style: italic; font-size: 14px;
+  color: var(--m-quiet);
+}
+html body .tm-say b { font-style: normal; color: var(--m-or); letter-spacing: .12em; }
 
 /* ══════════════════════════════════════════════════════════════
    PAPERS — a record open at the table, on your own end.

@@ -23,12 +23,15 @@ const S = {
 let tables = S.get('tables', []);
 let chars  = S.get('chars',  []);
 /* WHO YOU ARE, as against what you have. `style` is what follows your name
-   ("of the Red Marches"), `motto` the word under your arms — both optional,
-   both shown in the corner of the hall only once you have written them.
    The coat itself is normalised through the engine, so a profile saved
    before furs, lines and hems existed comes back with all of them at their
    defaults rather than as undefined. */
-let me     = Object.assign({ name:'', pic:'', style:'', motto:'',
+/* WHO YOU ARE. A name, a coat, and a likeness — and nothing else. There
+   were a `style` and a `motto` here too; grumkata: "why is ther a motto
+   section reomve it", "get rid of the YOUR style thing thats unneccary".
+   He is right: neither was ever shown to anybody else at a table, so they
+   were two fields you filled in for your own benefit and then never saw. */
+let me     = Object.assign({ name:'', pic:'', body:'',
   arms: Object.assign({}, H.DEFAULTS) }, S.get('me', {}));
 me.arms = H.norm(me.arms);
 const saveT = () => S.put('tables', tables);
@@ -148,6 +151,10 @@ function fall(){
 function take(id){
   const b = BANNERS.find(x => x.id === id);
   if (!b || b.dead) return toast('Not built yet');
+  /* a screen is entered at its beginning, not wherever you left it a week
+     ago — the one exception being that the flag maker keeps its bench */
+  if (id === 'set'){ setTab = 'you'; netPasting = false; }
+  if (id === 'join'){ needName = false; }
   at = id; path = []; paint();
   screen.style.setProperty('--field', H.TINCT[b.arms.a]);
   screen.dataset.house = H.TNAME[b.arms.a] || '';     /* up the edge, 00-hall.css */
@@ -232,14 +239,12 @@ if (window.AppUpdate){
 /* ── the tables ── */
 VIEW.tables = () => `
   <h2>The Tables</h2>
-  <div class="lede">Opening one takes you in alone — the hall goes quiet, and going
-    live is something you do once you are inside.</div>
   <div class="strip"></div>
   <div class="f"><label>Name a new table</label>
     <input id="tname" maxlength="60" placeholder="what this one is called"></div>
   <div class="sealrow">
     <button class="seal" data-do="maketable"><span class="wax"></span><b>M</b></button>
-    <span class="cap">Raise it<em>it is made when the wax lands</em></span>
+    <span class="cap">Raise it</span>
     <button class="lk" data-do="importtable">Import a table</button>
   </div>
   <div class="roll" id="roll">${rollT()}</div>`;
@@ -259,8 +264,6 @@ function rollT(){
 /* ── characters ── */
 VIEW.chars = () => `
   <h2>Characters</h2>
-  <div class="lede">Who you have been, and who you will be. Click one to take its
-    record down off the shelf.</div>
   <div class="strip"></div>
   <div class="row2" style="margin-bottom:34px">
     <button class="lk" data-do="newchar">Create a character</button>
@@ -283,7 +286,6 @@ function rollC(){
 /* ── the two ways into a character ── */
 VIEW.newchar = () => `
   <h2>A New Character</h2>
-  <div class="lede">Two ways in. One of them is open.</div>
   <div class="strip"></div>
   <div class="doors">
     <button class="door" data-do="blank">
@@ -299,9 +301,7 @@ VIEW.newchar = () => `
       <i>Walks you through species, culture, backgrounds and the points you
          have to spend, and hands back a finished sheet. Not opened yet.</i>
     </div>
-  </div>
-  <div class="lede" style="margin-top:30px;font-size:16px;opacity:.6">Either way the record
-    is yours to keep and yours to edit — nothing is locked once it is written.</div>`;
+  </div>`;
 
 /* ── the record itself ── */
 VIEW.sheet = () => cur ? window.Sheet.render(cur, stationer()) : '<h2>Nothing open</h2>';
@@ -484,21 +484,75 @@ function findSk(cat, ids){
 let picSlot = 'face';
 
 /* ── join ── */
+/* ══ JOINING SOMEBODY ELSE'S TABLE ════════════════════════
+   A word, said out loud across a room or down a phone. Not a link, not an
+   invite, not an account: the GM says "TUCRP" and ten people type it. The
+   alphabet it is drawn from (06-session.js) has no letters that turn into
+   other letters when spoken, which is the whole reason it is five
+   characters rather than a UUID.
+
+   WHAT YOU ARRIVE AS is what the hall already knows: your name, your arms
+   and your likeness. There is nothing to fill in here that is not already
+   part of you, so the only field is the word. */
+let joining = false, joinSaid = '', needName = false;
 VIEW.join = () => `
   <h2>Join a Game</h2>
-  <div class="lede">You need the word the table is sitting under. Your arms go with you —
-    that is what the table sees when you walk in.</div>
   <div class="strip"></div>
+  ${liveStrip()}
+  ${(!me.name || needName) ? `<div class="f"><label>The name you answer to</label>
+    <input id="jname" maxlength="40" value="${esc(me.name)}"
+      placeholder="type your name"></div>` : ''}
   <div class="f"><label>The table's word</label>
-    <input id="word" maxlength="16" spellcheck="false"
-      style="font-family:'Barlow Condensed',sans-serif;font-size:30px;letter-spacing:.3em;
-             text-transform:uppercase"></div>
-  <div class="f"><label>The name you answer to</label>
-    <input id="jname" maxlength="40" value="${esc(me.name)}" placeholder="type your name"></div>
+    <input id="word" maxlength="8" spellcheck="false" autocomplete="off" class="wordin"
+      placeholder="· · · · ·" value="${esc(joinSaid)}"></div>
   <div class="sealrow">
-    <button class="seal" data-do="join"><span class="wax"></span><b>M</b></button>
-    <span class="cap">Send word<em>the sync layer is not built — the word is remembered</em></span>
+    <button class="seal${joining ? ' busy' : ''}" data-do="join"><span class="wax"></span><b>M</b></button>
+    <span class="cap">Walk in${joining ? '<em>knocking…</em>' : ''}</span>
+  </div>
+  <div class="me-row" style="margin-top:34px">
+    <div class="me-arms">${me.pic
+      ? `<img class="ownpic" src="${esc(me.pic)}" alt="">`
+      : H.armsSVG(me.arms, { shape:'shield', w:96, h:116, edge:4 })}</div>
+    <div class="me-body">${me.body
+      ? `<img src="${esc(me.body)}" alt="you, at the table">`
+      : '<div class="me-nobody">no<br>likeness</div>'}</div>
+    <div class="me-fields">
+      <div class="opt-say"><b>${esc(me.name || 'unnamed')}</b></div>
+    </div>
   </div>`;
+AFTER.join = () => {
+  const nm = $('#jname');
+  if (nm) nm.addEventListener('input', () => {
+    me.name = nm.value; saveM(); paintArms(); });
+  const i = $('#word');
+  if (!i) return;
+  i.focus();
+  /* the word is upper case and has no punctuation in it; saying so as you
+     type is kinder than refusing afterwards */
+  i.addEventListener('input', () => {
+    const at = i.selectionStart;
+    i.value = window.Session.tidy(i.value);
+    joinSaid = i.value;
+    try { i.setSelectionRange(at, at); } catch (e) {}
+  });
+  i.addEventListener('keydown', e => { if (e.key === 'Enter') sendWord(); });
+};
+
+/* what the app can and cannot do about the wire, said once and plainly */
+function liveStrip() {
+  const N = window.Net;
+  if (!N) return '';
+  if (!N.configured())
+    return `<div class="note" style="margin-bottom:22px">No Firebase project has been given to
+      this copy, so tables can only be shared with other windows on THIS machine. Settings →
+      Multiplayer takes a config and makes it real.</div>`;
+  /* configured, but the wire is not up: say which of the two console
+     switches is the one that has not been thrown */
+  const t = N.trouble;
+  if (N.mode === 'local' && t && t.say)
+    return `<div class="note bad" style="margin-bottom:22px">${esc(t.say)}</div>`;
+  return '';
+}
 
 /* ══ SETTINGS ═══════════════════════════════════════
    Five blocks, in the order you would actually want them: who you are,
@@ -510,85 +564,222 @@ VIEW.join = () => `
    NO DROPDOWNS AND NO CHECKBOXES, the same rule the orders panel at the
    table follows: a choice is a row of pennons with every option in sight.
    A setting you have to open something to read is a setting nobody reads. */
+const KB = n => n < 1024 ? n + ' bytes'
+  : n < 1048576 ? (n/1024).toFixed(1) + ' KB' : (n/1048576).toFixed(1) + ' MB';
+
 function optRow(k){
   const d = window.Options.DEFS[k], v = window.Options.get(k);
   return `<div class="opt">
-    <div class="opt-say"><b>${d.t}</b><em>${d.w}</em></div>
+    <div class="opt-say"><b>${d.t}</b></div>
     <div class="chips">${d.of.map(o =>
       `<button class="num${v===o?' on':''}" data-opt="${k}" data-v="${o}">${d.say[o]}</button>`
     ).join('')}</div>
   </div>`;
 }
-const KB = n => n < 1024 ? n + ' bytes'
-  : n < 1048576 ? (n/1024).toFixed(1) + ' KB' : (n/1048576).toFixed(1) + ' MB';
+/* the switches, grouped the way 07-options.js declares them, so the screen
+   is laid out by the file that owns them rather than by a second list here
+   that can drift out of step with it */
+function optBlock(g){
+  return `<div class="setblk"><h3>${g.name}</h3>${g.keys.map(optRow).join('')}</div>`;
+}
+
+/* ══ THE KEYS ════════════════════════════════════════════════════
+   This list used to be printed across the top of the table, in a strip that
+   was on screen for the whole of every session — a manual taped to the
+   monitor. It was right to take it down and wrong to throw it away: the
+   shortcuts still exist and somebody has to be able to find out what they
+   are. A reference somebody opens once is a different thing from a caption
+   nobody can dismiss. */
+const KEYS = [
+  ['The table', [
+    ['Drag the wood', 'pan'], ['Wheel', 'zoom'], ['Wheel out, fully', 'sit down at the table'],
+    ['Drag a piece', 'move it'], ['Shift + drag', 'off the grid'],
+    ['Alt + wheel', 'resize a piece'], ['Arrows', 'nudge'], ['Shift + arrows', 'nudge finely'],
+    ['Del', 'bin what is selected'], ['Ctrl + Z / Ctrl + Y', 'undo, redo']
+  ]],
+  ['Getting about', [
+    ['Esc', 'the menu — or back out of whatever is open'],
+    ['B', 'the chest'], ['/', 'find, in the chest'], ['Space', 'end the turn, in a fight']
+  ]],
+  ['A record', [
+    ['Click a sheet on the wood', 'pick it up to read'],
+    ['Esc', 'put it back down'], ['Ctrl + S', 'save now (it saves as you write anyway)']
+  ]]
+];
+function keyBlock(){
+  return `<div class="setblk"><h3>Keys</h3>${KEYS.map(([g, rows]) => `
+    <div class="keys"><b>${g}</b>${rows.map(([k, w]) =>
+      `<div class="keyrow"><kbd>${esc(k)}</kbd><span>${esc(w)}</span></div>`).join('')}</div>
+  `).join('')}</div>`;
+}
+
+/* ══ WHAT THIS IS MADE OF ════════════════════════════════════
+   Not manners. Four of the six asset packs in this app are CC BY, which
+   means attribution is a CONDITION of using them, and until now only one of
+   the six was credited — in the flag maker, where nobody looking for a
+   licence would think to look. */
+const MADE_OF = [
+  ['Charges', 'game-icons.net', 'CC BY 3.0'],
+  ['The tavern', 'soiTavern', ''],
+  ['Wood and furniture', 'WoodStuff — loafbrr', 'CC0'],
+  ['Pieces', 'KayKit — Kay Lousberg', ''],
+  ['Trees and ground', 'Nature MegaKit', ''],
+  ['The village shell', 'Medieval Village MegaKit', ''],
+  ['The 3D', 'three.js r128', 'MIT']
+];
 
 let forgetArmed = false;
-VIEW.set = () => {
-  const w = window.Options.weigh();
-  return `
-  <h2>Settings</h2>
-  <div class="lede">Your arms and your name are set from the hall itself — they are the
-    first thing you see and the first thing anyone else does.</div>
-  <div class="strip"></div>
+let netPasting = false;
+/* ══ SETTINGS ══════════════════════════════════════════════
+   A LIST OF PLACES, AND ONE OF THEM. Not seven blocks in a column: that is
+   a document, and it is what a settings screen becomes if nobody stops it
+   — you end up scrolling past the keyboard shortcuts to reach the credits,
+   and past the credits to reach the thing you came for.
 
-  <div class="setblk"><h3>You</h3>
-    <div class="me-row">
+   The panes are declared once, below, and the screen is built from that
+   list. Adding one is a line in SET and a function; it cannot be added to
+   the nav and forgotten in the body, because they are the same list. */
+let setTab = 'you';
+const SET = [
+  ['you',   'You'],
+  ['look',  'Display'],
+  ['table', 'The table'],
+  ['keys',  'Keys'],
+  ['net',   'Multiplayer'],
+  ['data',  'What is kept'],
+  ['about', 'About']
+];
+
+function paneYou(){
+  return `<div class="me-row">
       <div class="me-arms">${me.pic
         ? `<img class="ownpic" src="${esc(me.pic)}" alt="the picture you uploaded">`
         : H.armsSVG(me.arms, { shape:'shield', w:120, h:144, edge:5 })}</div>
+      <div class="me-body">
+        ${me.body ? `<img src="${esc(me.body)}" alt="you, at the table">`
+                  : '<div class="me-nobody">no<br>likeness</div>'}
+        <button class="lk sm" data-do="uploadbody">${me.body ? 'Change' : 'Add one'}</button>
+        ${me.body ? '<button class="lk sm bad" data-do="dropbody">Drop</button>' : ''}
+      </div>
       <div class="me-fields">
         <div class="f"><label>The name you answer to</label>
           <input id="sname" maxlength="40" value="${esc(me.name)}"
             placeholder="type your name"></div>
-        <div class="f2">
-          <div class="f"><label>Your style</label>
-            <input id="sstyle" maxlength="48" value="${esc(me.style||'')}"
-              placeholder="of the Red Marches"></div>
-          <div class="f"><label>Your motto</label>
-            <input id="smotto" maxlength="48" value="${esc(me.motto||'')}"
-              placeholder="Nothing without labour"></div>
-        </div>
         <div class="row2"><button class="lk" data-do="arms">Change your arms</button></div>
         <div class="blazon">${me.pic ? 'A picture of your own is what shows.'
                                      : esc(H.blazonText(me.arms))}</div>
       </div>
+    </div>`;
+}
+
+function paneLook(){
+  const full = !!document.fullscreenElement;
+  const g = window.Options.groups().find(x => x.name === 'Display');
+  return `<div class="opt"><div class="opt-say"><b>Full screen</b></div>
+      <div class="chips">
+        <button class="num${full?'':' on'}" data-do="windowed">Windowed</button>
+        <button class="num${full?' on':''}" data-do="fullscreen">Full screen</button>
+      </div></div>
+    ${g ? g.keys.map(optRow).join('') : ''}`;
+}
+
+function paneTable(){
+  const g = window.Options.groups().find(x => x.name === 'The table');
+  return g ? g.keys.map(optRow).join('') : '';
+}
+
+function paneKeys(){ return keyBlock(); }
+
+function paneNet(){
+  return `<div class="opt">
+      <div class="opt-say"><b>${netSays()}</b></div>
+      <div class="chips">
+        <button class="num" data-do="netcfg">${window.Net && window.Net.configured()
+          ? 'Replace the config' : 'Paste a config'}</button>
+        ${window.Net && window.Net.configured()
+          ? '<button class="num bad" data-do="netclear">Forget it</button>' : ''}
+      </div>
     </div>
-  </div>
+    ${netPasting ? `<div class="f" style="margin-top:8px">
+      <label>The firebaseConfig object</label>
+      <textarea id="netcfg" rows="8" spellcheck="false"></textarea></div>
+      <div class="chips"><button class="num" data-do="netsave">Use it</button>
+        <button class="num" data-do="netcancel">Never mind</button></div>` : ''}`;
+}
 
-  <div class="setblk"><h3>Look</h3>
-    ${Object.keys(window.Options.DEFS).map(optRow).join('')}
-  </div>
-
-  <div class="setblk"><h3>What is kept</h3>
-    <div class="opt">
+function paneData(){
+  const w = window.Options.weigh();
+  return `<div class="opt">
       <div class="opt-say"><b>${tables.length} table${tables.length===1?'':'s'},
         ${chars.length} character${chars.length===1?'':'s'}</b>
         <em>${w.keys} thing${w.keys===1?'':'s'} in this browser's own store,
-        about ${KB(w.bytes)}. Nothing leaves this machine.</em></div>
+        about ${KB(w.bytes)}</em></div>
       <div class="chips">
         <button class="num" data-do="dumpall">Take a copy</button>
         <button class="num${forgetArmed?' bad on':' bad'}" data-do="forgetall">${
           forgetArmed ? 'Press again to forget it all' : 'Forget everything'}</button>
       </div>
-    </div>
-  </div>
+    </div>`;
+}
 
-  <div class="setblk"><h3>About</h3>
-    <div class="credit">Monarchy, running ${window.AppUpdate ? 'as an app' : 'in a browser'}.
-      Charges from game-icons.net, CC BY 3.0. Everything you make is kept in this
-      browser's own store and is never sent anywhere.</div>
+function paneAbout(){
+  return `<div class="opt">
+      <div class="opt-say"><b>Monarchy${appVersion ? ' ' + esc(appVersion) : ''}</b>
+        <em>${window.AppUpdate ? 'running as an app' : 'running in a browser'}</em></div>
+      ${window.AppUpdate ? `<div class="chips">
+        <button class="num" data-do="checkupdate">Check for updates</button></div>` : ''}
+    </div>
+    <div class="made">${MADE_OF.map(([what, who, lic]) =>
+      `<div class="maderow"><b>${esc(what)}</b><span>${esc(who)}</span>
+       <i>${esc(lic)}</i></div>`).join('')}</div>`;
+}
+
+const PANE = { you: paneYou, look: paneLook, table: paneTable, keys: paneKeys,
+               net: paneNet, data: paneData, about: paneAbout };
+
+VIEW.set = () => `
+  <h2>Settings</h2>
+  <div class="strip"></div>
+  <div class="setwrap">
+    <nav class="setnav">${SET.map(([k, n]) =>
+      `<button class="setnav-i${setTab===k?' on':''}" data-set="${k}">${n}</button>`).join('')}</nav>
+    <section class="setpane">${(PANE[setTab] || paneYou)()}</section>
   </div>`;
-};
+
 /* the three written fields save as you type, the way the record does —
    there is no seal on this screen because there is nothing to commit */
 AFTER.set = () => {
-  const live = (id, key, after) => { const i = $(id); if (!i) return;
+  const live = (id, key) => { const i = $(id); if (!i) return;
     i.addEventListener('input', () => { me[key] = i.value; saveM(); paintArms();
-      if (after) after(); }); };
+      /* a table you are sitting at should see you change */
+      if (window.Session && window.Session.live) window.Session.refresh(); }); };
   live('#sname', 'name');
-  live('#sstyle', 'style');
-  live('#smotto', 'motto');
 };
+
+/* the app's own version, pushed by electron/updater.js rather than asked
+   for — undefined in a browser, which is the honest answer there */
+let appVersion = '';
+if (window.AppUpdate && window.AppUpdate.onStatus)
+  window.AppUpdate.onStatus(st => {
+    if (st && st.version && st.version !== appVersion) {
+      appVersion = st.version;
+      if (at === 'set') render();
+    }
+  });
+
+function netSays(){
+  const N = window.Net;
+  if (!N) return 'Not available';
+  if (!N.configured()) return 'Tables are shared with other windows on this machine';
+  const t = N.trouble;
+  if (N.mode === 'local' && t && t.say) return t.say;
+  return 'This copy can host a table for other machines';
+}
+
+/* the tincture's name, run up the right edge of the cloth (00-hall.css).
+   A colour you typed in yourself has no name, and the full label for one
+   ("A colour of your own") is four words up the side of the screen. */
+const houseWord = A => H.named(A.a) ? H.tname(A.a) : 'Your own';
 
 /* THE CLOTH BEHIND THE MAKER HAS TO BE DARK, WHATEVER THE COAT IS.
    It used to be the field's own tincture straight out of the record, with
@@ -601,10 +792,6 @@ AFTER.set = () => {
    So the cloth is the LIVERY (which is a colour by construction — never a
    metal, never Sable) with a ceiling put on how light it is allowed to be.
    Same coat, same feel, and the words on it stay readable. */
-/* the tincture's name, run up the right edge of the cloth (00-hall.css).
-   A colour you typed in yourself has no name, and the full label for one
-   ("A colour of your own") is four words up the side of the screen. */
-const houseWord = A => H.named(A.a) ? H.tname(A.a) : 'Your own';
 function cloth(A){
   const c = H.liveryOf(A) || (A && A.a === 'sable' ? '#3a3126' : H.TINCT.gules);
   const m = /^#([0-9a-f]{6})$/i.exec(String(c).trim());
@@ -679,9 +866,12 @@ function tinctRow(title, key){
 }
 /* a line of partition only means something on a cut. Saying so is better
    than hiding the row, which reads as the app having lost it. */
-function lineRow(title, key, lineable, draw, why){
-  if (!lineable) return `<div class="mk"><h3>${title}</h3>
-    <div class="note">${why}</div></div>`;
+/* A CHOICE THAT CANNOT APPLY IS NOT SHOWN AT ALL. It used to be shown with
+   a paragraph explaining why it was unavailable, which is a manual printed
+   in the middle of a tool. If a chequy field has no cut to dress, the row
+   for dressing it has no business being on screen. */
+function lineRow(title, key, lineable, draw){
+  if (!lineable) return '';
   return pickRow(title, key, H.LINES, draw);
 }
 
@@ -690,10 +880,7 @@ function paneField(){
   return pickRow('The field', 'div', H.DIVISIONS,
       k => swatch(c => H.field(k, draft.a, draft.b, SW, SW, draft.line, c)))
     + lineRow('The line it is cut by', 'line', H.LINEABLE[draft.div],
-      k => swatch(c => H.field(draft.div, draft.a, draft.b, SW, SW, k, c)),
-      `A ${H.DIVISIONS[draft.div].toLowerCase()} field has no single cut across it to
-       dress. Choose a divided field — per pale, per fess, per bend, barry, paly —
-       and every line of partition opens up.`)
+      k => swatch(c => H.field(draft.div, draft.a, draft.b, SW, SW, k, c)))
     + tinctRow('First tincture', 'a')
     + tinctRow('Second tincture', 'b');
 }
@@ -742,8 +929,7 @@ function paneBord(){
       ${Object.keys(H.BORDURES).map(k => `<button class="num${draft.bord===k?' on':''}"
         data-arm="bord" data-v="${k}">${H.BORDURES[k]}</button>`).join('')}
     </div>
-    <div class="note">Compony alternates your tincture with Argent all the way round,
-      the way a bordure compony is painted.</div></div>
+    </div>
     ${draft.bord ? tinctRow("The bordure's tincture", 'bordT') : ''}`;
 }
 /* the cut of the foot of your banner, drawn as the banner it makes — and
@@ -759,9 +945,7 @@ function paneFlag(){
       ${Object.keys(H.HEMS).map(k => `<button class="sw${(draft.hem||'swallow')===k?' on':''}"
         data-arm="hem" data-v="${k}" title="${H.HEMS[k]}">
         <span class="flagwrap">${flag(k, 34, 58)}</span></button>`).join('')}
-    </div>
-    <div class="note">This is the shape your banner is cut to — behind your chair at the
-      table, and in the hall.</div></div>
+    </div></div>
   <div class="mk"><h3>Your livery</h3>
     <div class="chips">
       ${pick('', 'Taken from your arms', auto || 'var(--m-gules)', !draft.livery)}
@@ -774,10 +958,7 @@ function paneFlag(){
           value="${/^#[0-9a-fA-F]{6}$/.test(String(draft.livery)) ? draft.livery : '#8a8a8a'}">
       </label>
     </div>
-    <div class="note">One colour out of the coat, and the whole app wears it: the band down
-      the chat, the edge of every slip, the line under your name. It has to be a colour and
-      not a metal — Or would vanish into the gilt and Sable into the panel.
-      <span class="liv-now" style="--liv:${lv}">This is yours.</span></div></div>`;
+    </div>`;
 }
 const PANES = { field:paneField, ord:paneOrd, chg:paneCharge, bord:paneBord, flag:paneFlag };
 const TABS = [['field','Field'], ['ord','Ordinary'], ['chg','Charge'],
@@ -794,8 +975,6 @@ function tabTally(k){
 
 VIEW.arms = () => `
   <h2>Your Arms</h2>
-  <div class="lede">Blazon them yourself, or bring a picture. Whatever you choose rides
-    into every table you join.</div>
   <div class="strip"></div>
   <div class="row2" style="margin-bottom:22px">
     <button class="lk" data-do="randomarms">Roll for it</button>
@@ -822,21 +1001,18 @@ VIEW.arms = () => `
       </div>
       <div class="f" style="margin-top:20px"><label>The name you answer to</label>
         <input id="aname" maxlength="40" value="${esc(me.name)}" placeholder="type your name"></div>
-      <div class="f"><label>Your motto</label>
-        <input id="amotto" maxlength="48" value="${esc(me.motto||'')}"
-          placeholder="Nothing without labour"></div>
       <div class="sealrow" style="margin-bottom:0">
         <button class="seal" data-do="takearms"><span class="wax"></span><b>M</b></button>
         <span class="cap">Take these arms</span>
       </div>
     </div>
   </div>`;
-/* the name and the motto save as you write, so nothing is lost by pressing
+/* the name saves as you write, so nothing is lost by pressing
    a pennon mid-word and being redrawn */
 AFTER.arms = () => {
   const live = (id, key) => { const i = $(id); if (!i) return;
     i.addEventListener('input', () => { me[key] = i.value; saveM(); paintArms(); }); };
-  live('#aname', 'name'); live('#amotto', 'motto');
+  live('#aname', 'name');
   const q = $('#chgq');
   if (q) q.addEventListener('input', () => { chgQ = q.value; repaintMaker('#chgq'); });
 };
@@ -890,11 +1066,6 @@ function paintArms(){
       : `<div class="blank" style="clip-path:${clip}">no arms<br>yet</div>`;
   n.textContent = me.name || 'unnamed';
   n.classList.toggle('unset', !me.name);
-  /* a style and a motto are both optional and both take up room when they
-     are empty, so each is hidden rather than left blank */
-  const st = $('#mystyle'), mo = $('#mymotto');
-  if (st){ st.textContent = me.style || ''; st.hidden = !me.style; }
-  if (mo){ mo.textContent = '“' + (me.motto || '') + '”'; mo.hidden = !me.motto; }
 }
 
 /* ══ CLICKS ═══════════════════════════════════════════════════ */
@@ -940,6 +1111,10 @@ document.addEventListener('click', e => {
 
   /* a switch on the settings screen. 07-options.js refuses anything that is
      not one of that option's own states, so the value is not checked here. */
+  /* which place in Settings you are looking at */
+  const place = e.target.closest('[data-set]');
+  if (place){ setTab = place.dataset.set; netPasting = false; return render(); }
+
   const opt = e.target.closest('[data-opt]');
   if (opt){ window.Options.set(opt.dataset.opt, opt.dataset.v); return render(); }
 
@@ -974,9 +1149,28 @@ document.addEventListener('click', e => {
     case 'arms':       draft = H.norm(me.arms); mkTab='field'; chgQ=''; at='arms';
                        repaintMaker.tab = 'field'; return render(true);
     case 'uploadarms': return $('#pickP').click();
+    case 'uploadbody': return $('#pickB').click();
+    case 'dropbody':   me.body=''; saveM(); render();
+                       if (window.Session && window.Session.live) window.Session.refresh();
+                       return toast('Likeness dropped');
     case 'droppic':    me.pic=''; saveM(); paintArms(); render(); return toast('Picture dropped');
     case 'randomarms': return rollArms();
     case 'takearms':   return takeArms();
+    case 'fullscreen': return (document.documentElement.requestFullscreen
+                       ? document.documentElement.requestFullscreen()
+                           .then(() => render()).catch(() => toast('Full screen was refused'))
+                       : toast('Not available here'));
+    case 'windowed':   return (document.exitFullscreen
+                       ? document.exitFullscreen().then(() => render()).catch(() => {})
+                       : 0);
+    case 'checkupdate': window.AppUpdate.checkNow(); return toast('Looking…');
+    case 'netcfg':     netPasting = true; render();
+                       setTimeout(() => { const t = $('#netcfg'); if (t) t.focus(); }, 30);
+                       return;
+    case 'netcancel':  netPasting = false; return render();
+    case 'netsave':    return saveNetCfg();
+    case 'netclear':   window.Net.setCfg(null); netPasting = false; render();
+                       return toast('Forgotten — restart to take effect');
     case 'dumpall':    download('monarchy-everything', window.Options.dump());
                        return toast('A copy of everything is in your downloads');
     /* TWO PRESSES, and the second one says what it is about to do. This is
@@ -990,7 +1184,7 @@ document.addEventListener('click', e => {
         return; }
       forgetArmed = false;
       window.Options.forget();
-      tables = []; chars = []; me = Object.assign({ name:'', pic:'', style:'', motto:'',
+      tables = []; chars = []; me = Object.assign({ name:'', pic:'', body:'',
         arms: Object.assign({}, H.DEFAULTS) });
       paintArms(); if (window.Shell && window.Shell.livery) window.Shell.livery();
       render();
@@ -1191,6 +1385,46 @@ $('#pickT').addEventListener('change', function(){ if (this.files[0]) readFile(t
   this.value=''; });
 $('#pickC').addEventListener('change', function(){ if (this.files[0]) readFile(this.files[0], true);
   this.value=''; });
+/* A LIKENESS IS BIGGER THAN A COAT OF ARMS AND TRAVELS FURTHER. The arms
+   are drawn from a record of about two hundred bytes; this is a photograph,
+   and it is written to the table's own node where ten other people read it.
+   So it is shrunk on the way in rather than on the way out: 520px on the
+   long edge is more than a standee across a virtual room can show, and it
+   keeps a profile under the quarter-megabyte that a database node is
+   comfortable with. */
+function shrink(file, edge, done){
+  const r = new FileReader();
+  r.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, edge / Math.max(im.width, im.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.width * k));
+      c.height = Math.max(1, Math.round(im.height * k));
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      /* PNG, not JPEG: a standee wants its transparent ground kept, and a
+         cut-out on white is the difference between a person standing at the
+         table and a photograph propped against it. */
+      done(c.toDataURL('image/png'));
+    };
+    im.onerror = () => done(null);
+    im.src = r.result;
+  };
+  r.onerror = () => done(null);
+  r.readAsDataURL(file);
+}
+$('#pickB').addEventListener('change', function(){
+  const f = this.files && this.files[0]; this.value = '';
+  if (!f) return;
+  if (f.size > 12e6) return toast('That picture is too big — under 12 MB');
+  shrink(f, 520, url => {
+    if (!url) return toast('Sorry — that picture could not be read');
+    me.body = url; saveM(); render();
+    /* the table you are sitting at should see you change */
+    if (window.Session && window.Session.live) window.Session.refresh();
+    toast('That is you, at the table');
+  });
+});
 $('#pickP').addEventListener('change', function(){
   const f = this.files && this.files[0]; this.value = '';
   if (!f) return;
@@ -1210,21 +1444,66 @@ function takeArms(){
   me.arms = H.norm(draft);
   const n = ($('#aname') || {}).value;
   if (n != null) me.name = n.trim();
-  const m = ($('#amotto') || {}).value;
-  if (m != null) me.motto = m.trim();
   saveM(); paintArms();
   /* the chrome wears your livery (42-shell.js), so new arms re-dye it */
   if (window.Shell && window.Shell.livery) window.Shell.livery();
   setTimeout(() => { hang(); toast(me.pic ? 'Kept — your picture is still what shows'
                                           : 'Arms taken'); }, 260);
 }
-function sendWord(){
-  const w = ($('#word').value || '').trim();
-  const n = ($('#jname').value || '').trim();
-  if (!w) return toast('You need the word the table sits under');
-  if (n !== me.name){ me.name = n; saveM(); paintArms(); }
-  toast('Sync is not built — the word is remembered');
+/* THE CONSOLE HANDS YOU JAVASCRIPT, NOT JSON. `const firebaseConfig = {
+   apiKey: "...", ... };` is what is on the screen and it is what people
+   will paste, so it is what this accepts — refusing it over a missing pair
+   of quotes would be the app being right and useless at the same time. */
+function saveNetCfg(){
+  const t = $('#netcfg'); if (!t) return;
+  let raw = String(t.value || '').trim();
+  if (!raw) return toast('Nothing pasted');
+  raw = raw.replace(/^[\s\S]*?=\s*/, '').replace(/;\s*$/, '').trim();
+  let cfg = null;
+  try { cfg = JSON.parse(raw); }
+  catch (e) {
+    /* the unquoted-key form, turned into JSON rather than eval'd: a config
+       is a thing somebody pastes from the internet and it is not going to
+       be run as code in this app */
+    try {
+      cfg = JSON.parse(raw
+        .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+        .replace(/'/g, '"')
+        .replace(/,\s*([}\]])/g, '$1'));
+    } catch (e2) { cfg = null; }
+  }
+  if (!cfg || !cfg.apiKey || !cfg.databaseURL)
+    return toast('That needs at least an apiKey and a databaseURL');
+  window.Net.setCfg(cfg);
+  netPasting = false; render();
+  toast('Kept — restart the app to use it');
 }
+
+function sendWord(){
+  if (joining) return;
+  const w = window.Session.tidy(($('#word') || {}).value || '');
+  if (!w) return toast('You need the word the table sits under');
+  /* NO NAME IS NOT AN ERROR, IT IS A MISSING ANSWER. Sending somebody to
+     another screen to fetch one and then find their way back is the app
+     refusing to ask a question it is perfectly able to ask here. */
+  if (!me.name) { const n = (($('#jname') || {}).value || '').trim();
+    if (!n) { needName = true; render();
+              setTimeout(() => { const i = $('#jname'); if (i) i.focus(); }, 30);
+              return toast('What shall we call you?'); }
+    me.name = n; saveM(); paintArms(); }
+  joining = true; joinSaid = w; render();
+  window.Session.join(w).then(word => {
+    joining = false;
+    toast('You are at ' + word);
+    /* the table you have joined is the one you walk into: the GM's save id
+       comes back with the session, and the wood is raised on it */
+    window.Shell.openTable(window.Session.tableId || ('guest-' + word));
+  }).catch(e => {
+    joining = false; render();
+    toast(e && e.message ? e.message : 'That did not work');
+  });
+}
+
 
 $('#pickI').addEventListener('change', function(){
   const f = this.files && this.files[0]; this.value = '';

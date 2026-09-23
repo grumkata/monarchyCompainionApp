@@ -1301,6 +1301,127 @@ failure. That rule is now at the top of that file.
 
 ---
 
+### 3.20 Multiplayer: eleven people at one table (2026-09-18)
+
+grumkata: *"each table can support up to 11 people 10 players 1 gm […] its
+important the order stays the exact same on everyones stream […] we will be
+using firebase for this not peer to peer […] tables are only active when a gm
+instantiates one by hosting it which is diffrent then opening a table"*.
+
+Full reference in **`MULTIPLAYER.md`**; what follows is why it is shaped this
+way.
+
+**Six new files.** `04-ring.js` (who sits where), `05-net.js` (the wire),
+`06-session.js` (hosting, joining, presence, chat, sheets), `57-chat-net.js`
+(the dock when other people are in it), `58-sheets-net.js` (the sheets
+somebody pulled onto the wood), plus Firebase's three compat SDKs inlined
+from `node_modules` the way three.js is — 337KB against a 4.5MB page, and no
+CDN tag, because a table that cannot be hosted on a venue's guest wifi until
+gstatic answers is not hosted.
+
+**The seating is the whole trick.** Two requirements that look contradictory:
+everyone must be at their own near seat, and everyone must agree on the
+order. They resolve because what has to agree is not *where* anyone is in
+degrees but *who is beside whom and which way round* — a CYCLIC order, and a
+cyclic order survives rotation exactly. One global ring, rotated per client.
+No angle is ever stored: storing one would mean a single client deciding
+where everybody sits, which is a race every time two people join at once.
+
+**Presence and place are different facts with different lifetimes**, and
+conflating them was the one real bug the tests caught. `who` is removed the
+instant a socket dies; if the place went with it, a phone going through a
+tunnel would reshuffle the table for all eleven people. So arrival numbers
+live in a ledger that is never cleaned up, and a reconnect reads it. There is
+a test for exactly that scenario.
+
+**A roll is markup from a machine this one does not control.** Chat text is
+escaped; a roll is the rendered line, sent whole, because re-deriving it per
+client would mean a second renderer to keep in step with the first. So it is
+filtered down to the six tags and six class names `39-dice.js`'s own line is
+built from, every attribute dropped. Seven attacks in the test.
+
+**Sheets appear everywhere rather than in a panel.** The tempting design is a
+"sheets at this table" list beside your own; the right one widens
+`Characters.roster()`, which is where the chest, the counters, the papers and
+the token maker all get their list. None of them learned a new concept.
+Pulling a sheet to the table IS placing the character — no share button.
+
+**Two transports, one shape.** Firebase RTDB (chosen over Firestore because
+presence is the hard part and `onDisconnect` is a thing RTDB has), and a
+local one over `localStorage` + `BroadcastChannel`. The local one is not a
+toy: it is how this is developed without credentials and it is what makes the
+multiplayer path testable by `npm test`.
+
+**No credentials ship.** The project is the user's — Settings → Multiplayer
+takes the config, parsed rather than `eval`ed, accepting the unquoted-key
+form the Firebase console actually prints. `MULTIPLAYER.md` carries the
+database rules, which are what make "each client writes only its own node" a
+guarantee rather than a convention.
+
+**Verified:** new `test/session.test.js`, 25 checks, in `npm test`. Eleven
+genuinely independent clients — each its own global object with its own copy
+of the modules, wired to one shared tree — because a claim about what several
+machines agree on cannot be tested on one. An earlier attempt using three
+browser pages was wrong and said so: pages in one profile share localStorage,
+so they are one client with three windows.
+
+**Not built:** the wood itself is still per-client. Everyone sees the same
+people, chat and sheets; they do not yet see the same board. That is the next
+piece and it is the big one. Also no kick, no host transfer, and sheet writes
+are whole-record last-wins.
+
+---
+
+### 3.21 One menu, and nothing else on the walls (2026-09-18)
+
+grumkata: *"hosting should be a thing you can do in the table not on opening
+thats so fucking dumb"*, *"the table needs a real menu not random buttons all
+over the place"*, *"that stupid page back button in the top left instead make
+it an escape key and menu button in the top left that THEN brings you to
+menu"*, and *"remove all the extrenous explanation text its unproffesional"*.
+
+**Three complaints, one fault.** The table had a Back pennon pinned in one
+corner, Theme and Fit in another, and hosting was a decision you had to make
+in the hall before you had ever seen the wood. Every one of those was put
+where it was because that is where there was room, not because that is where
+anybody would look — and a person looks in one place.
+
+**New `59-table-menu.js`.** A mark in the top left, Escape opens it, Escape
+closes it. In it: host / stop hosting, leave a game you joined, back to the
+hall, fit, light or dark. Hosting from here rather than from the hall's roll,
+which is what grumkata asked for and is also simply correct — it is a
+decision about a table you are looking at.
+
+The Escape binding is on `window` in the bubble phase, deliberately last:
+23-table3d.js steps out of a field, then a lock, then a selection;
+45-papers.js puts a record down; 25-toolbox.js shuts the chest; 47-hand.js
+drops what you are carrying. Each of those is what Escape should mean first.
+The menu is what Escape means when it would otherwise have meant nothing.
+Every element lookup in that guard is null-checked, because most of them are
+built lazily — the first version threw on `#tp` before a record had ever been
+opened and took the key out entirely.
+
+**The prose went.** Seven `lede` paragraphs, the settings switches'
+descriptions, the flag maker's "why this row is unavailable" notes, the seal
+captions' sub-lines, and the HUD's keyboard manual printed across the top of
+the table for the whole of every session. The rule applied: **keep state,
+drop instruction.** A count, a word, a name, what went wrong — those stay. A
+sentence explaining what a button does is a design problem the sentence was
+hiding, and it is read once and then re-read four hundred times.
+
+One test had to change rather than be fixed: `blazon.test.js` asserted that a
+choice which cannot apply *says so where it would have been*. It now asserts
+the row is not there at all, which is the better behaviour and the one that
+was asked for.
+
+**Also:** the Firebase project is live and anonymous auth is on — confirmed
+by signing in and getting a uid. Writes still answer `PERMISSION_DENIED`,
+because the Realtime Database rules in `MULTIPLAYER.md` have not been pasted
+yet. `05-net.js` and the table menu both name that failure in words rather
+than going quiet: "The database refused it — its rules have not been set".
+
+---
+
 ## 4. Game system summary (content, not code)
 
 This app is a companion tool for a homebrew TTRPG built around:
@@ -1487,6 +1608,8 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-18 | **One menu, and nothing else on the walls** (3.21). grumkata: hosting belongs *in* the table not at the point of opening one; the table needs *"a real menu not random buttons all over the place"*, reached by Escape or a mark in the top left; and *"remove all the extrenous explanation text its unproffesional"*.<br>- **New `59-table-menu.js`:** one menu, Escape or the mark, holding host / stop hosting / leave / back to the hall / fit / light or dark. The Back pennon, Theme and Fit are gone from the corners, and the Host door is gone from the hall's roll.<br>- The Escape binding sits last on purpose — leaving a field, a lock, a selection, a record, the chest and a carried piece all get Escape first; the menu is what it means when it would otherwise mean nothing. Every lookup in that guard is null-checked, which the first version was not, and it took the key out entirely.<br>- **The prose went:** seven lede paragraphs, the settings descriptions, the maker's "why this is unavailable" notes, the seal sub-captions, and the keyboard manual printed across the top of the table all session. Rule applied: keep state, drop instruction.<br>- A test changed rather than being fixed: a choice that cannot apply is now simply absent instead of explaining itself. And `smooth.test.js`'s cover check was re-based on its own control rather than an absolute frame count, which was flaky at 7 against a threshold of 8.<br>- **Firebase:** anonymous auth confirmed working against the real project; writes still return `PERMISSION_DENIED` until the database rules are pasted, and the app now says exactly that instead of failing quietly. |
+| 2026-09-18 | **Multiplayer: eleven people at one table** (3.20, and the new `MULTIPLAYER.md`).<br>- **Hosting is not opening.** A table is a local save until a GM hosts it, at which point it goes on the wire under a five-character word said out loud (no letters that sound like other letters). It is live only while its GM is; when they go, everyone stands down and what is left is a save.<br>- **The seating guarantee.** Everyone is at their own near seat AND everyone agrees on the order — possible because what must agree is the CYCLIC order, which survives rotation. One global ring, rotated per client, evenly spaced: two face each other, three make a triangle, eleven sit 32.7° apart. The GM is in the ring like anybody else.<br>- **Presence ≠ place.** Arrival numbers live in a ledger that is never erased, so a dropped connection does not reshuffle the table. This was a real bug the tests caught.<br>- **Firebase RTDB** (for `onDisconnect`), inlined from node_modules rather than a CDN, with a local `localStorage`+`BroadcastChannel` transport that makes the whole path testable without credentials. No credentials ship; Settings → Multiplayer takes the config, parsed not `eval`ed.<br>- **Chat and rolls** over the wire, with a scrubber — a roll is markup from a machine you do not control, so only the tags and classes the dice renderer uses survive. The dice themselves are not sent; the numbers are.<br>- **Sheets:** any number, from anyone, and pulling one there is simply placing the character. `Characters.roster()` widened so the chest, counters, papers and token maker all got them for nothing.<br>- New `test/session.test.js` (25 checks) in `npm test`, driving eleven genuinely independent clients against one shared tree.<br>- **Not built:** the board itself is still per-client. |
 | 2026-09-18 | **The cover is not part of what it covers** (3.19). grumkata, after two failed attempts: the loading screen *"is laggy because your putting them on the same layer so when the table lags the loading screen lags even though the reason it exsists is to mask the lag"*. Exactly right, and neither earlier attempt had touched it — both treated the work instead of the coupling.<br>- **`#herald` now has `contain: layout paint style` and its own compositor layer**, so the table building underneath cannot dirty a pixel of the cloth on top. Same for the boot screen.<br>- **The cover is painted before the work begins** — two animation frames between raising the card and calling `mid()`, because adding a class paints nothing and `mid` blocks the thread that would have drawn it. The loading screen used to arrive at the end of the load.<br>- **A gilt sweep under the title card**, on `transform` alone, so something is visibly alive while the thread is dead.<br>- **Removed at his instruction:** the Motion setting and the seat picker. A speed dial on a broken animation is an apology, not a fix; `prefers-reduced-motion` is still honoured.<br>- **The test now carries its own control:** block the thread 600ms with and without the cover, read lossless frames from the browser compositor, and refuse to pass unless the control froze. Measured 1 frame against 9. Four harnesses in a row had told me what I wanted to hear — a software renderer, a warm-only benchmark, an offscreen window, and JPEG noise. |
 | 2026-09-18 | **Undoing 3.17: what that change actually cost** (3.18). grumkata: 3.17 shipped *"even laggier and less smooth"*, with the table transition *"basically skipped"*. He was right — every number in 3.17 was taken on a table opened AFTER the room was raised, and **nobody opens a table that way**. On the cold path the change had added the shader compile to the click, moved a 152ms `fitTable()` inside the Bend's frozen `mid`, scheduled the pre-warm with a `requestIdleCallback` timeout that fires *anyway* (often mid-transition), and left the tavern's render loop running behind the hall. All four undone or fixed; the room now draws zero times while you are in the hall.<br>- **And the thing 3.17 missed:** the cover was a WebGL bend driven by `requestAnimationFrame` — i.e. by the main thread, the one thing guaranteed to be blocked at the moment a cover exists to hide. It is the CSS veil now (one `transform` keyframe, `will-change`), on every machine. An animation that freezes and then arrives is a cut, not a slow animation.<br>- **Settings → Motion gained Swift**, between Full and Calm: the same transitions at ~55% length, scaled from one number (`Options.pace()` plus the `--t-*` tokens under `html.swift`). Fewer frames to drop is fewer frames to miss.<br>- **Third measurement failure in a row, recorded as a pattern:** the software renderer lied about shader linking, the warm-only benchmark lied about the transition, and offscreen Electron lied about compositing (it produces frames through the main thread, so it cannot detect compositor animation at all). A harness has to be shown capable of detecting the thing before its answer means anything. |
 | 2026-09-18 | **Smoothness: the walk into a table, and the loading screen** (3.17).<br>- **Measured first, and the first measurement lied.** A profile under the browser tests blamed shader linking (16.6s of 18.7 in `(program)`); re-measured through Electron on the real GPU that flag was inside noise. Both facts are now comments in the code — the software renderer cannot measure this.<br>- **The room is raised before anyone asks for a table.** `Table3D.mount` + `TableGL.build` + `TableGL.warm` do not read `TableModel`, so 42-shell.js asks for them on an idle callback while you are still in the hall. Opening a table is then ~1.5ms of work: **worst freeze 640ms → 225ms, total not-drawing 870ms → 225ms**, with the hall still at 60fps and zero stutters while it happens.<br>- **What did not work, kept in the file so it is not retried:** running the boot a piece per frame was *worse* on real hardware (981ms frozen vs 449ms). Moving work beats slicing it.<br>- **The Bend's cover waits for the work** instead of a flat 300ms, so it no longer uncovers a half-built room; the camera is fitted while still covered.<br>- **The loading bar is weighted by bytes parsed**, not by files counted, so its speed matches the pause instead of ticking evenly and then freezing; it gained a compositor-only gilt sweep that keeps moving through the parse, and it lifts like the Bend rather than fading.<br>- **More life in the menus:** settings blocks and rows deal in, the maker's bench turns, swatches and pennons lift — transform and opacity only, gated on `#screenbody.fresh` so nothing re-animates on a repaint, and all of it off under Motion → Calm.<br>- New `test/smooth.test.js` (16 checks) in `npm test`, including that the camera still fits and seats identically now that `fitTable()` first runs against a hidden viewport. |

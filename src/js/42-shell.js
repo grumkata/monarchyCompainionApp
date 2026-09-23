@@ -192,17 +192,13 @@ function warmTable() {
 const openTable = id => show('table', id);
 const backToHall = () => show('hall');
 
-/* the way back, on the table's own chrome rather than a browser button */
-function mountBack() {
-  if (doc.getElementById('to-hall')) return;
-  const b = doc.createElement('button');
-  b.id = 'to-hall';
-  b.className = 'to-hall';
-  b.innerHTML = '&#8249;&nbsp; The hall';
-  b.title = 'Leave the table standing and go back';
-  b.addEventListener('click', backToHall);
-  doc.body.appendChild(b);
-}
+/* THE WAY BACK IS IN THE MENU NOW (59-table-menu.js). There was a pennon
+   pinned to the top-left corner of the table that did one thing, and
+   grumkata is right that it was the wrong shape: leaving is a decision
+   about this table, and decisions about this table belong together in one
+   place you can find rather than one button per decision scattered round
+   the edges. `backToHall` is still the verb; the menu is what calls it. */
+function mountBack() { /* nothing to mount */ }
 
 /* ══ YOUR LIVERY ═══════════════════════════════════════════════
    Blazon's chrome (20-shell.css) wears exactly one accent, --m-house:
