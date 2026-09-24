@@ -35,6 +35,12 @@ function mount() {
   /* the seats live in the same table and change with it — a seat added,
      renamed or given a face is a reason for the room to be rebuilt */
   T().on(() => { if (root.TableGL && root.TableGL.syncSeats) root.TableGL.syncSeats(); });
+  /* who may touch what changes with the session, not with the board — so
+     the pieces already standing are told, without rebuilding any of them */
+  root.addEventListener('monarchy:session', () => {
+    doc.querySelectorAll('#tbl .prop.t3-thing').forEach(el =>
+      el.classList.toggle('hands-off', !!T().mayTouch && !T().mayTouch(T().get(el.dataset.id))));
+  });
   paint();
 }
 
@@ -77,6 +83,7 @@ function restyle() {
       /* only the faces that were given a height keep one — a note's is set
          by what is written on it and must stay that way */
       if (f.style.height) f.style.height = Math.round(+el.dataset.h0 * k) + 'px';
+      if (f.style.minHeight) f.style.minHeight = Math.round(+el.dataset.h0 * k) + 'px';
       const box = f.querySelector('.fgbox');
       if (box && box.dataset.k0) {
         box.style.transform = 'translate(-50%,-50%) scale(' +
@@ -258,9 +265,14 @@ function face(t, st) {
       ? `<div class="t3-pic grip">${
            t.src ? `<img alt="" src="${esc(t.src)}">`
                  : (F ? F.html({ kind:'art' }, {}, Math.min(w, h) * .8) : '')}</div>`
+      /* A PAGE IS THE WHOLE OF ITS BOX. It was drawn at 84% of the short
+         side, inside a box the shape of a sheet of A5, so every page lay in
+         a dark frame of its own unused box. The drawing is A5 too now, and
+         fills it edge to edge. */
       : `<div class="t3-fig grip">${
            F ? F.html({ kind: t.kind, scene: t.scene },
-                      { rule: t.rule, tint: t.tint }, Math.min(w, h) * .84) : ''}</div>`;
+                      { rule: t.rule, tint: t.tint },
+                      t.kind === 'page' ? Math.max(w, h) : Math.min(w, h) * .84) : ''}</div>`;
     return `<div class="face t3-face t3-bare" style="width:${w}px;height:${h}px">
               ${body}
               <span class="side f"></span><span class="side r"></span>
@@ -273,9 +285,13 @@ function face(t, st) {
   const bare = t.kind === 'scene' || t.kind === 'token';
   const hh = Math.round((t.h || (t.kind === 'token' ? 182 : bare ? 620 : 200))
                         * (t.scale || 1));
+  /* a note is a square of paper (100mm, 46-figures.js sizeOf) that grows
+     if you write more on it than fits — it was only ever as tall as its
+     text, so an empty one was a strip */
+  const noteH = t.kind === 'note' ? ';min-height:' + hh + 'px' : '';
   return `<div class="face t3-face${bare ? ' t3-bare' : ''}${
             t.kind === 'note' ? ' nt-' + esc(t.tint || 'cream') : ''
-          }" style="width:${w}px${bare ? ';height:' + hh + 'px' : ''}">
+          }" style="width:${w}px${bare ? ';height:' + hh + 'px' : ''}${noteH}">
             ${inner}
             <span class="side f"></span><span class="side r"></span>
             <span class="side l"></span><span class="side b"></span>
@@ -283,6 +299,12 @@ function face(t, st) {
 }
 
 function wire(el, t) {
+  /* A piece that is not yours to touch (TableModel.mayTouch) can still be
+     looked at, but nothing on it answers: no writing, no running, and no
+     raising it over its neighbours, which would move it for everybody. */
+  const mine = () => !T().mayTouch || T().mayTouch(T().get(t.id));
+  el.classList.toggle('hands-off', !mine());
+
   /* A note is a thing you WRITE ON. Typing goes straight to the model on the
      way out of the field, and the keys are kept away from the table — app.js
      and the toolbox both listen on the document, and B would have opened the
@@ -312,6 +334,7 @@ function wire(el, t) {
     };
     note.addEventListener('pointerdown', e => {
       if (note.isContentEditable) { e.stopPropagation(); return; }
+      if (!mine()) return;
       const now = performance.now();
       if (tap.id === t.id && now - tap.t < 450 &&
           Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 7) {
@@ -345,13 +368,13 @@ function wire(el, t) {
     run.addEventListener('pointerup', e => {
       const near = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 5;
       from = null;
-      if (near && T().state.active !== t.id) { e.stopPropagation(); T().activate(t.id); }
+      if (near && mine() && T().state.active !== t.id) { e.stopPropagation(); T().activate(t.id); }
     });
   }
   /* raising is the model's business, so the order survives a reload —
      22-table3d.js also bumps a live z-index while you drag, which is
      only for the duration of the drag */
-  el.addEventListener('pointerdown', () => T().raise(t.id));
+  el.addEventListener('pointerdown', () => { if (mine()) T().raise(t.id); });
 }
 
 /* ── the bin, while something is over it ─────────────────────── */

@@ -269,7 +269,25 @@ function paint() {
        <button class="tp-x" data-tp-close title="Put it back down (Esc)">&#10005;</button>
      </div>
      <div class="tp-leaf" id="tp-leaf">${root.Sheet.render(rec)}</div>`;
+  fitLeaf();
 }
+
+/* THE RECORD IS 900 WIDE AND THE READING WAS NOT. The sheet is laid out at
+   the width the hall draws it, and the reading was capped at 720 — so every
+   record opened with a scrollbar along the bottom and its right-hand column
+   cut off, which is most of what reads as broken about it. It is scaled to
+   the reading's width instead (never up), the same way the sheet lying on
+   the wood is scaled to the paper. */
+function fitLeaf() {
+  const leaf = doc.getElementById('tp-leaf');
+  const sheet = leaf && leaf.firstElementChild;
+  if (!sheet) return;
+  sheet.style.zoom = '';
+  const room = leaf.clientWidth - 32;           /* the leaf's own padding */
+  const need = sheet.scrollWidth;
+  if (room > 0 && need > room) sheet.style.zoom = (room / need).toFixed(4);
+}
+root.addEventListener('resize', () => { if (openId && el() && !el().hidden) fitLeaf(); });
 
 function close() {
   const p = el(); if (!p || p.hidden) return;

@@ -592,7 +592,8 @@ function optBlock(g){
    nobody can dismiss. */
 const KEYS = [
   ['The table', [
-    ['Drag the wood', 'pan'], ['Wheel', 'zoom'], ['Wheel out, fully', 'sit down at the table'],
+    ['Drag the wood', 'pan'], ['Wheel, or Up / Down', 'zoom'],
+    ['Wheel out, fully', 'sit down at the table'],
     ['Drag a piece', 'move it'], ['Shift + drag', 'off the grid'],
     ['Alt + wheel', 'resize a piece'], ['Arrows', 'nudge'], ['Shift + arrows', 'nudge finely'],
     ['Del', 'bin what is selected'], ['Ctrl + Z / Ctrl + Y', 'undo, redo']
@@ -1581,9 +1582,10 @@ function sendWord(){
   window.Session.join(w).then(word => {
     joining = false;
     toast('You are at ' + word);
-    /* the table you have joined is the one you walk into: the GM's save id
-       comes back with the session, and the wood is raised on it */
-    window.Shell.openTable(window.Session.tableId || ('guest-' + word));
+    /* the table you have joined is the one you walk into — a guest table
+       the GM's board is mirrored into (60-board-net.js), not the GM's own
+       save id, which on this machine is nobody's table */
+    window.Shell.openTable((window.BoardNet && window.BoardNet.tableId) || ('guest-' + word));
   }).catch(e => {
     joining = false; render();
     toast(e && e.message ? e.message : 'That did not work');
@@ -1611,6 +1613,6 @@ paintArms();
 trackPlates();
 
 window.Menu = { at:() => at, tables:() => tables, chars:() => chars, me:() => me,
-  take, hang, state:() => ({ at, tables:tables.length, chars:chars.length,
+  take, hang, toast, state:() => ({ at, tables:tables.length, chars:chars.length,
                              named:!!me.name, arms:me.arms }) };
 })();

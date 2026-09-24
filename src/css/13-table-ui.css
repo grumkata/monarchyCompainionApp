@@ -864,12 +864,14 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
   position:absolute; left:46px; right:12px; top:14px; height:26px;
   background:repeating-linear-gradient(180deg,rgba(58,42,20,.55) 0 2px,transparent 2px 7px);
 }
+/* the page is A5 now (46-figures.js NATURAL), so the text runs on down it
+   rather than stopping two thirds of the way and leaving a blank foot */
 .fg-page .fg-set::after{
-  content:''; position:absolute; left:-28px; right:0; top:32px; height:60px;
+  content:''; position:absolute; left:-28px; right:0; top:32px; height:88px;
   background:repeating-linear-gradient(180deg,rgba(58,42,20,.42) 0 2px,transparent 2px 9px);
 }
 .fg-page.r-ruled .fg-cap{ display:none; }
-.fg-page.r-ruled .fg-set{ left:18px; top:16px; height:88px;
+.fg-page.r-ruled .fg-set{ left:18px; top:16px; height:118px;
   background:repeating-linear-gradient(180deg,
     rgba(70,100,140,.5) 0 1.5px,transparent 1.5px 12px); }
 .fg-page.r-ruled .fg-set::after{ display:none; }
@@ -1370,6 +1372,25 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
    shadow it casts. */
 .prop.t3-art .side{ display:none }
 .prop.t3-art{ box-shadow:none }
+
+/* ── PAPER IS PAPER, NOT A CARD WITH PAPER ON IT ──────────────
+   grumkata: "all the papers are visually broken". A page put on the wood
+   was a small drawing of a page, 70% of the size of its own box, and the
+   box kept everything a card has — a 9px extruded edge on four sides and
+   the prop's own rectangular shadow — so every page lay inside a dark
+   frame bigger than itself. The drawing now fills the box it lands in
+   (24-table-props.js), and a sheet of paper has no edges and throws only
+   the shadow its own shape does. A note is the same paper, square. */
+.prop.t3-page, .prop.t3-note{ box-shadow:none }
+.prop.t3-page .side, .prop.t3-note .side{ display:none }
+.t3-note .t3-face{ display:flex; flex-direction:column;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 7px 14px rgba(0,0,0,.5); }
+.t3-note .nt-body{ flex:1 1 auto; min-height:0; overflow:hidden }
+
+/* a piece that is not yours to touch at somebody else's table does not
+   offer to be picked up (TableModel.mayTouch) */
+.prop.hands-off, .prop.hands-off .grip, .prop.hands-off .nt-body,
+.prop.hands-off .t3-fig, .prop.hands-off .t3-pic{ cursor:default }
 
 /* a figure sprite is a whole standing person; cropping it to a disc shows you
    their chest. Fit the whole of them inside the rim instead. */

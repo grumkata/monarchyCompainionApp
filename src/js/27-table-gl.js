@@ -902,6 +902,10 @@ function layRoom() {
      no chandelier means no flames */
   aimChandelier(plan);
   lightCandles(plan);
+  /* what the seats have to hang their colours clear of — and if the room
+     has just been rearranged, the seats are hung again against it */
+  findBlockers(plan);
+  if (seatRoot) { seatSig = ''; syncSeats(); }
   flushRoom(roomGroup, 'plan');
   /* the overhead pieces are batched separately so they can be faded out
      when you are looking straight down through where they hang */
@@ -934,6 +938,86 @@ let seatRoot = null, seatSig = '';
    chairs standing in front of you. */
 const SEAT_R = TABLE_M / 2 + 0.56;
 const SEAT_CHAIR = 0.78;      /* the pack's chair is 1.2m tall; a chair is 0.94 */
+
+/* ══ WHAT STANDS BEHIND A SEAT ═════════════════════════════════
+   grumkata: "banners clip the firplace and same with standing sprite".
+
+   Every seat hung its banner the same 0.48m behind the chair, whatever was
+   there. The room is six metres across and the hearth stands 1.88m from the
+   middle of the table, dead ahead — which is exactly where the ring puts
+   the other player whenever there are two, four, six... of you. So their
+   colours hung 26cm inside the chimney breast, showing only where they
+   poked out above and below the mantel. It was placed by a number, and the
+   number did not know what was in the room.
+
+   So the room is asked. Every piece in the plan that stands on the floor
+   near the table is boxed in room metres, and a banner or a standee is
+   brought in along its own bearing until it is clear of all of them. Read
+   from the plan, not from the shipped layout, so it follows the room
+   editor: move the hearth and the banners move with it. */
+let blockers = [];
+const extents = {};
+function extentOf(p, m) {
+  const k = p + '|' + m;
+  if (k in extents) return extents[k];
+  const lib = p === 'T' ? (typeof TAVERN !== 'undefined' ? TAVERN : null)
+                        : (typeof ROOM   !== 'undefined' ? ROOM   : null);
+  const mm = lib && lib[m];
+  if (!mm) return (extents[k] = null);
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const pr of mm.prims)
+    for (let i = 0; i < pr.p.length; i += 3)
+      for (let j = 0; j < 3; j++) {
+        const v = pr.p[i + j];
+        if (v < lo[j]) lo[j] = v;
+        if (v > hi[j]) hi[j] = v;
+      }
+  const piv = PIVOT[k] || [0, 0, 0];
+  return (extents[k] = { lo: lo.map((v, j) => v + piv[j]), hi: hi.map((v, j) => v + piv[j]) });
+}
+function findBlockers(plan) {
+  const out = [];
+  for (const row of plan) {
+    if (row.k || row.over || !row.m) continue;
+    const e = extentOf(row.p, row.m);
+    if (!e || !isFinite(e.lo[0])) continue;
+    const sx = row.sx != null ? row.sx : (row.s == null ? 1 : row.s);
+    const sy = row.sx != null ? row.sy : sx;
+    const sz = row.sx != null ? row.sz : sx;
+    const t = (row.r || 0) * Math.PI / 180, C = Math.cos(t), S = Math.sin(t);
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const cx of [e.lo[0] * sx, e.hi[0] * sx]) for (const cz of [e.lo[2] * sz, e.hi[2] * sz]) {
+      /* the same turn put() gives it: a rotation about Y */
+      const x = row.x + cx * C + cz * S, z = row.z - cx * S + cz * C;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (z < z0) z0 = z; if (z > z1) z1 = z;
+    }
+    /* only what is near enough to the ring to matter; the walls are three
+       metres out and nothing at a seat reaches them */
+    const nx = Math.max(x0, Math.min(0, x1)), nz = Math.max(z0, Math.min(0, z1));
+    if (Math.hypot(nx, nz) > SEAT_R + 1.0) continue;
+    out.push({ x0, x1, z0, z1,
+               y0: (row.y || 0) + e.lo[1] * sy, y1: (row.y || 0) + e.hi[1] * sy });
+  }
+  blockers = out;
+}
+/* How far out along bearing `a` a thing `halfW` wide, spanning `y0`..`y1`
+   above the floor, can stand: `want` if that is clear, otherwise the
+   furthest point short of it that is, but never nearer than `least`. */
+function reach(a, want, least, halfW, y0, y1) {
+  const dx = Math.sin(a), dz = -Math.cos(a);           /* outward, as syncSeats places */
+  const nx = Math.cos(a), nz = Math.sin(a);            /* across it */
+  const M = 0.04;
+  const hits = (x, z) => blockers.some(b => y1 > b.y0 && y0 < b.y1 &&
+    x > b.x0 - M && x < b.x1 + M && z > b.z0 - M && z < b.z1 + M);
+  for (let r = want; r >= least; r -= 0.02) {
+    let clear = true;
+    for (const s of [-halfW, 0, halfW])
+      if (hits(dx * r + nx * s, dz * r + nz * s)) { clear = false; break; }
+    if (clear) return r;
+  }
+  return least;
+}
 /* every hanging in the tavern, so the fire can light them all */
 const clothHangings = [];
 function banner(seat) {
@@ -1094,7 +1178,9 @@ function buildSeat(seat) {
       const h = 1.66, w = Math.max(0.28, Math.min(1.1, h * ar));
       card.geometry.dispose();
       card.geometry = new THREE.PlaneGeometry(w, h);
-      card.position.set(0, FLOOR_Y + h / 2, 0.06);
+      /* and clear of whatever is behind the chair, now its width is known */
+      const r = reach(seat.__a || 0, SEAT_R - 0.06, SEAT_R - 0.5, w / 2, 0.02, h);
+      card.position.set(0, FLOOR_Y + h / 2, SEAT_R - r);
       /* the shared one: it also releases anything waiting on the room's
          textures, which a local `waiting--` would have silently skipped */
       landed();
@@ -1155,7 +1241,11 @@ function buildSeat(seat) {
        player's banner was inside the chimney breast, which is the wall
        problem again in miniature. Against the chair back it is visible from
        every seat and it is unambiguously THEIRS. */
-    b.position.set(0, FLOOR_Y + 1.38, -0.48);
+    /* ...unless the room is in the way (reach, above). At the far seat the
+       chimney breast is 22cm behind the chair, so the banner hangs on the
+       breast itself, over its owner's head, instead of inside it. */
+    const r = reach(seat.__a || 0, SEAT_R + 0.48, SEAT_R - 0.1, 0.25, 1.04, 1.72);
+    b.position.set(0, FLOOR_Y + 1.38, SEAT_R - r);
     g.add(b);
   }
 
@@ -1236,7 +1326,13 @@ function syncSeats() {
        side is yours and is left empty by spaceSeats(). */
     const a = (s.at || 0) * Math.PI / 180;
     g.position.set(Math.sin(a) * SEAT_R, 0, -Math.cos(a) * SEAT_R);
-    g.rotation.y = a;                 /* facing the middle, which is you */
+    /* FACING THE MIDDLE, WHICH IS YOU — and that is -a, not a. A turn of `a`
+       about Y points a seat's +z at (sin a, cos a), and the middle of the
+       table from (sin a, -cos a) is the other way along x. The two agree only
+       at 0 and 180, the far seat and your own, which are the two anybody
+       had looked at: every seat at the sides faced the wall, with its chair
+       turned round and its banner hung between its owner and the table. */
+    g.rotation.y = -a;
     seatRoot.add(g);
   }
   invalidate(12);

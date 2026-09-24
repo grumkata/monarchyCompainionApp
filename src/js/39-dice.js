@@ -94,7 +94,13 @@ const onWood = () => !(window.Options && window.Options.get('dice') === 'off');
    fixture's character — so every roll anyone ever made in chat was signed
    by a person who is not at the table. The hall knows your name; use it. */
 function speaker(){
-  if (typeof ROLE !== 'undefined' && ROLE === 'gm') return 'GM';
+  /* AT A LIVE TABLE THE SESSION SAYS WHO YOU ARE. ROLE is 29-role.js's
+     constant and it is 'gm' on every machine, so at a live table every
+     player's roll was signed "GM". */
+  const S = window.Session;
+  const gm = (S && S.live) ? S.role === 'gm'
+                           : (typeof ROLE !== 'undefined' && ROLE === 'gm');
+  if (gm) return 'GM';
   try {
     const me = JSON.parse(localStorage.getItem('monarchy.me.v1') || '{}');
     if (me && me.name && String(me.name).trim()) return String(me.name).trim();
@@ -102,7 +108,7 @@ function speaker(){
   return 'You';
 }
 
-function say(res){
+function say(res, thrown){
   const who = speaker();
   const spec = res.map(label).join(' · ');
   const anyNum = res.some(t => t.kind !== 'coin');
@@ -116,13 +122,20 @@ function say(res){
   const html = `<b>${esc(who)}</b><span class="rspec">${esc(spec)}</span>`
     + `<span class="rdice">${chips}</span>`
     + (anyNum ? `<span class="rtot">${totalOf(res)}</span>` : '');
-  /* THE NUMBERS ARE DECIDED ONCE, BY WHOEVER ROLLED. The dice on the wood
-     are this client's own toy; eleven clients each throwing their own would
-     be eleven different answers to one roll. What goes on the wire is the
-     line that was drawn here, and it comes back to this screen the same way
-     it reaches theirs. 57-chat-net.js filters it on arrival, because by then
-     it is markup from a machine nobody controls. */
-  if (atTable()) { window.Session.talk(html, 'roll'); return; }
+  /* THE NUMBERS ARE DECIDED ONCE, BY WHOEVER ROLLED. Eleven clients each
+     rolling their own would be eleven different answers to one roll. What
+     goes on the wire is the line that was drawn here, and it comes back to
+     this screen the same way it reaches theirs. 57-chat-net.js filters it on
+     arrival, because by then it is markup from a machine nobody controls.
+
+     AND THE DICE GO WITH IT. grumkata: "dice visually do not show for
+     everyone they only show up in chat and visually for the one who
+     rolled". They were kept back on purpose, and the reason was wrong: the
+     tumble never decided anything (see the head of this file — the numbers
+     come first and the throw is choreographed to land on them). So a throw
+     is sent as its RESULTS, `thrown`, and every other table stages the same
+     landing on those numbers. Nobody re-rolls anything. */
+  if (atTable()) { window.Session.talk(html, 'roll', thrown ? { dice: thrown } : null); return; }
   const d = document.createElement('div');
   d.className = 'cl roll';
   d.innerHTML = html;
@@ -134,8 +147,9 @@ function roll(text, onTable){
   const terms = parse(text);
   if (!terms.length) return false;
   const res = rollTerms(terms);
-  say(res);
-  if (onTable && window.GLDice) window.GLDice.spawn(tableDice(res));
+  const thrown = onTable && window.GLDice ? tableDice(res) : null;
+  say(res, thrown);
+  if (thrown) window.GLDice.spawn(thrown);
   return true;
 }
 
@@ -205,9 +219,9 @@ function build(){
       if (num.length) num[num.length-1].mod = mod;   // one modifier, on the last term
     }
     const res = rollTerms(terms);
-    say(res);
-    if (onWood() && window.GLDice)
-      window.GLDice.spawn(tableDice(res));
+    const thrown = onWood() && window.GLDice ? tableDice(res) : null;
+    say(res, thrown);
+    if (thrown) window.GLDice.spawn(thrown);
   };
   /* the tray is a control, not the table — never start a pan from it */
   bar.addEventListener('pointerdown', ev => ev.stopPropagation());
@@ -260,8 +274,9 @@ function hookChat(){
     const v = inp.value.trim(); if (!v) return true;
     const explicit = /^\/(roll|r)\b/i.test(v);
     if (explicit || parse(v).length && /^[\d\s+\-dflipcoin·]+$/i.test(v)){
-      const onTable = !/\bquiet\b/i.test(v)
-        && (document.getElementById('dtable') || {checked:true}).checked;
+      /* `#dtable` was the checkbox that went to Settings; it no longer
+         exists, so this read "yes" whatever the setting said */
+      const onTable = !/\bquiet\b/i.test(v) && onWood();
       if (roll(v.replace(/\bquiet\b/ig,''), onTable)){ inp.value = ''; return false; }
     }
     /* NOT DICE — SO IT IS SPEECH, AND IT HAS TO GO SOMEWHERE.
@@ -286,5 +301,5 @@ if (document.readyState === 'loading')
   document.addEventListener('DOMContentLoaded', () => { build(); hookChat(); });
 else { build(); hookChat(); }
 
-window.Dice = { roll, parse, talk, speaker };
+window.Dice = { roll, parse, talk, speaker, onWood };
 })();

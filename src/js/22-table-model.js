@@ -609,22 +609,72 @@ const T = {
   },
   emptyBin() { this.state.bin = []; this.changed('emptybin'); return true; },
 
+  /* ── WHICH SIDE OF THE TABLE YOU ARE ─────────────────────────
+     grumkata: "when you join as a player you can access the toolbox and
+     bin and move stuff which is not allowed".
+
+     The gate below read `_sessionRole`, a binding from 09-session-sync.js —
+     a file that went with the previous generation (PROJECT.md 2.1). Nothing
+     has declared it since, so the role was always empty, empty meant "solo
+     play", and every player at a live table was handed the GM's box. The
+     role lives on 06-session.js's Session now, and that is what is read.
+
+     `_sessionRole` is still consulted when no session is live, because the
+     tests set it to stand a role up without standing up a table. */
+  role() {
+    const S = root.Session;
+    if (S && S.live) return S.role || null;
+    return (typeof _sessionRole !== 'undefined' && _sessionRole)
+      ? _sessionRole
+      : (root._sessionRole || null);
+  },
+
   /* ── who may use the box ─────────────────────────────────────
      Solo play has no session and no roles, so you are the GM of
      your own table. In a session, the GM and anyone handed the
      assistant's key.                                            */
   mayUseBox() {
-    /* 09-session-sync.js declares `let _sessionRole` at the top level of a
-       classic script. That is a SCRIPT-scoped binding, not a property of
-       window — `root._sessionRole` reads undefined no matter who is at the
-       table, so the gate silently never closed. Read the binding by name,
-       the way 15-app-shell.js does; `typeof` keeps this file loadable in
-       plain node, where the name does not exist at all. */
-    const r = (typeof _sessionRole !== 'undefined' && _sessionRole)
-      ? _sessionRole
-      : root._sessionRole;
+    const r = this.role();
     if (!r) return true;              /* solo play: your own table, your box */
     return r === 'gm' || r === 'assistant';
+  },
+
+  /* ── AND WHO MAY LAY A HAND ON A PIECE ───────────────────────
+     Moving, sizing, stacking, binning, renaming, turning a counter over,
+     writing on a note: everything that changes a thing on the wood. The
+     box's keyholders may touch anything. A player may touch only what
+     playerMayTouch() allows, which starts as nothing at all. */
+  mayTouch(t) {
+    if (this.mayUseBox()) return true;
+    return !!t && this.playerMayTouch(t);
+  },
+  /* A player at somebody else's table. `t` is a thing on the wood; the
+     session (root.Session) knows who you are, and a shared sheet on the
+     table records who brought it (58-sheets-net.js). */
+  playerMayTouch(t) {
+    /* TODO: nothing yet, which is the rule as asked. The case worth deciding
+       is a player's OWN character: a counter with t.source === 'char' whose
+       sheet they brought to the table. */
+    return false;
+  },
+
+  /* ── A TABLE THAT IS SOMEBODY ELSE'S ─────────────────────────
+     A player's copy of the GM's board is a mirror, not a save: it starts
+     empty every time they sit down and nothing of it is kept. This is
+     load() without the reading and without writing the outgoing table
+     down, because the outgoing table IS this one. */
+  blank(id) {
+    if (this._saveT) {
+      if (typeof root.cancelIdleCallback === 'function') { try { root.cancelIdleCallback(this._saveT); } catch (e) {} }
+      clearTimeout(this._saveT);
+      this._saveT = 0;
+    }
+    this.state = blankTable(id || this.state.id);
+    try { if (root.localStorage) root.localStorage.removeItem(KEY(this.state.id)); } catch (e) {}
+    this._past.length = 0; this._future.length = 0;
+    this._group = null; this._depth = 0; this._quiet = false;
+    this._subs.forEach(f => { try { f(this.state, 'load'); } catch (e) {} });
+    return this.state;
   }
 };
 

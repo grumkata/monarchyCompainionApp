@@ -133,7 +133,19 @@ function decorate() {
 /* ── the token's own controls, on the token ────────────────────
    Renaming and side live ON the counter, not in a panel: a token is a light
    thing and its two facts should cost one click each. */
+/* none of it answers a hand the piece is not yours to touch with
+   (TableModel.mayTouch) — a player at the GM's table reads the counters,
+   the GM turns them over */
+const yours = id => { const M = root.TableModel;
+  return !M || !M.mayTouch || M.mayTouch(M.get(id)); };
+const keyholder = () => { const M = root.TableModel;
+  return !M || !M.mayUseBox || M.mayUseBox(); };
+
 doc.addEventListener('click', e => {
+  const ctl = e.target.closest('[data-side-of],[data-rename],[data-off]');
+  if (ctl && !yours(ctl.dataset.sideOf || ctl.dataset.rename || ctl.dataset.off)) {
+    e.preventDefault(); e.stopPropagation(); return;
+  }
   const sd = e.target.closest('[data-side-of]');
   if (sd && root.Tokens) {
     e.preventDefault(); e.stopPropagation();
@@ -175,6 +187,10 @@ function renameToken(id, node) {
 }
 
 doc.addEventListener('click', e => {
+  /* the shape of the battlefield is the GM's to change */
+  if (e.target.closest('[data-add],[data-drop],.ln-name') && !keyholder()) {
+    e.preventDefault(); e.stopPropagation(); return;
+  }
   const a = e.target.closest('[data-add]');
   if (a) { e.preventDefault(); e.stopPropagation(); return add(a.dataset.add); }
   const d = e.target.closest('[data-drop]');

@@ -122,6 +122,11 @@ function mount() {
 
   if (root.Hand) root.Hand.mount();
   T().on(() => { if (open_) refill(); });
+  /* THE ROLE ARRIVES WITH THE SESSION, AFTER THE BOX IS UP. gate() only ran
+     here, once, at mount — which is before anybody has hosted or joined —
+     so the box stayed open to whoever sat down. It is asked again every time
+     the session moves: joining shuts it, leaving opens it back up. */
+  root.addEventListener('monarchy:session', gate);
   gate();
 }
 
@@ -341,6 +346,7 @@ function alsoBring(i) {
 
 function take(i, x, y, v) {
   v = v || {};
+  if (!T().mayUseBox()) { shut(); return; }
   alsoBring(i);
   if (i.act === 'unbin') { T().unbin(i.ref); refill(); return; }
   const at = (x == null)

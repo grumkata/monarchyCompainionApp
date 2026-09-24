@@ -1,7 +1,7 @@
 # MONARCHY — Project Reference
 
 **Status:** Active development
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-24
 
 > **Purpose of this document:** this is the single place to check before
 > working on the project — what exists, how it's built, and what rules to
@@ -1422,6 +1422,62 @@ than going quiet: "The database refused it — its rules have not been set".
 
 ---
 
+### 3.22 Nine things wrong at somebody else's table (2026-09-24, v1.0.1)
+
+grumkata's list, from the first real multiplayer session. Each item, what it
+actually was, and where the fix lives:
+
+1. **A player had the GM's chest, bin and hands.** `mayUseBox()` read
+   `_sessionRole`, a binding from a file deleted with the previous generation,
+   so the role was always empty and empty meant "solo". It reads
+   `Session.role` now (`TableModel.role()`), `25-toolbox.js` re-gates on every
+   session event, and a new `TableModel.mayTouch(t)` is checked wherever a hand
+   meets a piece: the drag, Delete/arrows/`[` `]`, Alt+wheel, raising, writing
+   on a note, running a scene, a counter's rename/side/off controls, and
+   `32-combat-app.js`'s `canControl` (which read `ROLE`, 'gm' everywhere).
+   Players touch nothing; `playerMayTouch()` is where an exception goes.
+2. **Dice only fell for the one who rolled.** A thrown roll now carries its
+   results (`Session.talk(..., { dice })`), and `57-chat-net.js` stages the
+   same throw on every other table. Also: every player's roll was signed "GM".
+3. **Pictures stood up in the chair view.** `t3-art` joined `STANDS_ALONE` in
+   `23-table3d.js`: a picture lies flat like the scenes do.
+4. **Paper looked broken.** A page was a drawing at 70% of its own box, inside
+   the box's extruded edges and rectangular shadow. The drawing is A5 now
+   (`46-figures.js`) and fills its box; pages and notes have no edges or card
+   shadow; a note is a 100mm square rather than a strip; the reading scales a
+   900-wide record to fit instead of scrolling sideways (`45-papers.js`).
+5. **Banners and standees in the fireplace.** Two faults in `27-table-gl.js`.
+   Every seat was turned `a` about Y where facing the middle needs `-a`, right
+   only at 0 and 180 — side seats faced the wall. And a banner hung a fixed
+   0.48m behind its chair: at the far seat that is 26cm inside the chimney
+   breast. The room's own plan is boxed now (`findBlockers`) and a banner or
+   standee is brought in along its bearing until clear (`reach`).
+6. **Pictures did not reach other players.** The worst of the nine: joining
+   answered before the player had walked into the table, so the GM's board
+   landed in the player's LAST table — and then loading the right one fired the
+   change hook, and `sendNow` sent a null for every piece it no longer saw. A
+   player arriving deleted the GM's board. `60-board-net.js` now names the
+   local table it mirrors into and never applies or sends from another; loading
+   is never sent; and a player's table is `guest-<WORD>`, emptied on arrival and
+   on leaving. See `MULTIPLAYER.md`.
+7. **Leaving left a player sitting at the table.** Leave walks a player back
+   to the hall, and so does the GM closing it (`59-table-menu.js`).
+8. **Settings threw you out to the hall.** It opens on the menu's own card now,
+   drawn from `07-options.js` the same way the hall draws it.
+9. **Scrolling.** ArrowUp/ArrowDown are the wheel (when no piece of yours is
+   selected — then they still nudge it). The zoom glides toward a goal instead
+   of jumping 10% per click, and a trackpad's small deltas count as fractions
+   of a click. Leaning back into the chair is one move that always finishes —
+   `lean` is only ever 0 or 1 at rest — and a step the other way turns it round.
+
+**Tests:** `session.test.js` gained a client that loads tables
+(`LoadingModel`) and eleven checks for the join ordering, the guest table and
+the dice filter; against the old `60-board-net.js` nine of them fail, including
+"loading it deletes nothing from the table". `handling.test.js` waits for the
+zoom glide to land rather than a fixed 400ms.
+
+---
+
 ## 4. Game system summary (content, not code)
 
 This app is a companion tool for a homebrew TTRPG built around:
@@ -1608,6 +1664,7 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-24 | **v1.0.1: nine things wrong at somebody else's table** (3.22). Players no longer get the chest, the bin or anyone's pieces (`TableModel.mayTouch`); dice land on every table; pictures lie flat; pages and notes are paper; banners and standees keep clear of the room, and side seats face the table; a joining player no longer deletes the GM's board (the board is bound to a guest table); leaving goes back to the hall; Settings opens at the table; arrows scroll, the zoom glides, and the chair never stops halfway. `package.json` 1.0.0 → 1.0.1. |
 | 2026-09-18 | **One menu, and nothing else on the walls** (3.21). grumkata: hosting belongs *in* the table not at the point of opening one; the table needs *"a real menu not random buttons all over the place"*, reached by Escape or a mark in the top left; and *"remove all the extrenous explanation text its unproffesional"*.<br>- **New `59-table-menu.js`:** one menu, Escape or the mark, holding host / stop hosting / leave / back to the hall / fit / light or dark. The Back pennon, Theme and Fit are gone from the corners, and the Host door is gone from the hall's roll.<br>- The Escape binding sits last on purpose — leaving a field, a lock, a selection, a record, the chest and a carried piece all get Escape first; the menu is what it means when it would otherwise mean nothing. Every lookup in that guard is null-checked, which the first version was not, and it took the key out entirely.<br>- **The prose went:** seven lede paragraphs, the settings descriptions, the maker's "why this is unavailable" notes, the seal sub-captions, and the keyboard manual printed across the top of the table all session. Rule applied: keep state, drop instruction.<br>- A test changed rather than being fixed: a choice that cannot apply is now simply absent instead of explaining itself. And `smooth.test.js`'s cover check was re-based on its own control rather than an absolute frame count, which was flaky at 7 against a threshold of 8.<br>- **Firebase:** anonymous auth confirmed working against the real project; writes still return `PERMISSION_DENIED` until the database rules are pasted, and the app now says exactly that instead of failing quietly. |
 | 2026-09-18 | **Multiplayer: eleven people at one table** (3.20, and the new `MULTIPLAYER.md`).<br>- **Hosting is not opening.** A table is a local save until a GM hosts it, at which point it goes on the wire under a five-character word said out loud (no letters that sound like other letters). It is live only while its GM is; when they go, everyone stands down and what is left is a save.<br>- **The seating guarantee.** Everyone is at their own near seat AND everyone agrees on the order — possible because what must agree is the CYCLIC order, which survives rotation. One global ring, rotated per client, evenly spaced: two face each other, three make a triangle, eleven sit 32.7° apart. The GM is in the ring like anybody else.<br>- **Presence ≠ place.** Arrival numbers live in a ledger that is never erased, so a dropped connection does not reshuffle the table. This was a real bug the tests caught.<br>- **Firebase RTDB** (for `onDisconnect`), inlined from node_modules rather than a CDN, with a local `localStorage`+`BroadcastChannel` transport that makes the whole path testable without credentials. No credentials ship; Settings → Multiplayer takes the config, parsed not `eval`ed.<br>- **Chat and rolls** over the wire, with a scrubber — a roll is markup from a machine you do not control, so only the tags and classes the dice renderer uses survive. The dice themselves are not sent; the numbers are.<br>- **Sheets:** any number, from anyone, and pulling one there is simply placing the character. `Characters.roster()` widened so the chest, counters, papers and token maker all got them for nothing.<br>- New `test/session.test.js` (25 checks) in `npm test`, driving eleven genuinely independent clients against one shared tree.<br>- **Not built:** the board itself is still per-client. |
 | 2026-09-18 | **The cover is not part of what it covers** (3.19). grumkata, after two failed attempts: the loading screen *"is laggy because your putting them on the same layer so when the table lags the loading screen lags even though the reason it exsists is to mask the lag"*. Exactly right, and neither earlier attempt had touched it — both treated the work instead of the coupling.<br>- **`#herald` now has `contain: layout paint style` and its own compositor layer**, so the table building underneath cannot dirty a pixel of the cloth on top. Same for the boot screen.<br>- **The cover is painted before the work begins** — two animation frames between raising the card and calling `mid()`, because adding a class paints nothing and `mid` blocks the thread that would have drawn it. The loading screen used to arrive at the end of the load.<br>- **A gilt sweep under the title card**, on `transform` alone, so something is visibly alive while the thread is dead.<br>- **Removed at his instruction:** the Motion setting and the seat picker. A speed dial on a broken animation is an apology, not a fix; `prefers-reduced-motion` is still honoured.<br>- **The test now carries its own control:** block the thread 600ms with and without the cover, read lossless frames from the browser compositor, and refuse to pass unless the control froze. Measured 1 frame against 9. Four harnesses in a row had told me what I wanted to hear — a software renderer, a warm-only benchmark, an offscreen window, and JPEG noise. |

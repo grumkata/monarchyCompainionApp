@@ -102,8 +102,13 @@ const slotsOf = e => e.kind==='unit' ? 1 : e.kind==='large' ? 2 : (e.wide ? 3 : 
 const usedIn  = l => l.ents.reduce((n,e)=>n+slotsOf(e),0);
 const lineOf  = id => S.lines.find(l => l.ents.some(e=>e.id===id));
 const entById = id => { for(const l of S.lines){ const e=l.ents.find(x=>x.id===id); if(e) return e; } return null; };
-/* players may only command their own character; the GM commands everything */
-const canControl = e => ROLE==='gm' || e.id===ME;
+/* players may only command their own character; the GM commands everything.
+   WHO IS THE GM is the table's answer (TableModel.mayUseBox), not ROLE:
+   ROLE is 29-role.js's constant and it says 'gm' on every machine, so at a
+   live table every player commanded every unit on the board. */
+const isGM = () => (window.TableModel && window.TableModel.mayUseBox)
+  ? window.TableModel.mayUseBox() : ROLE==='gm';
+const canControl = e => isGM() || e.id===ME;
 /* Rules 8, Movement: 1 line costs a QUICK action; spending your FULL action
    moves up to your move speed in lines. Move speed comes from passive Agility
    (Dexterity): 1-3 -> 1, 4-6 -> 2, 7-8 -> 3, 9-10 -> 4.
@@ -394,7 +399,7 @@ function renderSel(){
   const stats = e.kind==='form'
     ? [['Bodies',`${e.alive}/${e.total}`],['HP ea',e.hpea],['Hit',e.skl],['Dmg',e.dmg],['Def',e.def]]
     : [['Health',`${e.hp}/${e.max}`],['Stamina',e.sta||'—'],['Stress',e.str||'—'],['Ward','—'],['Move',e.move||'—']];
-  const editable = ROLE==='gm' || canControl(e);
+  const editable = isGM() || canControl(e);
   const toks = ((e.cond||[]).map((t,i)=>
       `<span class="tk ${tokClass(t.n)}">${esc(t.n)} <span class="n">${t.c}</span>`+
       (editable?`<button class="tkbtn" data-tk="${i}" data-d="-1">&minus;</button>`+
@@ -410,9 +415,9 @@ function renderSel(){
       <button class="act ${e.q?'':'on'}" id="act-q" ${canControl(e)?'':'disabled'}>Quick ${e.q?'':'&#10007;'}</button>
       <button class="act ${e.f?'':'on'}" id="act-f" ${canControl(e)?'':'disabled'}>Full ${e.f?'':'&#10007;'}</button>
       <label class="act amt" title="how much"><input id="act-n" type="number"
-        min="1" max="999" value="${AMOUNT}" ${canControl(e)||ROLE==='gm'?'':'disabled'}></label>
-      <button class="act" id="act-hurt" ${canControl(e)||ROLE==='gm'?'':'disabled'}>Take</button>
-      <button class="act" id="act-heal" ${canControl(e)||ROLE==='gm'?'':'disabled'}>Heal</button>
+        min="1" max="999" value="${AMOUNT}" ${canControl(e)?'':'disabled'}></label>
+      <button class="act" id="act-hurt" ${canControl(e)?'':'disabled'}>Take</button>
+      <button class="act" id="act-heal" ${canControl(e)?'':'disabled'}>Heal</button>
     </div>
     <div class="role">View <b>${ROLE==='gm'?'Game Master':'Player'}</b></div>`;
 }

@@ -113,7 +113,13 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       const vp = document.getElementById('vp');
       for (let i = 0; i < 16; i++) vp.dispatchEvent(new WheelEvent('wheel',
         { deltaY: 120, bubbles: true, cancelable: true, clientX: 600, clientY: 430 }));
-      await new Promise(r => setTimeout(r, 1600));
+      /* sitting down is an animated move now (23-table3d.js leanTo), after
+         the zoom has glided to its floor — so it is waited for, not timed.
+         The software renderer draws a few frames a second and a fixed
+         1600ms was sometimes a frame short of the chair. */
+      for (let t = 0; t < 60 && window.__viewU() < 1; t++)
+        await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 200));
       const e = window.__eye(), want = window.Table3D.TABLE_M / 2 + 0.42;
       return Math.abs(e.back - want) < 0.06 && Math.abs(e.up - 0.70) < 0.06;
     }));

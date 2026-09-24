@@ -316,7 +316,10 @@ const variantsFor = o => VARIANTS[keyOf(o)] || null;
    whatever box it has been given, so the SAME markup is a 76px
    slot and a 320px thing in your hand with no second stylesheet. */
 const NATURAL = {
-  token: [96, 104], note: [116, 92], art: [124, 96], page: [104, 118],
+  /* a page is A5 — 148 x 210 — the shape it lands at (sizeOf below). It was
+     drawn nearly square, so on the wood the drawing could only fill 70% of
+     the page it stood for and the rest of the box showed round it. */
+  token: [96, 104], note: [116, 92], art: [124, 96], page: [104, 148],
   model: [104, 96], sheet: [96, 118],
   /* A SCENE'S DRAWING IS THE SHEET'S OWN SHAPE. It used to be a wide
      landscape box because the drawing was a little picture of a battlefield;

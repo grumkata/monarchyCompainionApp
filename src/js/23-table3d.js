@@ -330,7 +330,13 @@ function aimMarks() {
    neither does anything printed on it: scenes (t3-scene) and the running
    combat sheet (#combat-prop, a scene that predates the class) lie flat
    at every angle. The tokens standing on them still stand. */
-const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b/;
+/* ── AND NEITHER DOES A PICTURE ───────────────────────────
+   grumkata: "images stand up in table view for some reason". The reason
+   was this list: art was never on it, so a map or a handout put down on
+   the wood hinged up off its near edge like a cardboard cutout as you sat
+   back. A picture laid on a table is laid on it — it lies flat with the
+   scenes it so often is. */
+const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b|\bt3-art\b/;
 const flatAlways = p => STANDS_ALONE.test(p.className) || p.id === 'combat-prop';
 /* ── A PIECE THAT HAS JUST LANDED ─────────────────────────
    The squash itself is in 12-combat.css; this only fires it, because CSS
@@ -401,6 +407,7 @@ function fitTable() {
      table you're playing on" was describing. A table you can see the edges of
      is a table; a table that reaches every edge of the screen is a texture. */
   const ROOM = 0.86;
+  stopZoom(); stopLean();
   lean = 0; seatCam();
   T = { k: Math.min(VW / (TW + 120), VH / (TH * c + 190)) * ROOM, x: 0, y: 0 };
   apply();
@@ -434,6 +441,7 @@ function fitTable() {
    fitted to the slab and the slab overflows the viewport by design. */
 function frame(prop, pad) {
   if (!vp || !prop) return;
+  stopZoom();
   pad = pad == null ? 70 : pad;
   const VW = vp.clientWidth, VH = vp.clientHeight;
   const c = Math.cos(TILT * Math.PI / 180);
@@ -686,6 +694,8 @@ function seatCam() {
 
 function lockIn(prop) {
   if (lock === prop) return;
+  /* a lock never inherits a half-finished lean: it lands where it was going */
+  stopZoom(); if (leanAnim) { lean = leanAnim.to; stopLean(); seatCam(); }
   before = { x: T.x, y: T.y, k: T.k, tilt: TILT };
   lock = prop; doc.body.classList.add('locked-in'); prop.classList.add('locked');
   const to = viewFor(prop); lockK = to.k;
@@ -814,8 +824,18 @@ function slabVisible() {
    been fitted to the slab and not yet deliberately unpinned. */
 const nailed = p => p.classList.contains('fixed') || p.dataset.locked === '1';
 
+/* ── AND WHETHER IT IS YOURS TO PICK UP ───────────────────────
+   A thing on the wood answers to TableModel.mayTouch, which is where the
+   player/GM rule lives. Anything that is not a model thing — your own
+   record lying at your place (45-papers.js) — is yours on every table. */
+function handles(p) {
+  const M = root.TableModel;
+  if (!M || !M.mayTouch || !p || !p.dataset.id) return true;
+  return M.mayTouch(M.get(p.dataset.id));
+}
+
 function grabProp(p, e) {
-  if (nailed(p)) return;
+  if (nailed(p) || !handles(p)) return;
   p.setPointerCapture(e.pointerId);
   p.classList.add('lift'); p.style.zIndex = ++zTop;
   /* lifted clear of wherever it was resting, not to a fixed height — a token
@@ -841,6 +861,8 @@ function startPan(e) {
   const a = doc.activeElement;
   if (a && a !== doc.body && !a.closest('.t3-hud, .chatdock')) a.blur();
 
+  /* a glide still running would fight the drag over T; let it land */
+  stopZoom(true);
   vp.classList.add('grabbing');
   dg = { pan: 1, sx: e.clientX, sy: e.clientY, ox: T.x, oy: T.y,
          oyaw: YAW, otilt: TILT, opitch: PITCH };
@@ -1108,9 +1130,24 @@ function wire() {
       return;
     }
 
-    /* everything below acts on the selected piece */
-    if (!M || !M.state.sel) return;
-    const t = M.get(M.state.sel); if (!t) return;
+    /* NOTHING SELECTED, SO THE ARROWS LOOK ROUND THE TABLE. grumkata: "we
+       need to make it acceable for people without a scroll wheel so lets
+       make it so up and down arrows count for scrolling". They go through
+       the same step the wheel does, aimed at the middle of the view. With a
+       piece selected they still nudge it, below — that is the one thing a
+       selection is for. */
+    const t = M && M.state.sel ? M.get(M.state.sel) : null;
+    const held = !!t && (!M.mayTouch || M.mayTouch(t));
+    if (!held && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      if (e.altKey || meta) return;
+      e.preventDefault();
+      const vr = vp.getBoundingClientRect();
+      step(e.key === 'ArrowUp', vr.left + vr.width / 2, vr.top + vr.height * ORIGIN_Y);
+      return;
+    }
+
+    /* everything below acts on the selected piece, if it is yours to move */
+    if (!held) return;
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault(); M.bin(t.id); return;
@@ -1129,12 +1166,6 @@ function wire() {
 
   vp.addEventListener('wheel', e => {
     e.preventDefault();
-    if (root.__field && root.__field.on()) {
-      const c = root.__field.cam;
-      c.zoom = Math.min(2.8, Math.max(.40, c.zoom * (e.deltaY < 0 ? 1.11 : 1 / 1.11)));
-      if (c.zoom <= .42) { leaveField(); return; }
-      root.__field.place(); return;
-    }
     /* ── THE WHEEL OVER A PIECE RESIZES THAT PIECE ────────────
        grumkata: "3d models should be scaleable". TableModel.scaleTo has
        existed since the model was written and nothing has ever called it —
@@ -1150,48 +1181,163 @@ function wire() {
        ordinary act of zooming out from something you were reading shrank
        the thing you were reading instead, permanently. Hold Alt to size a
        piece; the wheel on its own always means zoom, everywhere. */
-    if (e.altKey && scaleUnder(e)) return;
-    /* the ceiling leaves room ABOVE the field threshold, or the gesture that
-       enters the field is also the gesture that hits the stop */
-    /* THE FLOOR OF THE ZOOM USED TO BE THE END OF THE ROAD. At 0.18 the
-       wheel simply stopped and the table sat there small and pointless.
-       That last stretch is now where you push your chair back, so it goes
-       down to 0.045 — but only out of a lock, because a locked scene is a
-       board being read and has no seat to sit in. */
-    const inward = e.deltaY < 0;
-    if (!lock) {
-      /* out: shrink to the floor, then keep going and lean back.
-         in:  sit up first, then zoom. One gesture, in order. */
-      if (!inward && T.k <= ZOOM_MIN * 1.001 && lean < 1) {
-        lean = Math.min(1, lean + 0.11); seatCam(); apply(); return;
-      }
-      if (inward && lean > 0) {
-        lean = Math.max(0, lean - 0.11); seatCam(); apply(); return;
-      }
-    }
-    const floor = lock ? ZOOM_MIN * 0.6 : ZOOM_MIN;
-    const k = Math.min(lock ? 5.2 : 1.8, Math.max(floor, T.k * (inward ? 1.10 : 1 / 1.10)));
-    const vr = vp.getBoundingClientRect();
-    const px = e.clientX - vr.left, py = e.clientY - vr.top;
-    const was = { x: T.x, y: T.y, k: T.k };
-    T.x = px - (px - T.x) * (k / T.k); T.y = py - (py - T.y) * (k / T.k); T.k = k;
-    /* AND NOT INTO THE WOOD. Tried, then measured, then taken back if it
-       put the eye under the floor -- rather than solved for, because the
-       pan correction two lines up moves T.y in the same breath and the
-       closed form for "the largest k that keeps the eye above h" has to
-       account for it. Asking eyeLocal() afterwards is one call and it is
-       the same answer the renderer will use. */
-    if (inward && eyeLocal().z < EYE_FLOOR_M * U_PER_M) {
-      T.x = was.x; T.y = was.y; T.k = was.k;
-      return;
-    }
-    apply();
-    /* zooming out about a corner walks the table off screen just as surely
-       as dragging does, so the same rule applies after a wheel */
-    if (holdOnTheTable()) apply();
-    if (lock && k >= lockK * FIELD_IN) { enterField(); return; }
-    checkBounds();
+    if (!inField() && e.altKey && scaleUnder(e)) return;
+    step(e.deltaY < 0, e.clientX, e.clientY, notches(e));
   }, { passive: false });
+}
+
+/* ══ ONE STEP IN OR OUT ═══════════════════════════════════════
+   The wheel and the Up/Down arrows are the same gesture, so they are one
+   function: a step toward the table or away from it, about a point on the
+   screen. What a step does depends on where you already are — in the
+   field it zooms the field, over the wood it zooms the table, and at the
+   bottom of the zoom it sits you back in your chair. */
+/* the ceiling leaves room ABOVE the field threshold, or the gesture that
+   enters the field is also the gesture that hits the stop */
+/* THE FLOOR OF THE ZOOM USED TO BE THE END OF THE ROAD. At 0.18 the
+   wheel simply stopped and the table sat there small and pointless.
+   That last stretch is now where you push your chair back — but only out
+   of a lock, because a locked scene is a board being read and has no seat
+   to sit in. */
+function step(inward, cx, cy, n) {
+  if (!vp) return;
+  n = n == null ? 1 : n;
+  if (inField()) {
+    const c = root.__field.cam;
+    c.zoom = Math.min(2.8, Math.max(.40, c.zoom * Math.pow(1.11, inward ? n : -n)));
+    if (c.zoom <= .42) { leaveField(); return; }
+    root.__field.place(); return;
+  }
+  if (!lock) {
+    /* ── SITTING BACK IS A MOVE, NOT A PLACE TO STOP ──────────
+       grumkata: "when you go to table view you cant stop halfway through
+       at a weird angle".
+
+       Leaning back used to be spent a notch at a time, 0.11 of the way per
+       click, so any number of clicks short of nine left you somewhere in
+       between: head half down, the wood at forty degrees, neither over the
+       table nor in the chair. There are two places to be, and the travel
+       between them is now one move that always finishes. A step the other
+       way while it is moving turns it round. */
+    if (leanAnim) { if ((leanAnim.to === 0) !== inward) leanTo(inward ? 0 : 1); return; }
+    if (inward && lean > 0) { leanTo(0); return; }
+    if (!inward && lean >= 1) return;                  /* already sat back */
+    if (!inward && goalK() <= ZOOM_MIN * 1.001) {
+      /* still gliding down to the floor: the chair waits for it to land,
+         or it would start from a zoom the table has not reached — but it is
+         owed, so a quick spin of the wheel carries you all the way in */
+      if (T.k > ZOOM_MIN * 1.04) { if (zoom) zoom.then = 1; return; }
+      leanTo(1); return;
+    }
+  }
+  const floor = lock ? ZOOM_MIN * 0.6 : ZOOM_MIN;
+  const ceil = lock ? 5.2 : 1.8;
+  const k = Math.min(ceil, Math.max(floor, goalK() * Math.pow(1.10, inward ? n : -n)));
+  const vr = vp.getBoundingClientRect();
+  zoomTo(k, cx - vr.left, cy - vr.top, inward);
+}
+
+/* HOW MANY CLICKS AN EVENT IS WORTH. Every wheel event used to be a whole
+   click, which is right for a mouse and absurd for a trackpad — it sends
+   forty small events for one swipe, and each was a full 10% jump. A mouse
+   click is about 100 pixels in Chromium, so that is the unit. */
+function notches(e) {
+  const px = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 800 : e.deltaY;
+  return Math.min(3, Math.max(0.05, Math.abs(px) / 100));
+}
+
+/* ── THE ZOOM GLIDES ──────────────────────────────────────────
+   grumkata: "we also need to make scrolling more smooth". Each click used
+   to land the whole 10% in the frame it arrived in, so a run of clicks was
+   a run of jumps. Now a click moves the GOAL, and the camera closes on the
+   goal a little every frame — fast enough that it never feels behind the
+   hand, slow enough that you see it travel. Clicks that come in while it
+   is moving add to the goal rather than restarting, so a spin of the wheel
+   is one continuous move. */
+let zoom = null;                 /* { k, px, py, inward, t, raf } */
+const goalK = () => zoom ? zoom.k : T.k;
+function zoomTo(k, px, py, inward) {
+  /* a step in cancels a sit-down still waiting on this glide */
+  zoom = Object.assign(zoom || {}, { k, px, py, inward, then: 0 });
+  if (!zoom.raf) { zoom.t = performance.now(); zoom.raf = requestAnimationFrame(zoomFrame); }
+}
+function stopZoom(finish) {
+  if (!zoom) return;
+  if (zoom.raf) cancelAnimationFrame(zoom.raf);
+  const z = zoom; zoom = null;
+  if (finish && Math.abs(z.k - T.k) > 1e-6) zoomBy(z.k, z.px, z.py, z.inward);
+}
+function zoomFrame(now) {
+  const z = zoom; if (!z) return;
+  z.raf = 0;
+  /* a lock gliding in or out owns the camera; this gives way to it */
+  if (anim && !anim.tiltOnly) { zoom = null; return; }
+  /* a glide that pulled out of a lock aimed at the lock's lower floor; once
+     unlocked, the table's own floor is the bottom */
+  if (!lock && z.k < ZOOM_MIN) z.k = ZOOM_MIN;
+  /* measured in time, not frames: a machine drawing five frames a second
+     gets there in the same half-second as one drawing sixty */
+  const dt = Math.min(250, Math.max(0, now - z.t)); z.t = now;
+  const near = Math.abs(z.k - T.k) <= T.k * 0.002;
+  const k = near ? z.k : T.k + (z.k - T.k) * (1 - Math.exp(-dt / 80));
+  if (!zoomBy(k, z.px, z.py, z.inward) || near) {
+    if (zoom === z) zoom = null;
+    if (near && z.then && !lock) leanTo(1);
+    return;
+  }
+  z.raf = requestAnimationFrame(zoomFrame);
+}
+/* one move of the zoom about a point on the viewport. False when it had to
+   stop: the eye would have gone into the wood, or the step walked into the
+   field. */
+function zoomBy(k, px, py, inward) {
+  const was = { x: T.x, y: T.y, k: T.k };
+  T.x = px - (px - T.x) * (k / T.k); T.y = py - (py - T.y) * (k / T.k); T.k = k;
+  /* AND NOT INTO THE WOOD. Tried, then measured, then taken back if it
+     put the eye under the floor -- rather than solved for, because the
+     pan correction two lines up moves T.y in the same breath and the
+     closed form for "the largest k that keeps the eye above h" has to
+     account for it. Asking eyeLocal() afterwards is one call and it is
+     the same answer the renderer will use. */
+  if (inward && eyeLocal().z < EYE_FLOOR_M * U_PER_M) {
+    T.x = was.x; T.y = was.y; T.k = was.k;
+    return false;
+  }
+  apply();
+  /* zooming out about a corner walks the table off screen just as surely
+     as dragging does, so the same rule applies after a wheel */
+  if (holdOnTheTable()) apply();
+  if (lock && k >= lockK * FIELD_IN) { zoom = null; enterField(); return false; }
+  checkBounds();
+  return true;
+}
+
+/* ── AND THE CHAIR ────────────────────────────────────────────
+   From wherever `lean` is to 0 (over the wood) or 1 (in the chair), at a
+   steady rate so a half-finished turn-round takes half as long. The ease
+   is seatCam's own smoothstep, so this only has to move the number. */
+let leanAnim = null;
+function leanTo(to) {
+  stopLean();
+  stopZoom(true);
+  const from = lean, t0 = performance.now();
+  const dur = Math.max(1, 680 * Math.abs(to - from));
+  const me = leanAnim = { to, raf: 0 };
+  const frame = now => {
+    if (leanAnim !== me) return;
+    const u = Math.min(1, (now - t0) / dur);
+    lean = from + (to - from) * u;
+    seatCam(); apply();
+    if (u < 1) { me.raf = requestAnimationFrame(frame); return; }
+    leanAnim = null;
+    if (to === 0 && holdOnTheTable()) apply();
+  };
+  me.raf = requestAnimationFrame(frame);
+}
+function stopLean() {
+  if (!leanAnim) return;
+  cancelAnimationFrame(leanAnim.raf);
+  leanAnim = null;
 }
 
 /* ── RESIZE WHATEVER THE POINTER IS OVER ──────────────────────
@@ -1210,6 +1356,7 @@ function scaleUnder(e) {
   if (!p || !p.dataset.id) return false;
   const t = M.get(p.dataset.id);
   if (!t || t.kind === 'scene') return false;
+  if (M.mayTouch && !M.mayTouch(t)) return false;
   const was = t.scale || 1;
   /* the same 1.12 the table zooms by, so the two feel like one control */
   const want = was * (e.deltaY < 0 ? 1.12 : 1 / 1.12);

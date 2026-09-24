@@ -62,8 +62,34 @@ function Server() {
   };
 }
 
+/* ══ A MODEL THAT LOADS TABLES ═════════════════════════════════
+   The real app has more than one table and walks between them, which the
+   small model below cannot: its one table is always the right one. This one
+   keeps a save per id and loads and blanks the way 22-table-model.js does,
+   announcing both as 'load' — which is the case 60-board-net.js got wrong. */
+function LoadingModel(first) {
+  const saves = {};
+  const subs = [];
+  const copy = v => JSON.parse(JSON.stringify(v));
+  const fresh = id => ({ id, things: [], active: null, z: 1 });
+  return {
+    state: fresh(first || 'own'),
+    on(f) { subs.push(f); return () => {}; },
+    changed(why) { subs.forEach(f => { try { f(this.state, why); } catch (e) {} }); },
+    put(t) { this.state.things.push(t); this.changed('put'); return t; },
+    move(id, x) { const t = this.state.things.find(o => o.id === id);
+                  if (t) { t.x = x; this.changed('move'); } },
+    load(id) { saves[this.state.id] = copy(this.state);
+               this.state = saves[id] ? copy(saves[id]) : fresh(id);
+               this.changed('load'); },
+    blank(id) { delete saves[id]; this.state = fresh(id); this.changed('load'); },
+    saved(id) { return saves[id] || null; },
+    ids() { return this.state.things.map(t => t.id + '@' + t.x).sort().join(' '); }
+  };
+}
+
 /* ══ ONE CLIENT ════════════════════════════════════════════════ */
-function Client(server, uid, name) {
+function Client(server, uid, name, opts) {
   const win = {
     localStorage: (() => { const m = {}; return {
       getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },
@@ -111,6 +137,11 @@ function Client(server, uid, name) {
       ids() { return this.state.things.map(t => t.id + '@' + t.x).sort().join(' '); }
     };
   })();
+  /* a client that walks between tables, the way the app does */
+  if (opts && opts.boot) {
+    win.TableBoot = {};
+    win.TableModel = LoadingModel(opts.table);
+  }
   win.setTimeout = (f) => { f(); return 0; };      /* the debounce, taken out */
   win.clearTimeout = () => {};
   const ctx = vm.createContext(win);
@@ -483,6 +514,76 @@ function Client(server, uid, name) {
       gm.TableModel.ids() === 'a@222');
     T('and they keep their own things in front of them',
       dee.TableModel.ids().indexOf('z@5') >= 0);
+  }
+
+  /* == THE BOARD ARRIVES BEFORE THE TABLE DOES ================
+     grumkata: "images one one person end do not show up for everyone
+     else". Joining answers before the player has walked into the table —
+     that waits on the Bend — so the GM's board landed in whatever table
+     the player had open last. Then the right table loaded, and loading
+     fired the change hook, and sendNow saw an empty table where it
+     remembered a board: it sent a null for every piece. One arrival
+     deleted the GM's pictures for everybody. */
+  {
+    const S = Server();
+    const gm  = Client(S, 'u-gm',  'Grum', { boot: true, table: 'tb' });
+    const bob = Client(S, 'u-bob', 'Bob',  { boot: true, table: 'own' });
+    gm.TableModel.put({ id: 'pic', kind: 'art', name: 'A map', src: 'data:x', x: 100 });
+    bob.TableModel.put({ id: 'z', kind: 'note', name: 'my own prep', x: 5 });
+    const word = await gm.Session.host('tb', {});
+    await bob.Session.join(word);
+    const onWire = () => Object.keys(S.read('tables/' + word + '/board/things') || {}).sort().join(' ');
+
+    T('the GM\'s board does not land in whatever table the player had open',
+      bob.TableModel.ids() === 'z@5');
+    T('the player is pointed at a guest table of their own',
+      bob.BoardNet.tableId === 'guest-' + word);
+
+    bob.TableModel.load(bob.BoardNet.tableId);
+    T('walking into it, they see what the GM put down',
+      bob.TableModel.ids() === 'pic@100');
+    T('and loading it deletes nothing from the table',
+      onWire() === 'pic' && gm.TableModel.ids() === 'pic@100');
+    T('and their own table was never written into',
+      (bob.TableModel.saved('own') || { things: [] }).things.map(t => t.id).join(' ') === 'z');
+
+    gm.TableModel.move('pic', 300);
+    T('what the GM does after that still reaches them', bob.TableModel.ids() === 'pic@300');
+
+    bob.TableModel.load('own');
+    gm.TableModel.move('pic', 350);
+    T('a player looking at their own table again sends nothing from it',
+      onWire() === 'pic' && bob.TableModel.ids() === 'z@5');
+
+    bob.TableModel.load('guest-' + word);
+    T('and coming back to the guest table catches up', bob.TableModel.ids() === 'pic@350');
+
+    await bob.Session.leave();
+    T('leaving empties the guest table — the GM\'s board is not theirs to keep',
+      bob.TableModel.ids() === '' && !bob.TableModel.saved('guest-' + word));
+    T('and a player leaving takes nothing off the table', onWire() === 'pic');
+  }
+
+  /* == A THROW IS NUMBERS ======================================
+     A roll now carries the dice it threw (39-dice.js), so other tables can
+     stage the same landing. It is still data from a machine nobody here
+     controls, so only what a die can be survives. */
+  {
+    const S = Server();
+    const gm = Client(S, 'u-gm', 'Grum');
+    const clean = gm.Session.diceOf([
+      { kind: 20, result: 17 }, { kind: 6, result: 9 }, { kind: 'coin', result: 'Heads' },
+      { kind: 7, result: 3 }, { kind: 'coin', result: '<img>' }, null, 'x',
+      { kind: 10, result: '4', extra: 'onerror' }
+    ]);
+    T('a thrown roll keeps its real dice and drops anything that is not one',
+      JSON.stringify(clean) === JSON.stringify([
+        { kind: 20, result: 17 }, { kind: 'coin', result: 'Heads' }, { kind: 10, result: 4 }]));
+    const word = await gm.Session.host('td', {});
+    await gm.Session.talk('<b>Grum</b>', 'roll', { dice: [{ kind: 20, result: 20 }] });
+    const line = Object.values(S.read('tables/' + word + '/chat') || {})[0] || {};
+    T('and the roll line carries them to the table',
+      Array.isArray(line.dice) && line.dice[0].kind === 20 && line.dice[0].result === 20);
   }
 
   /* == EITHER YOU ARE AT A TABLE OR YOU ARE IN THE HALL =======

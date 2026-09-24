@@ -209,10 +209,38 @@ So it is filtered (`ChatNet.scrub`): only the tags and class names
 dropped. The worst a hostile client can manage is a roll that looks wrong.
 `test/session.test.js` throws seven attacks at it.
 
-**The dice themselves are not sent.** The physical dice on the wood are each
-client's own toy; eleven clients each throwing their own would be eleven
-different results for one roll. The numbers are decided once, by whoever
-rolled, and everyone else is told what they were.
+**The dice are sent as their results.** The numbers are decided once, by
+whoever rolled — eleven clients each rolling would be eleven answers to one
+roll. A thrown roll's line carries `dice: [{ kind, result }]`, and every
+other table stages the same throw landing on those faces (`57-chat-net.js`
+`throwFor`), because the tumble never decided anything: the numbers come
+first and the throw is choreographed to land on them. Both ends filter the
+list to real dice (`Session.diceOf`). Rolls already in the chat when you sit
+down are not thrown again, your own throw is not thrown twice, and Settings →
+Throw dice on the wood turns other people's off along with yours.
+
+## Who may do what
+
+The chest and the bin are the GM's: a player at a live table does not see
+either. A player cannot move, size, stack, bin, rename, turn over or write
+on anything on the wood, or command a unit in a running fight — the rule is
+`TableModel.mayTouch` (`22-table-model.js`), and `playerMayTouch` is where
+any exception for a player's own character belongs. It is enforced by the
+client; the database rules do not police the board.
+
+## The guest table
+
+A player does not open the GM's save id. They walk into `guest-<WORD>`, a
+table of their own that the board is mirrored into, started empty on every
+arrival and emptied again when they leave — the GM's board is not theirs to
+keep. `60-board-net.js` names the local table it belongs in and never applies
+or sends while a different one is loaded, because the board used to arrive
+before the player had walked into the table: it landed in their last table,
+and then loading the right one read as binning every piece, which sent a null
+for each and deleted the GM's board for everybody.
+
+Leaving as a player walks you back to the hall; so does the GM closing the
+table.
 
 ## Sheets
 
@@ -241,12 +269,6 @@ Honest gaps, in the order they would hurt:
 
 - **No kick, no lock, no transfer of host.** A GM cannot eject anybody or
   hand the table to someone else.
-- **Your own wood does not follow you in.** Join somebody else's table with
-  things already on your board and you keep seeing them; nobody else does.
-  They are yours, they are not published, and they are not reaped — but a
-  thing only you can see is still a thing only you can see. Whether joining
-  should hide your own board outright is a question about what a table *is*,
-  not a defect.
 - **The board has no size limit on the wire.** `chat` caps a line at 4000
   characters; `board` caps nothing, and a thing can carry an uploaded
   picture. Anyone who knows the word can write as much of it as they like.

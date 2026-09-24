@@ -231,7 +231,13 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
         vp.dispatchEvent(new WheelEvent('wheel', { deltaY: 240, clientX: 600,
           clientY: 450, bubbles: true, cancelable: true }));
       }
-      await new Promise(r => setTimeout(r, 400));
+      /* the zoom GLIDES now (23-table3d.js zoomTo), so it is given until it
+         lands rather than a fixed 400ms — the software renderer draws a few
+         frames a second, and a glide still running when this test moved on
+         unlocked the scene underneath the field half below */
+      for (let t = 0; t < 40 && document.body.classList.contains('locked-in'); t++)
+        await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 300));
       return !document.body.classList.contains('locked-in');
     }));
 

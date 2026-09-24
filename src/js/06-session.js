@@ -347,7 +347,9 @@ function leave(why) {
   }
   word = null; role = null; members = []; meta = null;
   sent = null; resitting = false;
-  say(why || 'left');
+  /* who we WERE, since role is already gone by now: a player who leaves
+     goes home, a GM who stops hosting is still at their own table */
+  say(why || 'left', { was: was, left: w });
   return Promise.all(jobs).catch(() => {});
 }
 
@@ -377,13 +379,36 @@ function refresh() {
 }
 
 /* ══ WHAT IS SAID ════════════════════════════════════════════ */
-function talk(text, kind) {
+function talk(text, kind, extra) {
   const t = String(text == null ? '' : text).trim();
   if (!live() || !t) return Promise.resolve(null);
-  return Net().push('tables/' + word + '/chat', {
+  const line = {
     uid: uid(), who: mine().name, role: role,
-    text: t.slice(0, 600), kind: kind || 'say', at: Net().now()
-  });
+    /* a roll line is markup, and one with a dozen dice in it runs well past
+       600 characters -- cut there, it arrived with its closing tags gone */
+    text: t.slice(0, kind === 'roll' ? 3800 : 600), kind: kind || 'say', at: Net().now()
+  };
+  /* a roll can carry the dice it threw, as numbers (39-dice.js) */
+  const dice = extra && diceOf(extra.dice);
+  if (dice) line.dice = dice;
+  return Net().push('tables/' + word + '/chat', line);
+}
+/* only what a die is: a kind the tray has and a face it can show. Anything
+   else on the wire is dropped here AND on arrival (57-chat-net.js). */
+const DIE_KINDS = { 4: 1, 6: 1, 8: 1, 10: 1, 12: 1, 20: 1, coin: 1 };
+function diceOf(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const out = [];
+  for (const d of list.slice(0, 60)) {
+    if (!d || !DIE_KINDS[d.kind]) continue;
+    if (d.kind === 'coin') {
+      if (d.result === 'Heads' || d.result === 'Tails') out.push({ kind: 'coin', result: d.result });
+      continue;
+    }
+    const r = parseInt(d.result, 10);
+    if (r >= 1 && r <= d.kind) out.push({ kind: d.kind, result: r });
+  }
+  return out.length ? out : null;
 }
 
 /* ══ THE SHEETS SOMEBODY PULLED ONTO THE WOOD ══════════════════
@@ -426,7 +451,7 @@ function takeBack(sheetId) {
 function seating() { return Ring().seating(members, uid()); }
 
 root.Session = { host, join, leave, talk, bring, takeBack, seating, refresh,
-                 makeWord, tidy,
+                 makeWord, tidy, diceOf,
                  get live() { return live(); },
                  get word() { return word; },
                  get role() { return role; },

@@ -360,6 +360,32 @@ html body .tm-say {
 }
 html body .tm-say b { font-style: normal; color: var(--m-or); letter-spacing: .12em; }
 
+/* SETTINGS, ON THE MENU'S OWN CARD (59-table-menu.js drawSettings). The
+   same switches as the hall's Settings cloth, drawn the same way — a row of
+   pennons with every choice in sight, the chosen one counterchanged — in the
+   card's narrower measure. */
+html body .tm-card.tm-set { width: 340px; max-height: calc(100vh - 80px); overflow-y: auto; }
+html body .tm-grp {
+  padding: 14px 16px 4px; font-family: var(--m-f-cap); font-size: 9px; font-weight: 700;
+  letter-spacing: var(--m-track); text-transform: uppercase; color: var(--m-or);
+}
+html body .tm-opt { padding: 6px 16px 8px; }
+html body .tm-opt > span {
+  display: block; margin-bottom: 6px; font-family: var(--m-f-hand); font-size: 14px;
+  color: var(--m-text);
+}
+html body .tm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+html body .tm-chip {
+  flex: 1 1 auto; min-width: 44px; padding: 6px 8px; border: 0; cursor: pointer;
+  font-family: var(--m-f-cap); font-size: 10px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--m-quiet); background: rgba(0,0,0,.34);
+  box-shadow: inset 0 0 0 1px var(--m-line);
+  transition: color var(--t-hover) var(--settle), box-shadow var(--t-hover) var(--settle);
+}
+html body .tm-chip:hover { color: var(--m-argent-hi); box-shadow: inset 0 0 0 1px var(--m-or); }
+html body .tm-chip.on { color: var(--m-sable); background: var(--m-or); box-shadow: none; }
+html body .tm-set .tm-rows { padding-top: 12px; }
+
 /* ══════════════════════════════════════════════════════════════
    PAPERS — a record open at the table, on your own end.
    Unscoped because it must sit over either half, and because the
@@ -369,7 +395,9 @@ html body .tm-say b { font-style: normal; color: var(--m-or); letter-spacing: .1
    flat panel with a hairline border.
 ══════════════════════════════════════════════════════════════ */
 #tp {
-  position: fixed; right: 316px; top: 14px; bottom: 14px; width: min(720px, 52vw);
+  /* wide enough for the record at its own 900 where the window allows it;
+     45-papers.js fitLeaf() scales it down where it does not */
+  position: fixed; right: 316px; top: 14px; bottom: 14px; width: min(944px, calc(100vw - 340px));
   z-index: 930; display: flex; flex-direction: column;
   /* vellum, with the faint lattice every record is ruled on */
   background:

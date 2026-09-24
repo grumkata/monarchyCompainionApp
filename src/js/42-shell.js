@@ -28,8 +28,12 @@ function tableName(id) {
   try {
     const t = (JSON.parse(root.localStorage.getItem('monarchy.tables.v3')) || [])
       .find(x => x.id === id);
-    return t && t.name ? String(t.name) : '';
-  } catch (e) { return ''; }
+    if (t && t.name) return String(t.name);
+  } catch (e) {}
+  /* a table you joined is not on your roll — it is called what its GM
+     called it, which came with the session */
+  const S = root.Session;
+  return (S && S.live && S.meta && S.meta.name) ? String(S.meta.name) : '';
 }
 /* the HUD's corner says which table this is, not just "The Table" */
 function nameHud(name) {

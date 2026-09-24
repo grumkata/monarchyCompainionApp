@@ -23,11 +23,14 @@
    few hundred kilobytes; nudging a token next to it should not re-send it.
 
    ── AND WHO IS ALLOWED TO MOVE WHAT ──────────────────────────
-   Anybody. This is a table, not a server: people reach across it and move
-   each other's pieces, and a permission system for that would be solving a
-   problem tabletop gaming does not have. The GM's authority is social, and
-   the one thing the rules enforce is that you cannot pretend to be somebody
-   else.
+   Not decided here. It was "anybody", and grumkata overruled it: "when you
+   join as a player you can access the toolbox and bin and move stuff which
+   is not allowed". The rule lives in the table model (TableModel.mayTouch,
+   22-table-model.js) and is enforced where a hand meets a piece — the drag,
+   the keys, the wheel, the controls on a counter. This file carries whatever
+   changes, from whoever made them; the database rules do not police the
+   board either, so the guarantee is the client's, like the rest of the
+   GM's authority at a table.
 
    ── THE ECHO ─────────────────────────────────────────────────
    Every client both writes and watches the same node, so everything you do
@@ -50,9 +53,48 @@ let ours = {};            /* ids that were on our own wood before we sat down */
 let synced = false;       /* has the table's own board reached us yet? */
 let applying = false;     /* a remote change is going in; do not send it back */
 let sendT = 0;
+let want = null;          /* the local table this board is mirrored into */
+let last;                 /* the board as last heard, for a table that loads late */
 
 const path = () => 'tables/' + word + '/board';
 const cut = t => JSON.stringify(t);
+
+/* ══ WHICH LOCAL TABLE IS THE BOARD'S ══════════════════════════
+   grumkata: "images one one person end do not show up for everyone else".
+
+   The board was mirrored into WHATEVER TABLE HAPPENED TO BE LOADED, and at
+   the moment a player joins that is the wrong one. The session answers,
+   this file starts listening — and the board arrives — before the hall has
+   walked the player into the table, because walking in waits on the Bend.
+   So the GM's pieces were merged into the player's last table, and then
+   the right table loaded over them. Two things followed, and the second is
+   the one that did the damage:
+
+     · everything already applied was remembered as our own echo, so the
+       player never drew it — the GM's pictures simply were not there;
+     · loading fires the model's change hook, which pushed, and sendNow
+       compared an empty table with everything it remembered and sent a
+       NULL for every piece. The player's arrival deleted the GM's board,
+       for everybody.
+
+   So the board now names the local table it belongs in. Nothing is applied
+   while a different one is loaded (it is kept, and applied when the right
+   one arrives), nothing is sent from a different one, and loading a table
+   is never mistaken for binning everything on it.
+
+   A player's copy is a GUEST table of its own, `guest-<word>`: the GM's
+   board, and nothing of the player's mixed into it, started empty on every
+   arrival. The GM's is the table they hosted from.
+
+   With no TableBoot there is no loading at all — one model, always the
+   right one — and that is the case the session tests run, so there `want`
+   stays null and the model in hand is the table. */
+const guestId = w => 'guest-' + w;
+function wantFor(w, role) {
+  if (!root.TableBoot) return null;
+  return role === 'gm' ? ((S() && S().tableId) || null) : guestId(w);
+}
+const here = () => !want || (M() && M().state && M().state.id === want);
 
 /* ══ OUT ═══════════════════════════════════════════════════════
    Debounced, because a drag fires `changed` on every pointer move and a
@@ -61,13 +103,13 @@ const cut = t => JSON.stringify(t);
    person who did not move it, and it collapses a whole drag into a handful
    of writes. */
 function push() {
-  if (!live() || applying || !synced) return;
+  if (!live() || applying || !synced || !here()) return;
   if (sendT) return;
   sendT = root.setTimeout(() => { sendT = 0; sendNow(); }, 90);
 }
 
 function sendNow() {
-  if (!live() || !M()) return;
+  if (!live() || !M() || !here()) return;
   const st = M().state;
   const now = {};
   (st.things || []).forEach(t => { now[t.id] = cut(t); });
@@ -107,6 +149,9 @@ function sendNow() {
 /* ══ IN ════════════════════════════════════════════════════════ */
 function take(board) {
   if (!M()) return;
+  last = board;
+  /* not the table this board goes into: keep it for when that one loads */
+  if (!here()) return;
   /* EVEN AN EMPTY ANSWER IS AN ANSWER. Until the table has told us what is
      on it we send nothing at all, so that a joiner's own save is never
      pasted over the GM's board. A table with nothing on it says exactly
@@ -161,7 +206,12 @@ function join(w) {
   word = w;
   mine = {};
   ours = {};
+  last = undefined;
   sendNow.moaned = false;
+  want = wantFor(w, S().role);
+  /* a guest table is the GM's board and nothing else, from empty, every
+     time: whatever an earlier evening left in it is not this evening's */
+  if (want && S().role !== 'gm') clearGuest(want);
   /* The GM's board IS the table's board -- it goes up whole the moment the
      table is hosted, and there is nothing of theirs to hold back.
 
@@ -178,28 +228,58 @@ function join(w) {
     synced = true;
   } else {
     synced = false;
-    (((M() && M().state.things) || [])).forEach(t => { if (t && t.id) ours[t.id] = 1; });
+    /* a guest table has nothing of ours on it by construction */
+    if (!want) (((M() && M().state.things) || [])).forEach(t => { if (t && t.id) ours[t.id] = 1; });
   }
   offs.push(root.Net.watch(path(), take));
   if (S().role === 'gm') sendNow();
 }
-function leave() {
+function leave(was) {
   offs.splice(0).forEach(f => { try { f(); } catch (e) {} });
   if (sendT) { root.clearTimeout(sendT); sendT = 0; }
-  word = null; mine = {}; ours = {}; synced = false;
+  const guest = (was === 'player') ? want : null;
+  word = null; mine = {}; ours = {}; synced = false; want = null; last = undefined;
+  /* a player's copy of somebody else's board is not theirs to keep. Done
+     after unwiring, so emptying it is not heard as a change to send. */
+  if (guest) clearGuest(guest);
+}
+
+/* empty a guest table, on disk and — if it is the one standing — in hand */
+function clearGuest(id) {
+  try { root.localStorage.removeItem('monarchy.table.' + id + '.v1'); } catch (e) {}
+  if (M() && M().state && M().state.id === id && M().blank) {
+    applying = true;
+    try { M().blank(id); } finally { applying = false; }
+  }
+}
+
+/* ── THE RIGHT TABLE HAS ARRIVED ──────────────────────────────
+   Loading is not a change anybody made to the board, so it is never sent.
+   If what loaded is the table this board belongs in, what we remember
+   sending is about some other copy of it and is forgotten: the GM sends
+   the table as it now stands, and a player takes the board as last heard. */
+function loaded() {
+  if (!word || !want || !here()) return;
+  mine = {}; ours = {};
+  if (S().role === 'gm') { synced = true; sendNow(); return; }
+  synced = false;
+  if (last !== undefined) take(last);
 }
 
 root.addEventListener('monarchy:session', e => {
   const d = e.detail || {};
   if (d.what === 'hosting' || d.what === 'joined') join(d.word);
-  if (d.what === 'left' || d.what === 'closed') leave();
+  if (d.what === 'left' || d.what === 'closed') leave(d.was);
 });
 
 /* every change to the wood, from anywhere: a drag, a bin, an undo, the
    toolbox putting something down. One choke point (22-table-model.js), so
    nothing can change the board without this hearing about it. */
-if (M()) M().on(() => push());
+if (M()) M().on((st, why) => { if (why === 'load') loaded(); else push(); });
 
-root.BoardNet = { push: sendNow, get wired() { return !!word; } };
+root.BoardNet = { push: sendNow, guestId,
+                  get wired() { return !!word; },
+                  /* the local table to walk into to see this board */
+                  get tableId() { return want; } };
 
 })(window, document);

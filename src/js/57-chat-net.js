@@ -28,6 +28,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
 
 let shown = {};          /* keys already on screen */
 let lastWord = null;
+let primed = false;      /* has this table's history already arrived? */
 
 function body() { return doc.getElementById('chat-body'); }
 
@@ -49,6 +50,11 @@ function body() { return doc.getElementById('chat-body'); }
 function draw(list) {
   const cb = body();
   if (!cb) return;
+  /* THE FIRST ANSWER IS THE EVENING SO FAR. Joining hands you every line
+     already said, and every roll in it would otherwise be thrown again,
+     all at once, the moment you sat down. */
+  const history = !primed;
+  primed = true;
   (list || [])
     .slice()
     .sort((a, b) => (a.at || 0) - (b.at || 0))
@@ -62,6 +68,7 @@ function draw(list) {
            another client... which is exactly the assumption a chat line
            must NOT make. See scrub(). */
         d.innerHTML = scrub(m.text);
+        if (!history) throwFor(m);
       } else if (m.kind === 'emote') {
         d.className = 'cl said emote';
         d.innerHTML = '<span class="stxt"><b>' + esc(m.who) + '</b> '
@@ -74,6 +81,23 @@ function draw(list) {
       cb.appendChild(d);
     });
   cb.scrollTop = cb.scrollHeight;
+}
+
+/* ── SOMEBODY ELSE'S DICE, ON THIS WOOD ───────────────────────
+   A roll that was thrown carries its dice as numbers (39-dice.js). Every
+   other table stages the same throw landing on the same faces, so the d20
+   everyone watches come up 17 is a 17 in the chat line under it too. Your
+   own throw is already on your wood — you threw it — so it is not thrown
+   twice. Same Settings switch as your own: dice off the wood means off. */
+function throwFor(m) {
+  const S = root.Session;
+  if (!m.dice || !S || m.uid === S.uid) return;
+  if (!root.GLDice || !doc.body.classList.contains('at-table')) return;
+  if (root.Dice && root.Dice.onWood && !root.Dice.onWood()) return;
+  /* a line that took a long road here is news, not a throw to watch */
+  if (root.Net && root.Net.ageOf && root.Net.ageOf(m.at) > 20000) return;
+  const dice = S.diceOf ? S.diceOf(m.dice) : null;
+  if (dice) root.GLDice.spawn(dice);
 }
 
 /* ── AND WHY A ROLL LINE IS SCRUBBED ──────────────────────────
@@ -132,7 +156,7 @@ function note(text) {
 root.addEventListener('monarchy:session', e => {
   const d = e.detail || {};
   /* a different table is a different conversation */
-  if (d.word !== lastWord) { lastWord = d.word; shown = {}; seenWho = null; }
+  if (d.word !== lastWord) { lastWord = d.word; shown = {}; seenWho = null; primed = false; }
   if (d.what === 'chat') draw(d.chat);
   if (d.what === 'who' || d.what === 'joined' || d.what === 'hosting') noticeWho(d.members);
   if (d.what === 'left' || d.what === 'closed') {
