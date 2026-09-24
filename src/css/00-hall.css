@@ -401,15 +401,6 @@ h2{animation:title-in .62s var(--pop) .16s both}
 #update-card .uc-txt{font-family:var(--m-f-hand);font-style:italic;
   font-size:16px;color:var(--m-text)}
 #update-card .uc-row{display:flex;gap:8px;flex-wrap:wrap}
-
-/* UPDATE TEST (1.0.3) — the smiley in menu-body.html. Over the hall and its
-   banners, under a cloth, a toast and the update card, and it takes no
-   clicks, so the hall still works through it. Delete with the markup. */
-#test-smile{position:fixed;inset:0;z-index:10;pointer-events:none;
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;
-  font-size:min(62vw,62vh);line-height:1}
-
 /* ── every picker is a grid of the thing itself, drawn ── */
 .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}
 .swgrid.tall{max-height:268px;overflow-y:auto;padding:4px;
