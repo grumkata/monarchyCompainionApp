@@ -179,6 +179,31 @@ ok('the box is yours in solo play, and the GM\'s in a session', () => {
   globalThis._sessionRole = 'gm';      assert.strictEqual(T.mayUseBox(), true);
   globalThis._sessionRole = undefined;
 });
+ok('at a live table a player may touch what they put down, and nothing else', () => {
+  globalThis.Session = { live: true, role: 'player', uid: 'u-bob' };
+  assert.strictEqual(T.mayUseBox(), false, 'no chest for a player');
+  assert.strictEqual(T.mayTouch({ kind: 'note', by: 'u-bob' }), true, 'their own note');
+  assert.strictEqual(T.mayTouch({ kind: 'ink', by: 'u-bob' }), true, 'their own drawing');
+  assert.strictEqual(T.mayTouch({ kind: 'note', by: 'u-gm' }), false, 'somebody else\'s');
+  assert.strictEqual(T.mayTouch({ kind: 'token' }), false, 'the GM\'s pieces');
+  globalThis.Session = { live: true, role: 'gm', uid: 'u-gm' };
+  assert.strictEqual(T.mayTouch({ kind: 'note', by: 'u-bob' }), true, 'the GM touches anything');
+  delete globalThis.Session;
+  assert.strictEqual(T.mayTouch({ kind: 'token' }), true, 'alone, it is all yours');
+});
+ok('taking a note back into your hand does not ask "bin it?"', () => {
+  fresh();
+  const was = globalThis.Options, asked = [];
+  globalThis.Options = { get: k => (k === 'bin' ? 'on' : null) };
+  const origConfirm = globalThis.confirm;
+  globalThis.confirm = m => { asked.push(m); return false; };
+  const n = T.put({ kind: 'note' });
+  assert.strictEqual(T.bin(n.id), false, 'an ordinary bin asks, and was told no');
+  assert.strictEqual(T.bin(n.id, true), true, 'a quiet one does not ask');
+  assert.strictEqual(asked.length, 1);
+  assert.ok(T.undo() && T.get(n.id), 'and Ctrl+Z still puts it back');
+  globalThis.Options = was; globalThis.confirm = origConfirm;
+});
 ok('a change tells whoever is listening', () => {
   fresh();
   let heard = 0; const off = T.on(() => heard++);

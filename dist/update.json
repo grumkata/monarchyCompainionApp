@@ -1,5 +1,5 @@
 {
- "version": "1.0.4",
+ "version": "1.0.5",
  "shell": 1,
  "files": {
   "assets/images/textures/table-surface.svg": "e30fb4f5f11d074ddef2e58a6766e6f1cfee3b5e4042554c4f76ac66f9ded93d",
@@ -79,6 +79,6 @@
   "assets/tex/ec62a96f1cff3ea9.png": "e88abfc5d7247e8dd6f6b6a4a60d51dd2f34bc3b5957c153be967cc7691e4bbb",
   "assets/tex/f9e2715e820d1be0.jpg": "3da65ba700181f0abe1254128066e3489b8f9ce27ec411bda98a3227445747de",
   "assets/tex/fb220079c1bf9fac.png": "33e5e73ab19995afcf772fb9dec88313200c2d71ebd00cca8e105567a0e5af2c",
-  "monarchy.html": "315400f61c44856fdee494358e8eb41758db61fd391e24f3803eacbcad9bb61c"
+  "monarchy.html": "f167b37b7fe19a6e603c9769cb365d8ef37dd33792e34b85f36c76675941c4e9"
  }
 }

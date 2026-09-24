@@ -1832,3 +1832,165 @@ body.chest-open .hud.br{ transform:translateY(calc(-1 * min(54vh, 470px) - 26px)
 #sc-make .sc-fixed b{ font-family:var(--m-f-tally); font-size:15px; color:var(--m-or); }
 /* one choice should not stretch the width of the panel */
 .sc-choice .sc-pen{ flex:0 1 auto; min-width:104px; }
+
+/* ══════════════════════════════════════════════════════════════
+   THE KIT — what you brought to the table (64-kit.js): your characters,
+   your notes, a pen and a pointer. A rail down the left edge in the same
+   Sable chrome as the menu's mark, and one card beside it. Over the model
+   canvases (#tgl is 870), under the reading (930), the chest (1200) and the
+   menu. It stands down while the chest is open: the two share a hand.
+══════════════════════════════════════════════════════════════ */
+.kit{ position:fixed; left:16px; top:50%; transform:translateY(-50%); z-index:910;
+  display:flex; align-items:flex-start; gap:10px; pointer-events:none;
+  transition:opacity var(--t-move) var(--settle); }
+body.chest-open .kit, body.reading .kit, body.field-on .kit{ opacity:0; pointer-events:none; }
+.kit > *{ pointer-events:auto; }
+body.chest-open .kit > *, body.reading .kit > *, body.field-on .kit > *{ pointer-events:none; }
+.kit-rail{ display:flex; flex-direction:column; gap:6px; }
+.kit-b{ width:42px; height:40px; padding:0 !important; border:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; color:var(--m-or);
+  background:var(--m-marks), var(--m-sable);
+  box-shadow:inset 0 0 0 1px var(--m-line), var(--m-lift);
+  clip-path:var(--m-pennon);
+  transition:box-shadow var(--t-hover) var(--settle), color var(--t-hover) var(--settle); }
+.kit-b[hidden]{ display:none; }
+.kit-b svg{ width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.6;
+  stroke-linecap:round; stroke-linejoin:round; }
+.kit-b:hover{ box-shadow:inset 0 0 0 1px var(--m-or), var(--m-lift); }
+.kit-b.on{ background:var(--m-or); color:var(--m-sable); }
+/* a note dragged off the table over the kit: it is about to go in your pocket */
+.kit.catching .kit-b[data-kit="notes"], .kit.catching .kit-card{
+  box-shadow:inset 0 0 0 2px var(--m-or), 0 0 22px rgba(201,162,39,.45); }
+
+.kit-card{ width:268px; max-height:min(70vh,560px); overflow-y:auto; padding:6px 0 10px !important;
+  background:var(--m-marks), linear-gradient(176deg, var(--m-sable-2), var(--m-sable) 64%);
+  box-shadow:var(--m-frame), var(--m-lift); color:var(--m-text);
+  animation:kit-in .18s var(--pop) both; }
+.kit-card[hidden]{ display:none; }
+@keyframes kit-in{ from{ opacity:0; transform:translateX(-8px) } }
+.kit-h{ display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:10px 14px 8px !important; font-family:var(--m-f-cap); font-size:9.5px; font-weight:700;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); }
+.kit-row{ display:flex; align-items:center; gap:6px; padding:7px 14px !important;
+  box-shadow:inset 0 -1px 0 var(--m-line); }
+.kit-nm{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.kit-nm b{ font-family:var(--m-f-hand); font-size:15px; font-weight:600; color:var(--m-argent-hi);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kit-nm i{ font-family:var(--m-f-hand); font-size:12px; color:var(--m-quiet); }
+.kit-none{ padding:6px 14px 10px !important; font-family:var(--m-f-hand); font-style:italic;
+  font-size:14px; color:var(--m-quiet); }
+.kit-chips{ display:flex; flex-wrap:wrap; gap:5px; padding:4px 14px 6px !important; }
+.kit-chip{ padding:6px 9px !important; border:0; cursor:pointer; white-space:nowrap;
+  font-family:var(--m-f-cap); font-size:9.5px; font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--m-quiet); background:rgba(0,0,0,.34);
+  box-shadow:inset 0 0 0 1px var(--m-line);
+  transition:color var(--t-hover) var(--settle), box-shadow var(--t-hover) var(--settle); }
+.kit-chip:hover{ color:var(--m-argent-hi); box-shadow:inset 0 0 0 1px var(--m-or); }
+.kit-chip.on{ color:var(--m-sable); background:var(--m-or); box-shadow:none; }
+.kit-chip.bad:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
+.kit-chip.busy{ opacity:.5; pointer-events:none; }
+.kit-wid{ display:inline-block; width:22px; height:var(--w); background:currentColor;
+  vertical-align:middle; }
+.kit-swatches{ display:flex; gap:6px; padding:2px 14px 8px !important; }
+.kit-sw{ width:28px; height:28px; padding:0 !important; border:0; cursor:pointer; background:var(--sw);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 5px rgba(0,0,0,.5);
+  clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); }
+.kit-sw.on{ outline:2px solid var(--m-or); outline-offset:2px; clip-path:none; }
+
+/* your notes, in the card: little papers you can take hold of */
+.kit-notes{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding:4px 14px 8px !important; }
+.pk-card{ position:relative; display:block; aspect-ratio:1; overflow:hidden; cursor:grab;
+  padding:6px !important; background:linear-gradient(172deg,#f6ebcd 0%,#e4d2a8 100%);
+  box-shadow:inset 0 0 0 1px #b49a68, 0 4px 9px rgba(0,0,0,.5);
+  transition:transform var(--t-hover) var(--settle); }
+.pk-card.t-blue{ background:linear-gradient(172deg,#dce7ef 0%,#b9cbdb 100%); }
+.pk-card.t-red{ background:linear-gradient(172deg,#f2d8ce 0%,#dcb0a0 100%); }
+.pk-card:hover{ transform:translateY(-2px) rotate(-1.5deg); }
+.pk-txt{ position:relative; z-index:1; display:block; font-family:'Crimson Text',serif;
+  font-size:10px; line-height:1.25; color:#241a10; white-space:pre-wrap; word-break:break-word; }
+.pk-sk{ position:absolute; inset:0; width:100%; height:100%; }
+.pk-sk path, .nt-sketch path, .pk-sk-big path{ fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.pk-float{ position:fixed; z-index:9100; width:84px; pointer-events:none;
+  transform:translate(-50%,-50%) rotate(-4deg); opacity:.92;
+  filter:drop-shadow(0 12px 16px rgba(0,0,0,.55)); }
+.pk-float.over{ transform:translate(-50%,-50%) rotate(0) scale(1.08); }
+body.pk-dragging, body.pk-dragging *{ cursor:grabbing !important; }
+
+/* what was drawn on a note, over its paper, under nothing you can press */
+.t3-note .t3-face{ position:relative; }
+.nt-sketch{ position:absolute; left:0; right:0; bottom:0; top:0; width:100%; height:100%;
+  pointer-events:none; }
+
+/* ── A NOTE UP IN YOUR HAND ─────────────────────────────────── */
+#pk-ed{ position:fixed; inset:0; z-index:1300; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; background:rgba(6,4,3,.55);
+  animation:kit-in .18s var(--settle) both; }
+#pk-ed[hidden]{ display:none; }
+.pk-sheet{ position:relative; width:min(460px,70vh); aspect-ratio:1;
+  background:linear-gradient(172deg,#f6ebcd 0%,#e4d2a8 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 0 0 1px #b49a68, 0 26px 60px rgba(0,0,0,.65); }
+.pk-sheet.t-blue{ background:linear-gradient(172deg,#dce7ef 0%,#b9cbdb 100%); }
+.pk-sheet.t-red{ background:linear-gradient(172deg,#f2d8ce 0%,#dcb0a0 100%); }
+.pk-sheet textarea{ position:absolute; inset:0; width:100%; height:100%; resize:none; border:0;
+  outline:none; padding:22px 24px !important; background:transparent; color:#241a10;
+  font-family:'Crimson Text',serif; font-size:19px; line-height:1.5; }
+.pk-draw{ position:absolute; inset:0; pointer-events:none; }
+.pk-sheet.drawing .pk-draw{ pointer-events:auto; cursor:crosshair; touch-action:none; }
+.pk-sk-big{ width:100%; height:100%; display:block; }
+.pk-bar{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px;
+  padding:8px 10px !important; max-width:min(560px,92vw);
+  background:var(--m-marks), var(--m-sable); box-shadow:var(--m-frame), var(--m-lift); }
+.pk-b{ padding:7px 11px !important; border:0; cursor:pointer; font-family:var(--m-f-cap); font-size:10px;
+  font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--m-quiet);
+  background:rgba(0,0,0,.34); box-shadow:inset 0 0 0 1px var(--m-line); }
+.pk-b:hover{ color:var(--m-argent-hi); box-shadow:inset 0 0 0 1px var(--m-or); }
+.pk-b.on, .pk-b.gilt{ color:var(--m-sable); background:var(--m-or); box-shadow:none; }
+.pk-b.bad:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
+.pk-pens, .pk-tints{ display:flex; gap:5px; padding:0 4px !important; }
+.pk-pen, .pk-tint{ width:22px; height:22px; padding:0 !important; border:0; cursor:pointer;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
+.pk-pen{ background:var(--pen); clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); }
+.pk-pen.on{ clip-path:none; outline:2px solid var(--m-or); outline-offset:2px; }
+.pk-tint.t-cream{ background:#eadbb5; }
+.pk-tint.t-blue{ background:#c4d5e3; }
+.pk-tint.t-red{ background:#e0b8a8; }
+.pk-tint.on{ outline:2px solid var(--m-or); outline-offset:2px; }
+
+/* ── A LINE ON THE WOOD (61-ink.js) ───────────────────────────
+   No card, no edges, no shadow of its own box: it is ink. The line takes
+   no presses unless you are rubbing out, so drawing over a piece never
+   stops you picking the piece up. */
+.prop.t3-ink{ box-shadow:none; pointer-events:none; }
+.prop.t3-ink .side{ display:none; }
+.t3-ink-face{ background:none; }
+.ink{ display:block; overflow:visible; }
+.ink path{ fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.ink .ink-hit{ stroke:transparent; pointer-events:none; }
+.ink .ink-line{ pointer-events:none; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+body.erasing .ink .ink-hit{ pointer-events:visibleStroke; stroke:rgba(0,0,0,.001); cursor:pointer; }
+body.erasing .prop.t3-ink:hover .ink-line{ opacity:.45; }
+.prop.ink-live{ opacity:.9; }
+body.inking #vp, body.inking #vp *{ cursor:crosshair !important; }
+body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
+
+/* ── A POINT (63-point.js) ────────────────────────────────────
+   Rings spreading out from the spot, in the pointer's own colours, and
+   their name beside it. Lies flat on the wood; gone in a few seconds. */
+.prop.t3-ping{ box-shadow:none; pointer-events:none; }
+.ping-face{ position:relative; width:0; height:0; }
+/* lozenges, not rings: Blazon has no round corners (STYLE.md), and a
+   lozenge spreading out from a point reads as heraldry rather than a map pin */
+/* in table units, two to the millimetre: a 20cm mark, big enough to find
+   from across the table at the zoom that shows all of it */
+.ping-face i{ position:absolute; left:-190px; top:-190px; width:380px; height:380px;
+  border:22px solid var(--ping); opacity:0;
+  animation:ping 1.6s cubic-bezier(.16,.84,.24,1) infinite; }
+.ping-face i:nth-child(2){ animation-delay:.35s; }
+.ping-face i:nth-child(3){ animation-delay:.7s; }
+.ping-face::before{ content:''; position:absolute; left:-40px; top:-40px; width:80px; height:80px;
+  background:var(--ping); transform:rotate(45deg); box-shadow:0 0 0 12px rgba(0,0,0,.35); }
+.ping-face b{ position:absolute; left:90px; top:-50px; white-space:nowrap; padding:12px 26px !important;
+  font-family:var(--m-f-cap); font-size:68px; font-weight:700; letter-spacing:.08em;
+  color:var(--m-sable); background:var(--ping); clip-path:var(--m-pennon); }
+@keyframes ping{ 0%{ transform:rotate(45deg) scale(.2); opacity:1 }
+                 100%{ transform:rotate(45deg) scale(2.4); opacity:0 } }

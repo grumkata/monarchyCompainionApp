@@ -194,6 +194,10 @@ const JS = [
   'src/js/58-sheets-net.js',     // the sheets somebody pulled onto the wood
   'src/js/59-table-menu.js',     // the table's one menu: Esc, or the mark
   'src/js/60-board-net.js',      // the same wood, for everyone at it
+  'src/js/61-ink.js',            // drawing on the wood
+  'src/js/62-pocket.js',         // your own notes, in your hand or on the table
+  'src/js/63-point.js',          // pointing at the table
+  'src/js/64-kit.js',            // the rail everyone has: sheets, notes, draw, point
   'src/js/42-shell.js',          // ── which half you are looking at ──
   'src/js/16-menu.js'            // last: it boots the hall
 ];

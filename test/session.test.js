@@ -564,6 +564,37 @@ function Client(server, uid, name, opts) {
     T('and a player leaving takes nothing off the table', onWire() === 'pic');
   }
 
+  /* == THE GM HANDS OUT THE PENS, AND ANYONE CAN POINT =========
+     grumkata: players "draw on the table if allowed by gm [...] or point at
+     things on the table". Permission lives on meta, which only the host
+     writes; a point lives in your own presence node. */
+  {
+    const S = Server();
+    const gm  = Client(S, 'u-gm',  'Grum');
+    const bob = Client(S, 'u-bob', 'Bob');
+    const word = await gm.Session.host('tp', {});
+    await bob.Session.join(word);
+    T('a player may not draw until the GM says so', bob.Session.allowed('draw') === false);
+    await bob.Session.allow({ draw: true });
+    T('and cannot say so for themselves', bob.Session.allowed('draw') === false
+      && !(S.read('tables/' + word + '/meta') || {}).draw);
+    await gm.Session.allow({ draw: true });
+    T('once the GM allows it, every player hears', bob.Session.allowed('draw') === true);
+    await gm.Session.allow({ draw: false });
+    T('and when the GM takes it back, they hear that too', bob.Session.allowed('draw') === false);
+
+    await bob.Session.point(1234, 2345, '#1f5fa8');
+    const seen = gm.Session.members.find(m => m.uid === 'u-bob') || {};
+    T('a point reaches everybody at the table, where it was made',
+      seen.ping && seen.ping.x === 1234 && seen.ping.y === 2345 && seen.ping.c === '#1f5fa8');
+    const k1 = seen.ping && seen.ping.k;
+    await bob.Session.point(1234, 2345, '#1f5fa8');
+    const again = (gm.Session.members.find(m => m.uid === 'u-bob') || {}).ping || {};
+    T('and pointing at the same spot twice is two points', again.k && again.k !== k1);
+    T('without costing them their name or their place',
+      (S.read('tables/' + word + '/who/u-bob') || {}).name === 'Bob');
+  }
+
   /* == A THROW IS NUMBERS ======================================
      A roll now carries the dice it threw (39-dice.js), so other tables can
      stage the same landing. It is still data from a machine nobody here

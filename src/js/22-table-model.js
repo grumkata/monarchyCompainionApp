@@ -572,8 +572,12 @@ const T = {
      already undoes it and a confirm on every one of forty pieces an evening
      is worse than the mistake it prevents — but it is a real preference for
      anybody running a table they cannot afford to fumble. */
-  bin(id) {
-    if (root.Options && root.Options.get('bin') === 'on') {
+  /* `quiet` is for taking something off the wood that is not being thrown
+     away — a note going back into your hand, a drawing wiped — which the
+     "ask before binning" question has no business interrupting. It is still
+     one entry on the history, so Ctrl+Z still puts it back. */
+  bin(id, quiet) {
+    if (!quiet && root.Options && root.Options.get('bin') === 'on') {
       const t = this.get(id);
       const what = (t && (t.name || t.kind)) || 'that';
       if (!root.confirm('Bin ' + what + '?')) return false;
@@ -651,11 +655,14 @@ const T = {
   /* A player at somebody else's table. `t` is a thing on the wood; the
      session (root.Session) knows who you are, and a shared sheet on the
      table records who brought it (58-sheets-net.js). */
+  /* grumkata: players "draw on the table if allowed by gm, make notes
+     (personal notes [...] can aslo be dragged on the table thne back into
+     your hand)". So a player may touch what they put there THEMSELVES — a
+     note they laid down, a line they drew — and nothing of anybody
+     else's. `by` is stamped on those things by 61-ink.js and 62-pocket.js. */
   playerMayTouch(t) {
-    /* TODO: nothing yet, which is the rule as asked. The case worth deciding
-       is a player's OWN character: a counter with t.source === 'char' whose
-       sheet they brought to the table. */
-    return false;
+    const S = root.Session;
+    return !!(S && S.live && t && t.by && t.by === S.uid);
   },
 
   /* ── A TABLE THAT IS SOMEBODY ELSE'S ─────────────────────────

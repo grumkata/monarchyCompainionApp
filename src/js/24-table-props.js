@@ -132,7 +132,9 @@ function repaint() {
        combat sheet is BEHIND that sheet's raised plaques (translateZ(38px))
        and cannot be clicked at all, however high its z-index. A token has to
        stand proud of the board it stands on. */
-    el.dataset.rest = t.kind === 'token' ? 44 : 8;
+    /* a drawing lies just over whatever it was drawn on — a map, a mat —
+       and under the pieces standing there (61-ink.js) */
+    el.dataset.rest = t.kind === 'token' ? 44 : t.kind === 'ink' ? 12 : 8;
     el.dataset.z = el.dataset.rest;
     el.dataset.locked = t.locked ? '1' : '0';
     el.style.setProperty('--pt', (t.kind === 'scene' ? 13 : 9) + 'px');
@@ -163,6 +165,11 @@ function repaint() {
 }
 
 function face(t, st) {
+  /* a line somebody drew: its own box, nothing round it (61-ink.js) */
+  if (t.kind === 'ink') {
+    return `<div class="face t3-bare t3-ink-face" style="width:${t.w}px;height:${t.h}px">${
+      root.Ink ? root.Ink.svg(t) : ''}</div>`;
+  }
   const def = t.kind === 'scene' ? C().SCENES[t.scene] : null;
   const live = st.active === t.id;
   const w = Math.round((t.w || 260) * (t.scale || 1));
@@ -203,7 +210,9 @@ function face(t, st) {
        </div>
        <div class="nt-body grip" data-note="${t.id}" contenteditable="false"
             spellcheck="false" title="Double-click to write on it"
-       >${esc(t.text || '')}</div>`
+       >${esc(t.text || '')}</div>${
+       /* what was drawn on it in somebody's hand (62-pocket.js) */
+       t.sketch && t.sketch.length && root.Pocket ? root.Pocket.sketchSVG(t.sketch) : ''}`
     /* ── A COUNTER, NOT A CARD ABOUT ONE ───────────────────────
        It was a brown card with a small blue circle, a name and a button
        reading "Ally" — which is nothing like the moulded counter you were
@@ -381,6 +390,7 @@ function wire(el, t) {
 function dragging(el, ev) {
   const bin = doc.querySelector('.tb-bin');
   if (bin) bin.classList.toggle('over', overBin(ev));
+  if (root.Kit) root.Kit.hover(ev.clientX, ev.clientY, el.classList.contains('t3-note'));
 }
 
 /* ── letting go ──────────────────────────────────────────────
@@ -392,6 +402,12 @@ function dropped(el, ev) {
   const bin = doc.querySelector('.tb-bin');
   if (bin) bin.classList.remove('over');
   if (!t) return;
+  if (root.Kit) root.Kit.hover(0, 0, false);
+
+  /* A NOTE LET GO OVER YOUR KIT GOES BACK INTO YOUR POCKET — off the table,
+     private again (62-pocket.js). Only one you may touch. */
+  if (t.kind === 'note' && root.Kit && root.Pocket && ev &&
+      root.Kit.over(ev.clientX, ev.clientY) && root.Pocket.pocket(t)) return;
 
   if (overBin(ev)) { T().bin(id); return; }
 

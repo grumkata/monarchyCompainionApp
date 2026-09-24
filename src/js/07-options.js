@@ -47,7 +47,9 @@ const KEYS = ['monarchy.opts.v1', 'monarchy.me.v1', 'monarchy.tables.v3',
      save would sit there for ever, forgotten by the app and not by the
      browser. */
   'monarchy.tavern.v3', 'monarchy.tavern.v4',
-  'monarchy.character'];
+  'monarchy.character',
+  /* your notes (62-pocket.js), and which characters you bring to a game */
+  'monarchy.pocket.v1', 'monarchy.bring.v1'];
 const PREFIX = /^monarchy\.table\./;
 
 /* ── what each one means, and what it is allowed to be ────────

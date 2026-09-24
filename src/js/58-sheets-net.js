@@ -96,8 +96,24 @@ function wrap() {
       delete clean.__shared; delete clean.__by; delete clean.__byName;
       return S().bring(clean), true;
     }
-    return putWas.call(this, rec);
+    const ok = putWas.call(this, rec);
+    /* YOUR OWN CHARACTER, BROUGHT TO THE TABLE, IS STILL YOURS — and what
+       you change on it has to reach the table too. It was saved at home and
+       nowhere else, so the GM went on reading the sheet as it stood when you
+       brought it. Sent a moment after you stop typing, not per keystroke. */
+    const node = live() && rec.id && shared[rec.id];
+    if (node && node.by === S().uid) resend(rec);
+    return ok;
   };
+}
+let resendT = 0, resendRec = null;
+function resend(rec) {
+  resendRec = rec;
+  clearTimeout(resendT);
+  resendT = setTimeout(() => {
+    const r = resendRec; resendRec = null;
+    if (r && live() && shared[r.id]) S().bring(Object.assign({}, r));
+  }, 700);
 }
 
 /* ── WHAT ARRIVES ─────────────────────────────────────────────

@@ -336,7 +336,9 @@ function aimMarks() {
    the wood hinged up off its near edge like a cardboard cutout as you sat
    back. A picture laid on a table is laid on it — it lies flat with the
    scenes it so often is. */
-const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b|\bt3-art\b/;
+/* nor does a line drawn on the wood, or a point made at it: both are ON the
+   table, not things standing on it (61-ink.js, 63-point.js) */
+const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b|\bt3-art\b|\bt3-ink\b|\bt3-ping\b/;
 const flatAlways = p => STANDS_ALONE.test(p.className) || p.id === 'combat-prop';
 /* ── A PIECE THAT HAS JUST LANDED ─────────────────────────
    The squash itself is in 12-combat.css; this only fires it, because CSS

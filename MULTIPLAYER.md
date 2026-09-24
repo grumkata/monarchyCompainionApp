@@ -223,10 +223,22 @@ Throw dice on the wood turns other people's off along with yours.
 
 The chest and the bin are the GM's: a player at a live table does not see
 either. A player cannot move, size, stack, bin, rename, turn over or write
-on anything on the wood, or command a unit in a running fight — the rule is
-`TableModel.mayTouch` (`22-table-model.js`), and `playerMayTouch` is where
-any exception for a player's own character belongs. It is enforced by the
+on anything on the wood, or command a unit in a running fight — except what
+they put there themselves: a note from their pocket, a line they drew
+(`TableModel.playerMayTouch`: `t.by` is their uid). It is enforced by the
 client; the database rules do not police the board.
+
+Everyone has the kit (`64-kit.js`, PROJECT.md 3.23): their own characters,
+their own notes, a pen, and pointing.
+
+| | where it lives on the wire |
+|---|---|
+| a brought sheet | `sheets/{id}`, as before; the Join screen brings the ones you picked |
+| a drawn line | `board/things/{id}`, kind `ink` — an ordinary thing |
+| a note put on the table | `board/things/{id}`, kind `note`, with `by` and its `sketch` |
+| a note in your pocket | nowhere — this machine only |
+| "players may draw" | `meta.draw`, written only by the host (`Session.allow`) |
+| a point | `who/{uid}/ping` — your own presence node, so no new rule |
 
 ## The guest table
 

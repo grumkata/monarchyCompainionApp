@@ -97,6 +97,11 @@ function draw() {
               : row('leave-live', 'Leave the game', 'gules'))
           : row('host', working ? 'Opening…' : 'Host this table', 'or', working)) +
 
+        /* the GM hands the players a pen, or takes it back (61-ink.js) */
+        (live() && role === 'gm'
+          ? row('pens', 'Players may draw · ' + (S().allowed('draw') ? 'Yes' : 'No'))
+          : '') +
+
         row('fit', 'Fit the table') +
         row('settings', 'Settings') +
         row('hall', 'Back to the hall') +
@@ -194,6 +199,10 @@ function onClick(e) {
   if (act === 'settings') { view = 'settings'; said = ''; return draw(); }
   if (act === 'back') { view = 'main'; return draw(); }
 
+  if (act === 'pens') {
+    return S().allow({ draw: !S().allowed('draw') })
+      .then(() => draw(), e => note(reason(e), true));
+  }
   if (act === 'host') return startHosting();
   if (act === 'close') return S().leave().then(() => { draw(); });
   /* A PLAYER WHO LEAVES GOES HOME. grumkata: "when you leave the table as a
@@ -288,12 +297,20 @@ function somethingElseIsOpen() {
   catch (e) {}
   try { if (root.TableModel && root.TableModel.state && root.TableModel.state.sel) return true; }
   catch (e) {}
+  /* the kit's pen, pointer or card, and a note up in your hand */
+  try { if (root.Kit && root.Kit.busy()) return true; } catch (e) {}
+  try { if (root.Pocket && root.Pocket.isOpen()) return true; } catch (e) {}
   return false;
 }
 root.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!doc.body.classList.contains('at-table')) return;
   if (open) { shut(); e.preventDefault(); return; }
+  /* SOMETHING ELSE ALREADY ANSWERED IT. Every handler before this one puts
+     its own thing away and says so with preventDefault — and then, a
+     moment later, somethingElseIsOpen() finds nothing open (it has just
+     been shut) and the menu came up as well. One Escape, one step. */
+  if (e.defaultPrevented) return;
   if (somethingElseIsOpen()) return;
   show(); e.preventDefault();
 });

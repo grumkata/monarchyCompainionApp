@@ -74,6 +74,8 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
                             pictures, token maker, preview, lines, combat scene, room editor
     30-34, 37-39            the fight: rules, content, combat app, GL pieces, field, bar, dice
     29-role.js              which side of the table you are
+    61-64                   the kit everyone has at the table (3.23): ink (drawing), pocket
+                            (your own notes), point, and the rail that holds them
     55-herald.js            Blazon's motion: the Bend transition, the Cry, gilt (see 3.13) — before 42-shell
     42-shell.js             which half you are looking at
   assets/tex/              ← the textures, as real files (see 2.3)
@@ -1548,6 +1550,63 @@ zoom glide to land rather than a fixed 400ms.
 
 ---
 
+### 3.23 The kit: what a player brings to the table (2026-09-24, v1.0.5)
+
+grumkata: *"when you join a table you can bring iwth your 1 or more charcter
+sheets (to share with dm) also that as a player you cant acess gm tools but
+you can still pullout any charcters sheets youve connected with your self as
+well as draw on the table if allowed by gm, make notes (personal notes that
+only appear on your screen but can aslo be dragged on the table thne back into
+your hand you may also draw on a note) or point at things on the table"*.
+
+The chest stays the GM's. Everyone — GM included — gets a **kit**: a rail of
+four down the left edge (`64-kit.js`), keys C / N / D / P, Escape puts away
+whatever is out before the table menu hears it (59-table-menu.js now respects
+`defaultPrevented`, which also stops one Escape closing the chest AND opening
+the menu).
+
+- **Sheets.** Chosen on the Join screen ("Bring with you", remembered in
+  `monarchy.bring.v1`) and brought the moment you sit down. At the table the
+  card lists your own characters — Read opens the record at your place; at a
+  live table Bring / At the table puts it on or takes it off. The GM's card
+  also lists everything anybody brought. A player's own edits to a brought
+  sheet now reach the table (58-sheets-net.js re-sends it, 700ms after the
+  last change); before, the GM kept reading the version from when it arrived.
+- **Notes** (`62-pocket.js`). A pocket in this machine's store
+  (`monarchy.pocket.v1`), never on the wire. Open one to write and draw on it
+  (a sketch in the note's own 0–1000 square). Drag a card onto the wood and it
+  becomes an ordinary note thing with `by` and its sketch, seen by everyone;
+  drag a note you may touch back onto the kit and it leaves the table and goes
+  back in your pocket (24-table-props.js `dropped`, `TableModel.bin(id, true)`
+  — a quiet bin: no "bin it?" question, still one Ctrl+Z).
+- **Draw** (`61-ink.js`). A stroke is a thing, kind `ink`: points in table
+  units relative to its own box, colour, width, `by`, locked. So it saves,
+  undoes and syncs through the board with no networking of its own. Six inks,
+  three widths, Rub out (your own lines; the GM's eraser takes any), Clear
+  mine, and for the GM Clear all (two presses). Lines lie flat and take no
+  presses unless you are rubbing out, so drawing over a piece never stops you
+  picking it up. **Players may draw only while the GM allows it** — a new row
+  in the table menu, stored as `meta.draw` through `Session.allow`, which
+  refuses anyone but the host (and so do the database rules).
+- **Point** (`63-point.js`). Click the wood: a lozenge in your livery with
+  your name spreads out on everybody's table for three seconds. It is not a
+  thing on the board — it rides in your own presence node (`Session.point`),
+  so it needed no new database rule. A point older than ten seconds is not
+  shown to somebody who has just sat down.
+- **Who may touch what:** `TableModel.playerMayTouch` — the question left open
+  in 3.22 — is answered by this request: a player may touch what they put down
+  themselves (`t.by` is their uid), and nothing else.
+
+**Verified:** new checks in `table.test.js` (a player touches their own notes
+and lines and nothing else; a quiet bin does not ask and still undoes) and
+`session.test.js` (a player cannot grant themselves the pen; the GM's grant and
+withdrawal reach every player; a point arrives where it was made, twice is two
+points, and it costs nobody their name). In the running app: two strokes drawn
+by pointer, a pocket note with a sketch dragged onto the table, a table note
+dragged back into the pocket with real mouse input, and a point shown.
+
+---
+
 ## 4. Game system summary (content, not code)
 
 This app is a companion tool for a homebrew TTRPG built around:
@@ -1734,6 +1793,7 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-24 | **v1.0.5: the kit** (3.23). Everyone at a table gets a rail of four: your characters (read them; bring them to a live table — and choose which on the Join screen), your pocket of private notes (write and draw on them, drag them onto the wood to share, drag them back to take them home), a pen when the GM allows it (new "Players may draw" in the table menu), and pointing. Players may now touch what they put down themselves and nothing else. New files 61-ink, 62-pocket, 63-point, 64-kit. |
 | 2026-09-24 | **v1.0.2: updates without reinstalling** (3.12). New `electron/content.js`: installed copies fetch changed files of `dist/` straight from the repo when `package.json`'s version goes up, verify them by sha256, and reload in place — no installer, no release. `build.js` writes `dist/update.json` and an LF-only page; `dist/` is committed byte-for-byte (`.gitattributes`); `.githooks/pre-commit` rebuilds on every commit (`npm run hooks`). electron-updater stays only for changes to the program itself. |
 | 2026-09-24 | **v1.0.1: nine things wrong at somebody else's table** (3.22). Players no longer get the chest, the bin or anyone's pieces (`TableModel.mayTouch`); dice land on every table; pictures lie flat; pages and notes are paper; banners and standees keep clear of the room, and side seats face the table; a joining player no longer deletes the GM's board (the board is bound to a guest table); leaving goes back to the hall; Settings opens at the table; arrows scroll, the zoom glides, and the chair never stops halfway. `package.json` 1.0.0 → 1.0.1. |
 | 2026-09-18 | **One menu, and nothing else on the walls** (3.21). grumkata: hosting belongs *in* the table not at the point of opening one; the table needs *"a real menu not random buttons all over the place"*, reached by Escape or a mark in the top left; and *"remove all the extrenous explanation text its unproffesional"*.<br>- **New `59-table-menu.js`:** one menu, Escape or the mark, holding host / stop hosting / leave / back to the hall / fit / light or dark. The Back pennon, Theme and Fit are gone from the corners, and the Host door is gone from the hall's roll.<br>- The Escape binding sits last on purpose — leaving a field, a lock, a selection, a record, the chest and a carried piece all get Escape first; the menu is what it means when it would otherwise mean nothing. Every lookup in that guard is null-checked, which the first version was not, and it took the key out entirely.<br>- **The prose went:** seven lede paragraphs, the settings descriptions, the maker's "why this is unavailable" notes, the seal sub-captions, and the keyboard manual printed across the top of the table all session. Rule applied: keep state, drop instruction.<br>- A test changed rather than being fixed: a choice that cannot apply is now simply absent instead of explaining itself. And `smooth.test.js`'s cover check was re-based on its own control rather than an absolute frame count, which was flaky at 7 against a threshold of 8.<br>- **Firebase:** anonymous auth confirmed working against the real project; writes still return `PERMISSION_DENIED` until the database rules are pasted, and the app now says exactly that instead of failing quietly. |

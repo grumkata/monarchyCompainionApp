@@ -445,13 +445,42 @@ function takeBack(sheetId) {
   });
 }
 
+/* ══ WHAT THE GM ALLOWS ════════════════════════════════════════
+   Table-wide permissions ride on `meta`, which only the host may write (the
+   database rules already say so), so a player cannot grant themselves
+   anything. Today there is one: `draw`, whether players may draw on the
+   wood (61-ink.js). Everybody hears it through the meta watch. */
+function allow(fields) {
+  if (!live() || role !== 'gm' || !fields) return Promise.resolve();
+  meta = Object.assign({}, meta || {}, fields);
+  say('meta');
+  return Net().update('tables/' + word + '/meta', fields);
+}
+const allowed = key => !!(meta && meta[key] === true);
+
+/* ══ POINTING ══════════════════════════════════════════════════
+   A point at the wood is a moment, not a thing on it — so it is not on the
+   board. It rides in your own presence node, the one place every client
+   already writes and everyone already watches, which needs no new database
+   rule. `k` changes on every point, so the same spot twice is two points. */
+let pointN = 0;
+function point(x, y, colour) {
+  if (!live()) return Promise.resolve();
+  pointN += 1;
+  return Net().update('tables/' + word + '/who/' + uid(), {
+    ping: { x: Math.round(x), y: Math.round(y), c: String(colour || ''),
+            k: uid() + ':' + Date.now().toString(36) + ':' + pointN, at: Net().now() },
+    seen: Net().now()
+  }).catch(() => {});
+}
+
 /* ══ WHO IS WHERE, FOR THE VIEW ════════════════════════════════
    The one call the table makes. Every client runs it with its own uid and
    gets its own rotation of the same cycle (04-ring.js). */
 function seating() { return Ring().seating(members, uid()); }
 
 root.Session = { host, join, leave, talk, bring, takeBack, seating, refresh,
-                 makeWord, tidy, diceOf,
+                 makeWord, tidy, diceOf, allow, allowed, point,
                  get live() { return live(); },
                  get word() { return word; },
                  get role() { return role; },

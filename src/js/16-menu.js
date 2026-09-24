@@ -512,6 +512,24 @@ let picSlot = 'face';
    and your likeness. There is nothing to fill in here that is not already
    part of you, so the only field is the word. */
 let joining = false, joinSaid = '', needName = false;
+
+/* ── AND WHO YOU BRING ─────────────────────────────────────────
+   grumkata: "when you join a table you can bring iwth your 1 or more
+   charcter sheets (to share with dm)". Chosen here, before you walk in, and
+   put on the table the moment you sit down (58-sheets-net.js) — so the GM
+   has your sheet in front of them without you doing anything at the table.
+   Remembered, because it is usually the same character every week. */
+const BRING_KEY = 'monarchy.bring.v1';
+function bringing(){
+  let ids = [];
+  try { ids = JSON.parse(localStorage.getItem(BRING_KEY)) || []; } catch (e) {}
+  return (Array.isArray(ids) ? ids : []).filter(id => chars.some(c => c.id === id));
+}
+function setBringing(ids){
+  try { localStorage.setItem(BRING_KEY, JSON.stringify(ids)); } catch (e) {}
+}
+const charName = c => c.name || (c.who && c.who.name) || 'Unnamed';
+
 VIEW.join = () => `
   <h2>Join a Game</h2>
   <div class="strip"></div>
@@ -522,6 +540,9 @@ VIEW.join = () => `
   <div class="f"><label>The table's word</label>
     <input id="word" maxlength="8" spellcheck="false" autocomplete="off" class="wordin"
       placeholder="· · · · ·" value="${esc(joinSaid)}"></div>
+  ${chars.length ? `<div class="f"><label>Bring with you</label>
+    <div class="chips">${chars.map(c => `<button class="num${bringing().includes(c.id) ? ' on' : ''}"
+      data-do="bringpick" data-v="${esc(c.id)}">${esc(charName(c))}</button>`).join('')}</div></div>` : ''}
   <div class="sealrow">
     <button class="seal${joining ? ' busy' : ''}" data-do="join"><span class="wax"></span><b>M</b></button>
     <span class="cap">Walk in${joining ? '<em>knocking…</em>' : ''}</span>
@@ -618,6 +639,10 @@ const KEYS = [
   ['Getting about', [
     ['Esc', 'the menu — or back out of whatever is open'],
     ['B', 'the chest'], ['/', 'find, in the chest'], ['Space', 'end the turn, in a fight']
+  ]],
+  ['Your kit', [
+    ['C', 'your characters'], ['N', 'your notes'], ['D', 'draw, when the GM allows it'],
+    ['P', 'point at the table'], ['Drag a note to the kit', 'back into your pocket']
   ]],
   ['A record', [
     ['Click a sheet on the wood', 'pick it up to read'],
@@ -1237,6 +1262,14 @@ document.addEventListener('click', e => {
     case 'open':       return openTable(row.dataset.id);
     case 'opensheet':  return openSheet(row.dataset.id);
     case 'join':       return sendWord();
+    case 'bringpick': {
+      const ids = bringing(), id = b.dataset.v, i = ids.indexOf(id);
+      if (i >= 0) ids.splice(i, 1); else ids.push(id);
+      setBringing(ids);
+      /* the word you were typing is kept by the input handler; repaint only
+         the chosen state, so the field keeps its focus */
+      return b.classList.toggle('on', i < 0);
+    }
     case 'arms':       draft = H.norm(me.arms); mkTab='field'; chgQ=''; at='arms';
                        repaintMaker.tab = 'field'; return render(true);
     case 'uploadarms': return $('#pickP').click();
@@ -1598,7 +1631,11 @@ function sendWord(){
   joining = true; joinSaid = w; render();
   window.Session.join(w).then(word => {
     joining = false;
-    toast('You are at ' + word);
+    /* the characters you chose come to the table with you */
+    const ids = window.SheetsNet ? bringing() : [];
+    ids.forEach(id => window.SheetsNet.bring(id));
+    toast('You are at ' + word + (ids.length
+      ? ' — ' + ids.length + (ids.length === 1 ? ' character' : ' characters') + ' brought' : ''));
     /* the table you have joined is the one you walk into — a guest table
        the GM's board is mirrored into (60-board-net.js), not the GM's own
        save id, which on this machine is nobody's table */
