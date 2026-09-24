@@ -909,7 +909,12 @@ html body .tm-set .tm-rows { padding-top: 12px; }
   padding:18px 18px 16px;border:0;
   background:var(--m-marks),var(--m-sable);
   box-shadow:inset 0 3px 0 var(--m-house),var(--m-frame),var(--m-lift)}body.at-hall #update-card .uc-txt{font-family:var(--m-f-hand);font-style:italic;
-  font-size:16px;color:var(--m-text)}body.at-hall #update-card .uc-row{display:flex;gap:8px;flex-wrap:wrap}/* ── every picker is a grid of the thing itself, drawn ── */body.at-hall .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}body.at-hall .swgrid.tall{max-height:268px;overflow-y:auto;padding:4px;
+  font-size:16px;color:var(--m-text)}body.at-hall #update-card .uc-row{display:flex;gap:8px;flex-wrap:wrap}/* UPDATE TEST (1.0.3) — the smiley in menu-body.html. Over the hall and its
+   banners, under a cloth, a toast and the update card, and it takes no
+   clicks, so the hall still works through it. Delete with the markup. */body.at-hall #test-smile{position:fixed;inset:0;z-index:10;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;
+  font-size:min(62vw,62vh);line-height:1}/* ── every picker is a grid of the thing itself, drawn ── */body.at-hall .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}body.at-hall .swgrid.tall{max-height:268px;overflow-y:auto;padding:4px;
   border:1px solid rgba(255,214,150,.16);background:rgba(0,0,0,.20)}body.at-hall .swgrid.tall::-webkit-scrollbar{width:4px}body.at-hall .swgrid.tall::-webkit-scrollbar-thumb{background:rgba(255,240,210,.3)}body.at-hall .sw{aspect-ratio:1;display:block;padding:0;overflow:hidden;
   border:1px solid rgba(255,214,150,.20);background:rgba(0,0,0,.22)}body.at-hall .sw:hover{border-color:rgba(255,214,150,.8)}body.at-hall .sw.on{border-color:var(--m-or);box-shadow:0 0 0 2px var(--m-sable),0 0 0 4px var(--m-or),0 4px 12px rgba(0,0,0,.55)}body.at-hall .sw svg{width:100%;height:100%;display:block}body.at-hall .num{padding:8px 16px;border:1px solid rgba(255,214,150,.30);font-size:10px;
   font-weight:700;letter-spacing:.14em;text-transform:uppercase;
@@ -3484,6 +3489,10 @@ to{opacity:1;transform:translateZ(10px) scale(1)}
     </div>
   </div>
 </div>
+
+<!-- UPDATE TEST (1.0.3): proof that a pushed change reaches an installed copy
+     without reinstalling. Delete this line and #test-smile in 00-hall.css. -->
+<div id="test-smile" aria-hidden="true">&#128512;</div>
 
 <!-- shown only when electron/updater.js reports a downloaded update
      (window.AppUpdate, wired in 16-menu.js) — absent entirely outside the
