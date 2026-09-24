@@ -1845,6 +1845,13 @@ body.chest-open .hud.br{ transform:translateY(calc(-1 * min(54vh, 470px) - 26px)
   transition:opacity var(--t-move) var(--settle); }
 body.chest-open .kit, body.reading .kit, body.field-on .kit{ opacity:0; pointer-events:none; }
 .kit > *{ pointer-events:auto; }
+.kit[hidden]{ display:none; }
+/* THE GM'S FURNITURE, NOT SHOWN TO A PLAYER (64-kit.js sets is-player).
+   Ending the turn and reshaping the battlefield are the GM's; the clicks were
+   already refused (41-lines-edit.js), and a button that does nothing when
+   pressed is worse than no button. */
+body.is-player #endturn, body.is-player .ln-add, body.is-player .ln-x{ display:none !important; }
+body.is-player .ln-name{ cursor:default; }
 body.chest-open .kit > *, body.reading .kit > *, body.field-on .kit > *{ pointer-events:none; }
 .kit-rail{ display:flex; flex-direction:column; gap:6px; }
 .kit-b{ width:42px; height:40px; padding:0 !important; border:0; cursor:pointer;
@@ -1982,11 +1989,16 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
    lozenge spreading out from a point reads as heraldry rather than a map pin */
 /* in table units, two to the millimetre: a 20cm mark, big enough to find
    from across the table at the zoom that shows all of it */
+/* ONE PULSE AND GONE. grumkata: "pointer lats for too long". It was three
+   seconds of rings repeating on a loop; a point is a moment — it spreads
+   once, the mark and the name fade out behind it, a second and a half. */
+.ping-face{ animation:pingout 1.5s ease-in forwards; }
+@keyframes pingout{ 0%, 55%{ opacity:1 } 100%{ opacity:0 } }
 .ping-face i{ position:absolute; left:-190px; top:-190px; width:380px; height:380px;
   border:22px solid var(--ping); opacity:0;
-  animation:ping 1.6s cubic-bezier(.16,.84,.24,1) infinite; }
-.ping-face i:nth-child(2){ animation-delay:.35s; }
-.ping-face i:nth-child(3){ animation-delay:.7s; }
+  animation:ping 1s cubic-bezier(.16,.84,.24,1) 1 both; }
+.ping-face i:nth-child(2){ animation-delay:.18s; }
+.ping-face i:nth-child(3){ animation-delay:.36s; }
 .ping-face::before{ content:''; position:absolute; left:-40px; top:-40px; width:80px; height:80px;
   background:var(--ping); transform:rotate(45deg); box-shadow:0 0 0 12px rgba(0,0,0,.35); }
 .ping-face b{ position:absolute; left:90px; top:-50px; white-space:nowrap; padding:12px 26px !important;

@@ -7,7 +7,12 @@
    which is why moving a unit is four lines here instead of a DOM
    surgery problem.
 ═══════════════════════════════════════════════════════════════ */
-const ROLE = window.__ROLE__;          // 'gm' | 'player'
+/* 'gm' | 'player'. It starts as 29-role.js says — 'gm', which alone at your
+   own table you are — and follows the session from then on (below isGM), so
+   a player at somebody else's table sees the player's version of this sheet
+   rather than the GM's buttons. `let`, because 38-bar-hud.js reads the same
+   binding and must see it change. */
+let ROLE = window.__ROLE__;
 const ME   = 'sa';                     // which character the player controls
 /* Rules 8, Turn Order: the GM DECLARES mana-in-the-air, then players act,
    then allies, then enemies. Declaring mana is setup, not a phase anyone
@@ -109,6 +114,15 @@ const entById = id => { for(const l of S.lines){ const e=l.ents.find(x=>x.id===i
 const isGM = () => (window.TableModel && window.TableModel.mayUseBox)
   ? window.TableModel.mayUseBox() : ROLE==='gm';
 const canControl = e => isGM() || e.id===ME;
+/* grumkata: "the gm shouldnt see player ui and vice versa". The GM's half of
+   this sheet — Allow and Dismiss, the difficulty, "View Game Master" — was
+   drawn for everybody, because ROLE never changed. It follows the table now. */
+window.addEventListener('monarchy:session', () => {
+  const r = isGM() ? 'gm' : 'player';
+  if (r === ROLE) return;
+  ROLE = r;
+  try { render(); } catch (e) {}
+});
 /* Rules 8, Movement: 1 line costs a QUICK action; spending your FULL action
    moves up to your move speed in lines. Move speed comes from passive Agility
    (Dexterity): 1-3 -> 1, 4-6 -> 2, 7-8 -> 3, 9-10 -> 4.
@@ -388,7 +402,9 @@ function renderSel(){
     bar.className='selbar none';
     bar.innerHTML = `<div class="pt"><span class="mono">—</span></div>
       <div class="sid"><div class="n">Nothing selected</div><div class="s">&nbsp;</div></div>
-      <div class="hint">Click a unit to select it${ROLE==='gm'?'' : ' — you can only move Sir Aldric'}. Drag it, or pick a highlighted line, to move.</div>
+      <div class="hint">${ROLE==='gm'
+        ? 'Click a unit to select it. Drag it, or pick a highlighted line, to move.'
+        : 'Click a unit to look at it.'}</div>
       <div class="role">View <b>${ROLE==='gm'?'Game Master':'Player'}</b></div>`;
     return;
   }

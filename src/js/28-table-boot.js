@@ -70,6 +70,10 @@ function raiseRoom(alsoCompile) {
      skipped". Left undone here, the room compiles as it draws, exactly as
      it always did. */
   if (alsoCompile) tryTo(() => { if (root.TableGL && root.TableGL.warm) root.TableGL.warm(); });
+  /* and meet a character record once, in the same quiet moment, so the
+     first one anybody opens does not freeze for the first-time styling
+     (45-papers.js warm) */
+  if (alsoCompile) tryTo(() => { if (root.Papers && root.Papers.warm) root.Papers.warm(); });
   return true;
 }
 /* from the hall, with time to spare */

@@ -6,13 +6,12 @@
    table if allowed by gm, make notes [...] or point at things on the table".
 
    The chest is the GM's (25-toolbox.js): scenes, people, pictures, models.
-   This is everybody's, GM included — the four things anybody at a table
-   does with their own hands:
+   This is the PLAYER'S — the four things a player at somebody else's table
+   does with their own hands. The GM does not see it (see isPlayer below):
 
      SHEETS   your characters. Read one (it comes up as paper at your place,
               45-papers.js), and at a live table bring it to the table for
-              the GM or take it home again (58-sheets-net.js). The GM also
-              sees every sheet brought by anybody.
+              the GM or take it home again (58-sheets-net.js).
      NOTES    your pocket (62-pocket.js): private notes, written and drawn
               on in your hand, dragged onto the wood to show everyone, and
               dragged back onto this to take them home.
@@ -65,8 +64,16 @@ function mount() {
   el.addEventListener('click', onClick);
 
   doc.addEventListener('keydown', onKey);
-  ['monarchy:kit', 'monarchy:pocket', 'monarchy:sheets', 'monarchy:session', 'monarchy:opts']
+  ['monarchy:kit', 'monarchy:pocket', 'monarchy:sheets', 'monarchy:opts']
     .forEach(ev => root.addEventListener(ev, paint));
+  /* NOT EVERY SESSION EVENT. The roll-call fires on every heartbeat and now
+     on every turn of somebody's head (63-point.js), and redrawing the card
+     each time lost whatever the pointer was hovering. Only the ones that
+     change what the kit is: arriving, leaving, and the GM's permissions. */
+  const MATTERS = { hosting: 1, joined: 1, left: 1, closed: 1, meta: 1, sheets: 1 };
+  root.addEventListener('monarchy:session', e => {
+    if (MATTERS[(e.detail || {}).what]) paint();
+  });
   root.addEventListener('monarchy:where', e => {
     if (!e.detail || e.detail.at !== 'table') close();
     paint();
@@ -75,8 +82,26 @@ function mount() {
 }
 
 /* ══ WHAT IS SHOWING ═══════════════════════════════════════════ */
+/* ── A PLAYER'S, NOT THE GM'S ─────────────────────────────────
+   grumkata: "the gm shouldnt see player ui and vice versa". The kit was
+   everybody's; it is a player's now, and the GM has the chest. Alone at your
+   own table you are its GM (TableModel.mayUseBox), so the kit is there only
+   at somebody else's table. `is-player` on the body is how the stylesheets
+   hide the GM's own furniture from a player (13-table-ui.css). */
+const isPlayer = () => !!(T() && T().mayUseBox && !T().mayUseBox());
 function paint() {
   if (!el) return;
+  const player = isPlayer();
+  doc.body.classList.toggle('is-player', player);
+  el.hidden = !player;
+  if (!player) {
+    panel = null; card.hidden = true; card.innerHTML = '';
+    /* a pen or a pointer left out when you stop being a player is put away
+       — without repainting from here, since putting them away repaints */
+    if (root.Ink && root.Ink.tool) return root.Ink.set(null);
+    if (root.Point && root.Point.on) return root.Point.set(false);
+    return;
+  }
   const canDraw = !!(root.Ink && root.Ink.allowed());
   const tool = root.Ink && root.Ink.tool;
   rail.querySelectorAll('.kit-b').forEach(b => {
@@ -116,15 +141,7 @@ function sheetsCard() {
       </div>`; }).join('')
     : `<p class="kit-none">No characters yet</p>`;
   /* the GM reads what everybody brought */
-  let theirs = '';
-  if (live() && T().mayUseBox()) {
-    const others = at.filter(n => n.by !== S().uid);
-    if (others.length) theirs = `<div class="kit-h">At the table</div>` + others.map(n =>
-      `<div class="kit-row"><span class="kit-nm"><b>${esc(n.name || 'Unnamed')}</b>
-         <i>${esc(n.who || '')}</i></span>
-       <button class="kit-chip" data-read="${esc(n.id)}">Read</button></div>`).join('');
-  }
-  return `<div class="kit-h">Your characters</div>${rows}${theirs}`;
+  return `<div class="kit-h">Your characters</div>${rows}`;
 }
 
 /* ── NOTES ── */
@@ -138,7 +155,6 @@ function notesCard() {
 /* ── DRAW ── */
 function drawCard() {
   const I = root.Ink;
-  const gm = T().mayUseBox();
   return `<div class="kit-h">Draw</div>
     <div class="kit-swatches">${I.COLOURS.map(c =>
       `<button class="kit-sw${c === I.colour && I.tool === 'draw' ? ' on' : ''}" data-ink="${c}"
@@ -148,8 +164,7 @@ function drawCard() {
          <span class="kit-wid" style="--w:${Math.max(2, w.w / 2.5)}px"></span></button>`).join('')}
       <button class="kit-chip${I.tool === 'erase' ? ' on' : ''}" data-do="erase">Rub out</button></div>
     <div class="kit-chips">
-      <button class="kit-chip" data-do="clearmine">Clear mine</button>
-      ${gm ? '<button class="kit-chip bad" data-do="clearall">Clear all</button>' : ''}</div>`;
+      <button class="kit-chip" data-do="clearmine">Clear mine</button></div>`;
 }
 
 /* ══ DOING THINGS ═══════════════════════════════════════════════ */
@@ -205,16 +220,10 @@ function onClick(e) {
   if (d.dataset.do === 'newnote' && root.Pocket) { const n = root.Pocket.add({}); root.Pocket.open(n.id); return; }
   if (d.dataset.do === 'erase') { root.Ink.set(root.Ink.tool === 'erase' ? 'draw' : 'erase'); return paint(); }
   if (d.dataset.do === 'clearmine') { root.Ink.clear(false); return; }
-  if (d.dataset.do === 'clearall') {
-    /* two presses: it takes everybody's drawing away */
-    if (!d.dataset.sure) { d.dataset.sure = '1'; d.textContent = 'Press again';
-      return setTimeout(() => { if (d.isConnected) { delete d.dataset.sure; d.textContent = 'Clear all'; } }, 3000); }
-    root.Ink.clear(true);
-  }
 }
 
 function onKey(e) {
-  if (!doc.body.classList.contains('at-table')) return;
+  if (!doc.body.classList.contains('at-table') || !isPlayer()) return;
   const a = doc.activeElement, tag = a && a.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (a && a.isContentEditable)) return;
   if (root.Pocket && root.Pocket.isOpen()) return;

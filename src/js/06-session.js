@@ -474,13 +474,24 @@ function point(x, y, colour) {
   }).catch(() => {});
 }
 
+/* ══ WHERE YOU ARE LOOKING ═════════════════════════════════════
+   grumkata: other players' figures should turn "when they look around on
+   table view". Which way your head is turned, in degrees (left positive),
+   in the same presence node as a point. 63-point.js sends it only when it
+   has moved a few degrees, so a still head sends nothing. */
+function look(deg) {
+  if (!live()) return Promise.resolve();
+  return Net().update('tables/' + word + '/who/' + uid(), { look: Math.round(deg) || 0 })
+    .catch(() => {});
+}
+
 /* ══ WHO IS WHERE, FOR THE VIEW ════════════════════════════════
    The one call the table makes. Every client runs it with its own uid and
    gets its own rotation of the same cycle (04-ring.js). */
 function seating() { return Ring().seating(members, uid()); }
 
 root.Session = { host, join, leave, talk, bring, takeBack, seating, refresh,
-                 makeWord, tidy, diceOf, allow, allowed, point,
+                 makeWord, tidy, diceOf, allow, allowed, point, look,
                  get live() { return live(); },
                  get word() { return word; },
                  get role() { return role; },

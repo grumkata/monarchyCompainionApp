@@ -593,6 +593,12 @@ function Client(server, uid, name, opts) {
     T('and pointing at the same spot twice is two points', again.k && again.k !== k1);
     T('without costing them their name or their place',
       (S.read('tables/' + word + '/who/u-bob') || {}).name === 'Bob');
+
+    /* and which way their head is turned, for their figure on every other
+       table to turn with it (27-table-gl.js faceSeats) */
+    await bob.Session.look(34.6);
+    T('where a player is looking reaches everybody, in whole degrees',
+      (gm.Session.members.find(m => m.uid === 'u-bob') || {}).look === 35);
   }
 
   /* == A THROW IS NUMBERS ======================================

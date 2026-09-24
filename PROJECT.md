@@ -1607,6 +1607,49 @@ dragged back into the pocket with real mouse input, and a point shown.
 
 ---
 
+### 3.24 The GM's table and the players' (2026-09-24, v1.0.6)
+
+grumkata: *"the gm shouldnt see player ui and vice versa"*, *"pointer lats for
+too long"*, *"opening charceter sheets is laggy"*, *"remove the chairs under
+players"*, *"banners clip with yourself"*, and other players' figures should
+turn as they look around, and be lit so they do not look pasted in.
+
+- **Two sides.** The kit (3.23) is the player's now: `64-kit.js` shows it only
+  when `TableModel.mayUseBox()` is false, and sets `body.is-player`, which
+  hides the GM's End Turn and the battlefield's line editing
+  (13-table-ui.css). `32-combat-app.js`'s `ROLE` is a `let` that follows the
+  session, so a player sees the player's half of the combat sheet (Withdraw,
+  "Your intent", no difficulty box) instead of the GM's. The GM clears the
+  table's drawings from the table menu now.
+- **A point is one pulse**, 1.5s, not three seconds of looping rings.
+- **Opening a record was ~650ms frozen, now ~40ms.** Two causes, both
+  measured: the `zoom` that fitted the record into the reading (3.22) cost
+  380ms *every* open — `zoom` re-lays out every piece of type at the new
+  size — and is a transform now (20ms), with negative margins giving back the
+  space the scale frees; and the first record the browser ever meets costs a
+  one-off ~300ms of styling, now paid in the hall's quiet moment
+  (`Papers.warm`, called from `28-table-boot.js` beside the room's own warm).
+  The copy lying on the wood is no longer redrawn on every keystroke or on
+  every close — only when put down after being written on.
+- **No chairs, and nothing of your own.** A seat is a figure and a banner;
+  your own seat builds neither (your banner hung behind your head and swept
+  through the view as you turned it).
+- **Figures turn with their owner's head.** `Session.look` writes your turn
+  into your presence node (63-point.js sends it on a 3° change, 5×/s at most);
+  every other table turns your figure by half of it, eased, never past 40°.
+- **Figures are lit by the room** (`figureLight`): darker to the floor and at
+  the sides, warmed and slightly dimmed toward the tavern's light, the
+  hearth's own flickering colour laid on low and round the edges, more of
+  Blazon's ramp, and a shadow on the floor under their feet.
+- **Found on the way:** the `monarchy:session` listener in 27-table-gl.js reset
+  the seat signature before checking it, so EVERY session event — every
+  heartbeat of every player — rebuilt every seat and reloaded every picture.
+  With heads turning five times a second that would have been a rebuild five
+  times a second. The signature now carries a sampled hash of each likeness
+  and coat, and the reset is gone; coats are drawn once per coat (`bannerURL`).
+
+---
+
 ## 4. Game system summary (content, not code)
 
 This app is a companion tool for a homebrew TTRPG built around:
@@ -1793,6 +1836,7 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-24 | **v1.0.6: the GM's table and the players'** (3.24). The kit is players-only and the GM's controls are hidden from players (including the GM half of the combat sheet); a point is one 1.5s pulse; opening a record ~650ms → ~40ms (a CSS `zoom` → transform, plus a warm-up); no chairs, no banner or figure of your own; other players' figures turn with their heads and are lit by the room. Also: every session event had been rebuilding every seat. |
 | 2026-09-24 | **v1.0.5: the kit** (3.23). Everyone at a table gets a rail of four: your characters (read them; bring them to a live table — and choose which on the Join screen), your pocket of private notes (write and draw on them, drag them onto the wood to share, drag them back to take them home), a pen when the GM allows it (new "Players may draw" in the table menu), and pointing. Players may now touch what they put down themselves and nothing else. New files 61-ink, 62-pocket, 63-point, 64-kit. |
 | 2026-09-24 | **v1.0.2: updates without reinstalling** (3.12). New `electron/content.js`: installed copies fetch changed files of `dist/` straight from the repo when `package.json`'s version goes up, verify them by sha256, and reload in place — no installer, no release. `build.js` writes `dist/update.json` and an LF-only page; `dist/` is committed byte-for-byte (`.gitattributes`); `.githooks/pre-commit` rebuilds on every commit (`npm run hooks`). electron-updater stays only for changes to the program itself. |
 | 2026-09-24 | **v1.0.1: nine things wrong at somebody else's table** (3.22). Players no longer get the chest, the bin or anyone's pieces (`TableModel.mayTouch`); dice land on every table; pictures lie flat; pages and notes are paper; banners and standees keep clear of the room, and side seats face the table; a joining player no longer deletes the GM's board (the board is bound to a guest table); leaving goes back to the hall; Settings opens at the table; arrows scroll, the zoom glides, and the chair never stops halfway. `package.json` 1.0.0 → 1.0.1. |

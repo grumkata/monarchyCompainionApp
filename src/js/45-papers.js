@@ -278,14 +278,27 @@ function paint() {
    cut off, which is most of what reads as broken about it. It is scaled to
    the reading's width instead (never up), the same way the sheet lying on
    the wood is scaled to the paper. */
+/* BY TRANSFORM, NOT BY ZOOM. This first used the CSS `zoom` property and
+   that was most of "opening charceter sheets is laggy": zoom changes the
+   size of everything inside it, so every piece of type in the record is laid
+   out again at the new size — 380ms, measured, and every single time. A
+   transform scales the picture after layout: 20ms. A transform leaves the
+   layout box at full size, so the negative margins hand back the room the
+   scaling freed, and the reading scrolls to the end of the record, not past
+   it. */
 function fitLeaf() {
   const leaf = doc.getElementById('tp-leaf');
   const sheet = leaf && leaf.firstElementChild;
   if (!sheet) return;
-  sheet.style.zoom = '';
+  sheet.style.transform = ''; sheet.style.marginRight = ''; sheet.style.marginBottom = '';
   const room = leaf.clientWidth - 32;           /* the leaf's own padding */
   const need = sheet.scrollWidth;
-  if (room > 0 && need > room) sheet.style.zoom = (room / need).toFixed(4);
+  if (!(room > 0 && need > room)) return;
+  const k = room / need;
+  sheet.style.transformOrigin = '0 0';
+  sheet.style.transform = 'scale(' + k.toFixed(4) + ')';
+  sheet.style.marginRight = -Math.round(need * (1 - k)) + 'px';
+  sheet.style.marginBottom = -Math.round(sheet.offsetHeight * (1 - k)) + 'px';
 }
 root.addEventListener('resize', () => { if (openId && el() && !el().hidden) fitLeaf(); });
 
@@ -305,27 +318,72 @@ function close() {
   setTimeout(done, a ? 290 : 0);
   openId = null;
   /* the record stays laid out at your end — closing the reading is putting
-     the sheet down, not taking it away (that is data-tp-away) */
-  paintPaper();
+     the sheet down, not taking it away (that is data-tp-away). It is only
+     redrawn if something was written on it while it was up: the sheet on the
+     wood is a whole record inside the 3D table, and drawing it again for
+     nothing was the one slow frame left in putting a sheet down. */
+  if (paperStale) { paperStale = false; paintPaper(); }
 }
 
+/* the copy on the wood is behind the reading while you write, where nobody
+   can see it — so it is brought up to date when the reading is put down,
+   not on every keystroke */
+let paperStale = false;
 function commit(r) {
   if (!r || !root.Characters) return;
   root.Characters.put(r);
   /* the piece on the line is this character; its hit points are the record's */
   if (root.Tokens) root.Tokens.refresh(r.id);
-  paintPaper();
+  if (openId) paperStale = true; else paintPaper();
 }
 
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+/* ══ THE FIRST RECORD IS THE SLOW ONE ══════════════════════════
+   grumkata: "opening charceter sheets is laggy for soemr reassons".
+
+   Measured: building the record's markup is a millisecond and a half, and
+   every keystroke in it is two. The lag was the browser meeting the record
+   for the FIRST time — matching a page's worth of 01-sheet.css against a
+   fresh tree and bringing up the faces it is set in — 304ms, frozen, and
+   then 7ms every time after. Opening one did that twice over (the paper on
+   the wood, then the reading).
+
+   So the first meeting is had early, with a record nobody can see: raised
+   off-screen when the hall has a quiet moment (28-table-boot.js warm, the
+   same moment the tavern is built in), or failing that once you have sat
+   down and gone still, and thrown away. By the time anybody opens a sheet
+   the browser has already met one. */
+let warmed = false;
+function warm() {
+  if (warmed || !root.Sheet || !root.Sheet.render) return;
+  warmed = true;
+  try {
+    const d = doc.createElement('div');
+    d.className = 'tp';
+    d.setAttribute('aria-hidden', 'true');
+    d.style.cssText = 'position:fixed;left:-12000px;top:0;width:900px;visibility:hidden;pointer-events:none';
+    d.innerHTML = `<div class="tp-leaf">${root.Sheet.render(root.Sheet.blank())}</div>`;
+    doc.body.appendChild(d);
+    void d.offsetHeight;                   /* style and lay it out, now */
+    d.parentNode.removeChild(d);
+  } catch (e) { /* a warm-up that fails costs the first open, nothing else */ }
+}
+root.addEventListener('monarchy:where', e => {
+  if (!e.detail || e.detail.at !== 'table' || warmed) return;
+  const later = () => (root.requestIdleCallback ? root.requestIdleCallback(warm, { timeout: 4000 })
+                                                : setTimeout(warm, 200));
+  setTimeout(later, 2500);                 /* after the Bend has come off */
+});
+
 function toast(m) {
   const t = doc.getElementById('toast'); if (!t) return;
   t.textContent = m; t.classList.add('on');
   setTimeout(() => t.classList.remove('on'), 2200);
 }
 
-root.Papers = { pick, open, close, lay, read, away,
+root.Papers = { pick, open, close, lay, read, away, warm,
                 get openId() { return openId; }, get laidId() { return laidId; } };
 
 })(window, document);

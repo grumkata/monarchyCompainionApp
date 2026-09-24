@@ -32,6 +32,12 @@
 
 let el = null, open = false;
 let view = 'main';        /* 'main' | 'settings' */
+let sureUnink = false;    /* "clear the drawings" is two presses */
+/* the GM's table has drawings on it */
+const inked = () => {
+  const M = root.TableModel;
+  return !!(M && M.mayUseBox && M.mayUseBox() && M.all().some(t => t.kind === 'ink'));
+};
 
 const S = () => root.Session;
 const live = () => !!(S() && S().live);
@@ -100,6 +106,12 @@ function draw() {
         /* the GM hands the players a pen, or takes it back (61-ink.js) */
         (live() && role === 'gm'
           ? row('pens', 'Players may draw · ' + (S().allowed('draw') ? 'Yes' : 'No'))
+          : '') +
+        /* and wipes the table of them — the GM's rubber, now the kit is the
+           players' alone. Only offered when there is something to wipe. */
+        (inked()
+          ? row('unink', sureUnink ? 'Press again to clear them' : 'Clear the drawings',
+                sureUnink ? 'gules' : '')
           : '') +
 
         row('fit', 'Fit the table') +
@@ -199,6 +211,13 @@ function onClick(e) {
   if (act === 'settings') { view = 'settings'; said = ''; return draw(); }
   if (act === 'back') { view = 'main'; return draw(); }
 
+  if (act === 'unink') {
+    if (!sureUnink) { sureUnink = true; draw();
+                      setTimeout(() => { sureUnink = false; if (open) draw(); }, 3000); return; }
+    sureUnink = false;
+    if (root.Ink) root.Ink.clear(true);
+    return draw();
+  }
   if (act === 'pens') {
     return S().allow({ draw: !S().allowed('draw') })
       .then(() => draw(), e => note(reason(e), true));

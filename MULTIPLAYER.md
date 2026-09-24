@@ -228,8 +228,9 @@ they put there themselves: a note from their pocket, a line they drew
 (`TableModel.playerMayTouch`: `t.by` is their uid). It is enforced by the
 client; the database rules do not police the board.
 
-Everyone has the kit (`64-kit.js`, PROJECT.md 3.23): their own characters,
-their own notes, a pen, and pointing.
+Every PLAYER has the kit (`64-kit.js`, PROJECT.md 3.23–3.24): their own
+characters, their own notes, a pen, and pointing. The GM has the chest
+instead, and neither sees the other's controls.
 
 | | where it lives on the wire |
 |---|---|
@@ -239,6 +240,7 @@ their own notes, a pen, and pointing.
 | a note in your pocket | nowhere — this machine only |
 | "players may draw" | `meta.draw`, written only by the host (`Session.allow`) |
 | a point | `who/{uid}/ping` — your own presence node, so no new rule |
+| which way you are looking | `who/{uid}/look`, degrees, sent on a 3° change |
 
 ## The guest table
 

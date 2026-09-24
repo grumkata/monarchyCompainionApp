@@ -17,7 +17,10 @@
 
 const S = () => root.Session;
 const D = () => root.Table3D;
-const HOLD = 3200;               /* how long a point stays on the wood, ms */
+/* how long a point stays on the wood, ms — one pulse, then gone. It was
+   3.2s, and grumkata: "pointer lats for too long". Matches pingout in
+   13-table-ui.css. */
+const HOLD = 1500;
 
 let on = false;
 const seen = {};                 /* uid -> the last point of theirs drawn */
@@ -91,7 +94,22 @@ function heard(members) {
   primed = true;
 }
 
+/* ── AND WHERE YOU ARE LOOKING ────────────────────────────────
+   Your head's turn in the chair (23-table3d.js, __yaw — nought while you are
+   leaning over the wood), sent when it has moved three degrees, five times a
+   second at most. Everybody else turns your figure a little with it
+   (27-table-gl.js faceSeats). */
+let sentLook = 0;
+function lookOut() {
+  if (!S() || !S().live || !S().look || !doc.body.classList.contains('at-table')) return;
+  const d = Math.round(root.__yaw ? root.__yaw() * 180 / Math.PI : 0);
+  if (Math.abs(d - sentLook) < 3 && !(d === 0 && sentLook !== 0)) return;
+  sentLook = d;
+  S().look(d);
+}
+
 function mount() {
+  root.setInterval(lookOut, 200);
   doc.addEventListener('pointerdown', e => {
     if (!on || e.button !== 0) return;
     if (!doc.body.classList.contains('at-table')) return;

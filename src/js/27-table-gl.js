@@ -605,6 +605,10 @@ function tickFire(t) {
                                      0.66 * (0.62 + 0.30 * n),
                                      0.38 * (0.62 + 0.30 * n));
   }
+  /* and the people at the table take the same breath (figureLight) */
+  for (const u of figureFire) u.value.setRGB(0.62 * (0.7 + 0.35 * n),
+                                             0.41 * (0.7 + 0.35 * n),
+                                             0.24 * (0.7 + 0.35 * n));
 }
 
 /* ══ THE ROOM IS DATA ══════════════════════════════════════════
@@ -937,7 +941,6 @@ let seatRoot = null, seatSig = '';
    behind your head and everyone else's is across the wood — not a ring of
    chairs standing in front of you. */
 const SEAT_R = TABLE_M / 2 + 0.56;
-const SEAT_CHAIR = 0.78;      /* the pack's chair is 1.2m tall; a chair is 0.94 */
 
 /* ══ WHAT STANDS BEHIND A SEAT ═════════════════════════════════
    grumkata: "banners clip the firplace and same with standing sprite".
@@ -1098,40 +1101,97 @@ function banner(seat) {
   return m;
 }
 
+/* ══ A FIGURE LIT BY THE ROOM IT STANDS IN ═════════════════════
+   grumkata: "add some lighting to the sprite as they look out of place".
+   They did: a figure is a flat card of somebody's character art, lit
+   evenly from head to foot and facing the camera, which is exactly how a
+   picture pasted over a photograph looks — every other thing in this room
+   is darker at the floor, warmer toward the fire and edged where the light
+   comes round it.
+
+   So the card is painted the way the room is lit, in its own shader, on top
+   of the room's light and under Blazon's banding (09-blazon3d.js):
+
+     THE FLOOR   darker toward the feet, as anything standing in a firelit
+                 room is — the light is at head height and the floor is far
+                 from it.
+     THE BODY    a little darker at the sides, so a flat card reads as having
+                 a front and not as a sheet of paper.
+     THE FIRE    the hearth's own colour, breathing with it (tickFire), laid
+                 on low and warm from in front, and caught round the edges
+                 where a figure with a fire behind it is rimmed with it.
+
+   And a shadow on the floor under its feet (footShade), because a card that
+   does not darken the floor it stands on is floating. */
+const figureFire = [];
+function figureLight(mat) {
+  mat.onBeforeCompile = shader => {
+    shader.uniforms.uFire = { value: new THREE.Color(0.62, 0.41, 0.24) };
+    figureFire.push(shader.uniforms.uFire);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'uniform vec3 uFire;\nvoid main() {')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        #ifdef USE_MAP
+          float fH = clamp(vUv.y, 0.0, 1.0);
+          float fX = abs(vUv.x - 0.5) * 2.0;
+          /* the room's own light is warm and low: take the cold out of the
+             art and a little of its brightness, then the floor and the sides */
+          diffuseColor.rgb *= vec3(0.92, 0.80, 0.66)
+                            * mix(0.40, 0.96, smoothstep(0.0, 0.62, fH))
+                            * (1.0 - 0.26 * fX * fX);
+        #endif`)
+      .replace('gl_FragColor = vec4( outgoingLight, diffuseColor.a );', `
+        #ifdef USE_MAP
+          outgoingLight += uFire * diffuseColor.rgb * (0.10 + 0.26 * (1.0 - fH));
+          outgoingLight += uFire * diffuseColor.rgb * 0.9 * smoothstep(0.62, 0.98, fX)
+                                 * smoothstep(0.08, 0.5, fH);
+        #endif
+        gl_FragColor = vec4( outgoingLight, diffuseColor.a );`);
+  };
+  return mat;
+}
+/* after Blazon has patched it: its program must not be shared with a
+   Blazon material that has the same settings and none of the above */
+function figureLit(mat) {
+  const k = mat.customProgramCacheKey;
+  mat.customProgramCacheKey = () => 'figure|' + (k ? k.call(mat) : '');
+  mat.needsUpdate = true;
+  return mat;
+}
+let footTex = null;
+function footShade() {
+  if (!footTex) {
+    const c = doc.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const gr = x.createRadialGradient(32, 32, 1, 32, 32, 31);
+    gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.3)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+    footTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: footTex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  m.renderOrder = -1;
+  return m;
+}
+
 function buildSeat(seat) {
   const g = new THREE.Group();
-  const T = (typeof TAVERN !== 'undefined') ? TAVERN : null;
+  /* a candle in front of every seat, so a face is never in the dark */
+  g.userData.lightAt = new THREE.Vector3(0, FLOOR_Y + 1.0, -0.18);
 
-  if (T && T.Chair) {
-    const ch = mesh(T.Chair.prims, TAVERN_TEX, DRESS.tavern);
-    /* ── AND LIT THE WAY THE ROOM IS LIT ──────────────────
-       This chair kept coming out cream in a room of brown oak, and no
-       amount of pulling its albedo down fixed it, because the albedo was
-       never the problem: the room is merged into Lambert batches and a
-       seat is built one at a time in Standard, which SAMPLES THE
-       ENVIRONMENT MAP. That environment is a lit room, so every seat's
-       chair was carrying an extra stop and a half of ambient that the
-       identical chairs at the bar were not.
+  /* NO CHAIR. grumkata: "remove the chairs under players its uncceary". A
+     seat was a chair, a figure and a banner; the figure is the person, the
+     banner says whose they are, and the chair was a third thing between
+     them and the table that said nothing.
 
-       Same material as the room, so the same chair looks like the same
-       chair — and one less Standard shader to compile per seat. */
-    ch.traverse(o => {
-      if (!o.isMesh) return;
-      const was = o.material;
-      o.material = B3(new THREE.MeshLambertMaterial({ map: was.map, color: was.color }),
-                      { room: 'tavern', rim: 0, steps: 6, tint: 0.30, hard: 0.5 });
-      was.dispose();
-      o.castShadow = false; o.receiveShadow = true;
-    });
-    /* 1.2m tall out of the pack, which next to a 1.2m-wide table is a
-       throne; and built 37cm off its own centre, which put every player's
-       chair a third of a metre to the left of their face. Both fixed here
-       so a seat is a person in a chair rather than three things near
-       each other. */
-    ch.scale.setScalar(SEAT_CHAIR);
-    ch.position.set(PIVOT['T|Chair'][0] * SEAT_CHAIR, FLOOR_Y, 0.16);
-    g.add(ch);
-  }
+     AND NOTHING OF YOUR OWN. Your place is where your eye is: your banner
+     hung just behind your head and swung through the view whenever you
+     turned it — "banners clip with yourself" — and your own figure stood
+     inside the camera. Nobody can see themselves at a table, so your seat
+     holds only the candle. */
+  if (seat.__mine) return g;
 
   /* ══ THE PERSON IN THE CHAIR ═════════════════════════════
      grumkata: "each player gets a fullbody image so that when you look
@@ -1160,10 +1220,13 @@ function buildSeat(seat) {
        without their face being repainted by it. A standee is somebody's
        character art; the room may fall on it, but the room does not get to
        recolour it. Hence the low dye and the near-untouched chroma. */
-    const mat = B3(new THREE.MeshStandardMaterial({ side: THREE.DoubleSide,
+    const mat = figureLit(B3(figureLight(new THREE.MeshStandardMaterial({ side: THREE.DoubleSide,
                      transparent: true, alphaTest: 0.02, roughness: 0.94,
-                     metalness: 0, envMapIntensity: 0.3 }),
-                   { room: 'tavern', rim: 0, tint: 0.14 });
+                     metalness: 0, envMapIntensity: 0.3 })),
+                   /* a little more of the room's ramp than before (0.14), so a
+                      figure's colours agree with the room's about what colour
+                      the light is */
+                   { room: 'tavern', rim: 0, tint: 0.24 }));
     waiting++;
     const card = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 1.62), mat);
     card.visible = false;
@@ -1181,6 +1244,11 @@ function buildSeat(seat) {
       /* and clear of whatever is behind the chair, now its width is known */
       const r = reach(seat.__a || 0, SEAT_R - 0.06, SEAT_R - 0.5, w / 2, 0.02, h);
       card.position.set(0, FLOOR_Y + h / 2, SEAT_R - r);
+      /* standing ON the floor, which a card only does if it darkens it */
+      const sh = footShade();
+      sh.scale.set(w * 1.15, 0.5, 1);
+      sh.position.set(0, FLOOR_Y + 0.004, SEAT_R - r);
+      g.add(sh);
       /* the shared one: it also releases anything waiting on the room's
          textures, which a local `waiting--` would have silently skipped */
       landed();
@@ -1248,9 +1316,6 @@ function buildSeat(seat) {
     b.position.set(0, FLOOR_Y + 1.38, SEAT_R - r);
     g.add(b);
   }
-
-  /* a candle in front of every seat, so a face is never in the dark */
-  g.userData.lightAt = new THREE.Vector3(0, FLOOR_Y + 1.0, -0.18);
   return g;
 }
 
@@ -1280,37 +1345,76 @@ function seatsNow() {
       face: m.pic || '',
       /* their own coat, drawn here rather than sent as a picture: the
          record is two hundred bytes and the drawing is this client's job */
-      banner: (m.arms && root.Heraldry)
-        ? root.Heraldry.armsURL(m.arms, { w: 220, h: 300 }) : '',
+      banner: (m.arms && root.Heraldry) ? bannerURL(m.arms) : '',
       __mine: !!m.mine, __uid: m.uid, __role: m.role
     }));
   }
   return root.TableModel.seats ? root.TableModel.seats() : [];
 }
+/* drawing a coat of arms into a picture is not free, and this is asked on
+   every session event — which is every heartbeat and every turn of anybody's
+   head. The same coat is the same picture. */
+const bannerMemo = new Map();
+function bannerURL(arms) {
+  const k = JSON.stringify(arms);
+  let u = bannerMemo.get(k);
+  if (u === undefined) {
+    u = root.Heraldry.armsURL(arms, { w: 220, h: 300 });
+    if (bannerMemo.size > 64) bannerMemo.clear();
+    bannerMemo.set(k, u);
+  }
+  return u;
+}
+
+/* ══ WHERE EACH OF THEM IS LOOKING ═════════════════════════════
+   grumkata: "make other charcters when they look aorund on table view make
+   their sprite roatate a bit with it". Each player's head turn arrives in
+   their presence node (Session.look, sent by 63-point.js) and is kept here
+   by uid; their figure turns with it by half, never past forty degrees —
+   a card turned edge-on is a person who has vanished. Left is positive both
+   ways round: their left is the card's own +x, which is a positive turn
+   about Y. It eases there rather than jumping, since a turn arrives five
+   times a second at most. */
+const looks = {};
+const TURN_K = 0.5, TURN_MAX = 40 * Math.PI / 180;
 
 /* every standee turns to the camera, about its upright axis only. The seat
    group is already rotated to its bearing, so what each card needs is the
-   DIFFERENCE between that bearing and the one the camera is on. */
+   DIFFERENCE between that bearing and the one the camera is on — and then
+   the owner's own turn on top. */
 const _sv = new THREE.Vector3();
 function faceSeats() {
   if (!seatRoot || !camera) return;
+  let moving = false;
   for (const g of seatRoot.children) {
+    const want = Math.max(-TURN_MAX, Math.min(TURN_MAX,
+                   (looks[g.userData.uid] || 0) * Math.PI / 180 * TURN_K));
+    const was = g.userData.turn || 0;
+    const now = Math.abs(want - was) < 0.002 ? want : was + (want - was) * 0.2;
+    if (now !== want) moving = true;
+    g.userData.turn = now;
     for (const c of g.children) {
       if (!c.userData.faceMe) continue;
       c.getWorldPosition(_sv);
       _sv.subVectors(camera.position, _sv);
-      c.rotation.y = Math.atan2(_sv.x, _sv.z) - g.rotation.y;
+      c.rotation.y = Math.atan2(_sv.x, _sv.z) - g.rotation.y + now;
     }
   }
+  if (moving) invalidate(2, true);
 }
 
 function syncSeats() {
   if (!seatRoot || !root.TableModel) return;
   const live = !!(root.Session && root.Session.live);
   const seats = seatsNow();
-  const sig = seats.map(s => s.id + '|' + s.at + '|' + (s.face || '').length +
-                             '|' + (s.body || '').length +
-                             '|' + (s.banner || '').length + '|' + (s.__mine ? 1 : 0)).join(',')
+  /* a likeness or a coat that changed but kept its length would slip past a
+     length, so a sampled hash of each goes in too — every 97th character
+     of a data URI, cheap enough to ask on every heartbeat */
+  const hx = s => { s = s || ''; let x = s.length;
+                    for (let i = 0; i < s.length; i += 97) x = (x * 31 + s.charCodeAt(i)) | 0;
+                    return x; };
+  const sig = seats.map(s => s.id + '|' + s.at + '|' + hx(s.face) + '|' + hx(s.body) +
+                             '|' + hx(s.banner) + '|' + (s.__mine ? 1 : 0)).join(',')
             + (live ? '|live' : '|me' + ((root.Shell && root.Shell.seat) ? root.Shell.seat() : 0));
   if (sig === seatSig) return;
   seatSig = sig;
@@ -1322,6 +1426,7 @@ function syncSeats() {
   for (const s of seats) {
     s.__a = (s.at || 0) * Math.PI / 180;        /* buildSeat needs the bearing */
     const g = buildSeat(s);
+    g.userData.uid = s.__uid || '';      /* whose head turn this figure follows */
     /* 0 is the far side of the table, clockwise from there. The near
        side is yours and is left empty by spaceSeats(). */
     const a = (s.at || 0) * Math.PI / 180;
@@ -3000,7 +3105,20 @@ function warm() {
    ring has moved and the chairs have to follow it. The signature check in
    syncSeats means a session event that changed nothing costs one string
    compare, so this can be as noisy as the wire is. */
-root.addEventListener('monarchy:session', () => { seatSig = ''; syncSeats(); });
+/* NOT `seatSig = ''` FIRST. It was, and it made the signature check below a
+   dead letter: every session event rebuilt every seat from scratch — its
+   meshes, its materials, its pictures reloaded from their data URIs, the
+   figure invisible until they decoded — and a session event is every
+   heartbeat of every player. With heads now turning five times a second it
+   would have been a rebuild five times a second. The signature carries a hash
+   of each likeness and coat (syncSeats), so a real change still rebuilds. */
+root.addEventListener('monarchy:session', e => {
+  const d = e.detail || {};
+  if (d.what === 'left' || d.what === 'closed') for (const k in looks) delete looks[k];
+  (d.members || []).forEach(m => { if (m && m.uid) looks[m.uid] = +m.look || 0; });
+  syncSeats();
+  invalidate(3, true);
+});
 
 root.TableGL = { build, warm, setOpen, sync, thumb, bit, onTextures, invalidate, showRoom, lens, syncSeats,
   planRows, planKinds, setPlan, resetPlan, defaultPlan: () => TAVERN_PLAN.map(r => Object.assign({}, r)),
