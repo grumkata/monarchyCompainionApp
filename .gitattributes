@@ -1,2 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# The built app is what installed copies download and check against the
+# hashes in dist/update.json, so git must store it byte for byte and never
+# convert its line endings (electron/content.js).
+dist/** -text
+
+# git runs hooks with sh, which cannot read a CRLF #! line
+.githooks/* text eol=lf

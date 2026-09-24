@@ -1,0 +1,11 @@
+#!/bin/sh
+# Monarchy: rebuild dist/ on every commit, so what reaches GitHub is exactly
+# what installed copies update to (electron/content.js reads
+# dist/update.json off the repo). Without this, changing "version" in
+# package.json and committing would push an update.json that still says the
+# old version, and nobody would update.
+#
+# Wired up by `git config core.hooksPath .githooks` (npm run hooks).
+command -v node >/dev/null 2>&1 || { echo "monarchy: node not found - dist/ was not rebuilt"; exit 0; }
+node build.js >/dev/null || { echo "monarchy: node build.js failed - fix the build before committing"; exit 1; }
+git add dist

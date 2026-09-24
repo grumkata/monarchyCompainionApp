@@ -103,7 +103,11 @@ build.js                  ← `node build.js` produces dist/monarchy.html (see 2
 dist/monarchy.html        ← build artifact. NOT standalone any more — needs dist/assets/tex
                             beside it, and will not load textures over file:// at all (see 2.3)
 package.json               ← Electron + electron-builder config; `npm run dist` is the distributable
-electron/main.js           ← Electron main: loads dist/monarchy.html, no menu bar
+electron/main.js           ← Electron main: loads the newest page (content.js), no menu bar
+electron/content.js        ← updates dist/ from the repo, no reinstall (see 3.12)
+electron/updater.js        ← the hub for both kinds of update; electron-updater for the program
+dist/update.json           ← written by build.js: the version and a hash per file in dist/
+.githooks/pre-commit       ← rebuilds dist/ on every commit (`npm run hooks` to wire it)
 release/                   ← OUTPUT of `npm run dist` (gitignored)
 ```
 
@@ -811,6 +815,54 @@ in.
     updater. Now the file, `latest.yml` and GitHub agree, so uploading the
     three files by hand works too: `Monarchy-Setup-<v>.exe`, its
     `.blockmap`, and `latest.yml`.
+
+- **Update 2026-09-24, later — UPDATES ARE THE PAGE NOW, NOT THE PROGRAM.**
+  grumkata, after the first release worked: *"i didnt realise by update it
+  was literally just reinstalling it every tiem which ismt what a fucking
+  update is [...] where i update github repo change the update number to say
+  its and update and all monarchy versions will update without going through
+  the install porccess every time"*.
+  - **How to ship an update:** change `"version"` in `package.json`, commit,
+    push. That is all. Installed copies check on launch and every 30 minutes.
+  - **What updates:** `dist/` — the page and its pictures, which is
+    everything that changes week to week. `electron/content.js` reads
+    `dist/update.json` off the repo (at the branch's exact commit, via one
+    GitHub API call; the branch with a cache-bust if that is refused),
+    fetches only the files whose sha256 it does not already have (usually
+    just `monarchy.html`), verifies every one, assembles them in
+    `userData/content/<version>/` and points `current.json` at it. The window
+    loads the newer of that and the page the program shipped with. The hall's
+    card says **Update now**, which is a one-second reload of the same window;
+    the next launch uses it regardless. Characters and tables are untouched —
+    every page loaded from disk shares the one `file://` origin, measured.
+  - **What made it possible:** `build.js` writes `dist/update.json` (version
+    from package.json, `shell`, and a sha256 per file) and writes the page
+    with LF only — the sources are CRLF on a Windows checkout and git was
+    normalising the page on commit, so GitHub's copy never matched the hash.
+    `.gitattributes` has `dist/** -text` so git stores dist byte for byte, and
+    `dist/` is no longer in `.gitignore` (the pictures had never been in the
+    repo at all).
+  - **Why "change the number, commit" is enough:** `.githooks/pre-commit`
+    runs `node build.js` and stages `dist/` on every commit, so update.json
+    always carries the version being committed. Wired with
+    `npm run hooks` (`git config core.hooksPath .githooks`); it is local git
+    config, so a fresh clone needs `npm run hooks` once.
+  - **The program still needs a release, rarely.** Anything outside dist/ —
+    electron/, the Electron version — can only change by electron-updater and
+    a GitHub release (`npm run release`, or upload the three files by hand).
+    A page that needs a newer program says so with `shell` in update.json
+    (build.js `NEEDS_SHELL` vs content.js `SHELL_API`), and older programs
+    leave it alone rather than load something they cannot run. `updater.js`
+    is now the hub for both kinds and tells the renderer one thing: a waiting
+    page beats a waiting program. It used to be whichever reported last.
+  - **Verified** by running the real `electron/main.js` against a local
+    stand-in for GitHub: 1.0.2 found 1.0.3, fetched 2 files and reused 77,
+    switched in place with localStorage intact, and relaunched straight into
+    1.0.3; a file that did not match its hash was refused and the running
+    version kept. Hook verified in a scratch repo: a commit bumping the
+    version carried the rebuilt `dist/update.json` with it.
+  - The first program that has this is **1.0.2**. Copies on 1.0.0/1.0.1 reach
+    it through one last ordinary release; every update after that is a push.
 
 ### 3.13 The look: Blazon (2026-09-17)
 
@@ -1682,6 +1734,7 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-24 | **v1.0.2: updates without reinstalling** (3.12). New `electron/content.js`: installed copies fetch changed files of `dist/` straight from the repo when `package.json`'s version goes up, verify them by sha256, and reload in place — no installer, no release. `build.js` writes `dist/update.json` and an LF-only page; `dist/` is committed byte-for-byte (`.gitattributes`); `.githooks/pre-commit` rebuilds on every commit (`npm run hooks`). electron-updater stays only for changes to the program itself. |
 | 2026-09-24 | **v1.0.1: nine things wrong at somebody else's table** (3.22). Players no longer get the chest, the bin or anyone's pieces (`TableModel.mayTouch`); dice land on every table; pictures lie flat; pages and notes are paper; banners and standees keep clear of the room, and side seats face the table; a joining player no longer deletes the GM's board (the board is bound to a guest table); leaving goes back to the hall; Settings opens at the table; arrows scroll, the zoom glides, and the chair never stops halfway. `package.json` 1.0.0 → 1.0.1. |
 | 2026-09-18 | **One menu, and nothing else on the walls** (3.21). grumkata: hosting belongs *in* the table not at the point of opening one; the table needs *"a real menu not random buttons all over the place"*, reached by Escape or a mark in the top left; and *"remove all the extrenous explanation text its unproffesional"*.<br>- **New `59-table-menu.js`:** one menu, Escape or the mark, holding host / stop hosting / leave / back to the hall / fit / light or dark. The Back pennon, Theme and Fit are gone from the corners, and the Host door is gone from the hall's roll.<br>- The Escape binding sits last on purpose — leaving a field, a lock, a selection, a record, the chest and a carried piece all get Escape first; the menu is what it means when it would otherwise mean nothing. Every lookup in that guard is null-checked, which the first version was not, and it took the key out entirely.<br>- **The prose went:** seven lede paragraphs, the settings descriptions, the maker's "why this is unavailable" notes, the seal sub-captions, and the keyboard manual printed across the top of the table all session. Rule applied: keep state, drop instruction.<br>- A test changed rather than being fixed: a choice that cannot apply is now simply absent instead of explaining itself. And `smooth.test.js`'s cover check was re-based on its own control rather than an absolute frame count, which was flaky at 7 against a threshold of 8.<br>- **Firebase:** anonymous auth confirmed working against the real project; writes still return `PERMISSION_DENIED` until the database rules are pasted, and the app now says exactly that instead of failing quietly. |
 | 2026-09-18 | **Multiplayer: eleven people at one table** (3.20, and the new `MULTIPLAYER.md`).<br>- **Hosting is not opening.** A table is a local save until a GM hosts it, at which point it goes on the wire under a five-character word said out loud (no letters that sound like other letters). It is live only while its GM is; when they go, everyone stands down and what is left is a save.<br>- **The seating guarantee.** Everyone is at their own near seat AND everyone agrees on the order — possible because what must agree is the CYCLIC order, which survives rotation. One global ring, rotated per client, evenly spaced: two face each other, three make a triangle, eleven sit 32.7° apart. The GM is in the ring like anybody else.<br>- **Presence ≠ place.** Arrival numbers live in a ledger that is never erased, so a dropped connection does not reshuffle the table. This was a real bug the tests caught.<br>- **Firebase RTDB** (for `onDisconnect`), inlined from node_modules rather than a CDN, with a local `localStorage`+`BroadcastChannel` transport that makes the whole path testable without credentials. No credentials ship; Settings → Multiplayer takes the config, parsed not `eval`ed.<br>- **Chat and rolls** over the wire, with a scrubber — a roll is markup from a machine you do not control, so only the tags and classes the dice renderer uses survive. The dice themselves are not sent; the numbers are.<br>- **Sheets:** any number, from anyone, and pulling one there is simply placing the character. `Characters.roster()` widened so the chest, counters, papers and token maker all got them for nothing.<br>- New `test/session.test.js` (25 checks) in `npm test`, driving eleven genuinely independent clients against one shared tree.<br>- **Not built:** the board itself is still per-client. |

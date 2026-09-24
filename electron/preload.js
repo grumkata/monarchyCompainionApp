@@ -25,5 +25,7 @@ contextBridge.exposeInMainWorld('AppUpdate', {
     ipcRenderer.on('update-status', (_event, status) => cb(status));
   },
   checkNow() { ipcRenderer.send('update-check-now'); },
+  /* a waiting PAGE is a reload of this window; a waiting PROGRAM is a quit
+     and reinstall — updater.js decides which, the page does not need to */
   restartNow() { ipcRenderer.send('update-restart-now'); }
 });

@@ -411,7 +411,13 @@ ${tail}
 `;
 
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, 'dist/monarchy.html'), html);
+/* LF, ALWAYS. The sources are checked out with CRLF on Windows (git's
+   autocrlf), so the page came out with nineteen thousand of them — and git
+   turns them back into LF when it commits, so the copy on GitHub was never
+   byte-for-byte the copy that was built. An installed app downloads the page
+   from GitHub and checks it against the hash in update.json (below), so a
+   page that changes on the way in is a page that never installs. */
+fs.writeFileSync(path.join(__dirname, 'dist/monarchy.html'), html.replace(/\r\n?/g, '\n'));
 
 /* The pictures have to travel with the page. electron/main.js does
    loadFile(dist/monarchy.html), so `assets/tex/x.jpg` resolves next to it —
@@ -450,6 +456,45 @@ let fonts = 0;
   if (fs.existsSync(to))
     for (const f of fs.readdirSync(to)) if (!have.includes(f)) fs.unlinkSync(path.join(to, f));
   for (const f of have) { fs.copyFileSync(path.join(FONT_DIR, f), path.join(to, f)); fonts++; }
+}
+
+/* ══ WHAT AN INSTALLED COPY UPDATES ITSELF TO ═════════════════════
+   grumkata: "i update github repo change the update number to say its an
+   update and all monarchy versions will update without going through the
+   install process every time".
+
+   So the thing that updates is THIS FOLDER, not the program around it.
+   Everything the app is lives in dist/ — the page and its pictures — and an
+   installed copy (electron/content.js) reads this file off the repo, sees a
+   higher version, and fetches whichever files' hashes it does not already
+   have. `version` is package.json's, which is the number you change to say
+   "this is an update". `shell` is the oldest program (electron/) this page
+   can run in: raise it, and electron/content.js's SHELL_API with it, only
+   when a change needs something new from the program itself — which is the
+   one case that still needs a real release.
+
+   No timestamp in here: the same build must produce the same file, or every
+   commit would carry a new update.json for nothing. */
+const NEEDS_SHELL = 1;
+{
+  const DIST = path.join(__dirname, 'dist');
+  const files = {};
+  const walk = rel => {
+    for (const e of fs.readdirSync(path.join(DIST, rel), { withFileTypes: true })) {
+      const r = rel ? rel + '/' + e.name : e.name;
+      if (e.isDirectory()) walk(r);
+      else if (r !== 'update.json')
+        files[r] = require('crypto').createHash('sha256')
+          .update(fs.readFileSync(path.join(DIST, r))).digest('hex');
+    }
+  };
+  walk('');
+  const version = JSON.parse(R('package.json')).version;
+  const sorted = {};
+  Object.keys(files).sort().forEach(k => { sorted[k] = files[k]; });
+  fs.writeFileSync(path.join(DIST, 'update.json'),
+    JSON.stringify({ version, shell: NEEDS_SHELL, files: sorted }, null, 1) + '\n');
+  console.log(`dist/update.json    version ${version}, ${Object.keys(sorted).length} files`);
 }
 
 console.log(`dist/monarchy.html  ${(html.length / 1024 / 1024).toFixed(2)} MB  ` +

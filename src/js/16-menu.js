@@ -214,6 +214,7 @@ const VIEW = {}, AFTER = {};
    'downloading' are background noise nobody asked to watch — the whole
    point of the background-check choice was that a player never has to
    think about updating until there's something to actually act on. */
+let asked = 0;          /* when "Check for updates" was last pressed */
 if (window.AppUpdate){
   const card = document.getElementById('update-card');
   if (card){
@@ -221,16 +222,32 @@ if (window.AppUpdate){
     const now = card.querySelector('#update-now'), later = card.querySelector('#update-later');
     if (now)   now.addEventListener('click', () => window.AppUpdate.restartNow());
     /* "Later" doesn't need to remember the dismissal past this session —
-       autoInstallOnAppQuit means the update installs on the next real
-       quit regardless of whether this card is ever seen again. It exists
-       purely so someone mid-table isn't nagged while they're busy. */
-    if (later) later.addEventListener('click', () => { card.style.display = 'none'; });
+       the next launch opens on the new version regardless. It exists purely
+       so someone mid-table isn't nagged while they're busy, and it holds for
+       THAT version: the half-hourly check does not bring the card back for
+       the update you already said later to. */
+    let later_ = '';
+    if (later) later.addEventListener('click', () => { card.style.display = 'none';
+                                                       later_ = card.dataset.v || ''; });
     window.AppUpdate.onStatus(s => {
-      if (s.state === 'downloaded'){
-        if (txt) txt.textContent = 'An update (' + s.latest + ') is ready.';
+      if (s.state === 'downloaded' && s.latest !== later_){
+        /* A NEW PAGE IS A RELOAD, NOT A REINSTALL (electron/content.js):
+           the button says what it will do. Only a new PROGRAM still means
+           quitting and running an installer. */
+        const page = s.kind !== 'shell';
+        if (txt) txt.textContent = 'Monarchy ' + s.latest + ' is ready.';
+        if (now) now.textContent = page ? 'Update now' : 'Restart & update';
+        card.dataset.v = s.latest;
         card.style.display = 'flex';
-      } else {
+      } else if (s.state !== 'downloaded') {
         card.style.display = 'none';
+      }
+      /* the answer to "Check for updates", when somebody asked */
+      if (asked && Date.now() - asked < 60000 && s.state !== 'checking' && s.state !== 'downloading'){
+        asked = 0;
+        if (s.state === 'not-available') toast('Up to date — ' + (s.version || ''));
+        else if (s.state === 'error') toast('Could not reach GitHub — try again later');
+        else if (s.state === 'unavailable') toast('Updates only run in the installed app');
       }
     });
   }
@@ -1250,7 +1267,7 @@ document.addEventListener('click', e => {
     case 'windowed':   return (document.exitFullscreen
                        ? document.exitFullscreen().then(() => render()).catch(() => {})
                        : 0);
-    case 'checkupdate': window.AppUpdate.checkNow(); return toast('Looking…');
+    case 'checkupdate': asked = Date.now(); window.AppUpdate.checkNow(); return toast('Looking…');
     case 'netcfg':     netPasting = true; render();
                        setTimeout(() => { const t = $('#netcfg'); if (t) t.focus(); }, 30);
                        return;

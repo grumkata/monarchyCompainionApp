@@ -7,6 +7,7 @@
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { setupAutoUpdater } = require('./updater');
+const Content = require('./content');
 
 // Remove Electron's default application menu (File/Edit/View/Window/Help).
 Menu.setApplicationMenu(null);
@@ -32,7 +33,9 @@ function createWindow() {
     }
   });
 
-  win.loadFile(path.join(__dirname, '..', 'dist', 'monarchy.html'));
+  /* the newest page this copy has — the one it shipped with, or a later one
+     fetched from the repo since (content.js) */
+  Content.load(win);
 
   // Uncomment while debugging a packaged build (also note: no default
   // menu means no Ctrl+Shift+I either, since that shortcut normally
