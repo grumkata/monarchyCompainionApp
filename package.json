@@ -8,6 +8,7 @@
     "build:html": "node build.js",
     "start": "npm run build:html && electron .",
     "dist": "npm run build:html && electron-builder",
+    "release": "npm run build:html && electron-builder --win --publish always",
     "test": "node build.js && node test/tincture.test.js && node test/session.test.js && node test/blazon.test.js && node test/smooth.test.js && node test/geometry.test.js && node test/table.test.js && node test/table-ui.test.js && node test/join.test.js && node test/handling.test.js && node test/herald.test.js && node test/case.test.js",
     "test:ui": "node build.js && node test/table-ui.test.js"
   },
@@ -44,9 +45,13 @@
         }
       ]
     },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "linux": {
       "target": [
@@ -61,7 +66,8 @@
     "publish": {
       "provider": "github",
       "owner": "grumkata",
-      "repo": "monarchyCompainionApp"
+      "repo": "monarchyCompainionApp",
+      "releaseType": "release"
     }
   },
   "dependencies": {

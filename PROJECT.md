@@ -793,6 +793,24 @@ in.
   permission to upload release assets on this repo) — e.g.
   `GH_TOKEN=... npx electron-builder --publish always` after
   `node build.js`. That step was intentionally not run or scripted here.
+- **Update 2026-09-24 — why nothing ever updated, and the release step.**
+  No release had ever been published, so every installed copy asked GitHub
+  for a newer version and got nothing back; the code was never the problem.
+  Three things now stand between a build and a working update, and all three
+  are in `package.json`:
+  - `npm run release` builds and publishes in one step (it needs `GH_TOKEN`
+    in the environment — a token with Contents read/write on this repo).
+  - `build.publish.releaseType: "release"`. electron-builder publishes a
+    DRAFT by default, and electron-updater cannot see drafts, so a publish
+    that "worked" still updated nobody until someone clicked Publish on the
+    website.
+  - `artifactName` with no spaces (`Monarchy-Setup-1.0.1.exe`,
+    `Monarchy-1.0.1-portable.exe`). `latest.yml` names the installer with
+    dashes; the file on disk had spaces, and GitHub turns spaces into DOTS on
+    a hand upload — three different names for one file, and a 404 for the
+    updater. Now the file, `latest.yml` and GitHub agree, so uploading the
+    three files by hand works too: `Monarchy-Setup-<v>.exe`, its
+    `.blockmap`, and `latest.yml`.
 
 ### 3.13 The look: Blazon (2026-09-17)
 
