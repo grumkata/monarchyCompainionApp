@@ -1727,6 +1727,20 @@ copies follow; a note let go over the wall stays in the pocket; a unit moved
 on the GM's combat sheet reaches the player; walking to the hall releases the
 lock and the field and the Join screen walks you back.
 
+**Afterwards, the same evening:** *"when the gm adds things it auto goes to
+the same spot and wont update when the gm moves the token"*. A token dropped
+onto a combat line got no column, and `Tokens.fill` answered any unit with no
+column by re-packing the WHOLE line into the middle (`packLine`) — so every
+arrival landed in the same place and undid however the GM had dressed the
+line, which read as their moves not sticking. A drop now lands in the column
+under the pointer (`Tokens.toLine(..., at)`, from `dropCol`), and a unit with
+no column is given the free slot nearest the middle without moving anybody
+else. Checked headless, GM and player, against a wire answering in Firebase's
+shape: every add and every move agrees on both screens. (Local mode's shared
+localStorage tree is a read-modify-write, so two windows' writes can clobber
+each other — a heartbeat landing mid-write lost a whole token in that test.
+Firebase merges on the server and does not do this; local mode still does.)
+
 **Not done here:** the fight's round, phase and declared intents are still
 this machine's alone (`S` in 32-combat-app.js), so a player's "Declared"
 never reaches the GM; and a piece being dragged is sent when it is let go,

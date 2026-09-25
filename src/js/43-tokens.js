@@ -201,10 +201,25 @@ function fill(scene) {
     l.ents.push(t.ent);
   });
 
-  /* keep each rank in column order and inside the width */
+  /* ONE NEWCOMER DOES NOT RESHUFFLE THE RANK. grumkata: "when the gm adds
+     things it auto goes to the same spot and wont update when the gm moves
+     the token". A unit with no column used to have the WHOLE line re-packed
+     into the middle round it (packLine) — so every piece added landed in the
+     same place, and every arrangement the GM had dressed the line into was
+     thrown away by the next arrival, which read exactly like their moves not
+     sticking. Only the units with no place are given one: the free slot
+     nearest the middle, everybody else stays where they were put. */
   S.lines.forEach(l => {
+    const lost = l.ents.filter(e => e.col == null);
+    if (lost.length && typeof firstFree === 'function' && typeof slotsOf === 'function') {
+      l.ents = l.ents.filter(e => e.col != null);
+      lost.forEach(e => {
+        const span = slotsOf(e);
+        e.col = firstFree(l, span, Math.max(0, Math.floor((S.width - span) / 2)), e);
+        l.ents.push(e);
+      });
+    } else if (lost.length && typeof packLine === 'function') packLine(l);
     l.ents.sort((a, b) => (a.col == null ? 99 : a.col) - (b.col == null ? 99 : b.col));
-    if (typeof packLine === 'function' && l.ents.some(e => e.col == null)) packLine(l);
   });
 }
 
@@ -226,12 +241,21 @@ function harvest(scene) {
    Dropped on a line: that line becomes its home, on the side that line
    belongs to. A token dropped on the enemy half IS an enemy — the board is
    the statement, not a dropdown somewhere. */
-function toLine(tokenId, sceneId, lineKey) {
+/* `at` is the column under the pointer, if the drop said (24-table-props.js):
+   it lands THERE, or in the nearest free slot to it, not wherever is left */
+function toLine(tokenId, sceneId, lineKey, at) {
   const t = T().get(tokenId); if (!t || t.kind !== 'token') return false;
   const l = (typeof S !== 'undefined' && S.lines || []).find(x => x.key === lineKey);
   if (!l) return false;
   t.in = sceneId; t.lineKey = lineKey;
-  if (t.ent) { t.ent.side = l.side; t.ent.col = null; }
+  if (t.ent) {
+    t.ent.side = l.side; t.ent.col = null;
+    if (at != null && typeof firstFree === 'function' && typeof slotsOf === 'function') {
+      const span = slotsOf(t.ent);
+      const want = (typeof targetCol === 'function') ? targetCol(l, t.ent, at) : Math.round(at);
+      t.ent.col = firstFree(l, span, want, t.ent);
+    }
+  }
   T().changed('token-placed');
   return true;
 }

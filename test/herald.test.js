@@ -101,7 +101,8 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     d.innerHTML = '<b>GM</b><span class="rdice"><i class="hi">20</i></span><span class="rtot">20</span>';
     document.getElementById('chat-body').appendChild(d);
   });
-  T('a natural twenty in the log is cried as Fortune', await criesOut('Fortune'));
+  await wait(900);
+  T('a natural twenty in the log is not cried across the screen', (await band()) === '');
 
   console.log('\n' + ok.length + ' passed, ' + bad.length + ' failed');
   await b.close();

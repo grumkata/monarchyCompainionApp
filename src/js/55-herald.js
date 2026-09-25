@@ -418,10 +418,10 @@ function watchDice() {
   if (!cb || !root.MutationObserver) return;
   new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(n => {
     if (!n.classList || !n.classList.contains('roll')) return;
-    if (n.querySelector('.rdice i.hi'))
-      proclaim('Fortune', { sub: 'a natural twenty', tone: 'or', hold: 800 });
-    else if (n.querySelector('.rdice i.lo'))
-      proclaim('Ill Omen', { sub: 'a natural one', tone: 'gules', hold: 800 });
+    /* NO CRY FOR A NATURAL TWENTY OR A NATURAL ONE. grumkata: "wayyy too
+       intrusive also isnt what this system uses". A band across the whole
+       screen for a single die was a d20 game's idea of a moment, and this
+       game rolls pools of d6 against a difficulty. The total's burst stays. */
     const tot = n.querySelector('.rtot');
     if (tot) setTimeout(() => burstOn(tot, 8), 180);
   }))).observe(cb, { childList: true });

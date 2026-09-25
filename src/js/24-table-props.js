@@ -431,7 +431,11 @@ function dropped(el, ev) {
     const line = lineUnder(ev);
     const live = T().activeScene();
     if (line && live && live.scene === 'combat' && root.Tokens) {
-      root.Tokens.toLine(id, live.id, line);
+      /* and WHERE along it: the column under the pointer, the same way the
+         sheet's own drag reads it (32-combat-app.js dropCol) */
+      const lineEl = doc.querySelector(`#field .line[data-line="${line}"]`);
+      const at = (lineEl && typeof dropCol === 'function') ? dropCol(lineEl, ev.clientX) : null;
+      root.Tokens.toLine(id, live.id, line, at);
       return;
     }
     if (t.in && root.Tokens) root.Tokens.toWood(id, x, y);
