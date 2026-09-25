@@ -127,6 +127,12 @@ function mount() {
      so the box stayed open to whoever sat down. It is asked again every time
      the session moves: joining shuts it, leaving opens it back up. */
   root.addEventListener('monarchy:session', gate);
+  /* and walking away from the table closes the case — it stayed open, with
+     `chest-open` on the body, which hides the table's own corner and the
+     kit when you come back */
+  root.addEventListener('monarchy:where', e => {
+    if ((!e.detail || e.detail.at !== 'table') && (open_ || (root.Hand && root.Hand.held))) shut();
+  });
   gate();
 }
 

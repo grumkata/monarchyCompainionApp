@@ -90,7 +90,12 @@ function makePaper() {
   if (!tbl || !root.Table3D) return null;
   p = doc.createElement('div');
   p.id = 'tp-paper';
-  p.className = 'prop tp tp-paper';
+  /* THE WHOLE SHEET IS THE HANDLE. grumkata: "players cannot move player
+     intiated objects (character sheets/notes)". The comment below promised
+     23-table3d.js would run the drag "because it is an ordinary prop" — but
+     that only picks a prop up by its `.grip`, and this had none, so a left
+     press on your own record could open it and never move it. */
+  p.className = 'prop tp tp-paper grip';
   const at = savedAt();
   p.dataset.x = at.x; p.dataset.y = at.y; p.dataset.r = at.r;
   /* rests above the mat: a sheet of paper lies ON whatever is under it */
@@ -107,7 +112,16 @@ function makePaper() {
   p.addEventListener('pointerup', e => {
     const near = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 5;
     from = null;
-    if (near) read(); else saveAt(p);
+    if (near) return read();
+    /* let go past the rim, it lies at the rim — not out in the room where
+       nobody can see it or pick it up again */
+    const D = root.Table3D;
+    if (D && D.ontoWood) {
+      const c = D.ontoWood(+p.dataset.x + PAPER.w / 2, +p.dataset.y + PAPER.h / 2, PAPER.h / 2);
+      p.dataset.x = Math.round(c.x - PAPER.w / 2); p.dataset.y = Math.round(c.y - PAPER.h / 2);
+      D.place(p);
+    }
+    saveAt(p);
   });
   root.Table3D.place(p);
   return p;
@@ -370,6 +384,17 @@ function warm() {
     d.parentNode.removeChild(d);
   } catch (e) { /* a warm-up that fails costs the first open, nothing else */ }
 }
+/* walking away from the table puts the record down, at once — a reading left
+   up kept `reading` on the body, which hides the kit when you come back */
+root.addEventListener('monarchy:where', e => {
+  if (e.detail && e.detail.at === 'table') return;
+  const p = el();
+  if (p && !p.hidden) {
+    p.hidden = true; openId = null;
+    const s = doc.getElementById('tp-scrim'); if (s) s.hidden = true;
+  }
+  doc.body.classList.remove('reading');
+});
 root.addEventListener('monarchy:where', e => {
   if (!e.detail || e.detail.at !== 'table' || warmed) return;
   const later = () => (root.requestIdleCallback ? root.requestIdleCallback(warm, { timeout: 4000 })

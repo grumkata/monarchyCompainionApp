@@ -109,17 +109,32 @@ function release(e) {
   if (d.el && d.el.parentNode) d.el.parentNode.removeChild(d.el);
   if (!d.moved) { open(d.id); return; }
   if (overWood(e.clientX, e.clientY)) lay(d.id, e.clientX, e.clientY);
+  else if (!(root.Kit && root.Kit.over(e.clientX, e.clientY))) hint('Put it down on the table itself');
 }
+function hint(m) {
+  const t = doc.getElementById('toast'); if (!t) return;
+  t.textContent = m; t.classList.add('on');
+  clearTimeout(hint._t); hint._t = setTimeout(() => t.classList.remove('on'), 1900);
+}
+/* ON THE WOOD, not merely over the window. The viewport is the whole screen
+   and most of it, sat back in your chair, is the room — and a note let go
+   over the wall was put where screenToTable said, which is a point on the
+   plane of the table a long way past its rim: out of sight, and already gone
+   from the pocket. grumkata: "player side notes disappear". */
 function overWood(x, y) {
   const vp = doc.getElementById('vp');
   if (!vp || !doc.body.classList.contains('at-table')) return false;
   if (root.Kit && root.Kit.over(x, y)) return false;
   const r = vp.getBoundingClientRect();
-  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  if (!(x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)) return false;
+  if (!D() || !D().onWood) return true;
+  const p = D().screenToTable(x, y);
+  return D().onWood(p.x, p.y, 60);
 }
 function lay(id, sx, sy) {
   const n = get(id); if (!n || !T()) return;
   const p = D().screenToTable(sx, sy);
+  if (D().onWood && !D().onWood(p.x, p.y, 60)) return;   /* it stays in your pocket */
   const W = 200, H = 200;                    /* a 100mm square, like any note */
   T().put({ kind: 'note', name: titleOf(n), text: n.text || '', tint: n.tint || 'cream',
             sketch: n.sketch || [], by: live() ? S().uid : '',
@@ -136,6 +151,36 @@ function pocket(t) {
   T().bin(t.id, true);
   return true;
 }
+
+/* ══ WHEN YOU GET UP FROM THE TABLE ══════════════════════════
+   grumkata: "player side notes disappear". A note you laid on the wood left
+   your pocket to go there, and your copy of that wood is emptied the moment
+   you leave or the GM closes the table (60-board-net.js) — so every note
+   you had not dragged back first was simply gone from this machine.
+
+   60-board-net.js shows us the guest table one last time before it empties
+   it. Whatever reclaimable() picks out of it goes back in your pocket. The
+   table's own copy is not touched either way: a player leaving takes
+   nothing off the GM's table.
+
+   `things`  everything on your copy of the wood, the GM's pieces included
+   `me`      your uid at this table — your own pieces carry it as `by`
+   `why`     'left' (you got up; the game goes on without you)
+             or 'closed' (the GM ended it; the table is gone for everyone)
+   Returns the things to turn back into pocket notes. */
+function reclaimable(things, me, why) {
+  // TODO(grumkata): which of these come home with you?
+  return [];
+}
+root.addEventListener('monarchy:guest-leaving', e => {
+  const d = e.detail || {};
+  const me = S() && S().uid;
+  if (!me) return;
+  reclaimable(d.things || [], me, d.why).forEach(t => {
+    if (t && t.kind === 'note')
+      add({ text: t.text || '', tint: t.tint || 'cream', sketch: Array.isArray(t.sketch) ? t.sketch : [] });
+  });
+});
 
 /* ══ READING ONE, WRITING ON IT, DRAWING ON IT ═══════════════ */
 let ed = null, edId = null, pen = PENS[0], mode = 'write', inkNow = null;
@@ -257,6 +302,6 @@ if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', mount
 else mount();
 
 root.Pocket = { list, get, add, update, remove, card, press, open, close, isOpen,
-                pocket, sketchSVG, titleOf, KEY };
+                pocket, sketchSVG, titleOf, overWood, KEY };
 
 })(window, document);

@@ -1922,6 +1922,15 @@ body.chest-open .kit > *, body.reading .kit > *, body.field-on .kit > *{ pointer
   filter:drop-shadow(0 12px 16px rgba(0,0,0,.55)); }
 .pk-float.over{ transform:translate(-50%,-50%) rotate(0) scale(1.08); }
 body.pk-dragging, body.pk-dragging *{ cursor:grabbing !important; }
+/* one of your characters, on its way from the kit to the wood (64-kit.js) */
+.kit-grab{ cursor:grab; }
+.kit-tip{ font-size:12.5px !important; padding-top:8px !important; }
+.kit-float{ position:fixed; z-index:9100; pointer-events:none; white-space:nowrap;
+  padding:7px 12px !important; transform:translate(-50%,-50%) rotate(-3deg);
+  font-family:var(--m-f-hand); font-size:15px; font-weight:600; color:var(--m-sable);
+  background:var(--m-or); clip-path:var(--m-pennon); opacity:.85;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.55)); }
+.kit-float.over{ opacity:1; transform:translate(-50%,-50%) rotate(0) scale(1.08); }
 
 /* what was drawn on a note, over its paper, under nothing you can press */
 .t3-note .t3-face{ position:relative; }

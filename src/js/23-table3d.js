@@ -1450,8 +1450,47 @@ function middle() {
            y: Math.round((vp.clientHeight / 2 - T.y) / (T.k * c)) };
 }
 
+/* ── IS THIS POINT ON THE WOOD ────────────────────────────────
+   screenToTable answers for any point on the screen, and above the far edge
+   of the table — the room, the wall, the ceiling in the chair view — the
+   answer is a point on the plane of the wood a long way off it. A note let
+   go there was put there: off the table, out of sight, and gone from the
+   pocket it came out of. That is "player side notes disappear". The wood is
+   a disc, so the test is a distance. */
+const onWood = (x, y, margin) =>
+  Number.isFinite(x) && Number.isFinite(y) &&
+  Math.hypot(x - TW / 2, y - TH / 2) <= TW / 2 - (margin || 0);
+/* and the nearest point that is, for a piece let go just past the rim */
+function ontoWood(x, y, margin) {
+  const R = TW / 2 - (margin || 0);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: TW / 2, y: TH / 2 };
+  const dx = x - TW / 2, dy = y - TH / 2, d = Math.hypot(dx, dy);
+  if (d <= R) return { x, y };
+  return { x: Math.round(TW / 2 + dx / d * R), y: Math.round(TH / 2 + dy / d * R) };
+}
+
+/* ── WALKING AWAY FROM THE TABLE PUTS EVERYTHING DOWN ─────────
+   grumkata: "when rentring ui disappears for some reason and it wont let you
+   bring in new charceters". Leaving the table left whatever you were in the
+   middle of exactly as it was: locked onto the fight, standing in its field,
+   a piece in your hand. Walk back in and you were still in the field — where
+   the kit, and the Bring button on it, are hidden (13-table-ui.css) — with
+   nothing on screen saying why. */
+function standDown() {
+  if (dg && dg.grouped && root.TableModel) root.TableModel.end();
+  if (dg && dg.p) { dg.p.classList.remove('lift'); dg.p.dataset.z = (+dg.p.dataset.rest || 8); }
+  dg = null; fdrag = null;
+  if (vp) vp.classList.remove('grabbing');
+  if (lock) unlock(true);
+  else if (root.__field && root.__field.on()) root.__field.set(false);
+}
+root.addEventListener('monarchy:where', e => {
+  if (!e.detail || e.detail.at !== 'table') standDown();
+});
+
 root.Table3D = { mount, fit: fitTable, frame, place: placeProp, middle, MM, TABLE_M,
-                 screenToTable, TW, TH, get tiltDeg() { return TILT; }, get k() { return T.k; },
-                 lockIn, unlock, get tilt() { return TILT; } };
+                 screenToTable, onWood, ontoWood, standDown,
+                 TW, TH, get tiltDeg() { return TILT; }, get k() { return T.k; },
+                 lockIn, unlock, get locked() { return lock; }, get tilt() { return TILT; } };
 
 })(window, document);

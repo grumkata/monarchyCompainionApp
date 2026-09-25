@@ -64,7 +64,13 @@ function show(t) {
 }
 
 function hide() {
-  const p = el(); if (p) p.style.display = 'none';
+  const p = el(); if (!p) return;
+  /* A FIGHT THAT ENDS UNDER YOU LETS YOU GO. The GM putting the scene away
+     hid the sheet and left anybody locked onto it — or standing in its field
+     — locked onto nothing: the field kept drawing a board that was gone, and
+     the kit stayed hidden under it (13-table-ui.css hides it in the field). */
+  if (root.Table3D && root.Table3D.locked === p) root.Table3D.unlock(true);
+  p.style.display = 'none';
 }
 
 /* the sheet is dragged by its own title bar, like any prop — so the model has
@@ -91,6 +97,14 @@ function hookSave() {
       if (live && live.scene === 'combat') root.Tokens.harvest(live);
     }
     if (root.TableModel) root.TableModel.save();
+    /* AND THE TABLE HEARS ABOUT IT. grumkata: "moving tokens does not sync
+       properly". A move on the combat sheet was written down here and told
+       to nobody: this saves, it does not go through the model's change hook
+       (it cannot — that hook repaints the wood, the repaint shows the sheet,
+       and showing the sheet renders), so 60-board-net.js never heard that a
+       unit had changed lines or taken a wound. The fight only reached the
+       other tables when something ELSE on the wood happened to move. */
+    if (root.BoardNet && root.BoardNet.soon) root.BoardNet.soon();
     return out;
   };
   wrapped.__saves = true;

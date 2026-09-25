@@ -230,7 +230,10 @@ client; the database rules do not police the board.
 
 Every PLAYER has the kit (`64-kit.js`, PROJECT.md 3.23–3.24): their own
 characters, their own notes, a pen, and pointing. The GM has the chest
-instead, and neither sees the other's controls.
+instead, and neither sees the other's controls. A character dragged off the
+kit lands as that player's counter, with `by` on it — so they can move it,
+and command it in a fight (`32-combat-app.js` `canControl`) — and brings
+its sheet to the table (PROJECT.md 3.25).
 
 | | where it lives on the wire |
 |---|---|
@@ -241,6 +244,27 @@ instead, and neither sees the other's controls.
 | "players may draw" | `meta.draw`, written only by the host (`Session.allow`) |
 | a point | `who/{uid}/ping` — your own presence node, so no new rule |
 | which way you are looking | `who/{uid}/look`, degrees, sent on a 3° change |
+
+## What comes back is not what went out
+
+Firebase returns a node **with its keys sorted by name, and with every
+null, empty list and empty object gone**. Anything that recognises its own
+echo, or compares a remote copy with a local one, has to compare in that
+shape — `60-board-net.js` does it through `BoardNet.canon`. It did not until
+the first stress test, and every GM drag rebuilt the wood and re-sent every
+piece (PROJECT.md 3.25). Three consequences worth keeping in mind:
+
+- **A field set to null does not arrive; it disappears.** A remote copy has
+  to be applied by removing what it no longer has (`absorb`), not only by
+  assigning what it does.
+- **An empty list does not arrive either.** Anything that reads a list
+  without asking (a combat line's `ents`) is given one back (`revive`).
+- **"No scene running" is a head with no `active` in it**, and only the GM
+  writes the head.
+
+`test/session.test.js` has a server that answers this way
+(`Server({ firebase: true })`); a board test that only passes against the
+plain one is not testing Firebase.
 
 ## The guest table
 
@@ -288,3 +312,9 @@ Honest gaps, in the order they would hurt:
   picture. Anyone who knows the word can write as much of it as they like.
 - **Sheets are whole-record writes.** Two people editing the same sheet in
   the same second, last write wins. Fine for hit points, not for prose.
+- **The fight's round, phase and declared intents are not on the wire.**
+  Where the units stand and what has happened to them is (the scene and its
+  tokens); `S.round`, `S.phase` and `S.intent` in `32-combat-app.js` are
+  each machine's own, so a player's "Declared" never reaches the GM.
+- **A piece in motion is not sent.** Others see it arrive where it was let
+  go, not travel there.

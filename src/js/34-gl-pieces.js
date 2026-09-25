@@ -562,6 +562,15 @@ const HIT     = 0.5;    // die on die
 const ROLLCPL = 7;      // how hard motion drives spin, so they roll not slide
 const SLEEP_V = 22, SLEEP_W = 1.4, SETTLE_T = 0.20;
 const HOLD = 2.2, FADE = 0.85;
+/* ── HOW BIG A THROW IS ON THE WOOD ────────────────────────────
+   grumkata, after the first night with other people at the table: "dice
+   rolls need to be made bigger visually". The sim stays in the tray's own
+   units and is untouched — the bounces, the settling and the landing on the
+   face the chat printed all behave exactly as before; the whole throw is
+   simply drawn this much larger about the tray's centre. A real die is
+   fifteen millimetres on a table two metres across, which is honest and
+   invisible from a chair. */
+const DICE_SCALE = 2.8;
 
 /* board basis: right, up-table, and the normal — the sim's three axes */
 const BX = new THREE.Vector3(1,0,0);
@@ -896,7 +905,7 @@ function stepDice(dt, anchor){
   if (!rolling.length) {
     if (puffs.length) {
       const TW0 = (diceAnchor && diceAnchor.offsetWidth) || 620;
-      stepPuffs(dt, anchor ? anchor.width / TW0 : 0.55,
+      stepPuffs(dt, (anchor ? anchor.width / TW0 : 0.55) * DICE_SCALE,
                 anchor ? anchor.left + anchor.width/2 - W/2 : 0,
                 anchor ? (H/2 - (anchor.top + anchor.height/2)) + OY : OY);
       mark();
@@ -904,7 +913,7 @@ function stepDice(dt, anchor){
     return;
   }
   const TWu = (diceAnchor && diceAnchor.offsetWidth) || 620;
-  const k  = anchor ? anchor.width / TWu : 0.55;
+  const k  = (anchor ? anchor.width / TWu : 0.55) * DICE_SCALE;
   const cx = anchor ? anchor.left + anchor.width/2 - W/2 : 0;
   const cy = anchor ? (H/2 - (anchor.top + anchor.height/2)) + OY : OY;
 
@@ -958,7 +967,7 @@ window.GLDice = {
        and never at the moment it was raised. */
     const a = diceAnchor && diceAnchor.getBoundingClientRect();
     const TWu = (diceAnchor && diceAnchor.offsetWidth) || 620;
-    const pk = a ? a.width / TWu : 0.55;
+    const pk = (a ? a.width / TWu : 0.55) * DICE_SCALE;
     const pcx = a ? a.left + a.width / 2 - W / 2 : 0;
     const pcy = a ? (H / 2 - (a.top + a.height / 2)) + OY : OY;
     for (let n = Math.round(sec * 120); n > 0; n--){

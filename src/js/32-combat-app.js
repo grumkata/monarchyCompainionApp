@@ -113,7 +113,15 @@ const entById = id => { for(const l of S.lines){ const e=l.ents.find(x=>x.id===i
    live table every player commanded every unit on the board. */
 const isGM = () => (window.TableModel && window.TableModel.mayUseBox)
   ? window.TableModel.mayUseBox() : ROLE==='gm';
-const canControl = e => isGM() || e.id===ME;
+/* AND WHICH ONE IS THEIR OWN. `ME` is the demo's Sir Aldric and nobody at a
+   real table is him, so no player could move anything in a fight at all. A
+   player's own character is the counter they put down themselves (64-kit.js
+   stamps `by` on it) — the same rule as every other piece on the wood. */
+const ownsUnit = e => {
+  const M = window.TableModel, t = M && M.get && e && M.get(e.id);
+  return !!(t && M.playerMayTouch && M.playerMayTouch(t));
+};
+const canControl = e => isGM() || e.id===ME || ownsUnit(e);
 /* grumkata: "the gm shouldnt see player ui and vice versa". The GM's half of
    this sheet — Allow and Dismiss, the difficulty, "View Game Master" — was
    drawn for everybody, because ROLE never changed. It follows the table now. */

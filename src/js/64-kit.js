@@ -59,7 +59,11 @@ function mount() {
     e.stopPropagation();
     const pk = e.target.closest('[data-pk]');
     if (pk && root.Pocket) root.Pocket.press(pk.dataset.pk, e);
+    const cd = e.target.closest('[data-cdrag]');
+    if (cd) pressChar(cd.dataset.cdrag, e);
   });
+  doc.addEventListener('pointermove', moveChar);
+  doc.addEventListener('pointerup', releaseChar);
   el.addEventListener('wheel', e => e.stopPropagation());
   el.addEventListener('click', onClick);
 
@@ -133,7 +137,7 @@ function sheetsCard() {
   const rows = own.length ? own.map(c => {
       const brought = live() && here(c.id);
       return `<div class="kit-row">
-        <span class="kit-nm"><b>${esc(C().nameOf(c))}</b>
+        <span class="kit-nm kit-grab" data-cdrag="${esc(c.id)}" title="Drag onto the table"><b>${esc(C().nameOf(c))}</b>
           <i>${esc([c.who && c.who.species, c.who && c.who.rank].filter(Boolean).join(' · '))}</i></span>
         <button class="kit-chip" data-read="${esc(c.id)}">Read</button>
         ${live() ? `<button class="kit-chip${brought ? ' on' : ''}" data-bring="${esc(c.id)}"
@@ -141,7 +145,62 @@ function sheetsCard() {
       </div>`; }).join('')
     : `<p class="kit-none">No characters yet</p>`;
   /* the GM reads what everybody brought */
-  return `<div class="kit-h">Your characters</div>${rows}`;
+  return `<div class="kit-h">Your characters</div>${rows}${
+    own.length ? '<p class="kit-none kit-tip">Drag one onto the table to put them down</p>' : ''}`;
+}
+
+/* ══ A CHARACTER, ONTO THE WOOD ════════════════════════════════
+   grumkata: "players cant put sheet on table". They could bring one — which
+   sent it to the GM and put nothing anywhere anybody could see — and read
+   one, which laid it at their own place on their own screen only. What a
+   character IS on the wood, for everyone, is their counter (43-tokens.js):
+   the GM puts one down by taking it out of the chest, and this is the same
+   thing for a player, with the same gesture the pocket already uses. It
+   carries `by`, so it is theirs to move (TableModel.playerMayTouch), and its
+   sheet comes to the table with it, as the chest's does (25-toolbox.js
+   alsoBring). */
+let cdrag = null;
+function pressChar(id, e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  cdrag = { id, sx: e.clientX, sy: e.clientY, moved: false, el: null };
+}
+function moveChar(e) {
+  if (!cdrag) return;
+  if (!cdrag.moved && Math.hypot(e.clientX - cdrag.sx, e.clientY - cdrag.sy) < 6) return;
+  if (!cdrag.moved) {
+    const rec = C() && C().get(cdrag.id);
+    if (!rec) { cdrag = null; return; }
+    cdrag.moved = true;
+    cdrag.el = doc.createElement('div');
+    cdrag.el.className = 'kit-float';
+    cdrag.el.textContent = C().nameOf(rec);
+    doc.body.appendChild(cdrag.el);
+    doc.body.classList.add('pk-dragging');
+  }
+  cdrag.el.style.left = e.clientX + 'px';
+  cdrag.el.style.top = e.clientY + 'px';
+  cdrag.el.classList.toggle('over', !!(root.Pocket && root.Pocket.overWood(e.clientX, e.clientY)));
+}
+function releaseChar(e) {
+  if (!cdrag) return;
+  const d = cdrag; cdrag = null;
+  doc.body.classList.remove('pk-dragging');
+  if (d.el && d.el.parentNode) d.el.parentNode.removeChild(d.el);
+  if (d.moved && root.Pocket && root.Pocket.overWood(e.clientX, e.clientY)) placeChar(d.id, e.clientX, e.clientY);
+}
+function placeChar(id, sx, sy) {
+  const D = root.Table3D, Tk = root.Tokens;
+  const rec = C() && C().get(id);
+  if (!D || !Tk || !rec) return;
+  const p = D.screenToTable(sx, sy);
+  const sz = root.Figures ? root.Figures.sizeOf({ kind: 'token' }, { entKind: 'unit' })
+                          : { w: 150, h: 182 };
+  if (live() && root.SheetsNet) root.SheetsNet.bring(id);
+  Tk.make({ source: 'char', char: id, name: C().nameOf(rec), side: 'al',
+            by: live() ? S().uid : '',
+            x: Math.round(p.x - sz.w / 2), y: Math.round(p.y - sz.h / 2), w: sz.w, h: sz.h });
+  paint();
 }
 
 /* ── NOTES ── */

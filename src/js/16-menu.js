@@ -530,22 +530,36 @@ function setBringing(ids){
 }
 const charName = c => c.name || (c.who && c.who.name) || 'Unnamed';
 
+/* ── STILL SITTING AT ONE ──────────────────────────────────────
+   grumkata: "when rentring ui disappears for some reason and it wont let you
+   bring in new charceters". The table menu's "Back to the hall" does not
+   leave the game — you are still in your seat, which is right — and then
+   this screen was the only door back, and it refused you: "already at a
+   table". Nothing in the hall even said which table. So when you are seated
+   this screen says where, and the seal walks you back in, bringing whoever
+   you have picked since. */
+const seated = () => !!(window.Session && window.Session.live);
 VIEW.join = () => `
   <h2>Join a Game</h2>
   <div class="strip"></div>
-  ${liveStrip()}
+  ${seated() ? `<div class="note" style="margin-bottom:22px">You are still at
+      <b>${esc((window.Session.meta && window.Session.meta.name) || 'a table')}</b>
+      &mdash; its word is <b>${esc(window.Session.word)}</b>.
+      <button class="num" data-do="leavelive" style="margin-left:8px">${
+        window.Session.role === 'gm' ? 'Stop hosting' : 'Leave that game'}</button></div>`
+    : liveStrip()}
   ${(!me.name || needName) ? `<div class="f"><label>The name you answer to</label>
     <input id="jname" maxlength="40" value="${esc(me.name)}"
       placeholder="type your name"></div>` : ''}
-  <div class="f"><label>The table's word</label>
+  ${seated() ? '' : `<div class="f"><label>The table's word</label>
     <input id="word" maxlength="8" spellcheck="false" autocomplete="off" class="wordin"
-      placeholder="· · · · ·" value="${esc(joinSaid)}"></div>
+      placeholder="· · · · ·" value="${esc(joinSaid)}"></div>`}
   ${chars.length ? `<div class="f"><label>Bring with you</label>
     <div class="chips">${chars.map(c => `<button class="num${bringing().includes(c.id) ? ' on' : ''}"
       data-do="bringpick" data-v="${esc(c.id)}">${esc(charName(c))}</button>`).join('')}</div></div>` : ''}
   <div class="sealrow">
     <button class="seal${joining ? ' busy' : ''}" data-do="join"><span class="wax"></span><b>M</b></button>
-    <span class="cap">Walk in${joining ? '<em>knocking…</em>' : ''}</span>
+    <span class="cap">${seated() ? 'Walk back in' : 'Walk in'}${joining ? '<em>knocking…</em>' : ''}</span>
   </div>
   <div class="me-row" style="margin-top:34px">
     <div class="me-arms">${me.pic
@@ -1262,6 +1276,7 @@ document.addEventListener('click', e => {
     case 'open':       return openTable(row.dataset.id);
     case 'opensheet':  return openSheet(row.dataset.id);
     case 'join':       return sendWord();
+    case 'leavelive':  return window.Session.leave().then(() => { render(); toast('You have left the game'); });
     case 'bringpick': {
       const ids = bringing(), id = b.dataset.v, i = ids.indexOf(id);
       if (i >= 0) ids.splice(i, 1); else ids.push(id);
@@ -1373,6 +1388,12 @@ function makeTable(){
 }
 function openTable(id){
   const t = tables.find(x => x.id === id); if (!t) return;
+  /* one table at a time while you are sitting at a live one: walking into a
+     different save from here left you seated in the game and looking at
+     somebody else's wood, where nothing you saw was the table's */
+  const S = window.Session;
+  if (S && S.live && !(S.role === 'gm' && S.tableId === id))
+    return toast('You are still at ' + S.word + ' — Join a Game walks you back, or leave it there');
   t.opened = Date.now(); saveT();
   /* One document. Opening a table is a state change, not a navigation —
      42-shell.js swaps which half of the app is on screen and boots the
@@ -1616,8 +1637,22 @@ function saveNetCfg(){
   toast('Kept — restart the app to use it');
 }
 
+/* back into the table you never left: whoever you have picked to bring since
+   comes with you, and you walk into the same table you walked out of — the
+   guest copy of the GM's board, or your own if you are the one hosting */
+function walkBack(){
+  const S = window.Session, N = window.SheetsNet;
+  const ids = N ? bringing().filter(id => !N.isShared(id)) : [];
+  ids.forEach(id => N.bring(id));
+  if (ids.length) toast(ids.length + (ids.length === 1 ? ' character' : ' characters') + ' brought');
+  const id = S.role === 'gm' ? S.tableId
+           : ((window.BoardNet && window.BoardNet.tableId) || ('guest-' + S.word));
+  window.Shell.openTable(id);
+}
+
 function sendWord(){
   if (joining) return;
+  if (seated()) return walkBack();
   const w = window.Session.tidy(($('#word') || {}).value || '');
   if (!w) return toast('You need the word the table sits under');
   /* NO NAME IS NOT AN ERROR, IT IS A MISSING ANSWER. Sending somebody to

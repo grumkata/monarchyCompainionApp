@@ -232,20 +232,31 @@ function sit(n) {
    client reaches the same conclusion from the same timestamps. */
 function startBeat() {
   stopBeat();
-  beat = root.setInterval(() => {
-    if (!live()) return stopBeat();
-    /* A BEAT CAN BE REFUSED, and the refusal is the interesting case. The
-       rules require `who/$uid` to carry our own uid; a beat is a partial
-       write of `seen` alone, so if our node is GONE the merged result has
-       no uid in it and the database says no. That is not a transient error
-       to swallow -- it is the table telling us we are not in it. (It was
-       swallowed, in the worst way: no catch at all, so it surfaced as an
-       unhandled rejection every four seconds and nothing else.) */
-    Net().update('tables/' + word + '/who/' + uid(), { seen: Net().now() })
-      .catch(() => resit());
-  }, Net().BEAT);
+  beat = root.setInterval(beatOnce, Net().BEAT);
+}
+function beatOnce() {
+  if (!live()) return stopBeat();
+  /* A BEAT CAN BE REFUSED, and the refusal is the interesting case. The
+     rules require `who/$uid` to carry our own uid; a beat is a partial
+     write of `seen` alone, so if our node is GONE the merged result has
+     no uid in it and the database says no. That is not a transient error
+     to swallow -- it is the table telling us we are not in it. (It was
+     swallowed, in the worst way: no catch at all, so it surfaced as an
+     unhandled rejection every four seconds and nothing else.) */
+  Net().update('tables/' + word + '/who/' + uid(), { seen: Net().now() })
+    .catch(() => resit());
 }
 function stopBeat() { if (beat) { root.clearInterval(beat); beat = 0; } }
+/* COMING BACK TO THE WINDOW SAYS SO AT ONCE. A browser tab — as opposed to
+   the app, which is told not to throttle (electron/main.js) — still slows a
+   hidden page's timers, and anybody gone quiet that long has been reaped
+   from every other table. The first thing on coming back is a beat, not up
+   to four seconds more of being absent. */
+if (root.document && root.document.addEventListener) {
+  root.document.addEventListener('visibilitychange', () => {
+    if (root.document.visibilityState === 'visible' && live() && beat) beatOnce();
+  });
+}
 
 /* -- TAKING OUR OWN CHAIR BACK --------------------------------
    Guarded, because the thing that triggers it is a node being absent and

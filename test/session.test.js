@@ -35,9 +35,36 @@ const SRC = f => fs.readFileSync(path.join(__dirname, '..', 'src', 'js', f), 'ut
 /* ══ ONE SERVER ════════════════════════════════════════════════
    A plain object and a list of watchers. Deliberately not clever: if this
    had a scheduler, a queue or a delay model it would be testing itself. */
-function Server() {
+/* `firebase: true` hands data back the way the Realtime Database does, which
+   is NOT the way it was written: keys sorted by name, and no nulls, no empty
+   lists and no empty objects at all. Everything the board module compared
+   by JSON.stringify was correct against the plain server and wrong against
+   the real one — which is where the first stress test found it. */
+function fbShape(v) {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v !== 'object') return v;
+  const keys = Object.keys(v).sort((a, b) => {
+    const ia = /^\d+$/.test(a), ib = /^\d+$/.test(b);
+    if (ia && ib) return a - b;
+    if (ia !== ib) return ia ? -1 : 1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const out = {};
+  let n = 0, max = -1, ints = true;
+  keys.forEach(k => {
+    const c = fbShape(v[k]);
+    if (c === undefined) return;
+    out[k] = c; n++;
+    if (/^\d+$/.test(k)) max = Math.max(max, +k); else ints = false;
+  });
+  if (!n) return undefined;
+  if (ints && max < 2 * n) { const a = []; Object.keys(out).forEach(k => { a[k] = out[k]; }); return a; }
+  return out;
+}
+function Server(opts) {
   const tree = {};
   const watchers = [];
+  const fb = !!(opts && opts.firebase);
   const cut = p => String(p).split('/').filter(Boolean);
   const dig = p => { let n = tree; for (const k of cut(p)) { if (n == null) return null; n = n[k]; }
                      return n === undefined ? null : n; };
@@ -50,7 +77,13 @@ function Server() {
     if (w.path === p || p.indexOf(w.path + '/') === 0 || w.path.indexOf(p + '/') === 0)
       w.cb(clone(dig(w.path)));
   });
-  const clone = v => v == null ? null : JSON.parse(JSON.stringify(v));
+  const clone = v => {
+    if (v == null) return null;
+    const c = JSON.parse(JSON.stringify(v));
+    if (!fb) return c;
+    const s = fbShape(c);
+    return s === undefined ? null : s;
+  };
   return {
     read: p => clone(dig(p)),
     write: (p, v) => { plant(p, v); touched(p); },
@@ -562,6 +595,72 @@ function Client(server, uid, name, opts) {
     T('leaving empties the guest table — the GM\'s board is not theirs to keep',
       bob.TableModel.ids() === '' && !bob.TableModel.saved('guest-' + word));
     T('and a player leaving takes nothing off the table', onWire() === 'pic');
+  }
+
+  /* == THE DATABASE HANDS IT BACK IN ITS OWN ORDER =============
+     grumkata, after the first stress test: "dragging as gm with peole at
+     table is laggy and rubberbandy", "moving tokens does not sync
+     properly". Against a server that answers the way Firebase does — keys
+     sorted, nulls and empty lists gone — every echo used to read as a
+     change: the GM's wood was rebuilt under the pointer, and every move
+     re-sent every piece on the table, pictures and all. */
+  {
+    const S = Server({ firebase: true });
+    const gm  = Client(S, 'u-gm',  'Grum');
+    const bob = Client(S, 'u-bob', 'Bob');
+    gm.TableModel.put({ id: 'a', kind: 'token', name: 'Aldric', x: 100, y: 5, in: null,
+                        ent: { name: 'Aldric', hp: 9, cond: [] } });
+    gm.TableModel.put({ id: 'm', kind: 'art', name: 'A map', src: 'data:' + 'x'.repeat(5000), x: 300 });
+    gm.TableModel.put({ id: 'sc', kind: 'scene', scene: 'combat', name: 'Fight', x: 0,
+                        lines: [{ key: 'a-front', side: 'al', ents: [] }] });
+    const word = await gm.Session.host('tf', {});
+    await bob.Session.join(word);
+
+    const sent = [];
+    const realMerge = S.merge;
+    S.merge = (p, o) => { if (/\/board$/.test(p)) sent.push(Object.keys(o).sort().join(' '));
+                          return realMerge(p, o); };
+    const heard = who => { const w = []; const was = who.TableModel.changed.bind(who.TableModel);
+                           who.TableModel.changed = r => { w.push(r); was(r); }; return w; };
+    const gmWhy = heard(gm), bobWhy = heard(bob);
+
+    gm.TableModel.move('a', 150);
+    T('moving one piece sends that piece and nothing else — not every picture on the table',
+      sent.join(',') === 'things/a');
+    T('and the GM\'s own echo is not taken for somebody else\'s change',
+      gmWhy.join(' ') === 'move');
+    T('a piece somebody else slid is slid where it stands, not the whole wood rebuilt',
+      bob.TableModel.ids().indexOf('a@150') >= 0 && bobWhy.join(' ') === 'move');
+
+    const tok = gm.TableModel.state.things.find(t => t.id === 'a');
+    const bobs = id => bob.TableModel.state.things.find(t => t.id === id) || {};
+    tok.in = 'sc'; gm.TableModel.changed('home');
+    T('a token put into a scene is in it on every table', bobs('a').in === 'sc');
+    tok.in = null; gm.TableModel.changed('home');
+    T('and taken back out, it is out on every table — a null is never stored, so it never arrived',
+      !bobs('a').in);
+
+    gm.TableModel.state.active = 'sc'; gm.TableModel.changed('activate');
+    T('the GM starting a fight starts it for everybody', bob.TableModel.state.active === 'sc');
+    gm.TableModel.state.active = null; gm.TableModel.changed('deactivate');
+    T('and ending it ends it for everybody — "no scene" is not stored either',
+      bob.TableModel.state.active === null);
+
+    bob.TableModel.state.active = 'sc';             /* a copy a moment behind */
+    bob.TableModel.put({ id: 'n1', kind: 'note', by: 'u-bob', x: 10, sketch: [] });
+    T('a player\'s copy of which scene is running is never sent over the GM\'s',
+      gm.TableModel.state.active === null && !(S.read('tables/' + word + '/board/head') || {}).active);
+    T('while the note they put down reaches the GM', gm.TableModel.ids().indexOf('n1@10') >= 0);
+
+    sent.length = 0;
+    bob.TableModel.move('n1', 40);
+    T('and moving it sends that note and nothing of anybody else\'s',
+      sent.join(',') === 'things/n1' && gm.TableModel.ids().indexOf('n1@40') >= 0);
+
+    T('a combat line with nobody on it still arrives with a list of nobody on it',
+      Array.isArray(bobs('sc').lines) && Array.isArray(bobs('sc').lines[0].ents));
+    T('and a token\'s empty list of conditions is still a list',
+      Array.isArray((bobs('a').ent || {}).cond) || (bobs('a').ent || {}).cond === undefined);
   }
 
   /* == THE GM HANDS OUT THE PENS, AND ANYONE CAN POINT =========

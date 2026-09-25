@@ -29,7 +29,16 @@ function createWindow() {
       // player restart into a downloaded update — nothing else about the
       // renderer's access changes. Runs fine sandboxed; contextBridge is
       // exactly what a sandboxed preload is for.
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      // A PLAYER IN ANOTHER WINDOW IS STILL AT THE TABLE. Chromium slows the
+      // timers of a hidden or minimised page — to once a minute after five
+      // minutes of it — and the heartbeat that says you are still here is a
+      // timer (src/js/06-session.js). Everybody else treats a beat fifteen
+      // seconds old as somebody gone, so alt-tabbing to Discord made your
+      // figure vanish from every other table and come back once a minute:
+      // "player avatar disappears sometimes". A table you are sitting at is
+      // not a background tab.
+      backgroundThrottling: false
     }
   });
 

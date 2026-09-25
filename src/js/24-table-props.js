@@ -411,8 +411,17 @@ function dropped(el, ev) {
 
   if (overBin(ev)) { T().bin(id); return; }
 
-  T().move(id, parseFloat(el.dataset.x), parseFloat(el.dataset.y),
-           { free: !!(ev && ev.shiftKey) });
+  /* A PIECE LET GO PAST THE RIM LIES AT THE RIM. Dragged up over the wall in
+     the chair view, the pointer's point on the plane of the wood is a long way
+     off the table, and the piece went there — out of sight and out of reach,
+     for everybody. Its middle is kept on the wood. */
+  let x = parseFloat(el.dataset.x), y = parseFloat(el.dataset.y);
+  if (t.kind !== 'scene' && D().ontoWood) {
+    const hw = (t.w || 0) * (t.scale || 1) / 2, hh = (t.h || 0) * (t.scale || 1) / 2;
+    const c = D().ontoWood(x + hw, y + hh, 0);
+    x = c.x - hw; y = c.y - hh;
+  }
+  T().move(id, x, y, { free: !!(ev && ev.shiftKey) });
 
   /* DROPPED ON A LINE. This is how a token becomes a combatant: the line you
      let go over is its home and its side, because the board is the statement.
@@ -425,8 +434,7 @@ function dropped(el, ev) {
       root.Tokens.toLine(id, live.id, line);
       return;
     }
-    if (t.in && root.Tokens) root.Tokens.toWood(id,
-      parseFloat(el.dataset.x), parseFloat(el.dataset.y));
+    if (t.in && root.Tokens) root.Tokens.toWood(id, x, y);
   }
 
   if (t.kind !== 'scene') {

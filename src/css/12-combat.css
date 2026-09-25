@@ -1405,3 +1405,72 @@ body.locked-in #vp { cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA
   transform-style:preserve-3d;z-index:0;pointer-events:none}
 #tglu{position:absolute;inset:0;z-index:1;pointer-events:none}
 #tbl{z-index:2}
+
+/* ══ LEGIBILITY ═════════════════════════════════════════════════
+   grumkata, after the first night with other people at the table: "make
+   text of combat more legible". Measured, not guessed: locked onto a fight
+   at 1280 wide, the sheet is drawn at about six-tenths of its own size, so
+   the line names came out 5.6px tall on screen, a unit's name 7.5px, and
+   the labels over the numbers 4px. A unit that had acted this round then
+   halved what was left of its name and its hit points. That is a sheet you
+   can see is there and cannot read — which, for the one thing everybody at
+   the table is watching, is the wrong way round.
+
+   So the smallest type in the fight is brought up to where it survives the
+   table's own zoom, the dimmed text is dimmed less, and the field view's
+   labels and the HUD come up with it. Kept together here, after the rules
+   they override, so the whole change reads as one decision and can be
+   tuned in one place. */
+.tb-l{font-size:9.5px;color:rgba(255,240,210,.82)}
+.ph{font-size:11px;color:rgba(255,240,210,.62)}
+.ph.done{color:rgba(255,240,210,.85)}
+.et small{font-size:10px}
+.tab span{font-size:11px}
+.cap span{font-size:9px}
+.nm{font-size:12.5px}
+.ent.lg .nm{font-size:13px}
+.hp{font-size:14.5px}
+.cd{height:16px}
+.cd i{font-size:9.5px;line-height:16px}
+.cd i b{font-size:11px}
+.sz{font-size:10px}
+.srow u,.fmld{font-size:9px}
+.ent.spent .nm,.ent.spent .hp,.ent.spent .sz,.ent.spent .cd{opacity:.72}
+.sid .s{font-size:10px}
+.st .l,.stk .l{font-size:9px}
+.tk{font-size:10.5px}
+.act{font-size:10px}
+.role{font-size:10px}
+.sugtxt em{font-size:10px}
+/* the field: a name has to be readable without selecting it */
+.fname b{font-size:11px}
+.fname i{font-size:11.5px}
+/* the HUD you act from */
+.awho b{font-size:13.5px}
+.agauge{height:14px}
+.agauge u{font-size:10.5px;line-height:14px}
+.apip{font-size:9.5px}
+.asrc b{font-size:12px}
+.asrc i{font-size:10px;opacity:.85}
+.asrc em{font-size:9px;opacity:.75}
+.amana i{font-size:9px;color:rgba(253,246,224,.72)}
+.aend{font-size:10px}
+.amenu>header b{font-size:12.5px}
+.amenu>header span{font-size:10px}
+.ahead b{font-size:11.5px}
+.ahead em{font-size:9.5px}
+.aitem p{font-size:13px;color:rgba(253,246,224,.9)}
+.astop{font-size:9.5px}
+.apass h5{font-size:9.5px;color:rgba(253,246,224,.7)}
+.apass p{font-size:12.5px;color:rgba(253,246,224,.82)}
+.apass b{font-size:10.5px}
+.aconf h4{font-size:13px}
+.aconf h4 i{font-size:9.5px}
+.aconf dt{font-size:9.5px;color:rgba(253,246,224,.7)}
+.aconf dd{font-size:13.5px}
+.apath{font-size:9px;color:rgba(253,246,224,.66)}
+.anote{font-size:12px;color:rgba(253,246,224,.75)}
+.atodo{font-size:9.5px}
+.ago,.aback{font-size:10px}
+.aaim b{font-size:12.5px}
+.aaim span{font-size:10px;opacity:.85}

@@ -503,9 +503,7 @@ function chat(who, what, r, tgt){
   const chips = (r.dice || []).map((v, i) => v === null
     ? `<i class="lo gone">${r.raw[i]}</i>`
     : `<i class="${v === 6 ? 'hi' : v === 1 ? 'lo' : ''}${r.raw[i] !== v ? ' up' : ''}">${v}</i>`).join('');
-  const d = document.createElement('div');
-  d.className = 'cl roll';
-  d.innerHTML = `<b>${esc(who)}</b><span class="rspec">${esc(what)}${
+  const said = `<b>${esc(who)}</b><span class="rspec">${esc(what)}${
       tgt ? ' &rarr; ' + esc(tgt.name) : ''}</span>`
     + (r.raw ? `<span class="rdice">${chips}</span>`
       + `<span class="rtot ${r.hit ? 'win' : 'lose'}">${r.successes}/${r.diff}</span>` : '')
@@ -513,10 +511,30 @@ function chat(who, what, r, tgt){
         r.log.map(l => l.act).join(', ')}</span>` : '')
     + (r.crit ? `<span class="redit">${r.crit} on the raw roll</span>` : '')
     + ((r.applied || []).length ? `<span class="redit did">${
-        r.applied.map(x => esc(x.text)).join(' &middot; ')}</span>` : '')
-    + ((r.forGM || []).length ? `<span class="redit gm">GM: ${
-        r.forGM.map(x => esc(x.text)).join(' &middot; ')}</span>` : '');
-  cb.appendChild(d); cb.scrollTop = cb.scrollHeight;
+        r.applied.map(x => esc(x.text)).join(' &middot; ')}</span>` : '');
+  const forGM = (r.forGM || []).length ? `<span class="redit gm">GM: ${
+        r.forGM.map(x => esc(x.text)).join(' &middot; ')}</span>` : '';
+  const line = html => {
+    const d = document.createElement('div');
+    d.className = 'cl roll';
+    d.innerHTML = html;
+    cb.appendChild(d); cb.scrollTop = cb.scrollHeight;
+  };
+  /* ── A BLOW STRUCK IN A FIGHT IS SAID AT THE TABLE ────────────
+     grumkata: "chat does not update when in combat view". What a fight
+     resolved went into THIS screen's dock and nowhere else — every other
+     chat at the table stayed exactly as it was while a round was fought
+     out on it. At a live table it goes to the table now, the way a thrown
+     roll does (39-dice.js), and comes back into every dock including this
+     one. The GM's own notes on it ("yours to rule on") are the GM's, and
+     stay on the GM's screen. */
+  const S = window.Session;
+  if (S && S.live) {
+    S.talk(said, 'roll');
+    if (forGM) line(forGM);
+    return;
+  }
+  line(said + forGM);
 }
 function renderResult(r){
   const dice = (r.dice || []).map((v, i) => v === null

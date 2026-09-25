@@ -112,7 +112,9 @@ function throwFor(m) {
    survive. Anything else — any attribute, any other element — is dropped.
    The worst a hostile client can now do is make a roll look wrong. */
 const TAGS = { B: 1, I: 1, U: 1, SPAN: 1 };
-const CLASSES = /^(rspec|rdice|rtot|cn|hi|lo)$/;
+/* and the fight's own result line (38-bar-hud.js chat): hit or miss on the
+   total, a die struck out or raised, what the blow did */
+const CLASSES = /^(rspec|rdice|rtot|cn|hi|lo|win|lose|gone|up|redit|did)$/;
 function scrub(html) {
   const bin = doc.createElement('div');
   bin.innerHTML = String(html || '');

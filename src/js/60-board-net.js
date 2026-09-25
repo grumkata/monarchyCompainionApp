@@ -55,9 +55,95 @@ let applying = false;     /* a remote change is going in; do not send it back */
 let sendT = 0;
 let want = null;          /* the local table this board is mirrored into */
 let last;                 /* the board as last heard, for a table that loads late */
+let sentHead = null;      /* the head as we last wrote or heard it */
 
 const path = () => 'tables/' + word + '/board';
-const cut = t => JSON.stringify(t);
+
+/* ══ WHAT A THING LOOKS LIKE ONCE THE DATABASE HAS HAD IT ══════
+   grumkata, after the first stress test: "dragging as gm with peole at
+   table is laggy and rubberbandy" and "moving tokens does not sync
+   properly".
+
+   The echo check above compared JSON.stringify of what we wrote with
+   JSON.stringify of what came back, and on Firebase those NEVER match.
+   Firebase hands a node back with its keys sorted by name, not in the order
+   they were written, and it does not keep nulls, empty arrays or empty
+   objects at all. So every echo read as somebody else's change: the GM's
+   own board was applied back over itself, the whole wood was torn down and
+   rebuilt — including the piece under the GM's pointer, which is the
+   rubber band — and the next sendNow saw every piece as different again and
+   uploaded all of them, pictures and all, on every drag. Local mode keeps
+   insertion order through localStorage, which is why the tests never saw it.
+
+   So both sides are compared in the shape the database keeps: keys sorted,
+   nothing that is null or empty. */
+function canon(v) {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+  if (typeof v !== 'object') return v;
+  if (Array.isArray(v)) {
+    const out = [];
+    for (let i = 0; i < v.length; i++) out[i] = canon(v[i]);
+    while (out.length && out[out.length - 1] === undefined) out.pop();
+    return out.length ? out : undefined;
+  }
+  const out = {};
+  let any = false;
+  Object.keys(v).sort().forEach(k => {
+    const c = canon(v[k]);
+    if (c !== undefined) { out[k] = c; any = true; }
+  });
+  return any ? out : undefined;
+}
+const cut = t => JSON.stringify(canon(t)) || '';
+/* one field, the same test: plain values straight, anything else by shape */
+const same = (a, b) => a === b ||
+  ((a == null || typeof a === 'object') && (b == null || typeof b === 'object') && cut(a) === cut(b));
+
+/* ── AND BACK INTO THE SHAPE THE APP EXPECTS ─────────────────
+   The other half of the same fact: an empty list does not survive the trip.
+   A combat line with nobody on it comes back with no `ents`, and a list
+   with holes in it can come back as an object. The combat sheet reads
+   `line.ents` without asking, so the shapes it relies on are put back. */
+function list(v) {
+  if (Array.isArray(v)) return v.filter(x => x != null);
+  if (v && typeof v === 'object') return Object.keys(v).sort((a, b) => a - b).map(k => v[k]).filter(x => x != null);
+  return [];
+}
+function revive(t) {
+  if (!t || typeof t !== 'object') return t;
+  if (t.kind === 'scene' && t.lines != null)
+    t.lines = list(t.lines).map(l => Object.assign({}, l, { ents: list(l.ents) }));
+  if (t.ent && typeof t.ent === 'object' && t.ent.cond != null && !Array.isArray(t.ent.cond))
+    t.ent.cond = list(t.ent.cond);
+  return t;
+}
+
+/* ── TAKING A REMOTE VERSION OF A PIECE WE ALREADY HAVE ───────
+   Object.assign alone could only ever ADD fields. A token taken off a combat
+   line has `in: null`, which the database stores as nothing at all, so the
+   field simply never arrived and every other table kept it on the line; the
+   same for anything else that was cleared. Fields the table no longer has
+   are removed here.
+
+   It answers whether anything changed beyond where the piece lies and how
+   it is stacked — because only that can be redrawn in place. Anything more
+   rebuilds the wood, and rebuilding the wood is what threw away a piece
+   somebody else was halfway through dragging. */
+const SLIDES = { x: 1, y: 1, z: 1, scale: 1 };
+function absorb(t, from) {
+  let heavy = false;
+  Object.keys(t).forEach(k => {
+    if (!(k in from) && canon(t[k]) !== undefined) { delete t[k]; heavy = true; }
+  });
+  Object.keys(from).forEach(k => {
+    if (same(t[k], from[k])) return;
+    t[k] = from[k];
+    /* a running fight is drawn by the combat bridge, not slid in place */
+    if (!SLIDES[k] || t.kind === 'scene') heavy = true;
+  });
+  return heavy;
+}
 
 /* ══ WHICH LOCAL TABLE IS THE BOARD'S ══════════════════════════
    grumkata: "images one one person end do not show up for everyone else".
@@ -115,7 +201,8 @@ function sendNow() {
   (st.things || []).forEach(t => { now[t.id] = cut(t); });
 
   const job = {};
-  /* changed and new */
+  /* changed and new — compared as the database keeps them (canon above),
+     so a piece that has not changed is not sent again */
   Object.keys(now).forEach(id => {
     /* NOT WHAT WAS ALREADY ON YOUR OWN WOOD. You open a table of your own,
        put your notes and your prep on it, and then join somebody else's
@@ -133,10 +220,17 @@ function sendNow() {
   Object.keys(mine).forEach(id => {
     if (!(id in now)) { job['things/' + id] = null; delete mine[id]; }
   });
-  /* which scene is being run, and the stacking counter, so a piece put
-     down on one machine does not land under everything on another */
-  const head = cut({ active: st.active || null, z: st.z || 1 });
-  if (head !== mine.__head) { job.head = JSON.parse(head); mine.__head = head; }
+  /* WHICH SCENE IS BEING RUN IS THE GM'S TO SAY. The head used to be sent by
+     everybody, carrying whatever scene their copy thought was running — so a
+     player whose copy was a moment behind could start a fight the GM had just
+     ended. And it was kept in `mine` beside the pieces, where the loop above
+     took it for a piece that had been binned: every send deleted a thing
+     called "__head" and sent the head again. The stacking counter needs no
+     head to travel — take() keeps it above every piece it hears of. */
+  if (S().role === 'gm') {
+    const head = cut({ active: st.active || null, z: st.z || 1 });
+    if (head !== sentHead) { job.head = JSON.parse(head); sentHead = head; }
+  }
 
   if (!Object.keys(job).length) return;
   root.Net.update(path(), job).catch(e => {
@@ -161,20 +255,24 @@ function take(board) {
   const st = M().state;
   const things = board.things || {};
   let touched = false;
+  /* whether the wood has to be rebuilt, or only has pieces to slide */
+  let heavy = false;
 
   applying = true;
   try {
     /* everything the table says is there */
     Object.keys(things).forEach(id => {
-      const t = things[id];
+      const t = revive(things[id]);
       if (!t || typeof t !== 'object') return;
       const js = cut(t);
       if (ours[id]) delete ours[id];             /* the table has it too */
       if (mine[id] === js) return;               /* our own echo */
       mine[id] = js;
       const at = (st.things || []).findIndex(x => x.id === id);
-      if (at >= 0) Object.assign(st.things[at], t);
-      else st.things.push(t);
+      if (at >= 0) { if (absorb(st.things[at], t)) heavy = true; }
+      else { st.things.push(t); heavy = true; }
+      /* anything put down here next goes on top of it */
+      if (typeof t.z === 'number' && t.z >= (st.z || 1)) st.z = t.z + 1;
       touched = true;
     });
     /* and nothing it does not. Only things we have seen ON the wire are
@@ -183,20 +281,31 @@ function take(board) {
     if (board.head) {
       for (let i = (st.things || []).length - 1; i >= 0; i--) {
         const id = st.things[i].id;
-        if (!(id in things) && (id in mine)) { st.things.splice(i, 1); delete mine[id]; touched = true; }
+        if (!(id in things) && (id in mine)) {
+          st.things.splice(i, 1); delete mine[id]; touched = heavy = true;
+          if (st.sel === id) st.sel = null;
+        }
       }
       const h = board.head;
-      if (h.active !== undefined && h.active !== st.active) { st.active = h.active; touched = true; }
+      /* NO SCENE RUNNING IS ALSO AN ANSWER. `active: null` is not stored, so
+         the GM ending a fight arrived as a head with no `active` in it — and
+         that was read as "nothing to say", leaving every player's copy of the
+         fight up after the GM had put it away. */
+      const act = h.active || null;
+      if (act !== (st.active || null)) { st.active = act; touched = heavy = true; }
       if (typeof h.z === 'number' && h.z > (st.z || 1)) st.z = h.z;
-      mine.__head = cut({ active: st.active || null, z: st.z || 1 });
+      sentHead = cut({ active: st.active || null, z: st.z || 1 });
     }
   } finally { applying = false; }
 
   if (touched) {
     /* redraw without going back out: `changed` is what push() listens to,
-       and applying is already false by here, so it is told explicitly */
+       and applying is already false by here, so it is told explicitly.
+       Pieces that only slid are moved where they stand ('move' is one of
+       24-table-props.js's cheap changes), so a piece you are holding is not
+       torn out of your hand because somebody else moved theirs. */
     applying = true;
-    try { M().changed('net'); } finally { applying = false; }
+    try { M().changed(heavy ? 'net' : 'move'); } finally { applying = false; }
   }
 }
 
@@ -206,6 +315,7 @@ function join(w) {
   word = w;
   mine = {};
   ours = {};
+  sentHead = null;
   last = undefined;
   sendNow.moaned = false;
   want = wantFor(w, S().role);
@@ -234,11 +344,22 @@ function join(w) {
   offs.push(root.Net.watch(path(), take));
   if (S().role === 'gm') sendNow();
 }
-function leave(was) {
+function leave(was, why) {
   offs.splice(0).forEach(f => { try { f(); } catch (e) {} });
   if (sendT) { root.clearTimeout(sendT); sendT = 0; }
   const guest = (was === 'player') ? want : null;
+  /* THE LAST LOOK AT THE GUEST TABLE BEFORE IT IS EMPTIED. A player's notes
+     came out of their pocket onto this wood, and emptying it below is the
+     end of them on this machine — so whoever wants them back (62-pocket.js)
+     is shown what was on it first. */
+  if (guest && M() && M().state && M().state.id === guest && root.CustomEvent) {
+    try {
+      root.dispatchEvent(new root.CustomEvent('monarchy:guest-leaving',
+        { detail: { things: (M().state.things || []).slice(), why: why || 'left' } }));
+    } catch (e) {}
+  }
   word = null; mine = {}; ours = {}; synced = false; want = null; last = undefined;
+  sentHead = null;
   /* a player's copy of somebody else's board is not theirs to keep. Done
      after unwiring, so emptying it is not heard as a change to send. */
   if (guest) clearGuest(guest);
@@ -260,7 +381,7 @@ function clearGuest(id) {
    the table as it now stands, and a player takes the board as last heard. */
 function loaded() {
   if (!word || !want || !here()) return;
-  mine = {}; ours = {};
+  mine = {}; ours = {}; sentHead = null;
   if (S().role === 'gm') { synced = true; sendNow(); return; }
   synced = false;
   if (last !== undefined) take(last);
@@ -269,7 +390,7 @@ function loaded() {
 root.addEventListener('monarchy:session', e => {
   const d = e.detail || {};
   if (d.what === 'hosting' || d.what === 'joined') join(d.word);
-  if (d.what === 'left' || d.what === 'closed') leave(d.was);
+  if (d.what === 'left' || d.what === 'closed') leave(d.was, d.what);
 });
 
 /* every change to the wood, from anywhere: a drag, a bin, an undo, the
@@ -277,7 +398,9 @@ root.addEventListener('monarchy:session', e => {
    nothing can change the board without this hearing about it. */
 if (M()) M().on((st, why) => { if (why === 'load') loaded(); else push(); });
 
-root.BoardNet = { push: sendNow, guestId,
+/* the combat sheet changes the fight without going through the model's
+   change hook (40-combat-scene.js) — it says so here instead */
+root.BoardNet = { push: sendNow, soon: push, guestId, canon,
                   get wired() { return !!word; },
                   /* the local table to walk into to see this board */
                   get tableId() { return want; } };

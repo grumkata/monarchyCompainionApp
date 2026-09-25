@@ -1650,6 +1650,90 @@ turn as they look around, and be lit so they do not look pasted in.
 
 ---
 
+### 3.25 The first stress test (2026-09-24)
+
+grumkata's list after a night with a friend at the table. Each item, what it
+actually was, and where the fix lives:
+
+1. **Dragging as GM was laggy and rubber-banded; tokens did not sync.** One
+   cause under most of it: `60-board-net.js` recognised its own echo by
+   comparing `JSON.stringify` of what it wrote with what came back, and
+   Firebase hands a node back **with its keys sorted and with every null,
+   empty list and empty object dropped**. So on Firebase every echo read as
+   somebody else's change: the GM's wood was rebuilt (tearing the dragged
+   piece out from under the pointer), and every later send re-uploaded every
+   piece on the table, pictures and all. Local mode keeps insertion order,
+   which is why no test saw it. Things are now compared in the database's
+   own shape (`canon`). The same two facts hid three more faults, fixed with
+   it: a remote change could only ADD fields, so a token taken off a combat
+   line (`in: null`, never stored) stayed on it for everyone else (`absorb`
+   now removes what the table no longer has); the GM ending a fight arrived
+   as a head with no `active` and was ignored; and an empty combat line
+   arrived with no `ents` list. Only the GM sends the head now (a player's
+   stale copy could restart a fight), and a remote change that only slides
+   pieces is applied as a cheap `move`, not a rebuild.
+2. **Combat moves never reached anybody.** `40-combat-scene.js`'s render
+   wrapper saved and told nobody — it cannot go through the model's change
+   hook (that repaints, which renders) — so the board only went out when
+   something else moved. It calls `BoardNet.soon()` now.
+3. **Chat did not update in the combat view.** A fight's result line was
+   written into the roller's own dock only (`38-bar-hud.js` `chat`). At a
+   live table it goes out through `Session.talk` like a thrown roll; the
+   GM's "yours to rule on" notes stay on the GM's screen. `ChatNet.scrub`
+   keeps the result line's own classes (`win lose gone up redit did`).
+4. **Player notes disappeared.** Let go anywhere over the viewport — which
+   sat back in the chair is mostly the room — a note was put at
+   `screenToTable`'s answer, a point on the table's plane far past its rim,
+   and removed from the pocket. `Table3D.onWood`/`ontoWood` test the disc; a
+   note let go off it stays in the pocket, and any piece let go past the rim
+   (24-table-props.js `dropped`, the paper at your place) lies at the rim.
+   Notes left on the table when you get up are offered back to the pocket
+   through `monarchy:guest-leaving` (62-pocket.js `reclaimable`).
+5. **Players could not put a sheet on the table, or move one.** Bringing a
+   sheet put nothing anywhere anybody could see; reading one laid it on your
+   own screen with no `.grip`, so it could not be dragged. Now a character
+   dragged off the kit's card lands as that player's counter (`by` = their
+   uid, so theirs to move), bringing the sheet with it; the paper at your
+   place is a grip; and `32-combat-app.js` `canControl` lets a player command
+   the unit that is their own counter (`ME` is the demo's Sir Aldric).
+6. **Re-entering: the UI vanished and characters could not be brought.**
+   Leaving the table never put anything down, so walking back in you were
+   still locked onto the fight or standing in its field, where the kit (and
+   its Bring) is hidden. `Table3D.standDown`, and the reading, the chest and
+   the hand, all let go on leaving now, and a fight put away under you
+   unlocks you. And "Back to the hall" keeps your seat — right — but the
+   Join screen then refused you ("already at a table") and nothing said
+   where you were: it now names the table and walks you back in, bringing
+   anyone newly picked (16-menu.js `walkBack`).
+7. **Player avatars disappeared sometimes.** Chromium throttles a hidden
+   page's timers — to once a minute after five minutes — and the heartbeat
+   is a timer, so alt-tabbing got you reaped by everybody else every minute.
+   `backgroundThrottling: false` (electron/main.js, needs a new .exe) and a
+   beat the moment the page is visible again (06-session.js).
+8. **Dice were too small**: drawn 2.8× about the tray's centre
+   (34-gl-pieces.js `DICE_SCALE`); the sim itself is untouched.
+9. **Combat text was illegible.** Measured locked onto a fight at 1280
+   wide: line names 5.6px tall on screen, unit names 7.5px, labels 4px, and
+   a unit that had acted halved what was left. A LEGIBILITY block at the end
+   of 12-combat.css raises the smallest type on the sheet, the field names
+   and the HUD, and dims spent units to .72 instead of .45.
+
+**Tests:** `session.test.js` gained a server that answers the way Firebase
+does (`Server({ firebase: true })`) and twelve checks against it; against
+the old `60-board-net.js` eight of them fail. Checked in the running app with
+two clients: a character dragged from the kit lands as the player's counter
+and the GM sees it; the player moves it and a note of theirs and the GM's
+copies follow; a note let go over the wall stays in the pocket; a unit moved
+on the GM's combat sheet reaches the player; walking to the hall releases the
+lock and the field and the Join screen walks you back.
+
+**Not done here:** the fight's round, phase and declared intents are still
+this machine's alone (`S` in 32-combat-app.js), so a player's "Declared"
+never reaches the GM; and a piece being dragged is sent when it is let go,
+not while it moves.
+
+---
+
 ## 4. Game system summary (content, not code)
 
 This app is a companion tool for a homebrew TTRPG built around:
@@ -1836,6 +1920,7 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-24 | **The first stress test** (3.25). The board's echo check never matched on Firebase (sorted keys, nulls dropped), so every GM move rebuilt the wood under the pointer and re-sent every piece; fixed with the null/empty/`active` faults it hid. Combat moves and combat results reach the table; players drag their characters onto the wood as their own counters and move them; notes let go off the wood stay in the pocket; leaving the table puts everything down and the Join screen walks you back in; no timer throttling in the app; dice 2.8×; combat type legible. |
 | 2026-09-24 | **v1.0.6: the GM's table and the players'** (3.24). The kit is players-only and the GM's controls are hidden from players (including the GM half of the combat sheet); a point is one 1.5s pulse; opening a record ~650ms → ~40ms (a CSS `zoom` → transform, plus a warm-up); no chairs, no banner or figure of your own; other players' figures turn with their heads and are lit by the room. Also: every session event had been rebuilding every seat. |
 | 2026-09-24 | **v1.0.5: the kit** (3.23). Everyone at a table gets a rail of four: your characters (read them; bring them to a live table — and choose which on the Join screen), your pocket of private notes (write and draw on them, drag them onto the wood to share, drag them back to take them home), a pen when the GM allows it (new "Players may draw" in the table menu), and pointing. Players may now touch what they put down themselves and nothing else. New files 61-ink, 62-pocket, 63-point, 64-kit. |
 | 2026-09-24 | **v1.0.2: updates without reinstalling** (3.12). New `electron/content.js`: installed copies fetch changed files of `dist/` straight from the repo when `package.json`'s version goes up, verify them by sha256, and reload in place — no installer, no release. `build.js` writes `dist/update.json` and an LF-only page; `dist/` is committed byte-for-byte (`.gitattributes`); `.githooks/pre-commit` rebuilds on every commit (`npm run hooks`). electron-updater stays only for changes to the program itself. |
