@@ -160,6 +160,32 @@ const inReach = (e,l) => costOf(e,l)!==null;
 let mark = null, dropped = 0;    // a one-shot animation class, and see the drop handler
 const colOf   = e => (e.col == null ? 0 : e.col);
 const endOf   = e => colOf(e) + slotsOf(e);
+/* ── WHAT THE GROUND IS, SLOT BY SLOT ─────────────────────────
+   grumkata: "i want the capability for field variety". A scene's features
+   (21-table-content.js FEATURES) sit on single slots — cover, an obstacle,
+   rough ground, a hazard, water. They are the scene's, carried here by
+   reference the same way the lines are (40-combat-scene.js), and only an
+   OBSTACLE has a rule the board enforces: nobody stands in it. Everything
+   else the board shows and the GM rules on, which is how reach already
+   works here. */
+const featAt  = (key, col) => (S.features || []).find(f => f.line === key && f.col === col) || null;
+/* the ground under a unit — any slot of its span */
+function featOf(e){
+  const l = lineOf(e.id); if (!l || !S.features || !S.features.length) return null;
+  for (let c = colOf(e); c < endOf(e); c++){ const f = featAt(l.key, c); if (f) return f; }
+  return null;
+}
+const featName = f => { const F = window.TableContent && TableContent.FEATURES;
+  const d = F && F[f.kind]; return d ? d.name + ' — ' + d.note : f.kind; };
+function blockedAt(l, col, span){
+  const F = window.TableContent && TableContent.FEATURES;
+  if (!F || !S.features || !S.features.length) return false;
+  for (let c = col; c < col + (span || 1); c++){
+    const f = featAt(l.key, c);
+    if (f && F[f.kind] && F[f.kind].blocks) return true;
+  }
+  return false;
+}
 /* Always the battlefield width. A rank never grows: `minmax(0,1fr)` columns
    share a fixed rank, so one extra column would shrink every piece in that line
    and nothing else on the sheet — the board would stop being one board. */
@@ -169,7 +195,8 @@ function occupants(l, e, col, span){
   span = span || slotsOf(e);
   return l.ents.filter(o => o !== e && col < endOf(o) && col + span > colOf(o));
 }
-const clashAt = (l, e, col, span) => occupants(l, e, col, span).length > 0;
+const clashAt = (l, e, col, span) => occupants(l, e, col, span).length > 0
+                                    || blockedAt(l, col, span || slotsOf(e));
 /* One piece of the same width can be swapped with rather than refused — which
    is the only way to reorder a line that has no gaps left in it. */
 function swapTarget(l, e, col, span){
@@ -178,7 +205,7 @@ function swapTarget(l, e, col, span){
 }
 /* the leftmost run of `span` free columns, preferring `want` if it is clear */
 function firstFree(l, span, want, ignore){
-  const fits = c => c >= 0 && !l.ents.some(o =>
+  const fits = c => c >= 0 && !blockedAt(l, c, span) && !l.ents.some(o =>
     o !== ignore && c < endOf(o) && c + span > colOf(o));
   if (want != null && fits(want)) return want;
   const cols = Math.max(S.width, colsOf(l, span));
@@ -226,7 +253,7 @@ function shove(l, e, col, span, dir, cols){
     if (c >= col + span) return;            // already wholly clear to the right
     if (c + w > edge){ pos.set(o, edge - w); edge -= w; } else edge = c;
   });
-  for (const [o, c] of pos) if (c < 0 || c + slotsOf(o) > cols) return null;
+  for (const [o, c] of pos) if (c < 0 || c + slotsOf(o) > cols || blockedAt(l, c, slotsOf(o))) return null;
   return pos;
 }
 
@@ -294,29 +321,48 @@ function entHTML(e){
   /* the cell carries its own column and width, so working out where a drop
      lands never has to be inferred from measured pixel widths */
   const g = `data-col="${colOf(e)}" data-span="${slotsOf(e)}"`;
+  /* ── A UNIT ON THE MAT IS THE PERSON, NOT A PLASTIC DISC ──────
+     grumkata: the board "is ugly". Every unit was a moulded counter with two
+     letters on it, painted by 34-gl-pieces.js over an empty socket — so a
+     board of twenty was forty letters to decode. It wears its picture now,
+     in a coin whose rim is its side's tincture (65-token-look.js): the same
+     face the counter on the wood wears and the figure the field stands up.
+     `.coin`, not `.tok`: the GL layer paints `.tok`, and has nothing to add
+     to a picture. The ground it stands on is marked under its feet. */
+  const L = window.TokenLook;
+  const who = { name:e.name, side:e.side, entKind:e.kind, src:e.pic || '', art:e.art || '',
+                fig:e.fig || (e.sprite || '') };
+  const feat = featOf(e);
+  const on = feat ? `<i class="onft ft-${feat.kind}" title="${esc(featName(feat))}"></i>` : '';
   if (e.kind==='form'){
     const pct = Math.round(e.alive/e.total*100);
     const lk = {Stable:'',Wavering:'wv',Crumbling:'cr',Broken:'bk',Unbreakable:''}[e.lead];
     return `<div class="${cls}" data-id="${e.id}" ${g} ${d}><div class="plate">
       <div class="plaque fmcap">${esc(e.name)}</div>
+      ${L ? `<div class="fmfig">${L.coin(who, 40)}</div>` : ''}
       <div class="must"><span class="mchan"><i style="width:${pct}%"></i></span>
         <span class="mct">${e.alive}<em>/${e.total}</em></span></div>
       <div class="rows"><div class="rcol">
-        <div class="srow"><u>Hit</u><span class="ld"></span><s>${e.skl}</s></div>
-        <div class="srow"><u>Dmg</u><span class="ld"></span><s>${e.dmg}</s></div></div>
-        <div class="rcol"><div class="srow"><u>HP ea</u><span class="ld"></span><s>${e.hpea}</s></div>
-        <div class="srow${e.def==='—'?' dim':''}"><u>Def</u><span class="ld"></span><s>${e.def}</s></div>
-      </div></div><div class="fmld ${lk}">${e.lead}</div>
+        <div class="srow"><u>Hit</u><span class="ld"></span><s>${esc(e.skl)}</s></div>
+        <div class="srow"><u>Dmg</u><span class="ld"></span><s>${esc(e.dmg)}</s></div></div>
+        <div class="rcol"><div class="srow"><u>HP ea</u><span class="ld"></span><s>${esc(e.hpea)}</s></div>
+        <div class="srow${e.def==='—'?' dim':''}"><u>Def</u><span class="ld"></span><s>${esc(e.def)}</s></div>
+      </div></div><div class="fmld ${lk}">${esc(e.lead)}</div>${on}
       <span class="pz f"></span><span class="pz b"></span><span class="pz l"></span><span class="pz r"></span>
     </div></div>`;
   }
-  const art = e.kind==='large'
-    ? `<div class="shield"><i></i><b></b><span class="mono">${e.mono}</span></div>`
-    : `<div class="tok"><span class="mono">${e.mono}</span></div>`;
+  const big = e.kind==='large';
+  const art = L
+    ? `<div class="coin${big ? ' big' : ''}">${L.coin(who, big ? 86 : 68)}</div>`
+    : (big ? `<div class="shield"><i></i><b></b><span class="mono">${e.mono}</span></div>`
+           : `<div class="tok"><span class="mono">${e.mono}</span></div>`);
   const hurt = e.hp < e.max ? ' hurt' : '';
+  const frac = Math.max(0, Math.min(1, (e.hp || 0) / (e.max || 1)));
+  const band = frac > .6 ? 'ok' : frac > .3 ? 'mid' : 'low';
   const pips = `<span class="ap"><i class="${e.q?'on':''}"></i><i class="${e.f?'on':''}"></i></span>`;
-  const inner = `<div class="art">${art}${pips}</div><div class="ped"></div>
+  const inner = `<div class="art">${art}${pips}${on}</div><div class="ped"></div>
     <div class="nm">${esc(e.name)}</div>${e.sz?`<div class="sz">${e.sz}</div>`:''}
+    <div class="hpb ${band}"><i style="width:${(frac*100).toFixed(0)}%"></i></div>
     <div class="hp${hurt}">${e.hp}/${e.max}</div>${condHTML(e.cond)}`;
   return e.kind==='large'
     ? `<div class="${cls}" data-id="${e.id}" ${g} ${d}>${inner}</div>`
@@ -355,7 +401,12 @@ function lineHTML(l){
     const e = at[i];
     if (e){ cells += entHTML(e); i += slotsOf(e) - 1; continue; }
     if (i === gcol){ cells += ghost; continue; }
-    cells += `<div class="free" data-line="${l.key}" data-col="${i}"></div>`;
+    /* an empty slot shows the ground it is: cover, an obstacle, water */
+    const ft = featAt(l.key, i);
+    cells += ft
+      ? `<div class="free ft ft-${ft.kind}" data-line="${l.key}" data-col="${i}" data-feat="${ft.kind}"
+             title="${esc(featName(ft))}"><i class="fz"></i></div>`
+      : `<div class="free" data-line="${l.key}" data-col="${i}"></div>`;
   }
   const over = used > S.width ? ' over' : '';
   return `<div class="line${l.front?' front':''}${state}${l.ents.length?'':' empty'}" data-line="${l.key}">
@@ -557,7 +608,10 @@ function move(id, key, col){
 }
 function resolveSug(accept){
   if (!S.sug) return;
-  if (accept){ const e=entById(S.sug.id), from=lineOf(e.id), to=S.lines.find(l=>l.key===S.sug.to);
+  /* the unit may have left the board, or the line been removed, since it
+     was declared — at a live table that is somebody else's doing */
+  const e0 = entById(S.sug.id), from0 = e0 && lineOf(e0.id), to0 = S.lines.find(l=>l.key===S.sug.to);
+  if (accept && e0 && from0 && to0){ const e=e0, from=from0, to=to0;
     from.ents.splice(from.ents.indexOf(e),1);
     e.col = firstFree(to, slotsOf(e), S.sug.col, e);
     to.ents.push(e); to.ents.sort((a,b)=>colOf(a)-colOf(b)); }
@@ -633,7 +687,9 @@ document.addEventListener('click', ev => {
      either of its homes, the top bar, and the ability panel with its
      declaration, and the field's own HUD. Clicking your own sheet must never
      let go of the unit whose sheet you are reading. */
-  if (ev.target.closest('#selbar,.topbar,.seldock,.abar,.ibar')) return;
+  /* the muster (72-muster.js) is the same kind of chrome: choosing a unit on
+     its roll must not be undone by this handler the moment the click lands */
+  if (ev.target.closest('#selbar,.topbar,.seldock,.abar,.ibar,.muster,.war,.insp')) return;
   /* a click inside a rank is inert now that it does not move anything — losing
      the selection (and the reach shown with it) because you clicked near the
      line you were reading would be its own small annoyance. Click the piece
@@ -944,9 +1000,14 @@ document.addEventListener('drop', ev => {
   move(id, line.dataset.line, col);
 });
 document.addEventListener('click', ev => {
-  const e = S.sel && entById(S.sel); if (!e) return;
+  /* A DECLARATION IS ANSWERED WHATEVER YOU HAVE SELECTED. These two sat
+     below the "is anything selected" check, so the GM's Allow and Dismiss
+     did nothing at all unless they happened to have a unit picked — and at a
+     live table the move being declared is a player's, not anything the GM
+     has in hand. */
   if (ev.target.id==='sug-yes'){ resolveSug(true); return; }
   if (ev.target.id==='sug-no'){ resolveSug(false); return; }
+  const e = S.sel && entById(S.sel); if (!e) return;
   if (ev.target.id==='act-q'){ e.q=!e.q; log(`${e.name} ${e.q?'regained':'spent'} a quick action`); render(); }
   if (ev.target.id==='act-f'){ e.f=!e.f; log(`${e.name} ${e.f?'regained':'spent'} a full action`); render(); }
   if (ev.target.id==='act-hurt'){

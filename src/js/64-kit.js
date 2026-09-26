@@ -35,10 +35,11 @@ const ICON = {
   sheets: '<svg viewBox="0 0 24 24"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19M9 11h7M9 14h7M9 17h4.5"/></svg>',
   notes:  '<svg viewBox="0 0 24 24"><path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5M7.5 9h9M7.5 12.5h6"/></svg>',
   draw:   '<svg viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L16.6 4a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z"/><path d="M14.5 6.1l3.4 3.4"/></svg>',
-  point:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6"/></svg>'
+  point:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6"/></svg>',
+  fight:  '<svg viewBox="0 0 24 24"><path d="M5 19l9.5-9.5M14.5 4.5l5 5-2.2 2.2-5-5z"/><path d="M19 19L9.5 9.5M9.5 4.5l-5 5 2.2 2.2 5-5z"/></svg>'
 };
 const NAMES = { sheets: 'Your characters  (C)', notes: 'Your notes  (N)',
-                draw: 'Draw  (D)', point: 'Point  (P)' };
+                draw: 'Draw  (D)', point: 'Point  (P)', fight: 'The fight  (F)' };
 
 let el = null, rail = null, card = null;
 let panel = null;             /* null | 'sheets' | 'notes' | 'draw' */
@@ -47,7 +48,10 @@ function mount() {
   if (el) return;
   el = doc.createElement('div');
   el.className = 'kit';
-  el.innerHTML = `<div class="kit-rail">${['sheets', 'notes', 'draw', 'point'].map(k =>
+  /* THE FIGHT, for a player too: the same muster the GM runs it from
+     (72-muster.js), showing who is in it and whose turn it is, where a
+     player may work their own units. Only while a fight is on. */
+  el.innerHTML = `<div class="kit-rail">${['sheets', 'notes', 'draw', 'point', 'fight'].map(k =>
       `<button class="kit-b" data-kit="${k}" title="${NAMES[k]}">${ICON[k]}</button>`).join('')}</div>
     <div class="kit-card" hidden></div>`;
   doc.body.appendChild(el);
@@ -110,6 +114,9 @@ function paint() {
   const tool = root.Ink && root.Ink.tool;
   rail.querySelectorAll('.kit-b').forEach(b => {
     const k = b.dataset.kit;
+    const fight = T() && T().activeScene && T().activeScene();
+    if (k === 'fight') { b.hidden = !(fight && fight.scene === 'combat');
+                         b.classList.toggle('on', !!(root.Muster && root.Muster.isOpen())); return; }
     const on = (k === 'point') ? !!(root.Point && root.Point.on)
              : (k === 'draw') ? !!tool
              : panel === k;
@@ -229,6 +236,13 @@ function drawCard() {
 /* ══ DOING THINGS ═══════════════════════════════════════════════ */
 function toggle(k) {
   const I = root.Ink, P = root.Point;
+  if (k === 'fight') {
+    panel = null;
+    if (root.Muster) root.Muster.toggle();
+    return paint();
+  }
+  /* the muster and a card share the space beside the rail */
+  if (root.Muster && root.Muster.isOpen()) root.Muster.close();
   if (k === 'point') {
     const was = P && P.on;
     if (I) I.set(null);
@@ -289,9 +303,10 @@ function onKey(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'Escape' && busy()) { e.preventDefault(); close(); return; }
   const k = { c: 'sheets', C: 'sheets', n: 'notes', N: 'notes', d: 'draw', D: 'draw',
-              p: 'point', P: 'point' }[e.key];
+              p: 'point', P: 'point', f: 'fight', F: 'fight' }[e.key];
   if (!k) return;
   if (k === 'draw' && !(root.Ink && root.Ink.allowed())) return;
+  if (k === 'fight') { const s = T().activeScene(); if (!s || s.scene !== 'combat') return; }
   e.preventDefault(); toggle(k);
 }
 

@@ -62,9 +62,10 @@ function make(spec) {
     const rec = root.Characters.get(spec.char);
     if (rec) {
       ent = root.Characters.combatant(rec); name = ent.name; source = 'char';
-      /* their own picture, off the record, unless this counter was handed one */
-      if (!spec.src && ent.pic) spec = Object.assign({}, spec, { src: ent.pic,
-                                                                 art: ent.picArt });
+      /* their own picture, off the record, unless this counter was handed one
+         — or was deliberately dressed as one of the painted figures */
+      if (!spec.src && !spec.fig && ent.pic) spec = Object.assign({}, spec, { src: ent.pic,
+                                                                              art: ent.picArt });
     }
   }
   if (!ent) {
@@ -83,6 +84,19 @@ function make(spec) {
     };
   }
   if (spec.side) ent.side = spec.side;
+  /* ── A FORMATION IS A BODY OF TROOPS, WITH ITS OWN NUMBERS ──────
+     This was the whole of the "straight up dont work" formation: a counter
+     made as one got the fields of a PERSON — hp, max — and none of the six
+     32-combat-app.js draws a formation with, so it came out on the board as
+     "undefined/undefined, Hit undefined, Dmg undefined". A formation counts
+     BODIES, and hits, harms and holds as a body; those are its fields, with
+     the demo levy's numbers as the default. */
+  if (ent.kind === 'form') formFields(ent, spec);
+  /* ── AND WHAT IT LOOKS LIKE TRAVELS WITH IT ─────────────────────
+     The combatant is what the board and the field read, and they have to
+     show the same person the counter on the wood is wearing. */
+  ent.look = spec.look === 'coin' ? 'coin' : 'standee';
+  ent.fig = spec.fig || ent.fig || '';
 
   /* its box is the counter's own, from 46-figures.js, so the thing that
      lands is exactly the size of the thing that was in your hand */
@@ -97,10 +111,36 @@ function make(spec) {
   t.char = spec.char || null;          /* the record it is the body of */
   t.src  = spec.src || '';             /* its face, as a picture */
   t.art  = spec.art || '';             /* or as an entry in the art library */
+  t.fig  = spec.fig || '';             /* or one of the painted figures */
+  t.look = ent.look;                   /* standing up, or lying flat as a coin */
   t.info = spec.info || '';            /* whatever else is attached to it */
   t.lineKey = null;
+  ent.pic = t.src; ent.art = t.art;
   T().changed('token');
   return t;
+}
+
+/* the six numbers a formation is drawn and fought with, each only where it
+   is missing — an edit that sets one must not reset the other five */
+const LEADS = ['Unbreakable', 'Stable', 'Wavering', 'Crumbling', 'Broken'];
+function formFields(ent, spec) {
+  spec = spec || {};
+  const n = (v, d, lo, hi) => {
+    const x = parseInt(v, 10);
+    return Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d;
+  };
+  if (spec.bodies != null || ent.total == null) {
+    const was = ent.total, gone = was != null && ent.alive != null ? was - ent.alive : 0;
+    ent.total = n(spec.bodies, ent.total != null ? ent.total : 10, 1, 60);
+    ent.alive = Math.max(0, ent.total - gone);
+  }
+  if (spec.hpea != null || ent.hpea == null) ent.hpea = n(spec.hpea, ent.hpea != null ? ent.hpea : 1, 1, 99);
+  if (spec.dmg  != null || ent.dmg  == null) ent.dmg  = n(spec.dmg,  ent.dmg  != null ? ent.dmg  : 2, 0, 99);
+  if (spec.skl  != null || ent.skl  == null) ent.skl  = String(spec.skl != null ? spec.skl : (ent.skl || '4+')).slice(0, 4);
+  if (spec.def  != null || ent.def  == null) ent.def  = String(spec.def != null ? spec.def : (ent.def || '—')).slice(0, 4) || '—';
+  if (spec.lead != null || ent.lead == null)
+    ent.lead = LEADS.indexOf(spec.lead) >= 0 ? spec.lead : (ent.lead || 'Stable');
+  if (ent.move == null) ent.move = 1;
 }
 
 /* ── EVERYTHING ABOUT A COUNTER THAT CAN BE CHANGED ───────────
@@ -116,10 +156,15 @@ function edit(id, next) {
                            if (t.in) t.lineKey = null; }
   if (next.entKind != null && t.source !== 'char') {
     e.kind = next.entKind;
+    if (e.kind === 'form') formFields(e, next);
     const sz = root.Figures
       ? root.Figures.sizeOf({ kind: 'token' }, { entKind: e.kind }) : null;
     if (sz && !t.in) { t.w = sz.w; t.h = sz.h; }
   }
+  if (e.kind === 'form' && ['bodies', 'hpea', 'dmg', 'skl', 'def', 'lead']
+        .some(k => next[k] != null)) formFields(e, next);
+  if (next.look != null) { t.look = next.look === 'coin' ? 'coin' : 'standee'; e.look = t.look; }
+  if (next.fig != null) { t.fig = String(next.fig); e.fig = t.fig; }
   if (next.max != null && t.source !== 'char') {
     const gone = Math.max(0, e.max - e.hp);          /* keep the damage taken */
     e.max = Math.max(1, parseInt(next.max, 10) || 1);
@@ -130,13 +175,16 @@ function edit(id, next) {
      their counters sets it on the record, which then reaches every other
      counter of them and the chest's offer of them — rather than leaving four
      tokens of the same person wearing four different faces. */
-  if ((next.src != null || next.art != null) && t.source === 'char' && t.char
+  /* ...but only when it IS a picture. Dressing one counter as a painted
+     figure clears that counter's own picture and must not reach through and
+     wipe the portrait off their record. */
+  if ((next.src || next.art) && t.source === 'char' && t.char
       && root.Characters) {
     root.Characters.setPic(t.char, next.src == null ? t.src : next.src,
                                    next.art == null ? t.art : next.art);
   }
-  if (next.src  != null) t.src  = next.src;
-  if (next.art  != null) t.art  = next.art;
+  if (next.src  != null) { t.src = next.src; e.pic = t.src; }
+  if (next.art  != null) { t.art = next.art; e.art = t.art; }
   if (next.info != null) t.info = String(next.info);
   T().changed('token-edit');
   if (typeof render === 'function' && t.in) render();
@@ -189,6 +237,12 @@ function fill(scene) {
     if (!t.ent) return;
     t.ent.name = t.name;                       /* the thing's name is the name */
     t.ent.id = t.id;
+    /* and its face is the face — a counter re-dressed on the workbench is
+       re-dressed on the mat and in the field, and a formation saved before
+       formations had numbers gets them on the way past */
+    t.ent.pic = t.src || ''; t.ent.art = t.art || ''; t.ent.fig = t.fig || '';
+    t.ent.look = t.look === 'coin' ? 'coin' : 'standee';
+    if (t.ent.kind === 'form') formFields(t.ent, {});
     /* a token whose line was renamed away, or which has never been placed,
        falls in on its own side's frontline rather than vanishing */
     let l = byKey[t.lineKey];
@@ -285,6 +339,6 @@ function setSide(id, side) {
 }
 
 root.Tokens = { make, edit, fill, harvest, toLine, toWood, rename, setSide, monoOf,
-                inScene, recordOf, refresh };
+                inScene, recordOf, refresh, formFields, LEADS };
 
 })(window, document);

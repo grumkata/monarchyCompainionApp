@@ -61,9 +61,27 @@ const C = {
   sun:     '#fff1cf', skyLight:'#bcdcf5', bounce:'#8aa848',
 };
 
+/* ══ WHERE THE FIGHT IS ═══════════════════════════════════════
+   grumkata: "not every combat will be on a grassy field". Everything in
+   `C` above is the MEADOW — it was the only place a fight could happen.
+   The rest of the field is the terrain's now: 21-table-content.js carries a
+   `field` row per terrain (sky, sun, fog, the ground painter's four colours,
+   how much grass, what is scattered round the edge, what falls from the
+   sky) and `dressFor` below re-dresses sky, light, ground and scenery from
+   it. The meadow's row is exactly the colours above, so a meadow looks
+   exactly as it always did. */
+const TERR = () => window.TableContent && TableContent.TERRAINS;
+const terrainNow = () => (window.TableContent ? TableContent.terrainOf(S.terrain) : 'meadow');
+const fieldOf = id => { const T = TERR(); return (T && T[id] && T[id].field) || (T && T.meadow.field); };
+
 const cv = document.createElement('canvas');
 cv.id = 'gl2';
-Object.assign(cv.style,{position:'fixed',inset:'0',zIndex:880,pointerEvents:'none',display:'none'});
+/* NOT inset:0. The canvas used to cover the whole window, so the chat's
+   column and a docked muster were both underneath the battlefield — the
+   fight was framed partly behind them, and the chat was painted over (the
+   other half of that is in 28-table-boot.js). It covers #vp now, the part of
+   the screen that is the table's, and follows it when a dock opens. */
+Object.assign(cv.style,{position:'fixed',left:'0',top:'0',zIndex:880,pointerEvents:'none',display:'none'});
 document.body.appendChild(cv);
 
 const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
@@ -105,17 +123,19 @@ scene.fog = new THREE.Fog(sRGB(C.skyLow), 62, 165);
 
 /* ── sky ───────────────────────────────────────────────────────
    Painted, not photographic: three stops and a couple of soft cloud bands,
-   which is exactly what the kit's own skybox is. */
-(function(){
+   which is exactly what the kit's own skybox is. Painted per terrain: an
+   overcast waste has low grey streaks, a crypt has no sky at all. */
+function paintSky(f){
   const c = document.createElement('canvas'); c.width = 512; c.height = 256;
   const x = c.getContext('2d');
   const g = x.createLinearGradient(0,0,0,256);
-  g.addColorStop(0, C.skyTop); g.addColorStop(.52, C.skyMid); g.addColorStop(1, C.skyLow);
+  g.addColorStop(0, f.sky[0]); g.addColorStop(.52, f.sky[1]); g.addColorStop(1, f.sky[2]);
   x.fillStyle = g; x.fillRect(0,0,512,256);
   /* wispy streaks, thin and near the top, the way the kit's own previews are */
   let sd = 4242; const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff)/0x7fffffff;
   x.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 70; i++){
+  const streaks = f.indoor ? 0 : 70;
+  for (let i = 0; i < streaks; i++){
     const cx = rnd()*512, cy = rnd()*rnd()*150, w = 40 + rnd()*190, h = 3 + rnd()*13;
     const rg = x.createRadialGradient(cx, cy, 0, cx, cy, w);
     const a = .05 + rnd()*.13;
@@ -127,14 +147,17 @@ scene.fog = new THREE.Fog(sRGB(C.skyLow), 62, 165);
   x.globalCompositeOperation = 'source-over';
   const t = new THREE.CanvasTexture(c);
   t.encoding = THREE.sRGBEncoding;
+  if (scene.background && scene.background.dispose) scene.background.dispose();
   scene.background = t;
-})();
+}
+paintSky(fieldOf('meadow'));
 
 /* ── light: hard sun, warm bounce, sky fill ── */
 /* a strong sky fill, because with no filmic toe lifting them the shadowed
    sides go to near-black otherwise — and a figure whose shadow side is black
    is a silhouette, not a figure */
-scene.add(new THREE.HemisphereLight(sRGB(C.skyLight), sRGB(C.bounce), 0.86));
+const hemi = new THREE.HemisphereLight(sRGB(C.skyLight), sRGB(C.bounce), 0.86);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(sRGB(C.sun), 1.12);
 sun.position.set(-32, 27, 22);   // raking, so the shadows have length
 sun.castShadow = true;
@@ -301,21 +324,44 @@ function driftClouds(dt){
    Baked to plain arrays by bake_kit.py, so there is no loader and no fetch —
    the same trade the dice already make. */
 const texCache = {};
-function kitTex(uri){
-  if (texCache[uri]) return texCache[uri];
-  const t = new THREE.TextureLoader().load(KIT_TEX[uri]);
+function kitTex(uri, book){
+  const src = (book || KIT_TEX)[uri];
+  if (!src) return null;
+  if (texCache[src]) return texCache[src];
+  const t = new THREE.TextureLoader().load(src);
   t.encoding = THREE.sRGBEncoding;
   t.flipY = false;                       // glTF UVs, not canvas UVs
-  return (texCache[uri] = t);
+  return (texCache[src] = t);
 }
+/* ── WHICH PACK A PIECE COMES FROM ─────────────────────────────
+   A bare name is the Nature kit, as it always was. `terra:` is the rest of
+   the MegaKit (dead and twisted trees, sandstone) and `dun:` is KayKit's
+   Dungeon — both baked by tools/bake_terrain.py in the kit's own shape.
+   The kit and TERRA are one unit on their longest side, so the scatter
+   scales them by the height it wants; the dungeon is at its own size in
+   metres, which is why a plan entry for it carries `s` instead. */
+const PACKS = {
+  kit:   () => (typeof KIT !== 'undefined' ? [KIT, KIT_TEX] : null),
+  terra: () => (typeof TERRA !== 'undefined' ? [TERRA, TERRA_TEX] : null),
+  dun:   () => (typeof DUNGEON !== 'undefined' ? [DUNGEON, DUNGEON_TEX] : null)
+};
+function packOf(name){
+  const i = name.indexOf(':');
+  const pk = i < 0 ? 'kit' : name.slice(0, i), key = i < 0 ? name : name.slice(i + 1);
+  const p = PACKS[pk] && PACKS[pk]();
+  return p && p[0][key] ? { src: p[0][key], book: p[1], key } : null;
+}
+const hasProp = name => !!packOf(name);
 /* Geometry and material per primitive, built once and shared — the scatter
    draws thousands of these and a cloned Group per shrub would be thousands of
    draw calls for a field of grass. */
 const propCache = {};
 function propParts(name){
   if (propCache[name]) return propCache[name];
-  const wind = WIND[name] || 0;
-  const src = KIT[name], parts = [];
+  const got = packOf(name);
+  if (!got) return (propCache[name] = { parts: [], r: 0 });
+  const wind = WIND[got.key] || WIND[name] || 0;
+  const src = got.src, parts = [];
   for (const pr of src.prims){
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pr.p, 3));
@@ -338,9 +384,10 @@ function propParts(name){
        alpha test rather than blending, so a thousand leaves need no depth
        sort, and double-sided because a leaf card has a back. */
     const mat = new THREE.MeshLambertMaterial({
-      map: pr.t ? kitTex(pr.t) : null, vertexColors: !!pr.ao,
+      map: pr.t ? kitTex(pr.t, got.book) : null, vertexColors: !!pr.ao,
       transparent: false, alphaTest: pr.cut ? 0.5 : 0,
       side: pr.cut ? THREE.DoubleSide : THREE.FrontSide });
+    if (pr.c) mat.color.setRGB(pr.c[0], pr.c[1], pr.c[2]);
     if (wind) windy(mat, wind);
     parts.push({ geo, mat, cut: !!pr.cut });
   }
@@ -412,127 +459,221 @@ function detailTexture(){
   return t;
 }
 
-function groundTexture(bw, bd){
+/* the terrain's colours as numbers the painters can mix */
+const rgbOf = hex => { const c = new THREE.Color(hex); return [c.r*255|0, c.g*255|0, c.b*255|0]; };
+const rgba = (rgb, a) => 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a.toFixed(3) + ')';
+
+/* ── THE GROUND, PAINTED FOR WHERE THE FIGHT IS ───────────────
+   One painter per kind of ground, all reading the terrain's own four
+   colours (21-table-content.js: warm, sunlit, base, shade) and its wear:
+
+     OPEN GROUND  the meadow's painter, unchanged in what it does — soft
+                  patches, a churned middle, trampled wear on the board —
+                  just no longer green by definition: the same strokes make
+                  a blighted waste grey-brown and a marsh black-green
+     SAND         the open-ground painter, then long wind ripples across it
+     SNOW         the same, then blue drift-shadows and nothing trampled in
+     STONE        a dungeon's and a courtyard's floor: laid flagstones,
+                  mortar lines, worn in the middle where the fight stands
+
+   The layout of the board is the same for all of them, so a slot on the
+   mat is a slot on the ground whatever the ground is. */
+function groundTexture(bw, bd, f){
+  f = f || fieldOf('meadow');
   const S = 2048, c = document.createElement('canvas');
   c.width = c.height = S;
   const x = c.getContext('2d');
   let seed = 12345;
   const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const G = f.ground.map(rgbOf);          /* warm, sun, base, shade */
+  const W = f.wear.split(',').map(Number);
+  const stone = f.scatter === 'dungeon' || f.scatter === 'courtyard';
 
   /* a base that already varies front to back, so even bare ground has a
      direction to it */
   const g = x.createLinearGradient(0, 0, 0, S);
-  g.addColorStop(0, C.grassWarm); g.addColorStop(.45, C.grassSun);
-  g.addColorStop(1, C.grass);
+  g.addColorStop(0, f.ground[0]); g.addColorStop(.45, f.ground[1]);
+  g.addColorStop(1, f.ground[2]);
   x.fillStyle = g; x.fillRect(0, 0, S, S);
 
   /* big soft patches, light and dark, laid down in two passes so the field
      reads as ground rather than as noise */
-  const blob = (fill, n, rMin, rMax, aMin, aMax) => {
+  const blob = (rgb, n, rMin, rMax, aMin, aMax) => {
     for (let i = 0; i < n; i++){
       const cx = rnd()*S, cy = rnd()*S, r = rMin + rnd()*(rMax-rMin);
       const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
       const a = aMin + rnd()*(aMax-aMin);
-      rg.addColorStop(0, fill.replace('ALPHA', a.toFixed(3)));
-      rg.addColorStop(1, fill.replace('ALPHA', '0'));
+      rg.addColorStop(0, rgba(rgb, a));
+      rg.addColorStop(1, rgba(rgb, 0));
       x.fillStyle = rg; x.fillRect(cx-r, cy-r, r*2, r*2);
     }
   };
-  blob('rgba(79,124,38,ALPHA)',  90, 90, 340, .10, .28);   // shade
-  blob('rgba(186,214,92,ALPHA)', 70, 70, 260, .10, .24);   // sun
-  blob('rgba(120,150,60,ALPHA)',120, 30, 110, .06, .16);   // texture
+  blob(G[3],  90, 90, 340, .10, .28);   // shade
+  blob(G[1],  70, 70, 260, .10, .24);   // sun
+  blob(G[2], 120, 30, 110, .06, .16);   // texture
+
+  if (stone) flagstones(x, S, f, G, rnd);
+  if (f.scatter === 'desert') ripples(x, S, G, rnd);
+  if (f.scatter === 'snow') drifts(x, S, rnd);
+  if (f.water) pools(x, S, rnd, bw, bd);
 
   /* THE CHURNED MIDDLE, where the two front lines meet. Built from overlapping
      ellipses rather than a straight gradient band — a battle line is not a
      ruler, and a hard-edged stripe across the field was the single most
      obviously computer-generated thing on it. Kept FAINT: it is a change in
      the ground, not a road. */
+  const churn = [Math.min(255, W[0] + 60), Math.min(255, W[1] + 52), Math.min(255, W[2] + 44)];
   for (let i = 0; i < 60; i++){
     const cx = rnd()*S, cy = S*0.5 + (rnd()-.5)*S*0.13;
     const rx = 60 + rnd()*180, ry = 22 + rnd()*70;
     const rg = x.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
-    const a = .08 + rnd()*.16;
-    rg.addColorStop(0, 'rgba(194,166,114,' + a.toFixed(3) + ')');
-    rg.addColorStop(.6,'rgba(194,166,114,' + (a*.5).toFixed(3) + ')');
-    rg.addColorStop(1, 'rgba(194,166,114,0)');
+    const a = (.08 + rnd()*.16) * (stone ? .5 : 1);
+    rg.addColorStop(0, rgba(churn, a));
+    rg.addColorStop(.6, rgba(churn, a*.5));
+    rg.addColorStop(1, rgba(churn, 0));
     x.save(); x.translate(cx, cy); x.scale(rx/Math.max(rx,ry), ry/Math.max(rx,ry));
     x.fillStyle = rg; x.beginPath(); x.arc(0, 0, Math.max(rx,ry), 0, 7); x.fill(); x.restore();
   }
 
   /* THE BATTLEFIELD ITSELF. It has to be bare — nothing grows where the units
-     stand — and bare clean grass is both boring and a lie. Two armies have
-     been standing on this.
-
-     But TRAMPLED GRASS, NOT MUD. The first pass laid two hundred and sixty
-     opaque dirt blobs into a four-hundred-pixel square and turned the entire
-     middle of the frame into one flat brown stain — which is worse than the
-     boring green it replaced, because the units are painted in browns and
-     greys and they vanished into it. Wear reads as wear when there is still
-     grass to have worn away: broad thin scuffing, hard little boot-churn where
-     feet actually land, ruts, and tufts that survived. */
+     stand — and bare clean ground is both boring and a lie. Two armies have
+     been standing on this. Wear reads as wear when there is still something to
+     have worn away: broad thin scuffing, hard little boot-churn where feet
+     actually land, ruts, and tufts that survived. */
   if (bw){
     const cx = S/2, cz = S/2;
     const px = bw / FIELD_W * S, pz = bd / FIELD_D * S;
-    /* how far into the board a point is, 0 at the edge and 1 at the middle —
-       wear is heaviest where the lines meet and fades out to the grass */
     const wear = (ex, ez) => {
       const u = Math.abs(ex - cx) / px, v = Math.abs(ez - cz) / pz;
       return Math.max(0, 1 - Math.max(u, v) * 0.82);
     };
-
-    /* broad scuffing: wide, soft, and mostly transparent */
+    const scuff = [W[0] + 30, W[1] + 24, W[2] + 20].map(v => Math.min(255, v));
+    const deep  = W.map(v => Math.max(0, v - 20));
+    const soft = f.scatter === 'snow' ? .45 : stone ? .35 : 1;
     for (let i = 0; i < 120; i++){
       const ex = cx + (rnd()*2-1)*px*1.06, ez = cz + (rnd()*2-1)*pz*1.06;
       const w = wear(ex, ez); if (w <= 0.02) continue;
       const r = 50 + rnd()*130;
       const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
-      const a = (.09 + rnd()*.22) * w;
-      const col = rnd() > .5 ? '156,128,84' : '134,116,72';
-      rg.addColorStop(0,'rgba(' + col + ',' + a.toFixed(3) + ')');
-      rg.addColorStop(1, 'rgba(' + col + ',0)');
+      const a = (.09 + rnd()*.22) * w * soft;
+      const col = rnd() > .5 ? scuff : W;
+      rg.addColorStop(0, rgba(col, a));
+      rg.addColorStop(1, rgba(col, 0));
       x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
     }
-    /* boot churn: small, harder, and only where the ground is really worn */
     for (let i = 0; i < 420; i++){
       const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
       const w = wear(ex, ez); if (rnd() > w * 0.9) continue;
       const r = 6 + rnd()*22;
       const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
-      const a = .22 + rnd()*.42;
-      const col = rnd() > .55 ? '120,96,60' : '92,74,48';
-      rg.addColorStop(0,'rgba(' + col + ',' + a.toFixed(2) + ')');
-      rg.addColorStop(.6,'rgba(' + col + ',' + (a*.5).toFixed(2) + ')');
-      rg.addColorStop(1, 'rgba(' + col + ',0)');
+      const a = (.22 + rnd()*.42) * soft;
+      const col = rnd() > .55 ? W : deep;
+      rg.addColorStop(0, rgba(col, a));
+      rg.addColorStop(.6, rgba(col, a*.5));
+      rg.addColorStop(1, rgba(col, 0));
       x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
     }
-    /* wheel ruts and drag marks */
-    x.lineCap = 'round';
-    for (let i = 0; i < 110; i++){
-      const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
-      const w = wear(ex, ez); if (w <= 0.1) continue;
-      const len = 40 + rnd()*160, ang = (rnd()-.5)*0.6 + (rnd() > .62 ? Math.PI/2 : 0);
-      x.strokeStyle = 'rgba(84,66,42,' + ((.13 + rnd()*.22) * w).toFixed(3) + ')';
-      x.lineWidth = 1.5 + rnd()*7;
-      x.beginPath(); x.moveTo(ex, ez);
-      x.lineTo(ex + Math.cos(ang)*len, ez + Math.sin(ang)*len*0.45); x.stroke();
-    }
-    /* and the grass that survived it, so the wear has something to be wear ON */
-    for (let i = 0; i < 900; i++){
-      const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
-      const w = wear(ex, ez); if (rnd() < w * 0.75) continue;
-      const r = 5 + rnd()*20;
-      const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
-      const a = .10 + rnd()*.22;
-      const col = rnd() > .5 ? '150,186,78' : '116,154,58';
-      rg.addColorStop(0,'rgba(' + col + ',' + a.toFixed(2) + ')');
-      rg.addColorStop(1, 'rgba(' + col + ',0)');
-      x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
+    if (!stone){
+      x.lineCap = 'round';
+      for (let i = 0; i < 110; i++){
+        const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
+        const w = wear(ex, ez); if (w <= 0.1) continue;
+        const len = 40 + rnd()*160, ang = (rnd()-.5)*0.6 + (rnd() > .62 ? Math.PI/2 : 0);
+        x.strokeStyle = rgba(deep, (.13 + rnd()*.22) * w * soft);
+        x.lineWidth = 1.5 + rnd()*7;
+        x.beginPath(); x.moveTo(ex, ez);
+        x.lineTo(ex + Math.cos(ang)*len, ez + Math.sin(ang)*len*0.45); x.stroke();
+      }
+      /* and what survived it, so the wear has something to be wear ON */
+      const tuft = f.blades && f.blades.length ? rgbOf(f.blades[0]) : G[1];
+      for (let i = 0; i < 900; i++){
+        const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
+        const w = wear(ex, ez); if (rnd() < w * 0.75) continue;
+        const r = 5 + rnd()*20;
+        const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
+        const a = .10 + rnd()*.22;
+        rg.addColorStop(0, rgba(rnd() > .5 ? tuft : G[1], a));
+        rg.addColorStop(1, rgba(tuft, 0));
+        x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
+      }
     }
   }
   const t = new THREE.CanvasTexture(c);
   t.encoding = THREE.sRGBEncoding;
   t.anisotropy = 8;
   return t;
+}
+
+/* STONE: flagstones in courses, each its own shade, with mortar between and
+   the odd one cracked. Big enough that a column of the board is about two
+   stones across. */
+function flagstones(x, S, f, G, rnd){
+  const rows = 64, h = S / rows;
+  const mortar = rgba(G[3].map(v => Math.max(0, v - 40)), .9);
+  for (let r = 0; r < rows; r++){
+    let cx = -rnd() * h;
+    while (cx < S){
+      const w = h * (1.1 + rnd() * 1.1);
+      const shade = G[(rnd() * 3) | 0].map(v => Math.max(0, Math.min(255, v + (rnd() - .5) * 26)));
+      x.fillStyle = rgba(shade, .92);
+      x.fillRect(cx + 2, r * h + 2, w - 4, h - 4);
+      /* a bevel of light along the top and dark along the bottom */
+      x.fillStyle = 'rgba(255,255,255,.07)'; x.fillRect(cx + 2, r * h + 2, w - 4, 3);
+      x.fillStyle = 'rgba(0,0,0,.14)'; x.fillRect(cx + 2, r * h + h - 5, w - 4, 3);
+      if (rnd() < .06){
+        x.strokeStyle = mortar; x.lineWidth = 2;
+        x.beginPath(); x.moveTo(cx + rnd()*w, r*h + 3);
+        x.lineTo(cx + rnd()*w, r*h + h*.5); x.lineTo(cx + rnd()*w, r*h + h - 3); x.stroke();
+      }
+      cx += w;
+    }
+    x.fillStyle = mortar; x.fillRect(0, r * h - 1, S, 3);
+  }
+}
+/* SAND: long, soft wind ripples */
+function ripples(x, S, G, rnd){
+  x.lineCap = 'round';
+  for (let i = 0; i < 520; i++){
+    const y0 = rnd() * S, x0 = rnd() * S, len = 80 + rnd() * 260, amp = 4 + rnd() * 8;
+    x.strokeStyle = rnd() > .5 ? rgba(G[0], .22 + rnd() * .2) : rgba(G[3], .16 + rnd() * .16);
+    x.lineWidth = 2 + rnd() * 3;
+    x.beginPath();
+    for (let t = 0; t <= 1.0001; t += .1) {
+      const px = x0 + t * len, py = y0 + Math.sin(t * 6 + y0) * amp;
+      if (t === 0) x.moveTo(px, py); else x.lineTo(px, py);
+    }
+    x.stroke();
+  }
+}
+/* SNOW: the cold blue of shadowed drifts, and a little grit */
+function drifts(x, S, rnd){
+  for (let i = 0; i < 90; i++){
+    const cx = rnd()*S, cy = rnd()*S, r = 60 + rnd()*260;
+    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    rg.addColorStop(0, 'rgba(150,176,206,' + (.10 + rnd()*.16).toFixed(3) + ')');
+    rg.addColorStop(1, 'rgba(150,176,206,0)');
+    x.fillStyle = rg; x.fillRect(cx-r, cy-r, r*2, r*2);
+  }
+  for (let i = 0; i < 700; i++){
+    x.fillStyle = 'rgba(70,74,80,' + (.10 + rnd()*.2).toFixed(2) + ')';
+    x.beginPath(); x.arc(rnd()*S, rnd()*S, .8 + rnd()*2, 0, 7); x.fill();
+  }
+}
+/* MARSH: black standing water between the tussocks, off the board */
+function pools(x, S, rnd, bw, bd){
+  const cx = S/2, cz = S/2;
+  const px = (bw || 20) / FIELD_W * S, pz = (bd || 16) / FIELD_D * S;
+  for (let i = 0; i < 70; i++){
+    const ex = rnd()*S, ez = rnd()*S;
+    if (Math.abs(ex - cx) < px * 1.1 && Math.abs(ez - cz) < pz * 1.1) continue;
+    const rx = 40 + rnd()*160, ry = 20 + rnd()*90;
+    x.save(); x.translate(ex, ez); x.rotate(rnd() * 3);
+    const rg = x.createRadialGradient(0, 0, 0, 0, 0, rx);
+    rg.addColorStop(0, 'rgba(22,34,30,.92)'); rg.addColorStop(.75, 'rgba(34,48,40,.8)');
+    rg.addColorStop(1, 'rgba(34,48,40,0)');
+    x.scale(1, ry / rx); x.fillStyle = rg; x.beginPath(); x.arc(0, 0, rx, 0, 7); x.fill();
+    x.restore();
+  }
 }
 
 /* a soft contact shadow, so a figure sits in the grass instead of on top of it */
@@ -556,23 +697,29 @@ const FIELD_W = 120, FIELD_D = 110;
    horizon a shape. It stays perfectly flat over the board, because units stand
    in lines and a line on a hill is a bug — the relief fades in outside it. */
 const BOARD_R = 26;
+/* a crypt's floor and a courtyard's paving do not roll, and the snow and the
+   sand roll more gently than a meadow — the terrain says how much */
+let RELIEF_K = 1;
 function relief(x, z){
+  if (!RELIEF_K) return 0;
   const d = Math.hypot(x * 0.72, z);
   const k = Math.max(0, Math.min(1, (d - BOARD_R) / 26));   // 0 on the board
   const ease = k * k * (3 - 2 * k);
-  return ease * (Math.sin(x * 0.055) * 1.5 + Math.cos(z * 0.043) * 1.7
+  return RELIEF_K * ease * (Math.sin(x * 0.055) * 1.5 + Math.cos(z * 0.043) * 1.7
                + Math.sin((x + z) * 0.021) * 2.6);
 }
 
 const groundGeo = new THREE.PlaneGeometry(FIELD_W, FIELD_D, 90, 84);
-(function(){
+function shapeGround(){
   const pos = groundGeo.attributes.position;
   for (let i = 0; i < pos.count; i++)
     pos.setZ(i, relief(pos.getX(i), -pos.getY(i)));         // pre-rotation axes
+  pos.needsUpdate = true;
   groundGeo.computeVertexNormals();
-})();
+}
+shapeGround();
 const groundMat = new THREE.MeshLambertMaterial({ map:groundTexture(
-    (S.width*COL/2 + COL*1.6), (S.lines.length*ROW/2 + ROW*1.1)) });
+    (S.width*COL/2 + COL*1.6), (S.lines.length*ROW/2 + ROW*1.1), fieldOf('meadow')) });
 /* the detail tile multiplied in, and FADED OUT WITH DISTANCE. Left on all the
    way to the horizon it turns into a shimmering moire the moment the camera
    moves, which is worse than having no detail at all — so it is strongest
@@ -724,7 +871,12 @@ function bladeGeometry(){
 
 const BLADE_GREENS = ['#8fc23f','#7cae32','#a3d051','#6f9d2c','#b6d968','#88b93a'];
 
-function sowGrass(halfW, halfD, rnd){
+function sowGrass(halfW, halfD, rnd, f){
+  /* HOW MUCH GROWS HERE, AND WHAT COLOUR. A meadow is the full sowing; a
+     desert a few dry wisps; a crypt none at all. */
+  const amount = f && f.grass != null ? f.grass : 1;
+  const greens = f && f.blades && f.blades.length ? f.blades : BLADE_GREENS;
+  if (amount <= 0.001) return null;
   /* WHERE, not just how many. Sown evenly over a thirty-four unit disc, a
      hundred and forty thousand blades come out at a blade a square foot —
      technically grass, visually a bald patch with hairs in it. Almost all of
@@ -735,7 +887,8 @@ function sowGrass(halfW, halfD, rnd){
      say "the army stopped here"; a thinner scatter runs out towards the trees
      so it does not end in a ring; and stubble inside the lines keeps the board
      from reading as a hole cut in the world. */
-  const BAND = 20000, OUT = 7000, IN = 5000, N = BAND + OUT + IN;
+  const BAND = Math.round(20000 * amount), OUT = Math.round(7000 * amount),
+        IN = Math.round(5000 * amount), N = BAND + OUT + IN;
   const geo = bladeGeometry();
   const mat = windy(new THREE.MeshLambertMaterial({
     vertexColors: true, side: THREE.DoubleSide }), 0.62);
@@ -763,7 +916,7 @@ function sowGrass(halfW, halfD, rnd){
     Vp.set(x, relief(x, z) - 0.02, z);
     Vs.set(w, h, w);
     im.setMatrixAt(n, M.compose(Vp, Q, Vs));
-    tint.copy(sRGB(BLADE_GREENS[(rnd() * BLADE_GREENS.length) | 0]))
+    tint.copy(sRGB(greens[(rnd() * greens.length) | 0]))
         .multiplyScalar(0.80 + rnd() * 0.36);
     im.setColorAt(n, tint);
     n++;
@@ -803,7 +956,126 @@ function sowGrass(halfW, halfD, rnd){
   return im;
 }
 
-function scatter(width, depth){
+/* ══ WHAT STANDS ROUND THE FIELD, BY TERRAIN ═══════════════════
+   The meadow's list below is the list that was here, unchanged; the rest
+   are the same two moves — COVER (ground cover sown everywhere off the
+   board) and CLUMPS (trees in copses, rocks in outcrops) — out of whichever
+   pieces make that place. A name with no prefix is the Nature kit; `terra:`
+   is the rest of the MegaKit; `dun:` is the dungeon, and is placed by
+   `build` rather than scattered, because a wall is laid, not sown.
+
+   cover:  [name, count, hMin, hMax, radius]
+   clumps: [[names], groups, per, hMin, hMax, rMin(+halfW), rMax, spread, tinted]  */
+const PLANS = {
+  meadow: {
+    cover: [['grassS',1700,.30,.66,62], ['wispyS',1200,.34,.76,60], ['clover',2200,.15,.30,52],
+            ['grass',1900,.52,1.05,60], ['wispy',1500,.58,1.15,60], ['plant',900,.38,.82,54],
+            ['fern',620,.42,.88,56], ['flower',760,.28,.54,52], ['flower2',640,.32,.60,52],
+            ['pebble',700,.13,.34,54], ['pebble2',520,.12,.30,54], ['mushroom',260,.15,.30,50]],
+    clumps: [[['tree','tree2'],58,6,4.5,9.5,8,84,7.0,true], [['pine'],34,5,5.5,11.0,12,90,7.5,false],
+             [['bush','bushfl'],150,4,0.7,2.0,2,66,3.4,false], [['rock','rock2'],70,5,0.4,1.4,1,60,2.6,false],
+             [['boulder'],26,3,1.3,3.4,5,66,3.2,false]] },
+  /* a clearing: the trees come right up to the edge of the fight */
+  forest: {
+    cover: [['fern',1500,.45,1.0,58], ['grassS',1200,.30,.60,58], ['plant',1200,.40,.90,56],
+            ['mushroom',600,.15,.34,52], ['terra:fungus',160,.14,.28,50], ['clover',1200,.15,.30,50],
+            ['terra:plantB',300,.5,.9,56], ['pebble2',400,.12,.28,52]],
+    clumps: [[['tree','tree2'],110,7,5.5,11.0,3,70,6.0,true], [['pine','terra:pine2'],80,6,6.0,12.0,4,80,6.5,false],
+             [['bush','bushfl'],180,4,0.8,2.2,1,60,3.0,false], [['boulder'],30,3,1.2,3.0,3,60,3.0,false]] },
+  /* nothing alive for a mile: dead wood, twisted trunks and stones */
+  blight: {
+    cover: [['pebble',900,.14,.40,58], ['pebble2',700,.12,.32,58], ['terra:pebS5',500,.2,.5,56],
+            ['grassS',700,.22,.46,58], ['wispyS',500,.24,.5,56], ['terra:fungus',140,.14,.28,50]],
+    clumps: [[['terra:dead1','terra:dead3'],60,4,4.5,10.0,5,84,7.5,false], [['terra:twist2'],22,2,5.0,9.0,8,80,6.0,false],
+             [['rock','rock2'],70,5,0.5,1.6,1,62,2.8,false], [['boulder'],30,3,1.3,3.6,4,66,3.2,false]] },
+  /* sand and sandstone, a dead tree or two, and a great deal of sky */
+  desert: {
+    cover: [['terra:pebR3',700,.2,.5,62], ['terra:pebS5',500,.2,.55,62], ['pebble',600,.14,.36,60]],
+    clumps: [[['terra:drock1','terra:drock2'],70,4,0.8,2.6,2,80,4.5,false], [['terra:drock3'],34,2,2.8,6.5,8,90,6.0,false],
+             [['terra:dead1'],10,1,3.5,6.5,10,80,5.0,false]] },
+  /* pines, stone, and snow over everything */
+  snow: {
+    cover: [['pebble',300,.14,.30,58], ['grassS',260,.20,.36,56]],
+    clumps: [[['pine','terra:pine1','terra:pine2'],110,6,5.0,12.0,6,88,6.5,false],
+             [['boulder'],36,3,1.2,3.4,3,70,3.4,false], [['rock','rock2'],60,4,0.5,1.4,1,64,2.6,false],
+             [['terra:dead3'],12,1,4.0,8.0,10,80,5.0,false]] },
+  /* twisted trees standing in black water, fungus on everything */
+  marsh: {
+    cover: [['grass',1500,.55,1.2,60], ['wispy',1300,.6,1.25,60], ['fern',700,.45,.9,56],
+            ['terra:plantB',400,.5,1.0,56], ['mushroom',400,.15,.34,52], ['terra:fungus',200,.14,.3,54],
+            ['clover',800,.15,.28,50]],
+    clumps: [[['terra:twist2'],60,4,4.5,9.0,4,80,6.5,false], [['terra:dead1','terra:dead3'],30,2,4.0,8.0,6,80,6.0,false],
+             [['bush'],120,4,0.8,2.0,1,60,3.0,false]] },
+  /* a crypt: laid, not sown (see build below) */
+  dungeon: { cover: [], clumps: [] },
+  /* inside the walls: flagstones, barrels, a tree or two in the corners */
+  courtyard: {
+    cover: [['grassS',260,.2,.4,40], ['pebble',260,.12,.26,40]],
+    clumps: [[['tree','tree2'],8,2,4.0,7.0,6,26,3.0,true]] }
+};
+
+/* ── A PLACE THAT IS BUILT ─────────────────────────────────────
+   Walls on three sides — the near one left out, the way a diorama is cut
+   away, because the camera stands off the near edge and a wall there is a
+   wall in front of the fight. Pillars down the long sides; torches on the
+   walls, each with a light of its own (a crypt is lit by what is in it);
+   and the clutter a fight happens among, kept off the board. KayKit is in
+   metres; DS makes a metre the field's metre (a figure is two units tall). */
+const DS = 1.14;
+let lamps = [];
+function build(put, halfW, halfD, f, rnd){
+  lamps = [];
+  const inside = f.scatter === 'dungeon';
+  const gapX = halfW + (inside ? 5.5 : 9), gapZ = halfD + (inside ? 4.5 : 8);
+  const wallLen = 4 * DS;
+  /* the far wall, and the two long ones */
+  for (let x = -gapX; x <= gapX + 0.01; x += wallLen) {
+    const k = Math.abs(x) < wallLen ? 'dun:wall_arched' : (rnd() < .18 ? 'dun:wall_broken' : 'dun:wall');
+    put(k, x, -gapZ, DS, null, 0);
+  }
+  for (let z = -gapZ + wallLen / 2; z <= gapZ; z += wallLen) {
+    const kind = inside && rnd() < .3 ? 'dun:wall_pillar' : (rnd() < .15 ? 'dun:wall_broken' : 'dun:wall');
+    put(kind, -gapX - 0.5, z, DS, null, Math.PI / 2);
+    put(kind, gapX + 0.5, z, DS, null, -Math.PI / 2);
+  }
+  /* pillars down the long sides, inside the walls */
+  const pillar = inside ? 'dun:pillar_decorated' : 'dun:pillar';
+  for (let z = -gapZ + 5; z < gapZ - 2; z += 7.5) {
+    put(pillar, -gapX + 2.4, z, DS, null, 0);
+    put(pillar, gapX - 2.4, z, DS, null, 0);
+  }
+  /* torches on the walls, facing in; each is a light in a crypt */
+  for (let z = -gapZ + 3; z < gapZ; z += 9) {
+    put('dun:torch_mounted', -gapX + 0.3, z, DS, null, Math.PI / 2);
+    put('dun:torch_mounted', gapX - 0.3, z, DS, null, -Math.PI / 2);
+    if (inside) lamps.push([-gapX + 0.9, 3.4, z], [gapX - 0.9, 3.4, z]);
+  }
+  for (let x = -gapX + 6; x < gapX - 3; x += 10) {
+    put('dun:torch_mounted', x, -gapZ + 0.3, DS, null, 0);
+    if (inside) lamps.push([x, 3.4, -gapZ + 0.9]);
+  }
+  /* banners in the courtyard, hung on the far wall */
+  if (!inside) for (let x = -gapX + 4; x < gapX - 2; x += 8)
+    put(rnd() < .5 ? 'dun:banner_patternA_red' : 'dun:banner_patternB_blue', x, -gapZ + 0.7, DS, null, 0);
+  /* the clutter: barrels, crates, rubble — in the corners and along the walls */
+  const junk = inside
+    ? ['dun:barrel_large', 'dun:barrel_small_stack', 'dun:crates_stacked', 'dun:rubble_half',
+       'dun:rubble_large', 'dun:chest', 'dun:table_long_broken', 'dun:candle_triple', 'dun:trunk_large_A',
+       'dun:sword_shield', 'dun:column', 'dun:shelf_small_candles']
+    : ['dun:barrel_large', 'dun:barrel_small_stack', 'dun:crates_stacked', 'dun:barrier', 'dun:trunk_large_A'];
+  for (let i = 0; i < (inside ? 34 : 18); i++) {
+    const side = rnd() < .5 ? -1 : 1;
+    const along = rnd() < .35;
+    const x = along ? (rnd() * 2 - 1) * (gapX - 3) : side * (halfW + 1.5 + rnd() * (gapX - halfW - 3.2));
+    const z = along ? -gapZ + 1.5 + rnd() * 2.5 : (rnd() * 2 - 1) * (gapZ - 2);
+    if (Math.abs(x) < halfW && Math.abs(z) < halfD) continue;
+    if (z > halfD - 1 && Math.abs(x) < halfW + 4) continue;          /* not in front of the camera */
+    put(junk[(rnd() * junk.length) | 0], x, z, DS * (0.85 + rnd() * 0.3), null, rnd() * Math.PI * 2);
+  }
+}
+
+function scatter(width, depth, f){
+  f = f || fieldOf('meadow');
   scenery.clear();
   let seed = 987654321;
   const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -823,14 +1095,13 @@ function scatter(width, depth){
   /* a plan of where each prop goes, gathered first so every instance of one
      prop can be handed to a single InstancedMesh */
   const plan = {};
-  const put = (name, x, z, h, tint) => {
+  const put = (name, x, z, h, tint, rot) => {
+    if (!hasProp(name)) return;
     (plan[name] || (plan[name] = [])).push({ x, z, h,
-      rot: rnd()*Math.PI*2, tint: tint || null });
+      rot: rot == null ? rnd()*Math.PI*2 : rot, tint: tint || null });
   };
 
-  /* GROUND COVER — everywhere, including under the figures. Grass and clover
-     are ankle-high; a battle line standing in grass is what it should look
-     like, and bare ground under every unit is what a game board looks like. */
+  /* GROUND COVER — everywhere off the board */
   const cover = (name, n, hMin, hMax, R) => {
     for (let i = 0; i < n; i++){
       const a = rnd()*Math.PI*2, r = Math.sqrt(rnd()) * R;
@@ -839,22 +1110,6 @@ function scatter(width, depth){
       put(name, x, z, hMin + rnd()*(hMax-hMin));
     }
   };
-  /* the MegaKit's grass tufts are now the OCCASIONAL clump among real blades
-     rather than the whole ground cover — thousands of painted quads standing
-     in for grass was always the wrong shape of solution */
-  cover('grassS',  1700, 0.30, 0.66, 62);
-  cover('wispyS',  1200, 0.34, 0.76, 60);
-  cover('clover',  2200, 0.15, 0.30, 52);
-  cover('grass',   1900, 0.52, 1.05, 60);
-  cover('wispy',   1500, 0.58, 1.15, 60);
-  cover('plant',    900, 0.38, 0.82, 54);
-  cover('fern',     620, 0.42, 0.88, 56);
-  cover('flower',   760, 0.28, 0.54, 52);
-  cover('flower2',  640, 0.32, 0.60, 52);
-  cover('pebble',   700, 0.13, 0.34, 54);
-  cover('pebble2',  520, 0.12, 0.30, 54);
-  cover('mushroom', 260, 0.15, 0.30, 50);
-
   /* CLUMPS — trees in copses, rocks in outcrops. A cluster centre, then a
      handful of things falling around it. */
   const clump = (names, groups, per, hMin, hMax, rMin, rMax, spread, tinted) => {
@@ -874,13 +1129,13 @@ function scatter(width, depth){
       }
     }
   };
-  clump(['tree','tree2'], 58, 6, 4.5, 9.5, halfW+8, 84, 7.0, true);
-  clump(['pine'],         34, 5, 5.5,11.0, halfW+12, 90, 7.5, false);
-  clump(['bush','bushfl'],150,4, 0.7, 2.0, halfW+2, 66, 3.4, false);
-  clump(['rock','rock2'], 70, 5, 0.4, 1.4, halfW+1, 60, 2.6, false);
-  clump(['boulder'],      26, 3, 1.3, 3.4, halfW+5, 66, 3.2, false);
+  const P = PLANS[f.scatter] || PLANS.meadow;
+  P.cover.forEach(c => cover.apply(null, c));
+  P.clumps.forEach(c => clump(c[0], c[1], c[2], c[3], c[4], halfW + c[5], c[6], c[7], c[8]));
+  if (f.scatter === 'dungeon' || f.scatter === 'courtyard') build(put, halfW, halfD, f, rnd);
 
-  scenery.add(sowGrass(halfW, halfD, rnd));
+  const blades = sowGrass(halfW, halfD, rnd, f);
+  if (blades) scenery.add(blades);
 
   /* build one InstancedMesh per prop primitive */
   const M = new THREE.Matrix4(), Q = new THREE.Quaternion(),
@@ -888,11 +1143,12 @@ function scatter(width, depth){
   let total = 0;
   for (const name of Object.keys(plan)){
     const list = plan[name], { parts } = propParts(name);
+    const casts = CASTS.has(name) || /^(dun|terra):/.test(name);
     for (const part of parts){
       const im = new THREE.InstancedMesh(part.geo, part.mat, list.length);
       /* ankle-high ground cover does not earn a shadow-map slot, and there are
          thousands of it */
-      im.castShadow = CASTS.has(name); im.receiveShadow = true;
+      im.castShadow = casts; im.receiveShadow = true;
       list.forEach((it, i) => {
         Q.setFromAxisAngle(up, it.rot);
         Vp.set(it.x, relief(it.x, it.z) - 0.02, it.z);
@@ -909,9 +1165,24 @@ function scatter(width, depth){
     }
     total += list.length;
   }
+  lightLamps();
   return total;
 }
 
+/* ── A CRYPT IS LIT BY WHAT IS IN IT ───────────────────────────
+   Each wall torch gets a warm point light, flickering on its own phase
+   (frame() below). Capped: every light is a cost in every material on the
+   field, and eight torches light a crypt as well as twenty. */
+const lampGroup = new THREE.Group(); scene.add(lampGroup);
+function lightLamps(){
+  lampGroup.clear();
+  lamps.slice(0, 8).forEach((p, i) => {
+    const L = new THREE.PointLight(sRGB('#ffae5a'), 1.8, 34, 1.4);
+    L.position.set(p[0], p[1], p[2]);
+    L.userData.phase = i * 1.7;
+    lampGroup.add(L);
+  });
+}
 const flat = hex => new THREE.MeshLambertMaterial({ color:sRGB(hex) });
 
 /* ── figures ───────────────────────────────────────────────────
@@ -1000,7 +1271,51 @@ const SPRITE_FOR = {
   'Longbowman':'archer', 'Crow Archer':'archer',
   'Thane Bryn':'axeman', 'Vashka':'axeman',
 };
-const spriteOf = e => e.sprite || SPRITE_FOR[e.name] || 'spearman';
+/* THE COUNTER'S OWN FIGURE FIRST. A unit dressed on the workbench as an
+   archer is an archer here too (65-token-look.js), and one wearing a
+   portrait stands as that portrait, printed on a card. The name table below
+   is only for the demo army, whose units were never dressed at all. */
+const spriteOf = e => {
+  if (e.sprite && SPRITES[e.sprite]) return e.sprite;
+  if (e.fig && SPRITES[e.fig]) return e.fig;
+  const L = window.TokenLook;
+  if (L && (e.pic || e.art)) {
+    const k = L.figOf({ src: e.pic, art: e.art, fig: e.fig, side: e.side, entKind: e.kind });
+    if (k && SPRITES[k]) return k;
+  }
+  return SPRITE_FOR[e.name] || (e.side === 'en' ? (e.kind === 'large' ? 'lich' : 'skeleton')
+                                                : (e.kind === 'large' ? 'axeman' : 'spearman'));
+};
+const portraitOf = e => {
+  if (!e.pic) return '';
+  const L = window.TokenLook, p = L && L.pic({ src: e.pic, art: e.art });
+  return p && !p.cut ? p.src : '';
+};
+/* a portrait, printed on a card: cropped to the card's shape, a Sable
+   border and a gilt hairline, so a photograph stands on the field as a
+   standee does on the table rather than as a floating rectangle */
+const picCache = {};
+const CARD_W = 0.78;
+function picMat(src){
+  if (picCache[src]) return picCache[src];
+  const c = document.createElement('canvas'); c.width = 256; c.height = 328;
+  const x = c.getContext('2d');
+  x.fillStyle = '#171310'; x.fillRect(0, 0, 256, 328);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  const im = new Image();
+  im.onload = () => {
+    const bw = 232, bh = 304, k = Math.max(bw / im.width, bh / im.height);
+    const w = im.width * k, h = im.height * k;
+    x.save(); x.beginPath(); x.rect(12, 12, bw, bh); x.clip();
+    x.drawImage(im, 12 + (bw - w) / 2, 12 + (bh - h) / 2, w, h); x.restore();
+    x.strokeStyle = '#c9a227'; x.lineWidth = 2; x.strokeRect(13, 13, bw - 2, bh - 2);
+    t.needsUpdate = true; restamp();
+  };
+  im.src = src;
+  return (picCache[src] = new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide,
+    color: sRGB('#fffaf0'), fog: true }));
+}
 
 const GEO = {
   /* a thin ring on the ground, not a poker chip. The fat coloured discs were
@@ -1018,7 +1333,8 @@ function figure(e){
   const dark = en ? C.enemyDk : C.allyDk;
   const big = e.kind === 'large', form = e.kind === 'form';
   const s = big ? 1.45 : 1;
-  const art = SPRITES[spriteOf(e)];
+  const card = portraitOf(e);
+  const art = card ? { w: CARD_W } : SPRITES[spriteOf(e)];
   if (!SHADOW_TEX) SHADOW_TEX = blobShadow();
 
   /* the ground contact, soft-edged. A hard circle under a soft-edged figure is
@@ -1067,7 +1383,7 @@ function figure(e){
   }
 
   const bill = [];
-  const mat = spriteMat(spriteOf(e));
+  const mat = card ? picMat(card) : spriteMat(spriteOf(e));
   let hh = 0; for (let j = 0; j < e.id.length; j++) hh = (hh * 31 + e.id.charCodeAt(j)) & 255;
   men.forEach(([ox, oz], i) => {
     const m = new THREE.Mesh(QUAD, mat);
@@ -1082,7 +1398,7 @@ function figure(e){
     /* the shadow has to be cut out by the same alpha the sprite is, or every
        figure throws a rectangle */
     m.customDepthMaterial = new THREE.MeshDepthMaterial({
-      depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.4 });
+      depthPacking: THREE.RGBADepthPacking, map: card ? null : mat.map, alphaTest: card ? 0 : 0.4 });
     m.userData = { phase: i * 1.37, w: art.w * vary, h: vary };
     bill.push(m);
     g.add(m);
@@ -1112,7 +1428,8 @@ let builtSig = '';
 
 function boardSig(){
   return S.lines.map(l => l.key + ':' + l.ents.map(e =>
-    e.id + (e.col||0) + (e.hp||e.alive||0) + (e.acted?'x':'')).join(',')).join('|')
+    e.id + (e.col||0) + (e.hp||e.alive||0) + (e.acted?'x':'') + (e.fig||'') + (e.pic ? e.pic.length : 0)
+    ).join(',')).join('|')
     + '#' + S.sel + '#' + S.width;
 }
 
@@ -1157,15 +1474,32 @@ function placeCamera(k){
      in as it fades up, which is what makes it read as arriving somewhere
      rather than as a slide changing */
   const z = CAM.zoom * (k == null ? 1 : k);
-  const d = CAM.dist / z, h = CAM.height / Math.pow(z, 0.55);
+  /* A NARROW VIEW STANDS FURTHER BACK. The framing was tuned for the whole
+     window; with the chat and a docked muster either side the field can be
+     half as wide as it is tall, and a battle line twelve wide ran off both
+     edges of it. Step back until the width fits again. */
+  const fit = Math.pow(Math.max(1, 1.6 / Math.max(0.45, camera.aspect || 1.6)), 0.72);
+  const d = CAM.dist * fit / z, h = CAM.height * Math.sqrt(fit) / Math.pow(z, 0.55);
+  /* and the haze moves back with it: a crypt's fog is short, and a camera
+     stood further off would otherwise be looking at nothing but fog */
+  if (scene.fog && fogBase) { const off = Math.max(0, d - CAM.dist);
+    scene.fog.near = fogBase[0] + off; scene.fog.far = fogBase[1] + off; }
   camera.position.set(CAM.pan, h, d);
   camera.lookAt(CAM.pan * 0.55, 1.1, CAM.look);
 }
 
+/* the part of the screen that is the table's — #vp, which stops at the chat
+   and starts after a docked panel — and where it is, for picking and names */
+const view = { x: 0, y: 0, w: 1, h: 1 };
 function size(){
-  const W = innerWidth, H = innerHeight;
+  const vp = document.getElementById('vp');
+  const r = vp && vp.getBoundingClientRect();
+  const ok = r && r.width > 10 && r.height > 10;
+  const W = ok ? Math.round(r.width) : innerWidth, H = ok ? Math.round(r.height) : innerHeight;
+  view.x = ok ? Math.round(r.left) : 0; view.y = ok ? Math.round(r.top) : 0; view.w = W; view.h = H;
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   renderer.setSize(W, H, false);
+  cv.style.left = view.x+'px'; cv.style.top = view.y+'px';
   cv.style.width = W+'px'; cv.style.height = H+'px';
   camera.aspect = W/H; camera.updateProjectionMatrix();
 }
@@ -1204,15 +1538,15 @@ function drawLabels(){
     d.innerHTML = '<b></b><i></i>';
     layer.appendChild(d);
   }
-  const W = innerWidth, H = innerHeight;
+  const W = view.w, H = view.h;
 
   /* project everything first, then place in depth order */
   const want = [];
   pegs.forEach((p, i) => {
     const el = layer.children[i], e = p.ent;
     V.set(0, e.kind === 'large' ? 2.5 : 2.1, 0).applyMatrix4(p.group.matrixWorld).project(camera);
-    const x = (V.x * 0.5 + 0.5) * W, y = (-V.y * 0.5 + 0.5) * H;
-    if (!(V.z < 1 && x > -80 && x < W + 80 && y > -40 && y < H + 40)){
+    const x = view.x + (V.x * 0.5 + 0.5) * W, y = view.y + (-V.y * 0.5 + 0.5) * H;
+    if (!(V.z < 1 && x > view.x - 80 && x < view.x + W + 80 && y > view.y - 40 && y < view.y + H + 40)){
       el.style.display = 'none'; return;
     }
     want.push({ el, e, x, y, z: V.z });
@@ -1265,7 +1599,7 @@ function drawLabels(){
    DOM lookup. Everything else — what a click MEANS — is still app.js's. */
 const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
 function pick(cx, cy){
-  ptr.set((cx/innerWidth)*2 - 1, -(cy/innerHeight)*2 + 1);
+  ptr.set(((cx - view.x)/view.w)*2 - 1, -((cy - view.y)/view.h)*2 + 1);
   ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(army.children, true)[0];
   if (!hit) return null;
@@ -1284,6 +1618,197 @@ function pick(cx, cy){
    the engine's answer, not this layer's — all it does is paint it. */
 let aimSet = null;
 function setAim(ids){ aimSet = ids ? new Set(ids) : null; }
+
+/* ══ DRESSING THE FIELD FOR WHERE THE FIGHT IS ═════════════════
+   Sky, fog, the three lights, how much the ground rolls, what it is painted
+   as, what stands round it and what falls from the sky — all from the
+   terrain's row. Done behind the cloud (setOn), once per terrain and board
+   shape, because a scatter is thousands of instances and the field is a
+   place: it does not change while you stand in it. */
+let fogBase = null;
+function dressFor(id, width, depth){
+  const f = fieldOf(id);
+  paintSky(f);
+  scene.fog.color.copy(sRGB(f.sky[2]));
+  fogBase = f.fog.slice();
+  scene.fog.near = f.fog[0]; scene.fog.far = f.fog[1];
+  hemi.color.copy(sRGB(f.skyLight)); hemi.groundColor.copy(sRGB(f.bounce));
+  /* a crypt is lit from within — a cold light from high up so the fight can
+     be read at all, and the torches (lightLamps) doing the rest */
+  hemi.intensity = f.indoor ? 0.62 : 0.86;
+  sun.color.copy(sRGB(f.sun)); sun.intensity = f.indoor ? 0.55 : 1.12;
+  rim.intensity = f.indoor ? 0.14 : 0.26;
+  renderer.toneMappingExposure = f.exposure || 1.06;
+  RELIEF_K = (f.indoor || f.scatter === 'courtyard') ? 0
+           : (f.scatter === 'desert' || f.scatter === 'snow') ? 0.7 : 1;
+  shapeGround();
+  const bw = width*COL/2 + COL*1.6, bd = depth*ROW/2 + ROW*1.1;
+  if (groundMat.map) groundMat.map.dispose();
+  groundMat.map = groundTexture(bw, bd, f);
+  groundMat.needsUpdate = true;
+  apron.material.color.copy(sRGB(f.ground[2]));
+  apron.visible = !f.indoor;
+  scatter(width, depth, f);
+  layMarks(S.lines, width);
+  if (f.clouds && !clouds.children.length) makeClouds();
+  clouds.visible = !!f.clouds;
+  setMotes(f.motes || null);
+  featSig = '';
+}
+
+/* ── WHAT FALLS FROM THE SKY ───────────────────────────────────
+   Snow on the snowfield, ash drifting over the waste, dust in the desert
+   wind, embers rising in a crypt, midges over the marsh. One cloud of
+   points, a soft dot each, moved on the CPU — there are a few hundred of
+   them, not a few hundred thousand. */
+const MOTES = {
+  snow:   { n: 900, size: 0.22, color: '#ffffff', add: false, fall: 1.6,  drift: 0.5, op: .85 },
+  ash:    { n: 420, size: 0.16, color: '#b8b0a4', add: false, fall: 0.35, drift: 0.8, op: .6 },
+  dust:   { n: 380, size: 0.12, color: '#e8d2a0', add: false, fall: 0.05, drift: 2.4, op: .5 },
+  embers: { n: 160, size: 0.14, color: '#ffae4a', add: true,  fall: -0.8, drift: 0.4, op: .9 },
+  flies:  { n: 120, size: 0.10, color: '#d8f080', add: true,  fall: 0,    drift: 0.6, op: .8 }
+};
+let moteKind = null, motes = null;
+function dotTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.7)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(c);
+}
+function setMotes(kind){
+  if (motes) { scene.remove(motes); motes.geometry.dispose(); motes = null; }
+  moteKind = kind && MOTES[kind] ? kind : null;
+  if (!moteKind) return;
+  const M = MOTES[moteKind];
+  const pos = new Float32Array(M.n * 3), vel = new Float32Array(M.n * 3);
+  let sd = 5150;
+  const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (let i = 0; i < M.n; i++){
+    pos[i*3] = (rnd() - .5) * 80; pos[i*3+1] = rnd() * 18; pos[i*3+2] = (rnd() - .5) * 70;
+    vel[i*3] = (rnd() - .5) * M.drift; vel[i*3+1] = -M.fall * (.6 + rnd() * .8); vel[i*3+2] = (rnd() - .5) * M.drift;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  motes = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: M.size, map: dotTexture(), color: sRGB(M.color), transparent: true, opacity: M.op,
+    depthWrite: false, sizeAttenuation: true,
+    blending: M.add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+  motes.userData.vel = vel;
+  motes.frustumCulled = false;
+  scene.add(motes);
+}
+function stepMotes(dt, t){
+  if (!motes) return;
+  const p = motes.geometry.attributes.position.array, v = motes.userData.vel;
+  const wob = moteKind === 'flies' ? 1.6 : moteKind === 'snow' ? 0.6 : 0.3;
+  for (let i = 0; i < p.length; i += 3){
+    p[i]   += (v[i]   + Math.sin(t * 1.3 + i) * wob) * dt;
+    p[i+1] += (v[i+1] + (moteKind === 'flies' ? Math.sin(t * 2 + i * .7) * .8 : 0)) * dt;
+    p[i+2] += (v[i+2] + Math.cos(t * 1.1 + i) * wob * .5) * dt;
+    if (p[i+1] < 0) p[i+1] += 18; else if (p[i+1] > 18) p[i+1] -= 18;
+    if (p[i] > 40) p[i] -= 80; else if (p[i] < -40) p[i] += 80;
+    if (p[i+2] > 35) p[i+2] -= 70; else if (p[i+2] < -35) p[i+2] += 70;
+  }
+  motes.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ══ THE GROUND UNDER THE FIGHT ════════════════════════════════
+   The scene's features (21-table-content.js), stood up on their slots out
+   of the same packs the scenery is: a low wall or a row of stones for
+   cover, a boulder or a pillar that nobody stands in, rubble for rough
+   ground, a fire for a hazard, black water. Rebuilt when the features, the
+   width or the terrain change — not every frame. */
+const featGroup = new THREE.Group(); scene.add(featGroup);
+let featSig = '', fires = [];
+const featSigNow = () => (S.features || []).map(f => f.line + '@' + f.col + ':' + f.kind).join('|')
+  + '#' + S.width + '#' + terrainNow() + '#' + S.lines.map(l => l.key).join(',');
+
+function flameTexture(){
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 96, 2, 32, 80, 60);
+  g.addColorStop(0, 'rgba(255,248,210,1)'); g.addColorStop(.25, 'rgba(255,200,90,.95)');
+  g.addColorStop(.55, 'rgba(240,110,30,.6)'); g.addColorStop(1, 'rgba(160,40,10,0)');
+  x.fillStyle = g;
+  x.beginPath(); x.moveTo(32, 6); x.quadraticCurveTo(62, 70, 50, 118); x.lineTo(14, 118);
+  x.quadraticCurveTo(2, 70, 32, 6); x.fill();
+  return new THREE.CanvasTexture(c);
+}
+let FLAME = null;
+
+function standProp(name, x, z, s, rot){
+  const { parts } = propParts(name);
+  parts.forEach(pt => {
+    const m = new THREE.Mesh(pt.geo, pt.mat);
+    m.position.set(x, 0, z); m.scale.setScalar(s); m.rotation.y = rot || 0;
+    m.castShadow = true; m.receiveShadow = true;
+    featGroup.add(m);
+  });
+  return parts.length > 0;
+}
+
+function buildFeatures(){
+  featGroup.clear(); fires = [];
+  const F = window.TableContent && TableContent.FEATURES;
+  if (!F || !S.features || !S.features.length) return;
+  const f = fieldOf(terrainNow());
+  const stone = f.indoor || f.scatter === 'courtyard';
+  const n = S.lines.length, width = S.width;
+  S.features.forEach(ft => {
+    const i = S.lines.findIndex(l => l.key === ft.line); if (i < 0) return;
+    const line = S.lines[i];
+    const x = (ft.col - (width - 1) / 2) * COL, z = (i - (n - 1) / 2) * ROW;
+    /* in front of the slot is toward the other side of the Line */
+    const front = line.side === 'en' ? 1 : -1;
+    if (ft.kind === 'cover'){
+      if (stone || f.scatter === 'forest') standProp('dun:barrier', x, z + front * 1.0, DS * 0.55, 0);
+      else if (f.scatter === 'desert') standProp('terra:drock2', x, z + front * 1.0, 1.4, 0.3);
+      else [-0.8, 0, 0.8].forEach((d, k) => standProp(k === 1 ? 'rock2' : 'rock', x + d, z + front * 1.0, 0.8 + (k % 2) * .25, k));
+    } else if (ft.kind === 'obstacle'){
+      if (f.indoor) standProp('dun:pillar', x, z, DS * 0.62, 0);
+      else if (f.scatter === 'courtyard') standProp('dun:pillar', x, z, DS * 0.5, 0);
+      else if (f.scatter === 'desert') standProp('terra:drock3', x, z, 2.6, 0.7);
+      else standProp('boulder', x, z, 2.4, 0.4);
+    } else if (ft.kind === 'rough'){
+      if (stone) standProp('dun:rubble_half', x, z, DS * 0.42, 0.5);
+      else {
+        const bits = f.scatter === 'desert' ? ['terra:pebR3', 'terra:pebS5'] : ['pebble', 'pebble2', 'rock'];
+        for (let k = 0; k < 6; k++) standProp(bits[k % bits.length], x + Math.cos(k * 2.1) * 0.9, z + Math.sin(k * 2.1) * 0.9, .35 + (k % 3) * .15, k);
+        if (f.scatter !== 'desert' && f.scatter !== 'snow') standProp('bush', x + .3, z - .4, 0.7, 0);
+      }
+    } else if (ft.kind === 'hazard'){
+      for (let k = 0; k < 7; k++) standProp('pebble', x + Math.cos(k * .9) * 0.7, z + Math.sin(k * .9) * 0.7, .32, k);
+      if (!FLAME) FLAME = flameTexture();
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FLAME, transparent: true,
+        depthWrite: false, blending: THREE.AdditiveBlending, fog: true }));
+      sp.position.set(x, 0.75, z); sp.scale.set(1.1, 1.7, 1);
+      featGroup.add(sp);
+      const L = new THREE.PointLight(sRGB('#ff9a40'), 1.2, 9, 1.8);
+      L.position.set(x, 1.2, z); featGroup.add(L);
+      fires.push({ sp, L, ph: fires.length * 2.3 });
+    } else if (ft.kind === 'water'){
+      const m = new THREE.Mesh(new THREE.CircleGeometry(1.25, 28),
+        new THREE.MeshPhongMaterial({ color: sRGB(f.indoor ? '#1f3a48' : '#2c5a7c'), shininess: 90,
+          specular: sRGB('#a8c8e0'), transparent: true, opacity: .86 }));
+      m.rotation.x = -Math.PI / 2; m.position.set(x, 0.035, z); m.scale.set(1, 0.8, 1);
+      m.receiveShadow = true;
+      featGroup.add(m);
+    }
+  });
+}
+function stepFires(t){
+  lampGroup.children.forEach(L => {
+    L.intensity = 1.8 + Math.sin(t * 9 + L.userData.phase) * .16 + Math.sin(t * 23 + L.userData.phase * 2) * .10;
+  });
+  fires.forEach(fr => {
+    const k = 1 + Math.sin(t * 11 + fr.ph) * .08 + Math.sin(t * 27 + fr.ph) * .05;
+    fr.sp.scale.set(1.1 * (2 - k), 1.7 * k, 1);
+    fr.L.intensity = 1.1 + (k - 1) * 3;
+  });
+}
 
 let on = false, t0 = 0, lastTs = 0, alive = false, fade = 0, scatterSig = '';
 /* Rendering the field costs a real frame. While the cloud is closing over it,
@@ -1344,10 +1869,12 @@ function setOn(v){
     /* THE FIELD IS A PLACE AND IT DOES NOT MOVE. Scattering nineteen thousand
        instances was being redone on every single transition, for a landscape
        that is identical every time. Built once, kept. */
-    const layout = S.width + 'x' + S.lines.length;
+    /* the terrain is part of the layout: a fight moved from the meadow to
+       the crypt is a different place, dressed again behind the cloud */
+    size();
+    const layout = S.width + 'x' + S.lines.length + ':' + terrainNow();
     if (layout !== scatterSig){ scatterSig = layout;
-      scatter(S.width, S.lines.length); layMarks(S.lines, S.width); }
-    if (!clouds.children.length) makeClouds();
+      dressFor(terrainNow(), S.width, S.lines.length); }
     placeCamera();
     restamp();
     if (nameLayer){ nameLayer.style.display = 'block'; nameLayer.style.opacity = '0'; }
@@ -1388,9 +1915,17 @@ function frame(ts){
 
   const sig = boardSig();
   if (sig !== builtSig){ builtSig = sig; buildArmy(); restamp(); }
+  const fsig = featSigNow();
+  if (fsig !== featSig){ featSig = fsig; buildFeatures(); restamp(); }
+  /* the GM changed the ground, or the width, while everyone is standing in
+     it: dress it again, here, rather than making them leave and come back */
+  const lay = S.width + 'x' + S.lines.length + ':' + terrainNow();
+  if (lay !== scatterSig){ scatterSig = lay; dressFor(terrainNow(), S.width, S.lines.length); restamp(); }
 
   uTime.value = t;
   driftClouds(dt);
+  stepMotes(dt, t);
+  stepFires(t);
   const camAng = Math.atan2(camera.position.x, camera.position.z);
   for (const p of pegs){
     for (const m of (p.group.userData.bill || [])){

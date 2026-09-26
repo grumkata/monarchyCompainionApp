@@ -21,6 +21,17 @@
 'use strict';
 
 const el = () => doc.getElementById('combat-prop');
+let shownId = null;          /* the scene the sheet was last set up for */
+/* ── WRITTEN BY WHOEVER CHANGED IT, AND BY NOBODY ELSE ────────
+   The turn is written back onto the scene only when THIS machine changed it
+   — somebody here pressed End Turn, declared a move, asked for an ability.
+   Every table renders the sheet all the time; if each of them wrote what it
+   was showing, a table a moment behind would send the old phase straight
+   back over the GM's End Turn. So what the scene last told us is kept, and
+   only a difference from it is news. */
+let heardFight = '';
+const fightNow = () => (typeof S === 'undefined') ? '' :
+  JSON.stringify([S.round, S.phase, S.sug || null, S.intent || null]);
 
 /* Nothing here touches the board's contents. The lines, the units and every
    rule about them are app.js's and rules.js's; if this file ever starts
@@ -46,10 +57,42 @@ function show(t) {
      reload without a single line of syncing code. */
   if (!Array.isArray(t.lines)) t.lines = root.TableContent.blankLines();
   S.lines = t.lines;
-  S.sel = null; S.drag = null; S.sug = null; S.intent = null;
+  /* the ground slot by slot, and the ground the whole fight stands on — the
+     mat is dressed in the terrain's colours (14-war.css), and the field is
+     built from it (37-scene-field.js) */
+  S.features = Array.isArray(t.features) ? t.features : [];
+  S.terrain = root.TableContent.terrainOf(t.setup && t.setup.terrain);
+  S.name = t.name || 'Combat';
+  p.dataset.terrain = S.terrain;
+  const cw = p.querySelector('.cwin');
+  if (cw) { cw.dataset.terrain = S.terrain; matColours(cw, S.terrain); }
+  /* ── THE SAME FIGHT, SHOWN AGAIN, IS STILL YOUR FIGHT ─────────
+     This ran on every repaint of the wood, and at a live table the wood is
+     repainted whenever anybody changes anything — so a player's selection,
+     the ability bar open on their unit and the move they had just declared
+     were all wiped by somebody else nudging a token. Only a DIFFERENT scene
+     starts from nothing. What you are pointing at and holding is yours and
+     is kept while it still exists. */
+  const again = shownId === t.id;
+  shownId = t.id;
+  if (!again) { S.sel = null; S.drag = null; }
+  /* ── AND WHOSE TURN IT IS IS THE TABLE'S ──────────────────────
+     The round, the phase, the move a player has declared and the ability
+     they have asked to use lived in THIS machine's `S` and nowhere else:
+     every table counted its own rounds, and a player's "Declared" never
+     reached the GM, who was the only one who could allow it. They ride on
+     the scene now (`fight`), so they go wherever the scene goes. */
+  const f = t.fight || {};
+  S.round = Number.isFinite(+f.round) && +f.round > 0 ? +f.round : (again ? S.round : 1);
+  S.phase = Number.isFinite(+f.phase) ? +f.phase : (again ? S.phase : 0);
+  S.sug = f.sug || null;
+  S.intent = f.intent || null;
+  heardFight = fightNow();
 
   /* the combatants ARE the tokens homed in this scene — see 43-tokens.js */
   if (root.Tokens) root.Tokens.fill(t);
+  if (S.sel && typeof entById === 'function' && !entById(S.sel)) S.sel = null;
+  if (S.sug && typeof entById === 'function' && !entById(S.sug.id)) S.sug = null;
 
   const w = parseInt(t.setup && t.setup.width, 10);
   const changed = Number.isFinite(w) && w !== S.width;
@@ -63,6 +106,19 @@ function show(t) {
   if (typeof render === 'function') render();
 }
 
+/* THE MAT IS THE GROUND. Its cloth, the two halves' washes and the ink its
+   lines are named in come from the terrain's own row (21-table-content.js),
+   written as custom properties 14-war.css paints with — so a new terrain is
+   a new row and never a new rule. */
+function matColours(node, id) {
+  const t = root.TableContent.TERRAINS[id]; if (!t || !node) return;
+  node.style.setProperty('--mat', t.mat.ground);
+  node.style.setProperty('--mat-edge', t.mat.edge);
+  node.style.setProperty('--mat-ink', t.mat.ink);
+  node.style.setProperty('--mat-en', t.mat.en);
+  node.style.setProperty('--mat-al', t.mat.al);
+}
+
 function hide() {
   const p = el(); if (!p) return;
   /* A FIGHT THAT ENDS UNDER YOU LETS YOU GO. The GM putting the scene away
@@ -71,6 +127,8 @@ function hide() {
      the kit stayed hidden under it (13-table-ui.css hides it in the field). */
   if (root.Table3D && root.Table3D.locked === p) root.Table3D.unlock(true);
   p.style.display = 'none';
+  shownId = null;
+  if (root.Muster) root.Muster.paint();
 }
 
 /* the sheet is dragged by its own title bar, like any prop — so the model has
@@ -90,13 +148,28 @@ function hookSave() {
   const wrapped = function () {
     const out = inner.apply(this, arguments);
     if (root.LinesEdit) root.LinesEdit.decorate();
+    /* the tracker is the same fight, read the other way round */
+    if (root.Muster) root.Muster.paint();
     /* app.js splices ents between lines; which line a token is in has to be
        written back onto the token or it is lost on reload */
     if (root.Tokens && root.TableModel) {
       const live = root.TableModel.activeScene();
-      if (live && live.scene === 'combat') root.Tokens.harvest(live);
+      if (live && live.scene === 'combat') {
+        root.Tokens.harvest(live);
+        /* and the turn, written back onto the scene so it travels (show) */
+        if (typeof S !== 'undefined' && live.id === shownId && fightNow() !== heardFight) {
+          heardFight = fightNow();
+          live.fight = { round: S.round, phase: S.phase,
+                         sug: S.sug || null, intent: S.intent || null };
+        }
+      }
     }
-    if (root.TableModel) root.TableModel.save();
+    /* SOON, NOT NOW. save() writes the whole table out as JSON — pictures
+       and all — and the sheet renders on every change anybody at the table
+       makes to the fight, so at a busy table this was megabytes stringified
+       synchronously many times a round. The model's own coalesced save is
+       the same write, once, when the page is idle. */
+    if (root.TableModel) (root.TableModel.saveSoon || root.TableModel.save).call(root.TableModel);
     /* AND THE TABLE HEARS ABOUT IT. grumkata: "moving tokens does not sync
        properly". A move on the combat sheet was written down here and told
        to nobody: this saves, it does not go through the model's change hook
@@ -111,6 +184,6 @@ function hookSave() {
   root.render = wrapped;
 }
 
-root.CombatScene = { show, hide, moved, el, hookSave };
+root.CombatScene = { show, hide, moved, el, hookSave, matColours };
 
 })(window, document);

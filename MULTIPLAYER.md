@@ -100,6 +100,24 @@ against `Date.now()` meant a machine running half a minute fast found every
 beat at the table stale, reaped the lot, and drew an empty room to somebody
 sitting in a full one. `.info/serverTimeOffset` is watched and added back on.
 
+**Not every change to `who` is news.** Every client beats every four
+seconds and sends its head's turn up to five times a second, all into this
+one node. `06-session.js` sorts each change: `who` (somebody arrived, left,
+or changed their name, arms or likeness), `stir` (only a head turned or
+somebody pointed), or nothing at all (only `seen` moved). Listeners that
+rebuild things listen for `who`; a heartbeat wakes nobody.
+
+**A blink keeps its chair.** A connection that drops for a moment clears
+presence at once, and a seat that goes re-spaces the whole ring. So a seat
+that vanishes without a goodbye stays in the seating for 20 seconds; leaving
+on purpose writes `gone` first and frees it at once.
+
+**The same table keeps its word.** A GM whose app closes never stopped
+hosting — the players are still sitting there. Hosting that table again
+takes back the word it was last hosted under (kept in `monarchy.hosted.v1`)
+if the meta still names this GM, rather than opening an empty room under a
+new one.
+
 `onDisconnect` is used because it is instant, and it is **not trusted alone**.
 A slept laptop, a `kill -9`, a phone walking out of signal — the socket may
 take a long time to be noticed. So every client also writes `seen` every four
@@ -312,9 +330,13 @@ Honest gaps, in the order they would hurt:
   picture. Anyone who knows the word can write as much of it as they like.
 - **Sheets are whole-record writes.** Two people editing the same sheet in
   the same second, last write wins. Fine for hit points, not for prose.
-- **The fight's round, phase and declared intents are not on the wire.**
-  Where the units stand and what has happened to them is (the scene and its
-  tokens); `S.round`, `S.phase` and `S.intent` in `32-combat-app.js` are
-  each machine's own, so a player's "Declared" never reaches the GM.
+- **One declaration at a time.** The fight's round, phase, declared move and
+  declared ability ride on the scene as `fight` (PROJECT.md 3.26), but there
+  is one slot for the whole table: two players declaring together, the
+  second replaces the first. And a scene is written whole, so two people
+  changing the same fight in the same instant is last write wins.
 - **A piece in motion is not sent.** Others see it arrive where it was let
   go, not travel there.
+- **Local mode loses writes under contention.** Two windows share one
+  localStorage tree by read-modify-write, and a write landing mid-way through
+  another's is lost. Firebase merges on the server and does not do this.

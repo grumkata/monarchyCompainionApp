@@ -231,11 +231,45 @@ function hostUp() {
   host = doc.createElement('div');
   host.id = 'herald';
   host.setAttribute('aria-live', 'polite');
-  host.innerHTML = '<div class="hr-veil"></div>' +
-                   '<div class="hr-card"><b></b><i></i><u class="hr-work"></u></div>' +
+  /* ── THE CLOTH HAS ITS HERALDRY BACK ────────────────────────
+     When the cover moved from the shader to CSS it kept its colours and lost
+     its drawing: a straight-cut gradient, where the shader had a DANCETTY
+     gilt edge and a woven Sable with a diaper of lozenges. It is all back,
+     as things the compositor can move — the cloth is a band cut on the bend
+     with gilt teeth on both edges and your livery inside them, and while it
+     is across, the same sun in splendour the loading screen turns (build.js
+     leaves it as <template id="m-sun">) turns behind the name, your arms turn
+     in over it, and gold leaf rises. Every one of those is a transform or an
+     opacity, so none of it stops when the work behind the cloth starts. */
+  const sun = doc.getElementById('m-sun');
+  let dust = '';
+  for (let i = 0; i < 14; i++) {
+    const r = (i * 0.618034) % 1;
+    dust += `<i style="--x:${(5 + r * 90).toFixed(1)}%;--s:${(3 + (i * 7) % 5)}px;` +
+            `--d:${(3.4 + (i * 0.37) % 2.2).toFixed(2)}s;--t:${(-(i * 0.53) % 3.4).toFixed(2)}s"></i>`;
+  }
+  host.innerHTML = '<div class="hr-veil"><div class="hr-cloth"></div></div>' +
+                   '<div class="hr-dust">' + dust + '</div>' +
+                   '<div class="hr-card"><span class="hr-sun"></span><span class="hr-arms"></span>' +
+                   '<b></b><i></i><u class="hr-work"></u></div>' +
                    '<div class="hr-cry"></div><div class="hr-sparks"></div>';
+  if (sun && sun.content) host.querySelector('.hr-sun').appendChild(sun.content.cloneNode(true));
   doc.body.appendChild(host);
   return host;
+}
+
+/* your coat, over the name of where you are going — the herald announces
+   who is arriving. Drawn fresh each time (it may have changed in the maker),
+   and left out entirely while you have none. */
+function armsInto(el) {
+  const H = root.Heraldry;
+  let arms = null;
+  try { arms = (JSON.parse(root.localStorage.getItem('monarchy.me.v1')) || {}).arms || null; }
+  catch (e) {}
+  const has = !!(H && arms && H.blazoned && H.blazoned(arms));
+  el.innerHTML = has ? H.armsSVG(arms, { shape: 'shield', w: 84, h: 101, edge: 3 })
+    .replace(/id="/g, 'id="hr-').replace(/url\(#/g, 'url(#hr-').replace(/href="#/g, 'href="#hr-') : '';
+  el.hidden = !has;
 }
 
 /* ══ THE BEND ══════════════════════════════════════════════════
@@ -289,6 +323,7 @@ function wipe(mid, o) {
       const card = h.querySelector('.hr-card');
       card.querySelector('b').textContent = job.o.title || '';
       card.querySelector('i').textContent = job.o.sub || '';
+      armsInto(card.querySelector('.hr-arms'));
       h.classList.add('carded');
       /* ══ AND ONLY THEN THE WORK ══════════════════════════════
          Adding a class does not put anything on screen. The pixels change at

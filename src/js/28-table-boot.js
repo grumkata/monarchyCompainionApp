@@ -97,10 +97,29 @@ function boot(tableId) {
     return;
   }
   booted = id;
+  /* ── THE CHAT IS ON TOP OF EVERYTHING, ALWAYS ──────────────────
+     grumkata: "the chat should be visible in combat view no matter what".
+     It was not, and it was nothing to do with the field: #table-app is
+     position:fixed, and a fixed element is a stacking context of its own —
+     so the chat's z-index of 1500 only ever counted INSIDE it, and the
+     whole of #table-app sat at z 0 against the field's canvas (880, on the
+     body). Walk into the field and the canvas painted straight over the
+     chat; you could still click into it, which is why it looked like it
+     had simply vanished. The dock moves out to the body, where 1500 means
+     what it says. (20-shell.css keeps it out of the hall.) */
+  tryTo(() => {
+    const cd = doc.querySelector('#table-app .chatdock');
+    if (cd) doc.body.appendChild(cd);
+  });
   tryTo(() => root.TableModel.load(id));
   tryTo(() => { if (root.CombatScene) root.CombatScene.hookSave(); });
   tryTo(() => root.TableProps.mount());
   tryTo(() => root.Toolbox.mount());
+  /* the three that replaced the chest and the bin: the GM's rail, the bar
+     that says what you have hold of, and the tracker a fight is run from */
+  tryTo(() => { if (root.GmRail) root.GmRail.mount(); });
+  tryTo(() => { if (root.Inspector) root.Inspector.mount(); });
+  tryTo(() => { if (root.Muster) root.Muster.mount(); });
   /* if a session hands out a role later, the box has to notice */
   root.addEventListener('monarchy:role', () => root.Toolbox.gate());
 }

@@ -146,7 +146,7 @@ heraldic:
 
 | Call | What you see | When |
 |---|---|---|
-| `Herald.wipe(mid, {title, sub})` | **The Bend.** A Sable cloth in your livery is drawn across on the diagonal with a *dancetty* (zig-zag) gilt edge. While it covers the screen, `mid()` runs and a sun *in splendour* turns behind the destination's name. Then it's drawn off the same way. | Hall ↔ table (`42-shell.js`). The table boots under the cloth, so its first-load hitch is hidden. |
+| `Herald.wipe(mid, {title, sub})` | **The Bend.** A band of Sable cloth, woven with a diaper of gilt lozenges and hemmed in your livery, is drawn across on the diagonal with a *dancetty* (zig-zag) gilt edge. While it covers the screen, `mid()` runs, a sun *in splendour* turns behind the destination's name, your arms turn in above it, the name is slammed in on a slant and gold leaf rises. Then it's drawn off the same way. All of it is CSS on `transform`/`opacity`, so none of it stops while `mid()` blocks the thread. | Hall ↔ table (`42-shell.js`). The table boots under the cloth, so its first-load hitch is hidden. |
 | `Herald.proclaim(title, {sub, tone, hold})` | **The Cry.** A Sable band slammed across the screen at −7°, with hems in the tone's tincture outside gilt. The title is engraved capitals with a blackletter initial and a hard offset shadow in the tone (the one gesture borrowed from P5), over splendour rays. Cries queue; they never overlap. | A new round (Or), whose turn it is (players: livery, allies: Azure, enemies: Gules), a natural 20 (*Fortune*, Or), a natural 1 (*Ill Omen*, Gules). |
 | `Herald.burst(x, y)` | **Gilt.** Lozenges of gold leaf thrown off a point. | Every wax seal press, the Roll seal, a roll's total. |
 
@@ -178,7 +178,14 @@ watching the DOM, so no other file's logic was changed.
   - Roll entries are dealt in one after another.
 - **Table:** chat lines arrive from the hem, a roll's total is stamped, and
   the toolbox deals its slots when the chest opens.
-- **Loading screen:** the same arrival as the lintel.
+- **Loading screen:** a herald reading the **roll of arms**. A shield turns through
+  eight coats (drawn at build time by `12-heraldry.js`, run in Node) with each
+  blazon written under it — your own coat first, with your name, once you have
+  one (`42-shell.js` leaves it drawn in `monarchy.boot.v1`). Behind it the sun in
+  splendour turns (two of it, crossing), the counterchange's gilt band passes
+  along the bend, gold leaf drifts up, and the name arrives as the lintel's does.
+  The bar runs from your livery into gilt. `test/smooth.test.js` fails if any of
+  its keyframes, or the Bend's, animates anything but `transform` and `opacity`.
 
 Reduced motion turns the Bend into a cut, and the global rule in
 `20-shell.css` makes every arrival instant.

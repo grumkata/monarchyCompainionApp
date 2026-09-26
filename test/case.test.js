@@ -1,11 +1,12 @@
-/* THE CASE, THE ORDERS, AND THE PAPER ON THE WOOD.
+/* THE DOCK, THE ORDERS, AND THE PAPER ON THE WOOD.
 
-   The three things the 2026-09-17 overhaul rebuilt. table-ui.test.js still
-   owns the rules they inherited — nothing in a kind slot is a label, the
-   name appears once, what you hold is what lands — so this only covers
-   what is new about them:
+   The case this file was named for was the chest's open lid; since
+   2026-09-25 it is a dock at your left hand (47-hand.js), and the orders
+   live in the muster (72-muster.js) rather than a writ over the board.
+   table-ui.test.js owns what you take out and how it lands; this covers:
 
-     the chest opens ON something and collapses while you carry a thing
+     the toolbox opens ON something, and its big kinds can be searched
+     carrying something leaves the dock where it is and says what it is
      a yes is a seal, a number is a tally, a choice is a row of pennons
      a record is a prop lying on the wood, and pressing it picks it up   */
 const { chromium } = require('playwright');
@@ -25,63 +26,63 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   await pg.evaluate(() => window.Shell.openTable('case-' + Date.now()));
   await wait(2200);
 
-  /* ══ THE CASE ══════════════════════════════════════════════ */
+  /* ══ THE DOCK ══════════════════════════════════════════════ */
   await pg.evaluate(() => window.Toolbox.open());
   await wait(500);
-  T('the chest opens ON a kind, not on an empty box', await pg.evaluate(() =>
-    !document.getElementById('hb-tray').hidden
-    && document.querySelectorAll('#hb-tray .hb-opt').length > 0
-    && document.querySelector('.hb-slot.on') === document.querySelectorAll('.hb-slot')[0]
-    && document.getElementById('hb-what').textContent === 'Scenes'));
+  T('the toolbox opens ON a kind, not on an empty box', await pg.evaluate(() =>
+    !document.getElementById('tbx').hidden
+    && document.querySelectorAll('#tbx-grid .tbx-tile').length > 0
+    && document.querySelector('.tbx-kind.on') === document.querySelectorAll('.tbx-kind')[0]
+    && document.getElementById('tbx-what').textContent === 'Scenes'));
 
-  T('the rail, the grid and the foot are one case', await pg.evaluate(() => {
-    const c = document.querySelector('.hb-case');
-    return !!c && c.contains(document.getElementById('hb-slots'))
-        && c.contains(document.getElementById('hb-tray'))
-        && c.contains(document.getElementById('hb-held'));
+  T('the kinds, the shelf, the grid and the foot are one dock', await pg.evaluate(() => {
+    const c = document.getElementById('tbx');
+    return !!c && ['tbx-kinds', 'tbx-shelf', 'tbx-grid', 'tbx-foot']
+      .every(id => c.contains(document.getElementById(id)));
   }));
 
-  await pg.evaluate(() => document.querySelectorAll('.hb-slot')[3].click());
+  await pg.evaluate(() => document.querySelectorAll('.tbx-kind')[3].click());
   await wait(400);
-  T('a kind with more than a plank\'s worth gets its pennons and its find well',
+  T('a kind with more than a shelf\'s worth gets its pennons and its find well',
     await pg.evaluate(() => {
-      const tabs = document.querySelectorAll('#hb-tabs .hb-tab');
-      return document.getElementById('hb-what').textContent === 'Models'
+      const tabs = document.querySelectorAll('#tbx-tabs .tbx-tab');
+      return document.getElementById('tbx-what').textContent === 'Models'
         && tabs.length > 2 && tabs[0].classList.contains('on')
-        && document.body.querySelector('.hb.finding')
-        && /\d+ things/.test(document.getElementById('hb-count').textContent);
+        && document.getElementById('tbx-shelf').classList.contains('findable')
+        && /^\d+$/.test(document.getElementById('tbx-count').textContent);
     }));
 
   T('and typing narrows it to what you asked for', await pg.evaluate(async () => {
-    const q = document.getElementById('hb-q');
+    const q = document.getElementById('tbx-q');
     q.value = 'barrel';
     q.dispatchEvent(new Event('input', { bubbles: true }));
     await new Promise(r => setTimeout(r, 120));
-    const n = [...document.querySelectorAll('#hb-tray .hb-opt .hb-nm')]
+    const n = [...document.querySelectorAll('#tbx-grid .tbx-tile .tbx-nm')]
       .map(e => e.textContent.toLowerCase());
     q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true }));
     return n.length > 0 && n.every(t => t.indexOf('barrel') >= 0);
   }));
 
-  /* ── and it gets out of the way while you carry something ── */
+  /* ── the dock stays where it is while you carry something: it is beside
+     the table now, not across the bottom of it, so there is nothing for it
+     to get out of the way of ── */
   await pg.evaluate(() => window.Hand.take(
     window.Toolbox.options('people').find(o => o.name === 'Aldric Vane')));
   await wait(300);
-  T('taking one out collapses the case to its foot', await pg.evaluate(() =>
-    document.body.classList.contains('holding')
-    && getComputedStyle(document.getElementById('hb-tray')).display === 'none'
-    && getComputedStyle(document.getElementById('hb-slots')).display === 'none'
-    && document.getElementById('hb-held').classList.contains('on')));
-  T('and the foot says what you are holding and what it can still be',
-    await pg.evaluate(() =>
-      /Aldric Vane/.test(document.getElementById('hb-held').textContent)
-      && document.querySelectorAll('#hb-rack .hb-var').length === 2
-      && /wheel to change/.test(document.getElementById('hb-hint').textContent)));
+  T('taking one out leaves the dock open beside the table', await pg.evaluate(() =>
+    document.body.classList.contains('holding') && window.Hand.isUp()
+    && getComputedStyle(document.getElementById('tbx-grid')).display !== 'none'));
+  T('and says, at the foot of the table, what you are holding and how to put it down',
+    await pg.evaluate(() => {
+      const p = document.querySelector('.tbx-pill');
+      return !!p && !p.hidden && /Aldric Vane/.test(p.textContent)
+          && /wheel to change/.test(p.textContent)
+          && /Aldric Vane/.test(document.getElementById('tbx-foot').textContent);
+    }));
   await pg.evaluate(() => window.Hand.drop());
   await wait(300);
-  T('putting it back brings the whole case back', await pg.evaluate(() =>
-    !document.body.classList.contains('holding')
-    && getComputedStyle(document.getElementById('hb-tray')).display !== 'none'));
+  T('putting it back leaves nothing in your hand', await pg.evaluate(() =>
+    !document.body.classList.contains('holding') && document.querySelector('.tbx-pill').hidden));
   await pg.evaluate(() => window.Toolbox.shut());
   await wait(300);
 
@@ -139,9 +140,14 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   /* ══ THE ORDERS ════════════════════════════════════════════ */
   await pg.evaluate(() => window.Toolbox.take({ act: 'make', kind: 'scene', scene: 'combat' }, 1200, 780));
   await wait(900);
-  const sceneId = await pg.evaluate(() => window.TableModel.scenes()[0].id);
+  /* the orders of the fight that is RUNNING, which live in its muster now */
+  const sceneId = await pg.evaluate(() => window.TableModel.activeScene().id);
   await pg.evaluate(id => window.SceneSetup.showOptions(id, true), sceneId);
   await wait(300);
+  T('asking for a fight\'s orders opens its muster, not a writ over the board',
+    await pg.evaluate(() => window.Muster.isOpen()
+      && !!document.querySelector('#muster #sc-opts .sc-seal[data-opt="fog"]')
+      && !document.querySelector('#sc-float:not([hidden])')));
 
   T('no dropdown, no checkbox, no spinner is left in the orders',
     await pg.evaluate(() => {

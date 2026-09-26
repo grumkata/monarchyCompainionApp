@@ -35,25 +35,20 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   await pg.evaluate(() => Shell.openTable('join-test')); await pg.waitForTimeout(1800);
   await pg.evaluate(() => Toolbox.open()); await pg.waitForTimeout(600);
 
-  /* The chest offers him as a COUNTER in a slot, not as a row reading his
-     name — 46-figures.js draws the piece and the bar names only whatever you
-     are pointing at. So the check is: he is in the bar, his slot holds a
-     counter lettered from his name, and pointing at it says who he is. */
-  /* He is in the PEOPLE tray, drawn as his own counter. The plank holds the
-     kinds; the tray holds the actual people, and the bar names only whatever
-     you are pointing at. */
-  T('the chest offers him by name', await pg.evaluate(async () => {
-    document.querySelectorAll('.hb-slot')[1].click();     /* People */
+  /* He is under PEOPLE in the toolbox, drawn as his own counter with his name
+     beneath it, and pointing at him says who he is. (The chest's rule that a
+     slot must not carry a name went with the chest: the toolbox is a shelf
+     of a hundred things, and a name under each is how one is found.) */
+  T('the toolbox offers him by name', await pg.evaluate(async () => {
+    document.querySelectorAll('.tbx-kind')[1].click();     /* People */
     await new Promise(r => setTimeout(r, 80));
-    const n = Toolbox.options('people').findIndex(o => o.name === 'Sir Aldric');
-    if (n < 0) return false;
-    const slot = document.querySelectorAll('#hb-tray .hb-opt')[n];
-    if (!slot) return false;
-    const disc = slot.querySelector('.fg-tok b');
-    if (!disc || disc.textContent !== 'SA') return false;
-    slot.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
+    const tile = [...document.querySelectorAll('#tbx-grid .tbx-tile')]
+      .find(b => b.querySelector('.tbx-nm') && b.querySelector('.tbx-nm').textContent === 'Sir Aldric');
+    if (!tile || !tile.querySelector('.fg-tok')) return false;
+    tile.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
     await new Promise(r => setTimeout(r, 60));
-    return document.getElementById('hb-tip').textContent.trim() === 'Sir Aldric';
+    const tip = document.querySelector('.tbx-tip');
+    return !!tip && tip.classList.contains('on') && tip.textContent.trim() === 'Sir Aldric';
   }));
 
   await pg.evaluate(() => Toolbox.take({ act: 'make', kind: 'scene', scene: 'combat' }, 1200, 780));

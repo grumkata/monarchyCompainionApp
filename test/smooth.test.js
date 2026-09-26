@@ -56,7 +56,48 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
     /@keyframes bootsweep\{to\{transform:translateX\(100%\)\}\}/.test(page)
     && /\.boot-bar u\{[^}]*animation:bootsweep/.test(page));
 
+  /* ══ THE LOADING SCREENS ARE HERALDRY, AND THEY MOVE ON THE COMPOSITOR ══
+     grumkata: "make the loading screens more dynamic and interesting and most
+     importantly coherent with the design elements and identity of the game".
+     The boot screen reads a roll of arms drawn at build time by the app's own
+     heraldry; the Bend turns the same sun behind the name. And more motion is
+     only allowed if it survives the freeze it covers: every keyframe either
+     screen uses may animate transform and opacity and nothing else. */
+  const rollOf = page.slice(page.indexOf('<div id="boot">'), page.indexOf('<template id="m-sun">'));
+  const coats = [...rollOf.matchAll(/<figure class="boot-arms[^"]*"[^>]*>(<svg[\s\S]*?<\/svg>)<figcaption>([^<]+)<\/figcaption><\/figure>/g)];
+  T('the boot screen reads a roll of eight coats, each drawn and blazoned at build time',
+    coats.length === 8 && coats.every(m => /clip-path="url\(#rl\d-/.test(m[1]) && /,|Or|Gules|Azure/.test(m[2])));
+  T('and the sun in splendour is left as a template for the Bend to turn as well',
+    /<template id="m-sun"><svg[^>]*viewBox="-1 -1 2 2"/.test(page));
+  const frames = [...page.matchAll(/@keyframes\s+((?:boot|hr-)[\w-]*)\s*\{([\s\S]*?\})\s*\}/g)];
+  const animated = frames.map(m => [m[1], [...new Set([...m[2].matchAll(/([a-z-]+)\s*:/g)].map(x => x[1]))]]);
+  T('every keyframe either loading screen uses animates transform or opacity, and nothing else  ('
+    + animated.length + ' of them)',
+    animated.length >= 15 && animated.every(([, ps]) => ps.every(p => p === 'transform' || p === 'opacity')));
+
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+
+  /* ══ AND IT READS YOUR ARMS FIRST ══════════════════════════ */
+  {
+    const site0 = await serve();
+    const p0 = await b.newPage({ viewport: { width: 1200, height: 800 } });
+    await p0.addInitScript(() => {
+      try { localStorage.setItem('monarchy.boot.v1', JSON.stringify({
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" width="176" height="211"><rect id="me-t" width="10" height="10"/></svg>',
+        blazon: 'Azure, a lion Or', name: 'Test Herald', house: '#27508f' })); } catch (e) {}
+      /* the screen is gone once the page loads, so what it said is caught as
+         it says it */
+      new MutationObserver(() => {
+        const f = document.querySelector('#boot .boot-arms.me figcaption');
+        if (f && /Test Herald/.test(f.textContent)) window.__meFirst = f.textContent;
+      }).observe(document, { childList: true, subtree: true });
+    });
+    await p0.goto(site0.url + '/monarchy.html');
+    await p0.waitForTimeout(1500);
+    T('a player\'s own coat, left by the last session, is the first one read — with their name',
+      /Test Herald\s*Azure, a lion Or/.test(await p0.evaluate(() => window.__meFirst || '')));
+    await p0.close();
+  }
   const pg = await b.newPage({ viewport: { width: 1500, height: 950 } });
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
   const site = await serve();

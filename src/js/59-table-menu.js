@@ -345,7 +345,7 @@ root.addEventListener('monarchy:session', e => {
     setTimeout(() => { if (root.Menu && root.Menu.toast) root.Menu.toast('The GM has closed the table'); }, 700);
     return;
   }
-  if (open) draw();
+  if (open && d.what !== 'stir') draw();
 });
 root.addEventListener('monarchy:opts', () => { if (open && view === 'settings') draw(); });
 doc.addEventListener('fullscreenchange', () => { if (open && view === 'settings') draw(); });

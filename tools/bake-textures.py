@@ -85,6 +85,8 @@ PACKS = [
     "36-sprite-assets.js",
     "52-room-assets.js",
     "53-tavern-assets.js",
+    "70-terra-assets.js",
+    "71-dungeon-assets.js",
 ]
 
 # JPEG quality. 85 is the point where re-encoding a 1024 down to 512 stops

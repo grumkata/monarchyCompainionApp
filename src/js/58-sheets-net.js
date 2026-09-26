@@ -94,7 +94,11 @@ function wrap() {
     if (rec.__shared && live()) {
       const clean = Object.assign({}, rec);
       delete clean.__shared; delete clean.__by; delete clean.__byName;
-      return S().bring(clean), true;
+      /* a moment after the typing stops, like your own — the record is saved
+         on every keystroke (45-papers.js commit), and this sent the whole of
+         it, portrait and all, to every seat at the table each time */
+      shared[rec.id] = Object.assign({}, shared[rec.id], { data: clean });
+      return resend(clean), true;
     }
     const ok = putWas.call(this, rec);
     /* YOUR OWN CHARACTER, BROUGHT TO THE TABLE, IS STILL YOURS — and what
@@ -106,12 +110,16 @@ function wrap() {
     return ok;
   };
 }
-let resendT = 0, resendRec = null;
+/* one timer PER SHEET: with one for all of them, editing two records inside
+   the same moment sent only the second, and the first never reached the
+   table */
+const resendT = {}, resendRec = {};
 function resend(rec) {
-  resendRec = rec;
-  clearTimeout(resendT);
-  resendT = setTimeout(() => {
-    const r = resendRec; resendRec = null;
+  resendRec[rec.id] = rec;
+  clearTimeout(resendT[rec.id]);
+  resendT[rec.id] = setTimeout(() => {
+    const r = resendRec[rec.id];
+    delete resendRec[rec.id]; delete resendT[rec.id];
     if (r && live() && shared[r.id]) S().bring(Object.assign({}, r));
   }, 700);
 }

@@ -53,7 +53,11 @@ const pack = {
   WOOD:      () => (typeof WOOD      !== 'undefined' ? WOOD      : null),
   WOOD_TEX:  () => (typeof WOOD_TEX  !== 'undefined' ? WOOD_TEX  : null),
   BITS:      () => (typeof BITS      !== 'undefined' ? BITS      : null),
-  BITS_TEX:  () => (typeof BITS_TEX  !== 'undefined' ? BITS_TEX  : null)
+  BITS_TEX:  () => (typeof BITS_TEX  !== 'undefined' ? BITS_TEX  : null),
+  TERRA:     () => (typeof TERRA     !== 'undefined' ? TERRA     : null),
+  TERRA_TEX: () => (typeof TERRA_TEX !== 'undefined' ? TERRA_TEX : null),
+  DUNGEON:     () => (typeof DUNGEON     !== 'undefined' ? DUNGEON     : null),
+  DUNGEON_TEX: () => (typeof DUNGEON_TEX !== 'undefined' ? DUNGEON_TEX : null)
 };
 const G = k => { try { return pack[k] ? pack[k]() : undefined; } catch (e) { return undefined; } };
 const KEY_ART = 'monarchy.art.v1';
@@ -291,8 +295,74 @@ function bitsPack() {
   });
 }
 
+/* ── THE WILDS ────────────────────────────────────────────────
+   The rest of the Nature MegaKit (tools/bake_terrain.py): what the blighted
+   waste, the desert and the snowfield are made of in the field, and worth
+   having on the wood for the same reason a tree is. Unit-normalised like
+   the kit, so the width each stands at is written here. */
+function terraPack() {
+  const P = G('TERRA'); if (!P) return [];
+  const NAMED = {
+    dead1: ['Dead tree', 520], dead3: ['Dead tree, tall', 560], twist2: ['Twisted tree', 580],
+    pine1: ['Pine, slender', 500], pine2: ['Pine, broad', 540],
+    drock1: ['Sandstone', 330], drock2: ['Sandstone, flat', 300], drock3: ['Sandstone boulder', 420],
+    fungus: ['Bracket fungus', 170], plantB: ['Broad leaves', 260], plantA: ['Tall fern', 260],
+    pebR3: ['Stones', 140], pebS5: ['Flat stones', 150]
+  };
+  return Object.keys(P).map(k => {
+    const n = NAMED[k] || [k, 240];
+    return { id: 'terra:' + k, name: n[0], foot: n[1], prims: P[k].prims,
+             tex: G('TERRA_TEX'), pack: 'Wilds' };
+  });
+}
+
+/* ── THE DUNGEON ──────────────────────────────────────────────
+   KayKit's Dungeon Pack, at its own size in metres (the field builds a
+   crypt out of these and it has to close). On the wood a metre is sixty
+   units — a four-metre wall is 120mm, a counter's base is 42mm — which is
+   the scale the rest of a tabletop dungeon is set out at. */
+const DUNGEON_SCALE = 60;
+const DUNGEON_NAMES = {
+  floor_tile_large: 'Flagstones', floor_tile_large_rocks: 'Flagstones, rubble',
+  floor_dirt_large: 'Earth floor', floor_dirt_large_rocky: 'Earth floor, stony',
+  floor_wood_large: 'Wooden floor', wall: 'Wall', wall_broken: 'Wall, broken',
+  wall_arched: 'Wall, arched', wall_doorway: 'Doorway', wall_half: 'Wall, half',
+  wall_corner: 'Wall, corner', wall_pillar: 'Wall with pillar', wall_window_open: 'Wall, window',
+  pillar: 'Pillar', pillar_decorated: 'Pillar, carved', column: 'Column stump',
+  torch_lit: 'Torch', torch_mounted: 'Wall torch', barrel_large: 'Barrel',
+  barrel_small_stack: 'Barrels, stacked', crates_stacked: 'Crates', rubble_large: 'Rubble',
+  rubble_half: 'Rubble, small', barrier: 'Barricade', barrier_column: 'Barricade, posts',
+  banner_patternA_red: 'Banner, red', banner_patternB_blue: 'Banner, blue',
+  banner_thin_yellow: 'Pennant, gold', candle_triple: 'Candles', chest: 'Chest',
+  sword_shield: 'Sword and shield', table_long_broken: 'Broken table',
+  shelf_small_candles: 'Shelf of candles', stairs: 'Stairs', trunk_large_A: 'Trunk'
+};
+function dungeonPack() {
+  const P = G('DUNGEON'); if (!P) return [];
+  return Object.keys(P).map(k => {
+    const sz = P[k].size || [1, 1, 1];
+    const shelf = /^(floor|wall|pillar|column|stairs)/.test(k) ? 'Stonework' : 'Dungeon';
+    return { id: 'dun:' + k, name: DUNGEON_NAMES[k] || prettify(k),
+             foot: Math.max(80, Math.round(Math.max(sz[0], sz[2]) * DUNGEON_SCALE)),
+             dress: 'stone', prims: P[k].prims, tex: G('DUNGEON_TEX'), pack: shelf };
+  });
+}
+
+/* ── WHAT WENT, AND WHY ───────────────────────────────────────
+   grumkata: "many objects in the toolbox who look weird and artifical and
+   straight up dont work sometimes". Two shelves were exactly that:
+
+     PIECES   KayKit's board-game bits — plastic meeples, pawns and discs in
+              toy colours. They were here because a counter used to BE one;
+              a counter is a person now (65-token-look.js), and a meeple on
+              a tavern table is a toy somebody left there.
+     THINGS   the animated chest and the cream KayKit container, which were
+              only ever here because they were the toolbox and the bin.
+
+   bitsPack and bigPack are left written, in case a shelf of them is ever
+   wanted back; they are simply not on the list. */
 function modelList() {
-  return kitPack().concat(woodPack(), bitsPack(), bigPack());
+  return kitPack().concat(terraPack(), woodPack(), dungeonPack());
 }
 function modelGroups() {
   const by = {};

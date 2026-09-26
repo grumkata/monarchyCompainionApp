@@ -68,7 +68,9 @@ const GEO_PACKS = {
   '33-dice-assets.js':   'DICE_ASSETS',
   '35-kit-assets.js':    'KIT',
   '52-room-assets.js':   'ROOM',
-  '53-tavern-assets.js': 'TAVERN'
+  '53-tavern-assets.js': 'TAVERN',
+  '70-terra-assets.js':  'TERRA',
+  '71-dungeon-assets.js':'DUNGEON'
 };
 const { pack } = require('./tools/pack-geometry.js');
 let geoWas = 0, geoNow = 0, geoArrays = 0;
@@ -121,7 +123,10 @@ const CSS = [
      wear the record's own stylesheet */
   ['src/css/01-sheet.css',   ['body.at-hall', '.tp']],
   ['src/css/12-combat.css',  'body.at-table'],
-  ['src/css/13-table-ui.css','body.at-table']
+  ['src/css/13-table-ui.css','body.at-table'],
+  /* the toolbox dock, the workbench, the counters, the tracker and the war
+     room (2026-09-25) — last, so it wins over what it replaced */
+  ['src/css/14-war.css',     'body.at-table']
 ];
 
 const JS = [
@@ -143,15 +148,18 @@ const JS = [
   'src/js/09-blazon3d.js',       // Blazon in 3D: banded light, the house ramp, a gilt rim
   'src/js/01-castle-assets.js',  // Castle Pack, baked by tools/bake_castle.py
   'src/js/02-charge-assets.js',  // heraldic charges (game-icons.net, CC BY 3.0)
-  'src/js/20-chest-asset.js',    // AnimatedChest, baked by tools/bake_chest.py
-  'src/js/19-bin-asset.js',      // KayKit container, baked by tools/bake_gltf.py
+  /* 20-chest-asset.js, 19-bin-asset.js and 18-bits-assets.js are no longer
+     built in: the chest and the bin were the toolbox, and the board-game bits
+     were what a counter used to be (2026-09-25). The files are still in
+     src/js and still bake; put a line back here to have one again. */
   'src/js/17-wood-assets.js',    // WoodStuff (CC0, loafbrr) — the table, and the furniture
-  'src/js/18-bits-assets.js',    // KayKit BoardGameBits — the pieces that stand on it
   'src/js/33-dice-assets.js',
   'src/js/35-kit-assets.js',     // Nature MegaKit, baked
   'src/js/36-sprite-assets.js',
   'src/js/52-room-assets.js',    // Medieval Village MegaKit — the tavern shell
   'src/js/53-tavern-assets.js',  // soiTavern — what makes it a tavern
+  'src/js/70-terra-assets.js',   // the rest of the Nature MegaKit — wastes, marsh, desert, snow
+  'src/js/71-dungeon-assets.js', // KayKit Dungeon — the crypt, and what a fight happens among
 
   'src/js/10-sheet-data.js',     // ── the hall ──
   'src/js/11-prebuilt-data.js',
@@ -160,6 +168,7 @@ const JS = [
   'src/js/14-codex.js',
   'src/js/15-sheet.js',
 
+  'src/js/65-token-look.js',     // what a counter looks like; read by the mat, the wood and the field
   'src/js/30-rules.js',          // ── the fight ──
   'src/js/31-content.js',
   'src/js/32-combat-app.js',     // needs #field in the page: it renders on load
@@ -198,6 +207,11 @@ const JS = [
   'src/js/62-pocket.js',         // your own notes, in your hand or on the table
   'src/js/63-point.js',          // pointing at the table
   'src/js/64-kit.js',            // the rail everyone has: sheets, notes, draw, point
+  'src/js/66-workbench.js',      // everything a thing can be, chosen before it is put down
+  'src/js/67-inspector.js',      // the one you have hold of: edit, duplicate, turn, remove
+  'src/js/68-gm-rail.js',        // the GM's rail: toolbox, the fight, prepared fights
+  'src/js/72-muster.js',         // the fight run from one place: the roll, the card, the ground
+  'src/js/73-encounters.js',     // fights made before the evening, and the war room they are made in
   'src/js/42-shell.js',          // ── which half you are looking at ──
   'src/js/16-menu.js'            // last: it boots the hall
 ];
@@ -269,43 +283,155 @@ const tail = bodies.map((src, i) => {
          `<script>window.__boot&&__boot(${jsSeen},${jsBytes})</script>`;
 }).join('\n');
 
+/* ══ THE LOADING SCREEN IS A ROLL OF ARMS ═════════════════════
+   grumkata: make the loading screens "more dynamic and interesting and most
+   importantly coherent with the design elements and identity of the game".
+
+   It was a crossed-swords glyph, the name and a bar: correct, and nothing
+   that could only be Monarchy. What only Monarchy has is its heraldry, so
+   the wait is a HERALD READING THE ROLL — a shield that turns through coats
+   of arms, each with its blazon written under it the way the flag maker
+   writes yours; a sun IN SPLENDOUR turning behind it (the same sun the Bend
+   and the Cry use); the counterchange's gilt band passing along the bend;
+   gold leaf drifting up through the dark. Your own coat is read first, once
+   you have one (42-shell.js leaves it where this screen can find it).
+
+   THE ARMS ARE DRAWN HERE, AT BUILD TIME, by the app's own heraldry. This
+   screen is up precisely because no script has been read yet, so nothing
+   can draw at run time — but 12-heraldry.js touches no DOM, so Node can run
+   it and the coats arrive as finished SVG in the page itself.
+
+   AND EVERY MOVING PART MOVES ON transform OR opacity, the only two things
+   the compositor animates on its own thread (STYLE.md §6⅓). The page behind
+   this is parsing twelve megabytes and the main thread is gone for seconds
+   at a time; a turn, a spin or a drift driven by anything else would freeze
+   for exactly as long as it exists to cover. test/smooth.test.js reads the
+   keyframes below and fails if one ever animates anything else. */
+const vm = require('vm');
+function heraldryInNode() {
+  const w = {}; w.window = w;
+  const ctx = vm.createContext({ window: w });
+  vm.runInContext(R('src/js/02-charge-assets.js'), ctx);
+  vm.runInContext(R('src/js/12-heraldry.js'), ctx);
+  return w.Heraldry;
+}
+/* every id in a baked coat is given a prefix, so eight coats and the
+   player's own can share one page without two clip paths answering to the
+   same name — a duplicate id resolves to whichever the document met first */
+const reid = (svg, p) => svg.replace(/id="/g, 'id="' + p)
+  .replace(/url\(#/g, 'url(#' + p).replace(/href="#/g, 'href="#' + p);
+const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* THE ROLL. Eight coats, every one of them keeping the rule of tincture, a
+   spread of divisions, ordinaries and charges so the turning shield shows
+   off what the flag maker can do. The first slot is the player's own when
+   there is one. */
+const ROLL = [
+  { a: 'gules', chg: 'lion', chgT: 'or' },
+  { a: 'azure', chg: 'fleur', chgT: 'or', chgN: 3 },
+  { div: 'quarterly', a: 'or', b: 'gules', bord: 'plain', bordT: 'sable' },
+  { a: 'vert', ord: 'chief', ordT: 'or', chg: 'stag', chgT: 'argent' },
+  { a: 'purpure', chg: 'tower', chgT: 'argent', bord: 'compony', bordT: 'or' },
+  { a: 'or', ord: 'bend', ordT: 'azure', chg: 'raven', chgT: 'sable' },
+  { div: 'perChevron', a: 'argent', b: 'gules', chg: 'rose', chgT: 'or', chgN: 3 },
+  { a: 'sable', ord: 'cross', ordT: 'or', chg: 'crown', chgT: 'gules' }
+];
+const HER = heraldryInNode();
+const ROLL_HTML = ROLL.map((A, i) =>
+  `<figure class="boot-arms${i === 0 ? ' me' : ''}" style="--i:${i}">` +
+  reid(HER.armsSVG(A, { shape: 'shield', w: 176, h: 211 }), 'rl' + i + '-') +
+  `<figcaption>${escH(HER.blazonText(A))}</figcaption></figure>`).join('');
+
+/* A SUN IN SPLENDOUR, the heraldic way: twenty-two rays round a face, straight
+   and wavy by turns (rayonny), never a starburst. Drawn in a unit circle and
+   filled with a radial of the app's own Or tokens, so it is gilt whatever
+   happens to the palette. Kept outside the loading screen as a <template>,
+   because 55-herald.js stands the same sun behind the Bend's title long
+   after this screen is gone. */
+function sunSVG() {
+  const n = 22, r0 = 0.15, pt = (r, a) => (r * Math.cos(a)).toFixed(4) + ' ' + (r * Math.sin(a)).toFixed(4);
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2, half = (Math.PI / n) * 0.46;
+    if (i % 2 === 0) {
+      d += 'M' + pt(r0, a - half) + 'L' + pt(1, a) + 'L' + pt(r0, a + half) + 'Z';
+    } else {
+      /* a flame: its spine waves, and it tapers to a point short of the rim */
+      const L = [], Rt = [], steps = 22, tip = 0.84;
+      for (let s = 0; s <= steps; s++) {
+        const u = s / steps, r = r0 + (tip - r0) * u;
+        const wave = Math.sin(u * Math.PI * 3.2) * 0.07 * u;
+        const w = half * 0.9 * (1 - u) + 0.004;
+        L.push(pt(r, a + wave - w)); Rt.unshift(pt(r, a + wave + w));
+      }
+      d += 'M' + L.join('L') + 'L' + Rt.join('L') + 'Z';
+    }
+  }
+  return '<svg viewBox="-1 -1 2 2" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<defs><radialGradient id="msun-g" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse">' +
+    '<stop offset=".12" style="stop-color:var(--m-or-hi,#ecd27a);stop-opacity:.95"/>' +
+    '<stop offset=".5" style="stop-color:var(--m-or,#c9a227);stop-opacity:.55"/>' +
+    '<stop offset="1" style="stop-color:var(--m-or,#c9a227);stop-opacity:0"/></radialGradient></defs>' +
+    '<path fill="url(#msun-g)" d="' + d + '"/></svg>';
+}
+const SUN = sunSVG();
+
+/* gold leaf, rising — placed and timed from a fixed seed so every build
+   draws the same drift */
+const DUST = (() => {
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  let out = '';
+  for (let i = 0; i < 18; i++) {
+    const x = (4 + rnd() * 92).toFixed(1), s = (3 + rnd() * 5).toFixed(1);
+    const dur = (7 + rnd() * 7).toFixed(2), t = (-rnd() * 14).toFixed(2);
+    out += `<i style="--x:${x}%;--s:${s}px;--d:${dur}s;--t:${t}s"></i>`;
+  }
+  return out;
+})();
+
 const LOADING = `
 <div id="boot">
+  <div class="boot-bend"></div>
+  <div class="boot-dust">${DUST}</div>
   <div class="boot-in">
-    <div class="boot-mark">&#9876;</div>
+    <div class="boot-roll">
+      <div class="boot-sun">${SUN}</div>
+      <div class="boot-sun far">${SUN}</div>
+      ${ROLL_HTML}
+    </div>
     <div class="boot-name">Monarchy</div>
     <div class="boot-bar"><i></i><u></u></div>
-    <div class="boot-say">setting the table&hellip;</div>
+    <div class="boot-say">the heralds are summoned&hellip;</div>
   </div>
 </div>
+<template id="m-sun">${SUN}</template>
 <style>
-/* Blazon's first frame: Sable ground, the mark in Argent, the bar in Or on a
-   bend-cut track. The tokens are 20-shell.css's — that sheet is in <head>,
-   so they already resolve here.
+/* Blazon's first frame. The tokens are 20-shell.css's — that sheet is in
+   <head>, so they already resolve here.
 
    ══ WHAT CAN MOVE WHILE THE PAGE IS BUSY ══════════════════════
-   Almost nothing, and that is the whole design problem here. This screen is
-   up because the browser is parsing twelve megabytes of script, which blocks
-   the main thread — so anything driven by JavaScript, or by a CSS property
-   that needs layout or paint, is frozen for the entire time it matters.
-
-   What DOES keep running is animation the compositor can do by itself:
-   transform and opacity, on their own layers. So the two things that move
-   continuously here — the shimmer sweeping the bar (translateX) and the
-   mark's pulse (opacity) — are both compositor-only, and they carry on
-   through a two-second parse freeze. The bar's own width cannot: it is laid
-   out, so it advances in steps, one per script. That is why the steps are
-   weighted by bytes and eased over a long curve: they are the one part that
-   has to look deliberate rather than smooth. */
+   Only what the compositor can do by itself: transform and opacity, on
+   their own layers. So everything that moves here — the turning shield, the
+   sun, the bend, the gold leaf, the shimmer on the bar — is one of those two
+   and carries on through a two-second parse freeze. The bar's own width
+   cannot: it is laid out, so it advances in steps, one per script, weighted
+   by bytes and eased over a long curve so that it looks deliberate. */
 /* the same isolation as the Bend's cover, for the same reason: this is up
    because the page is busy, so it must not share a layer with the page */
 #boot{contain:layout paint style;will-change:transform;
-  position:fixed;inset:0;z-index:100000;display:flex;
+  position:fixed;inset:0;z-index:100000;display:flex;overflow:hidden;
   align-items:center;justify-content:center;
-  background:radial-gradient(ellipse at 50% 38%,#241a10 0%,var(--m-sable-0,#0a0705) 76%);
+  background:radial-gradient(ellipse at 50% 40%,#2c1e10 0%,#150f09 44%,var(--m-sable-0,#0a0705) 80%);
   font-family:var(--m-f-hand,Georgia,serif);
   transition:opacity .5s ease}
-.boot-in{display:flex;flex-direction:column;align-items:center;gap:18px;
+/* the Bend's cloth, faintly: a lattice of lozenges (a diaper) over the dark */
+#boot::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(45deg,rgba(201,162,39,.05) 0 1px,transparent 1px 40px),
+             repeating-linear-gradient(-45deg,rgba(201,162,39,.05) 0 1px,transparent 1px 40px);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 42%,#000 12%,transparent 72%);
+          mask-image:radial-gradient(ellipse at 50% 42%,#000 12%,transparent 72%)}
+.boot-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;
   will-change:transform,opacity;
   transition:transform .62s cubic-bezier(.5,0,.85,.4),opacity .42s ease}
 /* the screen lifts the way the Bend's cloth does rather than just fading:
@@ -313,15 +439,74 @@ const LOADING = `
    agree about how a cover comes off */
 #boot.gone{opacity:0;pointer-events:none}
 #boot.gone .boot-in{transform:translateY(-26px) scale(.97);opacity:0}
-.boot-mark{font-size:40px;color:var(--m-or,#c9a227);opacity:.72;
-  text-shadow:0 0 26px rgba(201,162,39,.35);
-  animation:bootpulse 2.6s ease-in-out infinite;will-change:opacity}
-.boot-name{font-family:var(--m-f-mark,serif);font-size:56px;
-  color:var(--m-argent-hi,#e8dfc8);letter-spacing:.02em;text-shadow:0 0 40px rgba(201,120,40,.35)}
+
+/* ── THE SUN, turning behind the shield: two of it, one large and slow, one
+   larger, fainter and the other way, so the rays shimmer as they cross ── */
+.boot-sun{position:absolute;left:50%;top:44%;width:620px;height:620px;transform:translate(-50%,-50%);
+  pointer-events:none;opacity:.34;will-change:transform;animation:bootsun 80s linear infinite}
+/* centred by translate, not margins: the hall's reset (body.at-hall *{margin:0})
+   outranks a bare class and put the first sun off in a corner */
+.boot-sun.far{width:1100px;height:1100px;opacity:.12;
+  animation-duration:150s;animation-direction:reverse}
+.boot-sun svg{display:block;width:100%;height:100%}
+@keyframes bootsun{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* ── THE ROLL. Eight coats on one spot, each turning in on its edge, held,
+   and turning away as the next comes round — the whole roll every 14.4s,
+   each coat's turn 1.8s later than the last (--i). ── */
+.boot-roll{position:relative;width:176px;height:252px;perspective:900px}
+.boot-arms{position:absolute;left:0;top:0;width:176px;margin:0;opacity:0;
+  transform:rotateY(-78deg) scale(.94);backface-visibility:hidden;will-change:transform,opacity;
+  animation:bootturn 14.4s cubic-bezier(.2,.7,.2,1) infinite both;
+  animation-delay:calc(var(--i) * 1.8s)}
+.boot-arms svg{display:block;width:176px;height:211px;filter:drop-shadow(0 12px 18px rgba(0,0,0,.65))}
+.boot-arms figcaption{width:420px;margin:12px 0 0 -122px;text-align:center;white-space:nowrap;
+  font-style:italic;font-size:14px;letter-spacing:.02em;color:rgba(222,216,200,.72)}
+.boot-arms figcaption b{font-family:var(--m-f-cap,serif);font-style:normal;font-size:10px;font-weight:700;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--m-or,#c9a227);margin-right:6px}
+@keyframes bootturn{
+  0%{opacity:0;transform:rotateY(-78deg) scale(.94)}
+  2.5%{opacity:1;transform:rotateY(0) scale(1)}
+  11%{opacity:1;transform:rotateY(0) scale(1)}
+  13.5%{opacity:0;transform:rotateY(78deg) scale(.94)}
+  100%{opacity:0;transform:rotateY(78deg) scale(.94)}}
+
+/* ── THE COUNTERCHANGE, across the whole screen: the gilt band every hovered
+   and chosen thing in the app wears, passing along the bend ── */
+.boot-bend{position:absolute;top:-50%;left:0;width:26vw;height:200%;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(236,210,122,.05) 38%,rgba(236,210,122,.11) 50%,rgba(236,210,122,.05) 62%,transparent);
+  transform:translateX(-40vw) rotate(25deg);will-change:transform;
+  animation:bootbend 6s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes bootbend{0%{transform:translateX(-40vw) rotate(25deg)}
+  60%,100%{transform:translateX(125vw) rotate(25deg)}}
+
+/* ── GOLD LEAF: the Herald's burst, slowed to a drift ── */
+.boot-dust{position:absolute;inset:0;pointer-events:none}
+.boot-dust i{position:absolute;left:var(--x);bottom:-12px;width:var(--s);height:var(--s);
+  background:var(--m-or-hi,#ecd27a);opacity:0;transform:translateY(0) rotate(45deg);
+  will-change:transform,opacity;animation:bootdust var(--d) linear var(--t) infinite}
+@keyframes bootdust{0%{opacity:0;transform:translateY(0) rotate(45deg)}
+  12%{opacity:.75}75%{opacity:.4}
+  100%{opacity:0;transform:translateY(-104vh) rotate(315deg)}}
+
+/* ── the name, and the lozenge rule drawing out under it ── */
+.boot-name{position:relative;font-family:var(--m-f-mark,serif);font-size:58px;line-height:1;
+  color:var(--m-argent-hi,#e8dfc8);letter-spacing:.02em;
+  text-shadow:0 3px 0 rgba(0,0,0,.6),0 0 40px rgba(201,120,40,.35);
+  will-change:transform,opacity;animation:bootname 1s cubic-bezier(.16,.84,.24,1) both}
+.boot-name::after{content:'';display:block;width:240px;height:11px;margin:14px auto 0;
+  background:
+    linear-gradient(45deg,transparent 35%,var(--m-or,#c9a227) 35% 65%,transparent 65%) center/11px 11px no-repeat,
+    linear-gradient(90deg,transparent,var(--m-or,#c9a227) 36%,transparent 46%,transparent 54%,var(--m-or,#c9a227) 64%,transparent) center/100% 1px no-repeat;
+  animation:bootrule .9s cubic-bezier(.16,.84,.24,1) .35s both}
+@keyframes bootname{from{opacity:0;transform:translateY(14px) scale(1.08)}}
+@keyframes bootrule{from{opacity:0;transform:scaleX(0)}}
+
+/* ── the bar: gilt on a track cut on the bend, and a shimmer that never stops ── */
 .boot-bar{position:relative;width:236px;height:6px;background:rgba(201,162,39,.14);
   overflow:hidden;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
 .boot-bar i{display:block;height:100%;width:0;
-  background:linear-gradient(90deg,var(--m-or-lo,#8a6a20),var(--m-or-hi,#e0c169));
+  background:linear-gradient(90deg,var(--m-house,#a3232b),var(--m-or-lo,#8a6a20) 30%,var(--m-or-hi,#e0c169));
   /* a long, late-settling curve, so a big script's jump glides in instead of
      snapping — and so two ticks close together read as one movement */
   transition:width .7s cubic-bezier(.16,.84,.24,1)}
@@ -333,31 +518,36 @@ const LOADING = `
   transform:translateX(-100%);will-change:transform;
   animation:bootsweep 1.5s linear infinite}
 @keyframes bootsweep{to{transform:translateX(100%)}}
-.boot-say{font-size:13px;font-style:italic;color:rgba(222,216,200,.46);
-  letter-spacing:.04em}
-/* the mark resolves out of a blur and the lozenge rule draws out under it —
-   the same arrival the hall's lintel makes, so the first frame and the
-   second agree */
-.boot-name{position:relative;animation:bootname 1.1s cubic-bezier(.16,.84,.24,1) both}
-.boot-name::after{content:'';display:block;width:240px;height:11px;margin:14px auto 0;
-  background:
-    linear-gradient(45deg,transparent 35%,var(--m-or,#c9a227) 35% 65%,transparent 65%) center/11px 11px no-repeat,
-    linear-gradient(90deg,transparent,var(--m-or,#c9a227) 36%,transparent 46%,transparent 54%,var(--m-or,#c9a227) 64%,transparent) center/100% 1px no-repeat;
-  animation:bootrule .9s cubic-bezier(.16,.84,.24,1) .35s both}
-@keyframes bootname{from{opacity:0;letter-spacing:.24em;filter:blur(8px)}to{filter:blur(0)}}
-@keyframes bootrule{from{clip-path:inset(0 50%)}to{clip-path:inset(0 0)}}
-@keyframes bootpulse{0%,100%{opacity:.5}50%{opacity:.95}}
+.boot-say{font-size:13px;font-style:italic;color:rgba(222,216,200,.5);letter-spacing:.04em}
+
 @media (prefers-reduced-motion:reduce){
-  .boot-mark,.boot-bar u{animation:none}
-  .boot-bar u{opacity:0}
+  .boot-sun,.boot-bend,.boot-dust i,.boot-bar u,.boot-name,.boot-name::after{animation:none}
+  .boot-bend,.boot-dust,.boot-bar u{opacity:0}
+  .boot-arms{animation:none;opacity:0;transform:none}
+  .boot-arms.me{opacity:1}
 }
 </style>
 <script>
 (function(){
+  /* YOUR ARMS FIRST. Nothing that can draw a coat has been read yet, so
+     42-shell.js leaves the last one it drew here; the first slot of the roll
+     is swapped for it, and the bar wears your livery. */
+  try {
+    var mine = JSON.parse(localStorage.getItem('monarchy.boot.v1') || 'null');
+    var slot = document.querySelector('#boot .boot-arms.me');
+    if (mine && mine.svg && slot) {
+      var esc = function(s){ return String(s || '').replace(/[&<>"]/g, function(c){
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+      slot.innerHTML = mine.svg + '<figcaption><b>' + esc(mine.name || 'Your arms') + '</b>' +
+                       esc(mine.blazon) + '</figcaption>';
+      if (mine.house) document.documentElement.style.setProperty('--m-house', mine.house);
+    }
+  } catch (e) {}
   /* The words change as the work does, because "Loading..." for eight
      seconds tells you nothing and reads as a hang. */
-  var SAY = [[0,'setting the table\\u2026'],[.34,'lighting the hearth\\u2026'],
-             [.62,'pouring the drink\\u2026'],[.85,'laying out the pieces\\u2026']];
+  var SAY = [[0,'the heralds are summoned\\u2026'],[.18,'the roll of arms is read\\u2026'],
+             [.38,'the banners are hung\\u2026'],[.58,'the hearth is lit\\u2026'],
+             [.78,'the table is laid\\u2026']];
   var bar, say, shown = 0;
   /* n and of are BYTES parsed, not files done (see the marker in build.js) */
   window.__boot = function(n, of){

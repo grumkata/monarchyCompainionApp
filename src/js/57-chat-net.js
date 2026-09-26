@@ -137,16 +137,33 @@ function scrub(html) {
    Arrivals and departures belong in the dock: at a real table you notice
    somebody sitting down. Written by each client about what it has just
    seen change, not sent over the wire, so nobody can forge one. */
+/* NOT EVERY BLINK IS SOMEBODY LEAVING. A connection that drops for a few
+   seconds — a train, a microwave, a laptop that stalled — reads as gone and
+   back, and with eight people at the table the dock filled up with "gets up",
+   "sits down", "gets up" about somebody who never moved. A departure is only
+   said once they have stayed away a while; come back before then and nothing
+   is said at all. */
+const AWAY = 20000;
 let seenWho = null;
+const leaving = {};              /* uid -> the timer that will say they got up */
 function noticeWho(members) {
   const now = {};
   (members || []).forEach(m => { now[m.uid] = m.name || 'Someone'; });
   if (seenWho) {
-    Object.keys(now).forEach(u => { if (!(u in seenWho)) note(now[u] + ' sits down'); });
-    Object.keys(seenWho).forEach(u => { if (!(u in now)) note(seenWho[u] + ' gets up'); });
+    Object.keys(now).forEach(u => {
+      if (u in seenWho) return;
+      if (leaving[u]) { clearTimeout(leaving[u]); delete leaving[u]; return; }   /* only a blink */
+      note(now[u] + ' sits down');
+    });
+    Object.keys(seenWho).forEach(u => {
+      if (u in now || leaving[u]) return;
+      const name = seenWho[u];
+      leaving[u] = setTimeout(() => { delete leaving[u]; note(name + ' gets up'); }, AWAY);
+    });
   }
   seenWho = now;
 }
+function forgetLeaving() { Object.keys(leaving).forEach(u => { clearTimeout(leaving[u]); delete leaving[u]; }); }
 function note(text) {
   const cb = body(); if (!cb) return;
   const d = doc.createElement('div');
@@ -158,11 +175,11 @@ function note(text) {
 root.addEventListener('monarchy:session', e => {
   const d = e.detail || {};
   /* a different table is a different conversation */
-  if (d.word !== lastWord) { lastWord = d.word; shown = {}; seenWho = null; primed = false; }
+  if (d.word !== lastWord) { lastWord = d.word; shown = {}; seenWho = null; primed = false; forgetLeaving(); }
   if (d.what === 'chat') draw(d.chat);
   if (d.what === 'who' || d.what === 'joined' || d.what === 'hosting') noticeWho(d.members);
   if (d.what === 'left' || d.what === 'closed') {
-    seenWho = null;
+    seenWho = null; forgetLeaving();
     note(d.what === 'closed' ? 'The GM has closed the table' : 'You have left the table');
   }
 });

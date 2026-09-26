@@ -10,12 +10,15 @@ const fs = require('fs'), vm = require('vm'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 const { pack } = require(path.join(ROOT, 'tools/pack-geometry.js'));
 
+/* the packs that SHIP. The chest, the bin and the board-game bits went out
+   of the build with the toolbox that stood on the wood (2026-09-25); the
+   battlefields' two packs came in. */
 const PACKS = {
-  '01-castle-assets.js': 'CASTLE', '20-chest-asset.js': 'CHEST',
-  '19-bin-asset.js': 'BIN3D', '17-wood-assets.js': 'WOOD',
-  '18-bits-assets.js': 'BITS', '33-dice-assets.js': 'DICE_ASSETS',
+  '01-castle-assets.js': 'CASTLE', '17-wood-assets.js': 'WOOD',
+  '33-dice-assets.js': 'DICE_ASSETS',
   '35-kit-assets.js': 'KIT', '52-room-assets.js': 'ROOM',
-  '53-tavern-assets.js': 'TAVERN'
+  '53-tavern-assets.js': 'TAVERN',
+  '70-terra-assets.js': 'TERRA', '71-dungeon-assets.js': 'DUNGEON'
 };
 
 /* A minimal THREE so the decoder's setIndex widening can install itself. */

@@ -1,7 +1,7 @@
 # MONARCHY — Project Reference
 
 **Status:** Active development
-**Last updated:** 2026-09-24
+**Last updated:** 2026-09-26
 
 > **Purpose of this document:** this is the single place to check before
 > working on the project — what exists, how it's built, and what rules to
@@ -63,6 +63,8 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     01-sheet.css            the record — needed in the hall AND at the table
     12-combat.css           body.at-table
     13-table-ui.css         body.at-table
+    14-war.css              body.at-table — the toolbox dock, workbench, counters, muster,
+                            the terrain mat and the war room; last, so it wins (3.27)
   js/
     00-three.js             vendor (three.js r128)
     00-geo-runtime.js       reads the packed vertex blobs; MUST precede every pack
@@ -76,6 +78,12 @@ src/                       ← EDIT THIS. Multi-file source, never distributed a
     29-role.js              which side of the table you are
     61-64                   the kit everyone has at the table (3.23): ink (drawing), pocket
                             (your own notes), point, and the rail that holds them
+    65-token-look.js        what a counter looks like — standee or coin, its picture (3.27);
+                            loaded before 30-rules.js because the mat renders on load
+    66-68, 72, 73           the table after the chest (3.27): the workbench, the inspector,
+                            the GM's rail, the muster (a fight run from one place) and
+                            the war room (fights prepared ahead)
+    70-terra, 71-dungeon    the battlefields' scenery, baked by tools/bake_terrain.py
     55-herald.js            Blazon's motion: the Bend transition, the Cry, gilt (see 3.13) — before 42-shell
     42-shell.js             which half you are looking at
   assets/tex/              ← the textures, as real files (see 2.3)
@@ -1748,6 +1756,246 @@ not while it moves.
 
 ---
 
+### 3.26 Eight players at once (2026-09-25)
+
+grumkata: *"go over multiplayer functionailty and make sure it works for up
+to 8 players it runs smoothly and remove any bugs"*. What costs grew with
+the number of people, and what broke:
+
+- **The roll-call woke the whole app.** Every heartbeat (each client, every
+  4s) and every head turn (up to 5×/s each) fired the same `who` event, and
+  every listener ran on it: the tavern redrawn, each likeness hashed, every
+  prop re-checked, and on a player's machine the hidden chest's rack rebuilt
+  (25-toolbox.js `gate` called `shut()` unconditionally). `06-session.js`
+  now sorts a change: `who` (arrived, left, new name/arms/face), `stir` (a
+  head turned or somebody pointed), or nothing (a heartbeat). Listeners
+  filter accordingly; the room redraws on a stir only if a head moved.
+- **Every seat blinked when anybody came or went.** A roster change rebuilt
+  every seat, each reloading its pictures from data URIs and hidden until
+  decoded — so all figures vanished at once — and the old textures and
+  materials were never freed (nor the cloth materials in `clothHangings`).
+  Seat pictures are cached by source now (`seatPicture`) and what the new
+  seats do not use is released (`seatSweep`).
+- **A blink re-spaced the ring.** A dropped connection clears presence at
+  once, so one player's Wi-Fi hiccup moved every figure in the room and back.
+  A seat vanishing without a goodbye keeps its place for 20s (`linger`); a
+  deliberate leave writes `gone` first and frees it at once. The dock no
+  longer says "gets up / sits down" for a blink either (57-chat-net.js).
+- **The board re-serialised every picture on every change**, on every
+  machine. Long strings are compared by a cached full hash (`tag`); what is
+  sent is still the real thing.
+- **Heavy work per change:** the combat render wrapper saved the whole table
+  synchronously on every render (now `saveSoon`), and a player's guest table
+  was saved to localStorage after every change — pointless (it is emptied on
+  arrival and departure) and able to overflow the store (now never saved).
+- **A GM whose app closed stranded the table.** Hosting again made a new
+  word while everyone sat at the old one. The word is kept per table
+  (`monarchy.hosted.v1`) and taken back up if the meta still names this GM.
+- **The fight was each machine's own.** Round, phase and the declared
+  move/ability lived only in `S`: every table counted its own rounds and a
+  player's declaration never reached the GM. They ride on the scene as
+  `fight` (40-combat-scene.js), written only by the machine whose user
+  changed them. And `show()` used to wipe the selection, the drag and the
+  declaration on every repaint — i.e. whenever anybody changed anything — so
+  a player's ability bar closed under them and a GM's drag dropped nothing.
+- **Allow and Dismiss did nothing** unless the GM had a unit selected (the
+  click handler checked the selection first).
+- **Smaller:** sheet edits are debounced per sheet, including the GM editing
+  somebody else's (sent whole on every keystroke before); local mode no
+  longer leaves an empty node behind a removal.
+
+**Measured** on a table of 28 pieces with five ~170KB pictures and a fight:
+a remote piece sliding costs 0.26ms, a full rebuild 11.5ms, a combat render
+0.8ms. **Tests:** `session.test.js` gained nine clients on the Firebase-shaped
+server (everybody moving at once converges; a picture arrives whole;
+heartbeats wake nothing, a head turn is a stir, a rename is a roster change;
+a blink keeps its chair) and the GM-crash case. Headless, GM and player: the
+whole combat round trip — adds, moves, End Turn, a player's declaration,
+the GM allowing it — agrees on both screens, three runs out of three.
+
+**Still true:** one declaration at a time for the whole table (two players
+declaring together, the second replaces the first); a scene is written
+whole, so two people changing the same fight in the same instant is last
+write wins; and local mode's shared localStorage tree can lose a write when
+two windows write at once (Firebase merges on the server and does not).
+
+---
+
+### 3.27 The toolbox off the table, and fights worth running (2026-09-25)
+
+grumkata: *"remove the physical toolbox and bin they look mid"*, *"we need the
+ability to add things to the table to be more custmisable BEFORE Placing
+them"*, *"tokens souldnt look how they currently look same with many objects
+in the toolbox who look weird and artifical and straight up dont work
+sometimes"*; and for combat, *"preset combat scenes where gm makes a preset
+board and then bring it to the table"*, *"not every combat will be on a
+grassy field ... i want the capability for field variety"*, *"the chat should
+be visible in combat view no matter what"*, and the board *"isnt really
+dynamic enough ... its ugly and it doe not actually make running or being in
+combat easier for the gm or player"*.
+
+**THE CHEST AND THE BIN ARE GONE.** Nothing stands on the wood but what you
+put there. `27-table-gl.js` no longer builds either model (the file's guard no
+longer needs `CHEST`), and `20-chest-asset.js`, `19-bin-asset.js` and
+`18-bits-assets.js` are out of the build (the files still bake; one line in
+`build.js` brings one back). Page 6.48 MB after adding two packs.
+- **The toolbox is a dock** at your left hand (`47-hand.js`), opened by B or
+  the **GM's rail** (`68-gm-rail.js` — Toolbox, the Fight, Prepared fights; the
+  players keep their kit in the same place). The six kinds are tabs, the big
+  kinds get shelves and a find well, and every tile is drawn as itself with its
+  name under it. An open dock narrows `#vp` (14-war.css) and fires a resize, so
+  the table keeps its centre and framing means the part you can see.
+- **Putting things away:** select anything and the **inspector** (`67-inspector.js`)
+  offers Edit, Duplicate, Turn and Remove; Delete still removes; carrying a piece
+  back over the open dock puts it away. All one Ctrl+Z.
+- `Toolbox.options/take/KINDS/blankToken/open/shut/gate` and `Hand.take/grab/drop/held`
+  keep their shapes, so older callers and the tests talk to it the same way.
+
+**THE WORKBENCH** (`66-workbench.js`). Choosing a tile opens its bench: the
+thing large on lit oak, and every choice it has beside it — a counter's name,
+side, size, health (or a formation's bodies, health each, hits on, damage,
+defence, resolve), look and picture; a note's paper, title, text and lie; a
+page's rule and title; a picture's size and turn; a model's size and facing (the
+preview re-renders at that facing, `TableGL.thumb(id, px, yaw)`); a fight's
+name, terrain and width. **Take it** puts it in your hand (the hand keeps the
+bench's own object, so a change on the bench changes what you are holding);
+**Put in the middle** skips the hand; double-click a tile to take it as it is;
+drag a tile straight onto the wood. The **same bench edits a placed thing**
+(inspector Edit, or double-click it) through `TableModel.edit` (new, undoable,
+refuses `id/kind/in/z/ent/by`), `Tokens.edit` or `setSetup`.
+
+**COUNTERS WEAR PICTURES** (`65-token-look.js`). A counter is a **standee** —
+its picture printed on a card in a turned walnut base whose enamel band is the
+side's tincture, drawn in 3D by `27-table-gl.js` `buildStandee` (a formation is
+three abreast on a long tray; the base's front edge sits at the anchor's foot so
+the name tag shows) — or a **coin**, a flat disc with the picture in a rim of
+the side's tincture. The picture is a portrait (record, library, your computer)
+or one of the painted figures, and an undressed counter gets a figure by side
+and size. `t.look` and `t.fig` are new fields on a token, carried onto the
+combatant (`ent.look/fig/pic/art`) by `Tokens.fill` so **the mat, the wood and
+the field show the same person.** A char token dressed as a figure does not wipe
+the portrait off the record (`Tokens.edit` only writes a non-empty picture back).
+**Formations work:** a counter made as one used to get a person's fields and
+render `undefined/undefined`; `Tokens.formFields` gives it bodies, health each,
+hit, damage, defence and resolve, and mends old ones on the way past.
+
+**THE LIBRARY, CURATED** (`48-library.js`). Out: the plastic board-game bits and
+the chest/container "Things". In: **Wilds** (`70-terra-assets.js` — dead and
+twisted trees, pines, sandstone, fungus) and KayKit's Dungeon as **Stonework**
+and **Dungeon** (`71-dungeon-assets.js` — walls, pillars, floors, torches,
+barrels, crates, rubble, banners…, at 60 table units a metre). Both packs are
+baked by the new `tools/bake_terrain.py` (vertex welding, base-colour textures
+only, the heaviest pieces left out: 13 + 35 pieces, ~2 MB of text → ~0.9 MB
+packed). `DRESS.stone` dresses the dungeon atlas.
+
+**THE CHAT, ALWAYS.** It vanished in the field because `#table-app` is
+`position:fixed` — a stacking context — so its z-index 1500 counted only inside
+a layer sitting at z 0 under the field canvas (880, on the body). The dock is
+moved to `<body>` at boot (`28-table-boot.js`); 20-shell.css keeps it out of the
+hall. The field's canvas now covers `#vp` only (never the chat's column or a
+docked panel), with picking and names measured against it.
+
+**TERRAIN** (`21-table-content.js` `TERRAINS`): meadow, forest, blighted waste,
+desert, snowfield, marsh, dungeon, castle courtyard. Each row is DATA — the mat's
+cloth and washes (written as `--mat*` properties by `CombatScene.matColours`),
+and the field's sky, sun, fog, exposure, ground palette, grass amount and colour,
+scatter plan and weather. `37-scene-field.js` `dressFor` re-dresses sky, lights,
+fog (which now follows the camera), relief (flat indoors), the ground painter
+(open ground, sand ripples, snow drifts, marsh pools, flagstones), the scenery
+(`PLANS`, with `build` laying walls on three sides, pillars, lit torches and
+clutter for the crypt and the courtyard) and falling motes (snow, ash, dust,
+embers, midges). It re-dresses live if the GM changes the terrain mid-fight.
+Setup's old `model: 'none'` became `terrain`; `coerceField` maps unknown
+terrains to the meadow.
+
+**THE GROUND UNDER THE FIGHT** (`FEATURES`): cover, obstacle, rough ground,
+hazard, water — one per slot, on the scene (`t.features`, `TableModel.setFeature`,
+`coerceFeatures`). Only an **obstacle** is enforced (`blocks`): 32-combat-app.js's
+`clashAt/firstFree/shove` treat it as occupied. The rest are shown — on the mat
+(a swatch in the slot, a badge under whoever stands there, the rule on hover), in
+the muster's card, and in the field (a barricade or rocks for cover, a boulder
+or pillar, rubble, a fire with its own light, a pool) — and ruled on by the GM.
+
+**THE MAT** (32-combat-app.js `entHTML`, 14-war.css). Units are portrait coins
+(`.coin`, which the GL piece layer does not paint — it still throws the dice)
+with a name, a health bar and the terrain's own colours; formations are dark
+trays with their figure strip; the combat scene takes `data-terrain`.
+
+**THE MUSTER** (`72-muster.js`) — the fight run from one place, docked where the
+toolbox is and opened when a fight begins (F, the GM's rail, or the players' kit):
+round and phase (set by the GM), End Turn, mana, a player's "Your turn", a
+declared move with Allow/Dismiss; the **roll** grouped Players/Allies/Enemies with
+the acting group lit, health bars, action pips and conditions; the **card** for the
+chosen unit — take/heal by an amount, quick/full, conditions added from the rules'
+list, a map of the lines to move them on (through the app's own `move`, so a
+player's move is still a declaration), edit, their record, off the field; the
+**ground** brushes; and the scene's **orders**, which no longer float over the
+board (`SceneSetup.ordersInto`; the floating writ is `#sc-float` for maps and
+stages). Every button ends in 32-combat-app.js's `render()`, which the 40-combat-
+scene wrapper saves and sends, so the sheet, the muster and the field agree.
+
+**PREPARED FIGHTS** (`73-encounters.js`, `monarchy.encounters.v1`). The **war
+room** (E) lays a fight out as the mat is: name, terrain, width, a brush that is a
+counter on the workbench (or a feature, or erase), click to place. Kept on this
+machine. **Bring it to the table** puts the scene down fitted, with its lines,
+features and every counter in its slot, activated — in one undoable step; a
+running fight is stood down, not binned. Prepared fights are also tiles under the
+toolbox's Scenes. The muster's **Save as prepared** writes a running fight back
+(`fromScene`, which skips player characters by default — `keepInPreset`).
+
+**Tests:** `table.test.js` checks terrains, unknown terrains and feature
+cleaning; `geometry.test.js` now checks the packs that ship (246 prims, incl.
+TERRA and DUNGEON); `join.test.js` finds him in the toolbox. `table-ui.test.js`
+and `case.test.js` were rewritten around the dock, the bench, the inspector, the
+muster and the war room — see their headers.
+
+### 3.28 The loading screens read the roll of arms (2026-09-26)
+
+grumkata: make the loading screens "more dynamic and interesting and most
+importantly coherent with the design elements and identity of the game".
+
+**The boot screen** (`build.js`, the `LOADING` block) was a crossed-swords glyph,
+the name and a bar. It is a herald reading the **roll of arms** now:
+
+- a shield turning on its edge through eight coats, each with its blazon under
+  it. The coats are drawn **at build time**: `12-heraldry.js` touches no DOM, so
+  `build.js` runs it (with `02-charge-assets.js`) in a Node `vm` and bakes the
+  SVG into the page — the screen is up because no script has been read yet, so
+  nothing could draw them at run time. Ids are prefixed per coat (`rl0-`…).
+- **your own coat first**, with your name: `42-shell.js`'s `livery()` now also
+  draws your arms and leaves them finished in `monarchy.boot.v1` (SVG, blazon,
+  name, livery); the boot screen's inline script swaps them into the first slot
+  and sets `--m-house` before anything else has run. No arms, no swap.
+- behind the shield a **sun in splendour** (22 rays, straight and wavy by turns,
+  filled with the `--m-or` tokens), two of it turning opposite ways; the
+  **counterchange band** passing along the bend; **gold leaf** drifting up; the
+  Bend's lozenge **diaper** faintly over the dark. The bar runs from your livery
+  into gilt; the words are the heralds' ("the roll of arms is read…").
+- the name's arrival no longer animates `letter-spacing`, `filter` or
+  `clip-path` (all main-thread, so they froze during the parse); it is
+  transform and opacity like everything else.
+
+**The Bend** (`55-herald.js`, `20-shell.css`). When the cover moved from the
+shader to CSS (3.19) it kept its colours and lost its drawing. It is back: the
+cloth is a band skewed onto the bend with **dancetty gilt teeth** on both edges
+(conic-gradient triangles), your livery inside them and a woven Sable with the
+lozenge diaper between. While it is across, the same sun (`<template id="m-sun">`,
+left by `build.js`) turns behind the name, **your arms** turn in above it
+(`armsInto`, drawn fresh), the name is slammed in on a slant, and gold leaf rises.
+
+**The rule that made this possible:** every one of these moves is a `transform`
+or an `opacity`, which the compositor runs on its own thread — the only kind of
+motion that keeps going while the page behind is parsing or a table is being
+built. `test/smooth.test.js` now reads every `boot*` and `hr-*` keyframe in the
+built page and fails if one animates anything else; it also checks the roll is
+eight drawn, blazoned coats, the sun template is there, and a player's cached
+coat is the first one read. The existing compositor check (the cover keeps
+animating through a blocked thread) still passes.
+
+Also: `blazonText` says "an eagle" (not "a eagle") — but "a unicorn".
+
+---
+
 ## 4. Game system summary (content, not code)
 
 This app is a companion tool for a homebrew TTRPG built around:
@@ -1934,6 +2182,9 @@ comments, minor CSS tweaks) don't need a changelog entry.
 
 | Date | Change |
 |---|---|
+| 2026-09-26 | **The loading screens read the roll of arms** (3.28). The boot screen is a shield turning through eight coats drawn at build time by the app's own heraldry, blazons written under them, your own coat first; a sun in splendour, the counterchange band and gold leaf behind. The Bend's cloth has its dancetty gilt edge and diaper back, with the sun, your arms and a slammed name while it is across. Everything moves on transform/opacity, and the tests hold it there. |
+| 2026-09-25 | **The toolbox off the table, and fights worth running** (3.27). The chest and the bin are gone: the toolbox is a dock on the left (B), and everything is set up on a workbench before it touches the wood (tokens: name, side, face, look, formation numbers; notes, pages, models, scenes). Tokens are walnut standees or coins; selection gets an Edit/Duplicate/Turn/Remove bar. Combat scenes have eight terrains (meadow, forest, blight, desert, snow, marsh, dungeon, courtyard) driving the 3D field and the flat mat, plus painted ground features (cover, obstacle, rough, hazard, water) the rules respect. The Muster is a GM tracker docked beside the fight; the War Room (E) builds prepared fights to bring to the table. Chat sits above every view. New files 65-token-look, 66-workbench, 67-inspector, 68-gm-rail, 70/71 baked packs, 72-muster, 73-encounters, 14-war.css; test/war.test.js. |
+| 2026-09-25 | **Eight players at once** (3.26). Heartbeats no longer wake the app and head turns only turn heads; seats keep their decoded pictures and free the old ones; a connection blink keeps its chair; pictures compared by hash; no synchronous whole-table saves in combat and none of a guest table; a GM who crashes gets their word back; the fight's round, phase and declarations are shared, and a repaint no longer wipes your selection; Allow/Dismiss work without a selection. |
 | 2026-09-24 | **The first stress test** (3.25). The board's echo check never matched on Firebase (sorted keys, nulls dropped), so every GM move rebuilt the wood under the pointer and re-sent every piece; fixed with the null/empty/`active` faults it hid. Combat moves and combat results reach the table; players drag their characters onto the wood as their own counters and move them; notes let go off the wood stay in the pocket; leaving the table puts everything down and the Join screen walks you back in; no timer throttling in the app; dice 2.8×; combat type legible. |
 | 2026-09-24 | **v1.0.6: the GM's table and the players'** (3.24). The kit is players-only and the GM's controls are hidden from players (including the GM half of the combat sheet); a point is one 1.5s pulse; opening a record ~650ms → ~40ms (a CSS `zoom` → transform, plus a warm-up); no chairs, no banner or figure of your own; other players' figures turn with their heads and are lit by the room. Also: every session event had been rebuilding every seat. |
 | 2026-09-24 | **v1.0.5: the kit** (3.23). Everyone at a table gets a rail of four: your characters (read them; bring them to a live table — and choose which on the Join screen), your pocket of private notes (write and draw on them, drag them onto the wood to share, drag them back to take them home), a pen when the GM allows it (new "Players may draw" in the table menu), and pointing. Players may now touch what they put down themselves and nothing else. New files 61-ink, 62-pocket, 63-point, 64-kit. |

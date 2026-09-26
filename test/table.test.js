@@ -51,7 +51,7 @@ ok('a made scene carries its setup and its options', () => {
   fresh();
   const s = T.put({ kind:'scene', scene:'combat' });
   assert.strictEqual(s.setup.width, 8);
-  assert.strictEqual(s.setup.model, 'none');
+  assert.strictEqual(s.setup.terrain, 'meadow');
   assert.strictEqual(s.options.fog, false);
   assert.strictEqual(s.options.mana, 0);
   assert.strictEqual(s.options.flex, 'move');
@@ -60,6 +60,47 @@ ok('setup given at making time wins over the default', () => {
   fresh();
   const s = T.put({ kind:'scene', scene:'combat', setup:{ width:12 } });
   assert.strictEqual(s.setup.width, 12);
+});
+/* grumkata: "not every combat will be on a grassy field" */
+ok('a fight is fought somewhere, and there is more than one somewhere', () => {
+  fresh();
+  const s = T.put({ kind:'scene', scene:'combat', setup:{ terrain:'dungeon' } });
+  assert.strictEqual(s.setup.terrain, 'dungeon');
+  assert.ok(Content.TERRAIN_ORDER.length >= 8);
+  Content.TERRAIN_ORDER.forEach(k => {
+    const t = Content.TERRAINS[k];
+    assert.ok(t && t.name && t.mat && t.mat.ground && t.field && t.field.sky.length === 3, k);
+  });
+});
+ok('a terrain nobody has heard of is the meadow, not a field with no sky', () => {
+  fresh();
+  const s = T.put({ kind:'scene', scene:'combat', setup:{ terrain:'the moon' } });
+  assert.strictEqual(s.setup.terrain, 'meadow');
+});
+ok('a fight put down and running, undone and redone, is running again', () => {
+  fresh(); T._past.length = 0; T._future.length = 0;
+  T.begin();
+  const s = T.put({ kind:'scene', scene:'combat' });
+  T.put({ kind:'token', name:'Crow Archer', in: s.id });
+  T.activate(s.id);
+  T.end();
+  T.undo();
+  assert.strictEqual(T.state.things.length, 0);
+  assert.strictEqual(T.state.active, null);
+  T.redo();
+  assert.strictEqual(T.state.things.length, 2);
+  assert.strictEqual(T.state.active, s.id);
+});
+ok('features are one to a slot, real kinds only, on real lines', () => {
+  const lines = Content.blankLines();
+  const f = Content.coerceFeatures([
+    { line:'e-front', col:2, kind:'cover' }, { line:'e-front', col:2, kind:'water' },
+    { line:'nowhere', col:1, kind:'cover' }, { line:'a-back', col:'3', kind:'lava' },
+    { line:'a-back', col:'3', kind:'obstacle' }], lines);
+  assert.deepStrictEqual(f, [{ line:'e-front', col:2, kind:'cover' },
+                             { line:'a-back', col:3, kind:'obstacle' }]);
+  assert.strictEqual(Content.FEATURES.obstacle.blocks, true);
+  assert.strictEqual(Content.FEATURES.cover.blocks, false);
 });
 ok('one scene is active at a time', () => {
   fresh();

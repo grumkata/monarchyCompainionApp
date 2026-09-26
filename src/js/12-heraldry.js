@@ -595,7 +595,9 @@ function blazonText(A0){
     const n = bare(C ? C.n : A.chg);
     /* the arrangement comes AFTER the tincture, as a herald says it:
        "three lions Sable in pale", never "three lions in pale Sable" */
-    parts.push(COUNT[A.chgN] + ' ' + (A.chgN > 1 ? plural(n) : n)
+    /* "an eagle", "an owl" — the loading screen reads these aloud now */
+    const one = A.chgN === 1 && /^(?!uni)[aeiou]/.test(n) ? 'an' : COUNT[A.chgN];   /* but "a unicorn" */
+    parts.push(one + ' ' + (A.chgN > 1 ? plural(n) : n)
       + ' ' + say(A.chgT)
       + (A.chgA !== 'proper' ? ' ' + ARRANGE[A.chgA].toLowerCase() : ''));
   }

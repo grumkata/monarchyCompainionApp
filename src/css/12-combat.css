@@ -1403,7 +1403,7 @@ body.locked-in #vp { cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA
    itself, which would have been painted over every piece on the table. */
 #tblu{position:absolute;top:0;left:0;transform-origin:50% 50%;
   transform-style:preserve-3d;z-index:0;pointer-events:none}
-#tglu{position:absolute;inset:0;z-index:1;pointer-events:none}
+#tglu{position:absolute;left:0;top:0;z-index:1;pointer-events:none}
 #tbl{z-index:2}
 
 /* ══ LEGIBILITY ═════════════════════════════════════════════════

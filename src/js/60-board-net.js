@@ -77,25 +77,51 @@ const path = () => 'tables/' + word + '/board';
 
    So both sides are compared in the shape the database keeps: keys sorted,
    nothing that is null or empty. */
-function canon(v) {
+function canon(v, digest) {
   if (v === null || v === undefined) return undefined;
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+  if (typeof v === 'string') return (digest && v.length > LONG) ? tag(v) : v;
   if (typeof v !== 'object') return v;
   if (Array.isArray(v)) {
     const out = [];
-    for (let i = 0; i < v.length; i++) out[i] = canon(v[i]);
+    for (let i = 0; i < v.length; i++) out[i] = canon(v[i], digest);
     while (out.length && out[out.length - 1] === undefined) out.pop();
     return out.length ? out : undefined;
   }
   const out = {};
   let any = false;
   Object.keys(v).sort().forEach(k => {
-    const c = canon(v[k]);
+    const c = canon(v[k], digest);
     if (c !== undefined) { out[k] = c; any = true; }
   });
   return any ? out : undefined;
 }
-const cut = t => JSON.stringify(canon(t)) || '';
+/* ── A PICTURE IS COMPARED BY ITS FINGERPRINT ──────────────────
+   Every change anybody makes to the board brings the whole board back
+   (a value watch), and every piece in it was being written out as JSON to
+   see whether it had changed — pictures included, a few hundred kilobytes
+   each. With eight people moving things that was megabytes of string built
+   and thrown away on every move, on every machine. A long string is
+   compared by a full hash of it instead, remembered per string: the
+   database hands back the same string each time until it really changes,
+   so each picture is hashed once. What is SENT is still the real thing. */
+const LONG = 1024;
+const tags = new Map();
+function tag(s) {
+  let t = tags.get(s);
+  if (t) return t;
+  let h1 = 0x811c9dc5, h2 = 0x2545f491;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619);
+    h2 = Math.imul(h2 ^ c, 2246822519) + i | 0;
+  }
+  t = '\u0000' + s.length + ':' + (h1 >>> 0).toString(36) + ':' + (h2 >>> 0).toString(36);
+  if (tags.size > 400) tags.clear();
+  tags.set(s, t);
+  return t;
+}
+const cut = t => JSON.stringify(canon(t, true)) || '';
 /* one field, the same test: plain values straight, anything else by shape */
 const same = (a, b) => a === b ||
   ((a == null || typeof a === 'object') && (b == null || typeof b === 'object') && cut(a) === cut(b));
@@ -197,8 +223,8 @@ function push() {
 function sendNow() {
   if (!live() || !M() || !here()) return;
   const st = M().state;
-  const now = {};
-  (st.things || []).forEach(t => { now[t.id] = cut(t); });
+  const now = {}, byId = {};
+  (st.things || []).forEach(t => { now[t.id] = cut(t); byId[t.id] = t; });
 
   const job = {};
   /* changed and new — compared as the database keeps them (canon above),
@@ -213,7 +239,7 @@ function sendNow() {
        nothing after it. What is yours stays yours; what you do at this
        table is the table's. */
     if (ours[id]) return;
-    if (mine[id] !== now[id]) { job['things/' + id] = JSON.parse(now[id]); mine[id] = now[id]; }
+    if (mine[id] !== now[id]) { job['things/' + id] = canon(byId[id]); mine[id] = now[id]; }
   });
   /* and gone. A thing that was binned is removed from the board rather
      than written as null-ish: the bin is this client's own drawer. */
@@ -229,7 +255,7 @@ function sendNow() {
      head to travel — take() keeps it above every piece it hears of. */
   if (S().role === 'gm') {
     const head = cut({ active: st.active || null, z: st.z || 1 });
-    if (head !== sentHead) { job.head = JSON.parse(head); sentHead = head; }
+    if (head !== sentHead) { job.head = canon({ active: st.active || null, z: st.z || 1 }); sentHead = head; }
   }
 
   if (!Object.keys(job).length) return;

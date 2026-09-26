@@ -101,7 +101,13 @@ function combat(v) {
       ${half('al', 'Ally', al)}
     </div></div>
     <div class="selbar none"></div>`;
-  return sheet('Combat', body, '', true);
+  /* and on the ground it will be fought on: the mat is the terrain's colour
+     in your hand, the same as it will be on the wood (14-war.css) */
+  const C = root.TableContent;
+  const ter = C && C.terrainOf ? C.terrainOf(v && v.terrain) : 'meadow';
+  const m = C && C.TERRAINS ? C.TERRAINS[ter].mat : null;
+  const vars = m ? ` style="--mat:${m.ground};--mat-edge:${m.edge};--mat-ink:${m.ink};--mat-en:${m.en};--mat-al:${m.al}"` : '';
+  return sheet((v && v.name) || 'Combat', body, ` data-terrain="${esc(ter)}"${vars}`, true);
 }
 
 /* ── EXPLORATION AND STAGE ────────────────────────────────────

@@ -254,6 +254,26 @@ function livery() {
   if (c) s.setProperty('--m-house', c); else s.removeProperty('--m-house');
   const ink = c && inkFor(c);
   if (ink) s.setProperty('--m-house-ink', ink); else s.removeProperty('--m-house-ink');
+  bootArms(H, arms, c);
+}
+
+/* ── AND YOUR ARMS FOR THE NEXT LOADING SCREEN ─────────────────
+   The loading screen reads the roll of arms with yours first (build.js) —
+   but it is up before a line of this app has been parsed, so it cannot draw
+   a coat. The coat is drawn HERE, whenever the livery is, and left in
+   storage finished: the SVG, its blazon, your name and your livery colour.
+   Ids are prefixed so it cannot collide with the eight coats baked into
+   the page beside it. */
+const BOOT_KEY = 'monarchy.boot.v1';
+function bootArms(H, arms, house) {
+  try {
+    if (!H || !arms || !H.blazoned || !H.blazoned(arms)) { root.localStorage.removeItem(BOOT_KEY); return; }
+    const me = JSON.parse(root.localStorage.getItem(ME_KEY) || '{}') || {};
+    const svg = H.armsSVG(arms, { shape: 'shield', w: 176, h: 211 })
+      .replace(/id="/g, 'id="me-').replace(/url\(#/g, 'url(#me-').replace(/href="#/g, 'href="#me-');
+    root.localStorage.setItem(BOOT_KEY, JSON.stringify({ svg, blazon: H.blazonText(arms),
+      name: String(me.name || '').slice(0, 40), house: house || '' }));
+  } catch (e) {}
 }
 
 /* ?table=<id> walks straight in, so a table can be opened from a link or a

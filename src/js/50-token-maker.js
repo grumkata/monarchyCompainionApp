@@ -197,13 +197,17 @@ function paint() {
 
 /* pressing the base plate of a counter already on the wood opens the same
    panel — "attached info" is not something you only get one chance at */
+/* THE WORKBENCH IS WHERE A COUNTER IS CHANGED NOW (66-workbench.js) — the
+   same bench it was made on, with its picture, look and numbers. This panel
+   stays for a machine that has not got one. */
 doc.addEventListener('dblclick', e => {
   const p = e.target.closest && e.target.closest('.fg-plate');
   if (!p) return;
   const t = e.target.closest('.prop.t3-token');
   if (!t || !t.dataset.id) return;
   e.preventDefault(); e.stopPropagation();
-  forThing(t.dataset.id);
+  if (root.Hand && root.Hand.editThing && root.Workbench) root.Hand.editThing(t.dataset.id);
+  else forThing(t.dataset.id);
 });
 
 root.TokenMaker = { open, forThing, close, paint, el };

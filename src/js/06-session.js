@@ -111,11 +111,38 @@ function mine() {
 }
 
 /* ══ HOSTING ═══════════════════════════════════════════════════ */
+/* ── THE SAME TABLE KEEPS ITS WORD ────────────────────────────
+   A GM whose app closes — a crash, a flat battery, a window shut by mistake —
+   never stops hosting: `live` stays true, and the players are still sat at
+   it, playing on. Hosting again used to make a NEW word, so the GM came back
+   to an empty table while eight people waited at the old one with nobody to
+   run it. The word a table was last hosted under is kept, and hosting it
+   again takes it back up if it is still ours — same word, same seats. */
+const HOSTED = 'monarchy.hosted.v1';
+function lastWord(id) {
+  try { return (JSON.parse(root.localStorage.getItem(HOSTED)) || {})[id] || null; }
+  catch (e) { return null; }
+}
+function keepWord(id, w) {
+  try {
+    const all = JSON.parse(root.localStorage.getItem(HOSTED)) || {};
+    all[id] = w;
+    root.localStorage.setItem(HOSTED, JSON.stringify(all));
+  } catch (e) {}
+}
+function wordFor(id, opts) {
+  if (tidy(opts.word)) return Promise.resolve(tidy(opts.word));
+  const was = lastWord(id);
+  if (!was) return Promise.resolve(makeWord(5));
+  return Net().get('tables/' + was + '/meta')
+    .then(m => (m && m.host === uid() && m.id === id) ? was : makeWord(5), () => makeWord(5));
+}
+
 function host(id, opts) {
   opts = opts || {};
   if (live()) return Promise.reject(new Error('already at a table'));
-  return Net().start().then(() => {
-    const w = tidy(opts.word) || makeWord(5);
+  return Net().start().then(() => wordFor(id, opts)).then(w => {
+    keepWord(id, w);
     tableId = id; role = 'gm';
     const m = {
       id: id,
@@ -177,6 +204,7 @@ function unwind() {
   offs.splice(0).forEach(off => { try { off(); } catch (e) {} });
   word = null; role = null; tableId = null; members = []; meta = null;
   sent = null; resitting = false;
+  lingering = {}; root.clearTimeout(lingerT); lingerT = 0;
 }
 
 /* ── the place that is yours for the evening ──────────────────
@@ -271,6 +299,8 @@ function resit() {
 
 /* ══ LISTENING ═════════════════════════════════════════════════ */
 function listen() {
+  heardRoll = heardStir = null;         /* a new table: the first roll-call is news */
+  lingering = {}; root.clearTimeout(lingerT); lingerT = 0;
   /* -- OUR OWN CHAIR, WATCHED -----------------------------------
      onDisconnect is a promise the SERVER keeps, and it keeps it whether or
      not we meant to go. A closed lid, a tunnel, a sleeping laptop: the
@@ -295,9 +325,24 @@ function listen() {
     if (meta && meta.live === false) return;     /* the table is closing */
     resit();
   }));
+  /* ── NOT EVERY CHANGE TO THE ROLL-CALL IS NEWS ─────────────────
+     Every client beats every four seconds and sends its head's turn up to
+     five times a second, and all of it lands in this one node — so with
+     eight players this fired dozens of times a second, and every listener
+     in the app ran every time: the tavern redrawn, every seat's likeness
+     hashed, every prop on the wood re-checked, the chest rebuilt on a
+     player's machine where it is not even shown. None of that changes on a
+     heartbeat. So a change is sorted by what it actually was:
+       'who'    somebody arrived, left, or changed their name, arms or face
+       'stir'   only a head turned or somebody pointed
+       nothing  only `seen` moved — which is not news to anybody */
   offs.push(Net().watch('tables/' + word + '/who', who => {
-    members = asList(who).filter(p => p.uid === uid() || Net().fresh(p.seen));
-    say('who');
+    const was = members;
+    members = asList(who).filter(p => !p.gone && (p.uid === uid() || Net().fresh(p.seen)));
+    linger(was, members, who);
+    const roll = rosterKey(members), stir = stirKey(members);
+    if (roll !== heardRoll) { heardRoll = roll; heardStir = stir; return say('who'); }
+    if (stir !== heardStir) { heardStir = stir; say('stir'); }
   }));
   offs.push(Net().watch('tables/' + word + '/meta', m => {
     meta = m;
@@ -312,6 +357,58 @@ function listen() {
   offs.push(Net().watch('tables/' + word + '/sheets', s => {
     say('sheets', { sheets: asList(s, 'key') });
   }));
+}
+
+/* ── A BLINK KEEPS ITS CHAIR ──────────────────────────────────
+   A connection that drops for a few seconds takes its presence with it (the
+   server's onDisconnect), and a seat that goes re-spaces the whole ring — so
+   with eight people, one player's Wi-Fi hiccup moved every figure in the
+   room, and moved them all back a moment later. Somebody who vanishes
+   without saying goodbye keeps their place in the ring for GRACE; a player
+   who leaves on purpose says so first (`gone`, in leave()) and their chair
+   goes at once. Only the seating lingers: the roll-call itself is honest. */
+const GRACE = 20000;
+let lingering = {};                      /* uid -> { m, until } */
+let lingerT = 0;
+function linger(was, now, raw) {
+  const here = {};
+  now.forEach(m => { here[m.uid] = 1; delete lingering[m.uid]; });
+  (was || []).forEach(m => {
+    if (here[m.uid] || lingering[m.uid] || m.uid === uid()) return;
+    const node = raw && raw[m.uid];
+    if (node && node.gone) return;       /* said goodbye */
+    lingering[m.uid] = { m, until: Date.now() + GRACE };
+  });
+  Object.keys(lingering).forEach(u => { if (raw && raw[u] && raw[u].gone) delete lingering[u]; });
+  armLinger();
+}
+function armLinger() {
+  root.clearTimeout(lingerT); lingerT = 0;
+  const next = Object.keys(lingering).reduce((t, u) => Math.min(t, lingering[u].until), Infinity);
+  if (next === Infinity) return;
+  lingerT = root.setTimeout(() => {
+    lingerT = 0;
+    const t = Date.now();
+    const gone = Object.keys(lingering).filter(u => lingering[u].until <= t);
+    if (!gone.length) return;           /* too early — the next roll-call re-arms it */
+    gone.forEach(u => { delete lingering[u]; });
+    if (live()) say('who');
+    armLinger();
+  }, Math.max(50, next - Date.now()));
+}
+
+/* what makes a seat look the way it does, and what only moves it. A
+   likeness is a data URI of a few hundred kilobytes, so it is fingerprinted
+   by its length and its tail rather than compared whole. */
+let heardRoll = null, heardStir = null;
+const print = s => s ? s.length + ':' + s.slice(-48) : '';
+function rosterKey(list) {
+  return list.map(m => [m.uid, m.n, m.role, m.name, JSON.stringify(m.arms || null),
+                        print(m.body), print(m.pic)].join('\u0001')).sort().join('\u0002');
+}
+function stirKey(list) {
+  return list.map(m => m.uid + ':' + (m.look || 0) + ':' + ((m.ping && m.ping.k) || ''))
+             .sort().join(',');
 }
 
 /* a Firebase node is an object of objects; everything here wants a list */
@@ -330,7 +427,15 @@ function leave(why) {
   const w = word, was = role;
   stopBeat();
   offs.splice(0).forEach(off => { try { off(); } catch (e) {} });
-  const jobs = [Net().remove('tables/' + w + '/who/' + uid())];
+  /* goodbye first, then gone: everybody else sees `gone` and frees the chair
+     at once, rather than keeping it for somebody who has only blinked */
+  /* Only when the table goes on without you: a table that is closing is
+     being cleared, and a goodbye written after the GM has cleared it would
+     put a stub of you back into it. */
+  const at = 'tables/' + w + '/who/' + uid();
+  const jobs = [(was !== 'gm' && why !== 'closed')
+    ? Net().update(at, { gone: true }).catch(() => {}).then(() => Net().remove(at))
+    : Net().remove(at)];
   /* THE TABLE IS ONLY LIVE WHILE ITS GM IS. Not a rule imposed on anyone —
      it is what "hosting" means. Everyone else's client sees meta.live go
      false and stands down of its own accord. */
@@ -358,6 +463,7 @@ function leave(why) {
   }
   word = null; role = null; members = []; meta = null;
   sent = null; resitting = false;
+  lingering = {}; root.clearTimeout(lingerT); lingerT = 0;
   /* who we WERE, since role is already gone by now: a player who leaves
      goes home, a GM who stops hosting is still at their own table */
   say(why || 'left', { was: was, left: w });
@@ -499,7 +605,11 @@ function look(deg) {
 /* ══ WHO IS WHERE, FOR THE VIEW ════════════════════════════════
    The one call the table makes. Every client runs it with its own uid and
    gets its own rotation of the same cycle (04-ring.js). */
-function seating() { return Ring().seating(members, uid()); }
+function seating() {
+  const t = Date.now();
+  const kept = Object.keys(lingering).filter(u => lingering[u].until > t).map(u => lingering[u].m);
+  return Ring().seating(kept.length ? members.concat(kept) : members, uid());
+}
 
 root.Session = { host, join, leave, talk, bring, takeBack, seating, refresh,
                  makeWord, tidy, diceOf, allow, allowed, point, look,

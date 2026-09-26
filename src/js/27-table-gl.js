@@ -8,14 +8,17 @@
    the model is drawn at that rect — so the object pans, zooms and
    tilts with the table without knowing anything about the table.
 
-   The chest is grumkata's AnimatedChest, baked by tools/bake_chest.py.
-   Its lid hinges on the asset's own Bone using the OpenClose clip's
-   own extreme keyframe. It is not a drawing of a chest.
+   There used to be a chest and a bin standing on the wood as well —
+   grumkata's AnimatedChest with a hinged lid, and a barrel to drop
+   things into. grumkata: "remove the physical toolbox and bin they look
+   mid". The toolbox is on the screen now (47-hand.js) and removing a
+   piece is the inspector's (67-inspector.js); nothing of either stands
+   on the table any more.
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
 
-if (typeof THREE === 'undefined' || typeof CHEST === 'undefined') return;
+if (typeof THREE === 'undefined') return;
 
 /* THE LENS IS NOT A CONSTANT ANY MORE. It was 2400 for as long as this
    layer only ever looked at a table, and #vp's `perspective` said the same
@@ -76,9 +79,6 @@ const B3 = (m, o) => (root.Blazon3D ? root.Blazon3D.cel(m, o) : m);
 
 let cv, renderer, scene, camera, W = 0, H = 0, OX = 0, OY = 0;
 let shadowLight = null, catcher = null;
-let chest = null, lidGroup = null, QS = null, QO = null;
-let lidU = 0, lidWant = 0;
-let bin = null;
 
 function build() {
   cv = doc.createElement('canvas');
@@ -111,51 +111,6 @@ function build() {
   catcher.position.z = -2;
   catcher.receiveShadow = true;
   scene.add(catcher);
-
-  const body = new THREE.Group();
-  body.add(mesh(CHEST.base), mesh(CHEST.hinge));
-  lidGroup = new THREE.Group();
-  lidGroup.position.fromArray(CHEST.pivot.t);
-  lidGroup.scale.fromArray(CHEST.pivot.s);
-  lidGroup.add(mesh(CHEST.lid));
-  body.add(lidGroup);
-  QS = new THREE.Quaternion().fromArray(CHEST.shut);
-  QO = new THREE.Quaternion().fromArray(CHEST.open);
-  lidGroup.quaternion.copy(QS);
-  /* ON the wood, not half inside it. normalise() centres a model on its own
-     middle by default, and stand() plants that origin on the table plane —
-     so the chest and the bin were buried to the waist, which reads exactly
-     like furniture that is not sitting on anything. A thing that STANDS on
-     the board wants its feet at its origin, the same as every counter. */
-  chest = normalise(body, false, true);
-  casts(chest);
-  scene.add(chest);
-
-  /* ── THE BIN IS A BASKET ──────────────────────────────────
-     It was the KayKit container: a shallow square tray in pale cream
-     plastic, which on this table read as a takeaway lid somebody had left
-     on the wood, and read as nothing whatever like a bin. A woven basket
-     says what it is from across the room, needs no label, and comes out of
-     the same WoodStuff pack the table does — so it belongs to the room
-     instead of visiting from another one. */
-  const bb = new THREE.Group();
-  /* grumkata asked for a different one. An OPEN BARREL rather than a
-     basket: staves and iron bands give it a hard silhouette from the near
-     overhead angle this camera sits at, where a woven basket flattens into
-     a ring, and the open top says "put things in me" without a label.
-     Still the WoodStuff pack, so it is the same timber as the table. */
-  const BINS = ['Barrel_A_Open', 'Barrel_B_Open', 'Basket_B', 'Basket_E'];
-  let picked = null;
-  if (typeof WOOD !== 'undefined') picked = BINS.find(n => WOOD[n]);
-  if (picked) {
-    bb.add(mesh(WOOD[picked].prims, WOOD_TEX, DRESS.basket));
-  } else if (typeof BIN3D !== 'undefined') {
-    bb.add(mesh(BIN3D.prims, BIN3D_TEX, DRESS.bin));
-  }
-  if (bb.children.length) {
-    bin = casts(normalise(bb, false, true));   /* feet on the wood */
-    scene.add(bin);
-  }
 
   buildTable();
   sizeCam();
@@ -1023,6 +978,54 @@ function reach(a, want, least, halfW, y0, y1) {
 }
 /* every hanging in the tavern, so the fire can light them all */
 const clothHangings = [];
+
+/* ══ A LIKENESS IS DECODED ONCE ════════════════════════════════
+   grumkata: "player avatar disappears sometimes". One of the reasons: any
+   change to who is at the table — somebody arriving, leaving, renaming —
+   rebuilds every seat (syncSeats), and every seat loaded its pictures again
+   from their data URIs and stayed hidden until they had decoded. So with
+   eight players, each of those moments blanked every figure in the room at
+   once, and the old textures were never let go, so the GPU filled up over an
+   evening. Pictures are kept by source now: a seat rebuilt around the same
+   likeness has it at once, and a picture nobody is showing any more is
+   released (seatSweep, after each rebuild). The callback always comes on a
+   later tick, cached or not, because the code round every call sets things
+   up AFTER asking and relies on the answer arriving second. */
+const seatTex = new Map();            /* src|srgb -> { tex, ready, wait } */
+function seatPicture(src, srgb, done) {
+  const key = (srgb ? 's|' : 'l|') + src;
+  let e = seatTex.get(key);
+  if (!e) {
+    e = { tex: null, ready: false, failed: false, wait: [] };
+    e.tex = new THREE.TextureLoader().load(src,
+      t => { e.ready = true; e.wait.splice(0).forEach(f => f(t)); },
+      undefined,
+      () => { e.failed = true; seatTex.delete(key); e.wait.splice(0).forEach(f => f(null)); });
+    if (srgb) e.tex.encoding = THREE.sRGBEncoding;
+    seatTex.set(key, e);
+  }
+  e.used = true;
+  if (e.ready) Promise.resolve().then(() => done(e.tex));
+  else if (e.failed) Promise.resolve().then(() => done(null));
+  else e.wait.push(done);
+  return e.tex;
+}
+/* after a rebuild: what the old seats held and the new ones do not */
+function seatSweep(old) {
+  old.forEach(g => g.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    const ms = o.material ? [].concat(o.material) : [];
+    ms.forEach(m => {
+      const i = clothHangings.indexOf(m);
+      if (i >= 0) clothHangings.splice(i, 1);
+      m.dispose();                       /* textures are the cache's, not the material's */
+    });
+  }));
+  for (const [k, e] of seatTex) {
+    if (!e.used && e.ready) { e.tex.dispose(); seatTex.delete(k); }
+    else e.used = false;
+  }
+}
 function banner(seat) {
   /* the seat's own image if it has one; YOUR OWN ARMS if not — the hall
      knows what you march under (42-shell.js), and a stranger's rolled
@@ -1067,8 +1070,8 @@ function banner(seat) {
     });
     waiting++;
     let hung = null;
-    mat.uniforms.map.value = new THREE.TextureLoader().load(src,
-      () => { if (hung) hung.visible = true; landed(); }, undefined, landed);
+    mat.uniforms.map.value = seatPicture(src, false,
+      t => { if (!t) return landed(); if (hung) hung.visible = true; landed(); });
     hung = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 8, 14), mat);
     hung.visible = false;
     clothHangings.push(mat);
@@ -1088,10 +1091,8 @@ function banner(seat) {
                                                metalness: 0, envMapIntensity: 0.3 });
   waiting++;
   let plane = null;
-  mat.map = new THREE.TextureLoader().load(src,
-    t => { if (plane) plane.visible = true; landed(); },
-    undefined, landed);
-  mat.map.encoding = THREE.sRGBEncoding;
+  mat.map = seatPicture(src, true,
+    t => { if (!t) return landed(); if (plane) plane.visible = true; landed(); });
   /* NOTHING UNTIL THERE IS SOMETHING. An unmapped MeshStandardMaterial is
      WHITE, so between the seat being built and the heraldry decoding there
      was a blank white sheet hanging in the room — and if the decode ever
@@ -1230,7 +1231,8 @@ function buildSeat(seat) {
     waiting++;
     const card = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 1.62), mat);
     card.visible = false;
-    mat.map = new THREE.TextureLoader().load(seat.body, t => {
+    mat.map = seatPicture(seat.body, true, t => {
+      if (!t) return landed();
       card.visible = true;
       /* A PERSON IS A HEIGHT, NOT A WIDTH. Everything else in this file
          takes its width from the layout and lets the picture decide the
@@ -1252,8 +1254,7 @@ function buildSeat(seat) {
       /* the shared one: it also releases anything waiting on the room's
          textures, which a local `waiting--` would have silently skipped */
       landed();
-    }, undefined, landed);
-    mat.map.encoding = THREE.sRGBEncoding;
+    });
     card.position.set(0, FLOOR_Y + 0.83, 0.06);
     card.userData.faceMe = true;
     g.add(card);
@@ -1266,7 +1267,8 @@ function buildSeat(seat) {
     waiting++;
     const card = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.78), mat);
     card.visible = false;            /* same rule: a face with no picture is not a face */
-    mat.map = new THREE.TextureLoader().load(seat.face, t => {
+    mat.map = seatPicture(seat.face, true, t => {
+      if (!t) return landed();
       card.visible = true;
       /* THE PICTURE DECIDES THE SHAPE, not the other way round — the same
          rule the counters follow. Known the moment it decodes. */
@@ -1276,8 +1278,7 @@ function buildSeat(seat) {
       card.geometry = new THREE.PlaneGeometry(w, w * ar);
       card.position.y = FLOOR_Y + 0.40 + w * ar / 2;
       landed();
-    }, undefined, landed);
-    mat.map.encoding = THREE.sRGBEncoding;
+    });
     card.position.set(0, FLOOR_Y + 0.80, 0.02);
     g.add(card);
   }
@@ -1418,6 +1419,7 @@ function syncSeats() {
             + (live ? '|live' : '|me' + ((root.Shell && root.Shell.seat) ? root.Shell.seat() : 0));
   if (sig === seatSig) return;
   seatSig = sig;
+  const old = seatRoot.children.slice();
   while (seatRoot.children.length) seatRoot.remove(seatRoot.children[0]);
   if (!live) {
     const mineAt = (root.Shell && root.Shell.seat) ? root.Shell.seat() : 0;
@@ -1440,6 +1442,7 @@ function syncSeats() {
     g.rotation.y = -a;
     seatRoot.add(g);
   }
+  seatSweep(old);
   invalidate(12);
 }
 
@@ -2015,7 +2018,12 @@ const DRESS = {
      same table. Kept lighter than the wood for the same reason: a dark
      basket on dark oak is a hole. */
   basket:{ metal: { mul: [0.8, 0.7, 0.56], rough: 0.9, metalness: 0.0 },
-           wood:  { mul: [0.88, 0.76, 0.6], rough: 0.9, metalness: 0.0 } }
+           wood:  { mul: [0.88, 0.76, 0.6], rough: 0.9, metalness: 0.0 } },
+  /* KAYKIT'S DUNGEON is one painted atlas — stone, iron, wood and cloth all
+     in the texture. Brought down a little so the pale grey stone does not
+     glow on dark oak, and left rough: it is stone. */
+  stone: { metal: { mul: [0.62, 0.60, 0.56], rough: 0.7, metalness: 0.2 },
+           wood:  { mul: [0.78, 0.74, 0.68], rough: 0.82, metalness: 0.0 } }
 };
 
 /* Cached on the picture, not on the key. Several packs are drawn through this
@@ -2067,7 +2075,7 @@ const texDone = new WeakSet();
 function texReady(t) { return !!t && texDone.has(t); }
 
 function tex(k, book) {
-  const src = (book || CHEST_TEX)[k];
+  const src = (book || {})[k];
   if (!src) return null;
   if (texCache[src]) return texCache[src];
   waiting++;
@@ -2516,64 +2524,156 @@ function stand(obj, anchorId, lean, yaw, el, foot) {
    that ask for one gets all three with no bookkeeping. */
 const standees = new Map();
 const STAND_LEAN = 0.52;
-function bitFor(shape, side) {
-  if (typeof BITS === 'undefined') return null;
-  const c = side === 'en' ? 'red' : 'blue';
-  return BITS[shape === 'flag' ? 'flag_A_' + c
-            : shape === 'pawn' ? 'pawn_A_' + c
-            : 'meeple_' + c] || null;
+
+/* ── THE STANDEE ──────────────────────────────────────────────
+   grumkata: "tokens souldnt look how they currently look". They were
+   KayKit board-game bits — a meeple, a pawn, a flag, in toy red and toy
+   blue — which is exactly what they looked like: plastic stand-ins. A
+   counter at this table is the PERSON now, the way a card miniature is:
+   their picture printed on a card, slotted into a turned base.
+
+   Everything here is built in units of the base's own width, and
+   normalise() scales the lot to the anchor, so the numbers below are
+   proportions rather than sizes.
+
+     THE BASE    dark walnut, turned, with a bevelled top — a thing that
+                 has weight on the wood rather than a disc of plastic
+     THE BAND    enamel round its edge in the side's tincture, Azure or
+                 Gules: allegiance, read at a glance, from any angle
+     THE RIM     a hairline of gilt where the top meets the band
+     THE CARD    the picture. A painted figure is a CUTOUT and stands on
+                 its own; a portrait is a rectangle, so it is printed on a
+                 card with a Sable border and a back, like a real standee
+
+   A formation stands its figure three abreast on a long base; a large
+   unit is the same standee on a bigger anchor (its footprint is bigger,
+   27-table-gl.js never needs to know). */
+const STAND_MAT = {};
+function standMat(key, make) { return STAND_MAT[key] || (STAND_MAT[key] = make()); }
+const tinct = hex => new THREE.Color(hex).convertSRGBToLinear();
+
+function roundedRect(w, d, r) {
+  const s = new THREE.Shape(), x = -w / 2, y = -d / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+  s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  return s;
 }
 
-/* a picture standing on a base — the printed standee */
-function standeeOf(src, side) {
+function standBase(side, form) {
   const g = new THREE.Group();
-  let top = 0, cx = 0, cz = 0, wide = 1;
-  const base = typeof BITS !== 'undefined'
-    ? BITS[side === 'en' ? 'token_red' : 'token_blue'] : null;
-  if (base) {
-    const bm = mesh(base.prims, BITS_TEX, DRESS.bits);
-    g.add(bm);
-    const bb = new THREE.Box3().setFromObject(bm);
-    top = bb.max.y; cx = (bb.min.x + bb.max.x) / 2; cz = (bb.min.z + bb.max.z) / 2;
-    wide = Math.max(bb.max.x - bb.min.x, 1e-3);
+  const col = (root.TokenLook && root.TokenLook.TINCT[side]) || (side === 'en' ? '#a3232b' : '#27508f');
+  const wood = standMat('wood', () => B3(new THREE.MeshStandardMaterial({
+    color: tinct('#3a2618'), roughness: 0.52, metalness: 0 }),
+    { room: 'tavern', steps: 6, tint: 0.12, hard: 0.4, rim: 0.12 }));
+  const band = standMat('band-' + side, () => B3(new THREE.MeshStandardMaterial({
+    color: tinct(col), roughness: 0.34, metalness: 0.08 }),
+    { room: 'tavern', steps: 6, tint: 0.06, hard: 0.4, rim: 0.10 }));
+  const gilt = standMat('gilt', () => new THREE.MeshStandardMaterial({
+    color: tinct('#c9a227'), roughness: 0.28, metalness: 1 }));
+  const H = 0.09;
+  if (!form) {
+    /* turned on a lathe: flat underneath, a straight side for the band,
+       then a bevel up to the top */
+    const prof = [[0, 0], [0.5, 0], [0.5, 0.052], [0.488, 0.074], [0.462, H], [0, H]]
+      .map(([x, y]) => new THREE.Vector2(x, y));
+    g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 56), wood));
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.5035, 0.5035, 0.042, 56, 1, true), band);
+    ring.position.y = 0.028; g.add(ring);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.009, 6, 56), gilt);
+    rim.rotation.x = Math.PI / 2; rim.position.y = H - 0.004; g.add(rim);
+  } else {
+    /* a long tray for a body of troops, the same materials */
+    const W = 1, D = 0.42;
+    const top = new THREE.ExtrudeGeometry(roundedRect(W, D, 0.12),
+      { depth: H, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.014, bevelSegments: 2 });
+    top.rotateX(-Math.PI / 2);
+    g.add(new THREE.Mesh(top, wood));
+    const ring = new THREE.ExtrudeGeometry(roundedRect(W + 0.03, D + 0.03, 0.135),
+      { depth: 0.042, bevelEnabled: false });
+    ring.rotateX(-Math.PI / 2); ring.translate(0, 0.008, 0);
+    g.add(new THREE.Mesh(ring, band));
   }
-  /* THE CARD IS SHAPED BY THE PICTURE, not the other way round: a portrait
-     stays a portrait. Its proportions are known the moment the image decodes,
-     so the card is rebuilt to them then. */
-  const mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
-                                            transparent: true, alphaTest: 0.02 });
-  waiting++;
-  mat.map = new THREE.TextureLoader().load(src, t => {
-    const im = t.image, ar = im && im.width ? im.height / im.width : 1.3;
-    card.geometry.dispose();
-    card.geometry = new THREE.PlaneGeometry(wide, wide * ar);
-    card.position.set(cx, top + wide * ar / 2, cz);
-    landed();
-  }, undefined, landed);
-  mat.map.encoding = THREE.sRGBEncoding;
-  const card = new THREE.Mesh(new THREE.PlaneGeometry(wide, wide * 1.3), mat);
-  card.position.set(cx, top + wide * 0.65, cz);
+  return { g, top: H };
+}
+
+/* a picture on a card. `cut` is a painted figure with a clear ground: no
+   card round it. A portrait is framed in Sable and has a back. */
+function standCard(src, cut, wide) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: !cut,
+                                            alphaTest: cut ? 0.4 : 0.02 });
+  const frame = cut ? null : new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    standMat('card-back', () => new THREE.MeshStandardMaterial({ color: tinct('#171310'),
+      roughness: 0.7, side: THREE.DoubleSide })));
+  const card = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  /* sized by the picture's own proportions the moment it decodes, so a
+     tall figure is tall and a square portrait is square */
+  const shape = ar => {
+    const h = Math.min(wide * ar, wide * 1.9), w = h / ar;
+    card.scale.set(w, h, 1); card.position.y = h / 2 + 0.012;
+    if (frame) { frame.scale.set(w + 0.06, h + 0.06, 1);
+                 frame.position.set(0, h / 2 + 0.012, -0.004); }
+  };
+  shape(1.35);
+  if (src) {
+    waiting++;
+    mat.map = new THREE.TextureLoader().load(src, t => {
+      const im = t.image;
+      if (im && im.width) shape(im.height / im.width);
+      landed(); invalidate(4);
+    }, undefined, landed);
+    mat.map.encoding = THREE.sRGBEncoding;
+  } else {
+    mat.color = tinct('#30271e');
+  }
+  if (frame) g.add(frame);
   g.add(card);
   return g;
 }
 
 function buildStandee(el) {
-  const parts = (el.dataset.stand || '').split('|');
-  const shape = parts[0] || 'meep', side = parts[1] || 'al';
-  const img = el.parentNode && el.parentNode.querySelector('.fg-disc img');
-  const src = img ? img.getAttribute('src') : '';
-  const sig = shape + '|' + side + '|' + (src ? src.length + ':' + src.slice(-24) : '');
-  let inner = null;
-  if (src) inner = standeeOf(src, side);
-  else {
-    const b = bitFor(shape, side);
-    if (b) { inner = new THREE.Group(); inner.add(mesh(b.prims, BITS_TEX, DRESS.bits)); }
+  const d = el.dataset;
+  const side = d.side === 'en' ? 'en' : 'al';
+  const form = d.kind === 'form';
+  const cut = d.cut === '1';
+  const src = d.src || '';
+  const inner = new THREE.Group();
+  const base = standBase(side, form);
+  inner.add(base.g);
+  if (form) {
+    [-0.32, 0, 0.32].forEach((x, i) => {
+      const c = standCard(src, cut, 0.3);
+      c.position.set(x, base.top, i === 1 ? -0.05 : 0.04);
+      inner.add(c);
+    });
+  } else {
+    const c = standCard(src, cut, cut ? 0.84 : 0.7);
+    c.position.set(0, base.top, 0);
+    inner.add(c);
   }
-  if (!inner) return null;
-  const g = normalise(inner, false, true);      /* feet at the origin */
+  casts(inner);
+  /* normalised on the BASE, not the whole piece: the base is what has to
+     sit exactly on the anchor; the card stands as tall as its picture */
+  const box = new THREE.Box3().setFromObject(base.g);
+  const s = 1 / Math.max(box.max.x - box.min.x, 1e-6);
+  const g = new THREE.Group();
+  inner.scale.setScalar(s);
+  /* THE FRONT OF THE BASE IS AT THE FOOT OF THE ANCHOR, not its middle.
+     Centred, half the base stood in front of the anchor and over the name
+     tag the counter wears beneath it (46-figures.js), which is the one
+     thing on a counter you have to be able to read. */
+  inner.position.z = -box.max.z * s;
+  g.add(inner);
   scene.add(g);
-  return { g: g, sig: sig };
+  return { g: g, sig: d.stand };
 }
+
+/* the old photograph of a board-game bit, for a slot. Nothing draws with it
+   any more; kept so an older caller gets "no picture" rather than a throw */
+function bitFor() { return null; }
 
 function syncStandees() {
   if (!scene) return;
@@ -2634,17 +2734,20 @@ function stageOne(id, modelId) {
 /* called by the props layer whenever the set of models on the table changes */
 function sync(list) {
   if (!scene) return;
-  const want = {};
-  (list || []).forEach(t => { want[t.id] = t.model; });
+  const want = {}, turn = {};
+  (list || []).forEach(t => { want[t.id] = t.model; turn[t.id] = +t.rot || 0; });
   Object.keys(staged).forEach(id => {
     if (want[id] === staged[id].model) return;
     scene.remove(staged[id].g); delete staged[id];
   });
   Object.keys(want).forEach(id => {
-    if (staged[id]) return;
-    const made = stageOne(id, want[id]);
-    if (made) staged[id] = made;
+    if (!staged[id]) {
+      const made = stageOne(id, want[id]);
+      if (made) staged[id] = made;
+    }
+    if (staged[id]) staged[id].rot = turn[id];
   });
+  invalidate(4);
 }
 
 /* ══ A PICTURE OF A MODEL, FOR THE BOX ═════════════════════════
@@ -2658,14 +2761,17 @@ function sync(list) {
    almost nothing next to the one already running full-screen. */
 let shot = null, shotCam = null, shotScene = null;
 const thumbs = {};
-function thumb(modelId, px) {
+/* `yaw` is the facing the workbench is showing (66-workbench.js) — the same
+   turn about the model's own up that the wood will give it */
+function thumb(modelId, px, yaw) {
   px = px || 192;
-  const key = modelId + '@' + px;
+  yaw = +yaw || 0;
+  const key = modelId + '@' + px + (yaw ? '~' + yaw.toFixed(3) : '');
   if (thumbs[key]) return thumbs[key];
   const m = root.Library && root.Library.models.get(modelId);
   if (!m || typeof THREE === 'undefined') return null;
   ensureShot();
-  return shotOf(m.prims, m.tex, DRESS[m.dress] || DRESS_PLAIN, key, px);
+  return shotOf(m.prims, m.tex, DRESS[m.dress] || DRESS_PLAIN, key, px, yaw);
 }
 
 function ensureShot() {
@@ -2689,11 +2795,12 @@ function ensureShot() {
 }
 
 /* the picture-taking half, so anything with prims can have a preview */
-function shotOf(prims, book, dress, key, px) {
+function shotOf(prims, book, dress, key, px, yaw) {
   shot.setSize(px, px, false);
   const body = new THREE.Group();
   body.add(mesh(prims, book, dress));
   const g = normalise(body);
+  if (yaw) g.rotation.y = yaw;
   shotScene.add(g);
   let out = null;
   try { shot.render(shotScene, shotCam); out = shot.domElement.toDataURL('image/png'); }
@@ -2766,7 +2873,7 @@ function frame(ts) {
      One class check is the whole price of not doing that. */
   if (!doc.body.classList.contains('at-table')) return;
 
-  const busy = dirty > 0 || waiting > 0 || Math.abs(lidU - lidWant) > 0.001;
+  const busy = dirty > 0 || waiting > 0;
   if (!busy) {
     if ((ts || 0) - beat < HEARTBEAT) return;      /* nothing is moving: rest */
   }
@@ -2782,74 +2889,38 @@ function frame(ts) {
     if (!st.el || !st.el.isConnected) {
       st.el = doc.querySelector('.prop.t3-model[data-id="' + id + '"]');
     }
-    stand(st.g, null, 0, 0.5, st.el);
+    /* the turn it was set down at, on the workbench or since — about the
+       model's own up, the same way a thing is turned on a real table */
+    stand(st.g, null, 0, 0.5 + (st.rot || 0) * Math.PI / 180, st.el);
   }
 
   syncStandees();
   faceSeats();
 
-  const a = doc.getElementById('tb-anchor');
   const vp = doc.getElementById('vp');
   const vpr = (vp && !vp.hidden) ? vp.getBoundingClientRect() : null;
   clipTo(vp, vpr);
   aim(vpr);
-  /* one measurement, not two — this took a rect through onScreen() and then
-     another of the same element on the line below. And it is the anchor's
-     own middle line now, not the box around its projection: see anchorOf. */
-  /* ── AND THEY DO NOT STAND DOWN ───────────────────────────
-     These used to be hidden the moment you leaned back, on the argument
-     that they are tools for working the table from above and that the
-     over-canvas has no depth test against the room, so seated they would
-     paint over the tavern.
-
-     grumkata, twice: "the toolbox and bin are still dissapearing". He is
-     right and the argument was wrong. They are not a top-down affordance,
-     they are the two things on the table you always need to be able to
-     reach — and the clipping the argument was defending against was never
-     the missing depth test. It was the room being drawn in the wrong
-     place, which is fixed: the chest stands ON the wood, the room is
-     BEHIND the wood, so nothing in the room is ever between you and it
-     and there is nothing for the depth test to have decided. */
-  const ar = (vp && !vp.hidden) ? siteOf(a, false) : null;
-  chest.visible = !!ar;
-  stand(bin, 'tb-bin-prop', 0, 0.5);
-
-  if (ar) {
-    const cx = ar.wx, cy = ar.wy;
-    if (Math.abs(lidU - lidWant) > 0.001) invalidate(2);
-    /* Stand it ON the board. gl.js calls this AXIS: a model whose up is +Y
-       has to be tipped a quarter turn to stand on the board's normal, LESS
-       the board's own tilt. Using -tilt alone (the board's angle) leaves the
-       chest lying flat against the screen, facing the camera.
-
-       NO EXTRA LEAN. There used to be one, tipping every model a further 33
-       degrees toward the viewer "so you could see more of it" — a fudge from
-       when the table was a flat CSS rectangle and nothing had a real surface
-       to stand on. The wood is a real model now and it is placed at exactly
-       this angle; anything standing on it that uses a different one is
-       visibly sinking into it. */
-    chest.rotation.set(Math.PI / 2 - tilt(), YAW, 0);
-    const cz = woodZ(), cf = woodF(cz);
-    chest.position.set(cx * cf, cy * cf, cz);
-    /* the model is one unit on its longest side, so its screen size IS the
-       anchor's width — it zooms with the table for free */
-    const s = ar.w * cf;
-    chest.scale.set(s, s, s);
-
-    /* the lid eases rather than snapping; the asset's own two extremes */
-    if (Math.abs(lidU - lidWant) > 0.001) {
-      lidU += (lidWant - lidU) * 0.18;
-      lidGroup.quaternion.copy(QS).slerp(QO, lidU);
-    }
+  /* ── THE UNDER-CANVAS STAYS AT THE SCREEN'S ORIGIN ──────────
+     It lives INSIDE #vp (so the wood is under the pieces), and #vp's
+     perspective makes #vp its containing block — so when a docked toolbox
+     or muster moved #vp's left edge (14-war.css), the wood and the room
+     were drawn that far to the right of where the camera, which works in
+     screen coordinates, put them. Pulled back by #vp's own offset, the
+     canvas's pixel (0,0) is the screen's again, and #vp's overflow clips it. */
+  if (uCv && vpr) {
+    const l = -Math.round(vpr.left) + 'px', tp = -Math.round(vpr.top) + 'px';
+    if (uCv.style.left !== l) uCv.style.left = l;
+    if (uCv.style.top !== tp) uCv.style.top = tp;
   }
   /* ── DON'T SWITCH CONTEXTS FOR AN EMPTY CANVAS ────────────
      This file runs TWO WebGL contexts — models over the pieces, wood and
      room under them — and switching between them is one of the more
      expensive things a frame can do on real hardware, whatever a software
-     renderer says about it. Leaned back, the chest and the bin have stood
-     down and the over-canvas often holds nothing at all; rendering an
-     empty scene still pays the switch. So don't. */
-  let over = chest.visible || (bin && bin.visible) || standees.size > 0;
+     renderer says about it. With nothing standing on the wood the
+     over-canvas holds nothing at all; rendering an empty scene still pays
+     the switch. So don't. */
+  let over = standees.size > 0;
   if (!over) for (const id in staged) { if (staged[id].g.visible) { over = true; break; } }
   /* half a second is the insurance: if some future change moves something
      without saying so, the shadow is stale for two frames rather than for
@@ -2902,7 +2973,9 @@ function frame(ts) {
   shadowDirty = false;
 }
 
-function setOpen(v) { lidWant = v ? 1 : 0; invalidate(30); }
+/* there is no lid any more; kept so nothing that still says "the box is
+   open" throws */
+function setOpen() { invalidate(6); }
 
 /* anything that changes the page can wake the loop without knowing how it
    works: a resize, a scroll, a press, a key */
@@ -3034,10 +3107,6 @@ root.__what = (sx, sy, n) => {
   };
   extra(seatRoot, 'SEAT');
   extra(overGroup, 'OVERHEAD');
-  if (chest && chest.visible) { chest.getWorldPosition(v); v.project(camera);
-    out.push({ m: 'CHEST', at: [0,0,0], over: 0,
-               px: Math.round((v.x*0.5+0.5)*W), py: Math.round((-v.y*0.5+0.5)*H),
-               d: Math.round(Math.hypot((v.x*0.5+0.5)*W - sx, (-v.y*0.5+0.5)*H - sy)) }); }
   out.sort((a, b) => a.d - b.d);
   return out.slice(0, n || 6);
 };
@@ -3112,15 +3181,29 @@ function warm() {
    heartbeat of every player. With heads now turning five times a second it
    would have been a rebuild five times a second. The signature carries a hash
    of each likeness and coat (syncSeats), so a real change still rebuilds. */
+/* AND A HEAD TURNING IS NOT A NEW ROOM. With eight players the roll-call
+   stirs many times a second; the room — sixty thousand triangles — was
+   redrawn for every one of those, whether or not anybody's figure had moved.
+   A 'stir' (06-session.js) only ever changes where somebody is looking, so
+   the seats are left alone and the room is drawn only if a head actually
+   turned; faceSeats keeps it drawing while the figure eases round. */
 root.addEventListener('monarchy:session', e => {
   const d = e.detail || {};
   if (d.what === 'left' || d.what === 'closed') for (const k in looks) delete looks[k];
-  (d.members || []).forEach(m => { if (m && m.uid) looks[m.uid] = +m.look || 0; });
+  let turned = false;
+  (d.members || []).forEach(m => {
+    if (!m || !m.uid) return;
+    const v = +m.look || 0;
+    if (looks[m.uid] !== v) { looks[m.uid] = v; turned = true; }
+  });
+  if (d.what === 'stir') { if (turned) invalidate(3, true); return; }
   syncSeats();
   invalidate(3, true);
 });
 
 root.TableGL = { build, warm, setOpen, sync, thumb, bit, onTextures, invalidate, showRoom, lens, syncSeats,
+  /* 46-figures.js asks this before it leaves a standee's drawing to us */
+  standees: true,
   planRows, planKinds, setPlan, resetPlan, defaultPlan: () => TAVERN_PLAN.map(r => Object.assign({}, r)),
   stats: glStats,
   get frames() { return drawn; },

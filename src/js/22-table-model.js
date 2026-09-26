@@ -133,10 +133,13 @@ const T = {
       if (dir === 'undo') {
         const i = this.state.things.findIndex(x => x.id === e.id);
         if (i >= 0) e.thing = this.state.things.splice(i, 1)[0];
-        if (this.state.active === e.id) this.state.active = null;
+        /* remember it was the fight being run, so a redo runs it again —
+           a prepared fight brought out and taken back is one step each way */
+        if (this.state.active === e.id) { this.state.active = null; e.wasActive = true; }
         if (this.state.sel === e.id) this.state.sel = null;
       } else if (e.thing) {
         this.state.things.push(e.thing);
+        if (e.wasActive) this.state.active = e.id;
       }
     } else if (e.k === 'bin') {
       if (dir === 'undo') {
@@ -245,7 +248,11 @@ const T = {
           /* a table saved before setup was coerced holds strings; fix it
              on the way in rather than making every reader defensive */
           this.state.things.forEach(t => {
-            if (t.kind === 'scene') t.setup = Content.coerceSetup(t.scene, t.setup);
+            if (t.kind === 'scene') {
+              /* a scene saved before terrain existed stood in the meadow */
+              t.setup = Content.coerceSetup(t.scene, t.setup);
+              if (t.features) t.features = Content.coerceFeatures(t.features, t.lines);
+            }
           });
         }
       }
@@ -310,6 +317,13 @@ const T = {
      on and not so often that it becomes noise.                     */
   saveFailed: false,
   save() {
+    /* A GUEST TABLE IS NOT KEPT. A player's copy of the GM's board is emptied
+       every time they sit down and every time they leave (60-board-net.js), so
+       writing it down was all cost: the whole board stringified — every
+       picture the GM has put out — after every change anybody made, and on a
+       picture-heavy table it overflowed the five-megabyte store and told the
+       player their table had stopped saving. */
+    if (/^guest-/.test(this.state.id)) return;
     try {
       if (!root.localStorage) return;
       root.localStorage.setItem(KEY(this.state.id), JSON.stringify(this.state));
@@ -502,6 +516,59 @@ const T = {
     const t = this.get(id); if (!t) return false;
     if (!this._set(t, { name: String(name || '') })) return true;
     this.changed('rename'); return true;
+  },
+
+  /* ── CHANGING A THING AFTER IT IS DOWN ────────────────────────
+     grumkata wanted things customisable BEFORE they are placed, and the
+     workbench (66-workbench.js) is that — but a bench you can only use once
+     is a form you fill in and lose. The same bench edits a piece already on
+     the wood, and every change goes through here: one undoable entry, only
+     the fields that moved, never the id or where it lives. A drag of a
+     slider is one step back, not forty, because _push folds a run of edits
+     to the same fields together. */
+  EDIT_NEVER: { id: 1, kind: 1, in: 1, z: 1, ent: 1, by: 1 },
+  edit(id, fields) {
+    const t = this.get(id); if (!t || !fields) return false;
+    const want = {};
+    for (const k in fields) if (!this.EDIT_NEVER[k]) want[k] = fields[k];
+    if (typeof want.rot === 'number') want.rot = ((Math.round(want.rot) % 360) + 360) % 360;
+    if (want.scale != null) {
+      const v = Number(want.scale);
+      want.scale = Math.max(0.25, Math.min(4, Number.isFinite(v) ? v : 1));
+    }
+    if (!this._set(t, want)) return true;
+    this.changed('edit'); return true;
+  },
+
+  /* ── ANOTHER ONE OF THOSE ─────────────────────────────────────
+     A copy lands a little down and to the right of the original so both
+     can be seen, with a fresh id and nowhere to live but the bare wood — a
+     second counter of the same Grave Serjeant is a second body, not the
+     same one standing in two places. A scene is never copied: one of those
+     is a whole evening. */
+  duplicate(id) {
+    const t = this.get(id);
+    if (!t || t.kind === 'scene') return null;
+    const copy = JSON.parse(JSON.stringify(t));
+    delete copy.id; delete copy.z;
+    copy.in = null; copy.lineKey = null; copy.locked = false;
+    copy.x = Math.round((t.x || 0) + 60); copy.y = Math.round((t.y || 0) + 60);
+    if (copy.ent) { delete copy.ent.id; copy.ent.col = null; }
+    const made = this.put(copy);
+    if (made.ent) made.ent.id = made.id;
+    return made;
+  },
+
+  /* ── WHAT STANDS ON ONE SLOT OF A LINE ────────────────────────
+     One feature per slot, on the scene itself, so it saves, undoes and
+     goes over the wire with the fight. `kind` null clears it. */
+  setFeature(sceneId, line, col, kind) {
+    const s = this.get(sceneId);
+    if (!s || s.kind !== 'scene') return false;
+    const now = (s.features || []).filter(f => !(f.line === line && f.col === col));
+    if (kind && Content.FEATURES && Content.FEATURES[kind]) now.push({ line, col, kind });
+    this._set(s, { features: now });
+    this.changed('feature'); return true;
   },
 
   /* ── a piece has one home ────────────────────────────────────

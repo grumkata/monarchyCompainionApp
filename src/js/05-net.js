@@ -205,7 +205,12 @@ function plant(t, p, v) {
   if (!ks.length) return v;
   let n = t;
   for (let i = 0; i < ks.length - 1; i++) {
-    if (typeof n[ks[i]] !== 'object' || n[ks[i]] === null) n[ks[i]] = {};
+    if (typeof n[ks[i]] !== 'object' || n[ks[i]] === null) {
+      /* removing something under a node that is not there removes nothing —
+         it does not leave an empty node behind, which Firebase never keeps */
+      if (v === null) return t;
+      n[ks[i]] = {};
+    }
     n = n[ks[i]];
   }
   if (v === null) delete n[ks[ks.length - 1]];

@@ -70,54 +70,41 @@ const svg = g => `<svg class="fg-svg" viewBox="${esc(g.v || '0 0 512 512')}"
    version that stands on the wood and the version you carry there; the
    version in a hotbar slot has no plate, because a name in a slot is the
    label this whole thing exists to stop being. */
-function token(o, v) {
-  const side = (v && v.side) || 'al';
-  const plate = v && v.plate;
-  const hp = v && v.hp;
-  const form = (v && v.entKind) === 'form';
-  /* A COUNTER CAN HAVE A FACE. From the record's portrait, from the art
-     inside the app, or from a picture off your machine — all three arrive
-     here as the same thing, a `src`. Design-language rule 5: the side colour
-     lives in the RIM, not the fill, so a portrait never fights it. */
-  const face = art(v);
-  /* ── AND IT STANDS UP ──────────────────────────────────────
-     grumkata: "tokens ... are flat for some weird ass reason". They were
-     flat because this was the whole of them — a circle with a letter in it,
-     lying on the wood. It is an ANCHOR now: 27-table-gl.js measures this
-     span every frame and stands the real piece on it, out of the boardgame
-     bits pack, in this side's colour. A body of troops gets a standard, a
-     record gets a pawn, anybody else gets a meeple; a counter with a face
-     gets that face, printed and standing on its own base.
+/* ── A COUNTER WEARS A PICTURE ────────────────────────────────
+   grumkata: "tokens souldnt look how they currently look". This used to
+   stand a KayKit meeple, pawn or flag on the wood in toy red or toy blue —
+   a stand-in for a person. What a counter looks like is 65-token-look.js's
+   now: the person's picture, standing on a turned base or lying flat as a
+   coin, the side told by the tincture of the base's band.
 
-     The disc stays in the markup and is only made invisible, because it is
-     what the picture is carried in and what is left if the pack never
-     arrives. It is the fallback, not the piece. */
-  const shape = form ? 'flag' : (v && v.source) === 'char' ? 'pawn' : 'meep';
-  const solid = !!(v && v.stand) && typeof BITS !== 'undefined';
-  /* IN A SLOT, THE SAME PIECE, PHOTOGRAPHED. A hotbar slot is at z-index 1200
-     and the GL layer is at 870, so a standee drawn over a slot would be behind
-     the plank. 27-table-gl.js takes a picture of the piece with the same
-     camera it photographs every model with, so what you see in the box is
-     what stands on the wood — not a letter in a circle. */
-  const pic = (!solid && !face && root.TableGL && root.TableGL.bit)
-    ? root.TableGL.bit(shape, side === 'en' ? 'en' : 'al', 128) : null;
-  return `<span class="fg fg-tok ${side === 'en' ? 'en' : 'al'}${plate ? ' named' : ''}${
-            form ? ' form' : ''}${face ? ' faced' : ''}${solid ? ' standing' : ''}">
-            <span class="fg-plinth"></span>
-            <span class="fg-disc${pic ? ' shot' : ''}">${
-              face || (pic ? `<img alt="" src="${esc(pic)}">`
-                           : `<b>${esc(mono(o.name))}</b>`)}${
-              /* WHOSE PIECE IS IT. Every pawn is the same pawn, so a tray of
-                 six characters would be six identical blue pawns — worse than
-                 the letters it replaced. A record's counter keeps its
-                 monogram, on a little brass tag the way a painted miniature
-                 is labelled underneath. An NPC or a formation gets none:
-                 "SE" for "Someone else" was never information. */
-              (pic && shape === 'pawn') ? `<b class="fg-mono">${esc(mono(o.name))}</b>` : ''
-            }</span>
-            ${solid ? `<span class="fg-stand"
-                 data-stand="${shape}|${side === 'en' ? 'en' : 'al'}|${
-                   face ? '1' : '0'}"></span>` : ''}
+   ON THE WOOD AND IN YOUR HAND (`stand`), a standee is an ANCHOR: the
+   GL layer (27-table-gl.js) measures `.fg-stand` every frame and stands the
+   real base and card on it, so it has a silhouette and casts a shadow. The
+   flat drawing of it stays in the markup, hidden, as the fallback for a
+   machine with no GL — and IS the drawing everywhere the GL layer cannot
+   reach: the toolbox, the workbench, the tracker. A coin is flat by nature
+   and is the same markup everywhere. */
+function token(o, v) {
+  v = v || {};
+  const L = root.TokenLook;
+  const side = v.side === 'en' ? 'en' : 'al';
+  const plate = v.plate;
+  const hp = v.hp;
+  const kind = v.entKind || 'unit';
+  const look = L ? L.lookOf(v) : 'coin';
+  const who = Object.assign({ name: o && o.name }, v, { side, entKind: kind });
+  const solid = look === 'standee' && !!v.stand && !!(root.TableGL && root.TableGL.standees);
+  const p = L ? L.pic(who) : { src: '', cut: false };
+  const flat = L ? (look === 'coin' ? L.coin(who, kind === 'form' ? 116 : 84)
+                                    : L.standee(who, 100))
+                 : `<b>${esc(mono(o && o.name))}</b>`;
+  return `<span class="fg fg-tok ${side} look-${look} k-${esc(kind)}${plate ? ' named' : ''}${
+            kind === 'form' ? ' form' : ''}${p.src ? ' faced' : ''}${solid ? ' standing' : ''}">
+            <span class="fg-flat">${flat}</span>
+            ${solid ? `<span class="fg-stand" data-stand="${side}|${esc(kind)}|${p.cut ? 1 : 0}|${
+                 esc(p.src.length + ':' + p.src.slice(-32))}"
+                 data-side="${side}" data-kind="${esc(kind)}" data-cut="${p.cut ? 1 : 0}"
+                 data-src="${esc(p.src)}"></span>` : ''}
             ${plate ? `<span class="fg-plate">
                  <i${v.id ? ` data-rename="${esc(v.id)}" title="Rename"` : ''}
                     >${esc(plate)}</i>

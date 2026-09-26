@@ -37,7 +37,11 @@ function mount() {
   T().on(() => { if (root.TableGL && root.TableGL.syncSeats) root.TableGL.syncSeats(); });
   /* who may touch what changes with the session, not with the board — so
      the pieces already standing are told, without rebuilding any of them */
-  root.addEventListener('monarchy:session', () => {
+  /* only when who you ARE changes — arriving, leaving — not on every stir of
+     the roll-call, which with eight players is many times a second */
+  const ROLE = { hosting: 1, joined: 1, left: 1, closed: 1 };
+  root.addEventListener('monarchy:session', e => {
+    if (!ROLE[(e.detail || {}).what]) return;
     doc.querySelectorAll('#tbl .prop.t3-thing').forEach(el =>
       el.classList.toggle('hands-off', !!T().mayTouch && !T().mayTouch(T().get(el.dataset.id))));
   });
@@ -125,7 +129,12 @@ function repaint() {
       (st.sel === t.id ? ' sel' : '');
     el.dataset.id = t.id;
     el.dataset.x = t.x; el.dataset.y = t.y;
-    el.dataset.r = t.rot || 0;
+    /* A MODEL AND A COUNTER TURN IN 3D, NOT ON THE PAPER. Their anchors are
+       measured by a hairline across the middle (27-table-gl.js anchorOf), and
+       turning the anchor turns the hairline — so a tree turned forty-five
+       degrees would also have shrunk. The GL layer turns the model about its
+       own up; a standee always faces you anyway. */
+    el.dataset.r = (t.kind === 'model' || t.kind === 'token') ? 0 : (t.rot || 0);
     /* HOW HIGH IT STANDS, and this is not decoration. The table is
        transform-style:preserve-3d, so hit testing walks the 3D scene rather
        than the flattened boxes — a thing at translateZ(8px) sitting over the
@@ -155,7 +164,7 @@ function repaint() {
   /* every model on the wood, handed to the layer that can actually draw it */
   if (root.TableGL && root.TableGL.sync) {
     root.TableGL.sync(st.things.filter(t => t.kind === 'model' && t.model)
-                               .map(t => ({ id: t.id, model: t.model })));
+                               .map(t => ({ id: t.id, model: t.model, rot: t.rot || 0 })));
   }
 
   /* the running scene's live controls follow whatever is running */
@@ -232,8 +241,11 @@ function face(t, st) {
              /* it is a PIECE on the wood, not a drawing of one: 27-table-gl.js
                 stands the real figure on the anchor this asks for */
              stand: true, source: t.source || 'npc',
-             src: t.src || '', art: t.art || '',
-             hp: t.ent ? t.ent.hp + '/' + t.ent.max : '' },
+             src: t.src || '', art: t.art || '', fig: t.fig || '',
+             look: t.look || 'standee', name: t.name,
+             hp: t.ent ? (t.ent.kind === 'form'
+                            ? (t.ent.alive + '/' + t.ent.total)
+                            : t.ent.hp + '/' + t.ent.max) : '' },
            Math.min(w, Math.round((t.h || 182) * (t.scale || 1))) * 0.96) : ''
        }</div>`
     : null;
@@ -386,10 +398,12 @@ function wire(el, t) {
   el.addEventListener('pointerdown', () => { if (mine()) T().raise(t.id); });
 }
 
-/* ── the bin, while something is over it ─────────────────────── */
+/* ── THE BOX, WHILE SOMETHING IS OVER IT ─────────────────────
+   There is no bin on the wood any more (grumkata: the chest and the bin
+   "look mid"). A piece is put away the way it came out: carried back over
+   the open toolbox and let go, which lights up to say so. */
 function dragging(el, ev) {
-  const bin = doc.querySelector('.tb-bin');
-  if (bin) bin.classList.toggle('over', overBin(ev));
+  if (root.Hand && root.Hand.over) root.Hand.over(overBox(ev));
   if (root.Kit) root.Kit.hover(ev.clientX, ev.clientY, el.classList.contains('t3-note'));
 }
 
@@ -399,8 +413,7 @@ function dragging(el, ev) {
 function dropped(el, ev) {
   const id = el.dataset.id;
   const t = T().get(id);
-  const bin = doc.querySelector('.tb-bin');
-  if (bin) bin.classList.remove('over');
+  if (root.Hand && root.Hand.over) root.Hand.over(false);
   if (!t) return;
   if (root.Kit) root.Kit.hover(0, 0, false);
 
@@ -409,7 +422,13 @@ function dropped(el, ev) {
   if (t.kind === 'note' && root.Kit && root.Pocket && ev &&
       root.Kit.over(ev.clientX, ev.clientY) && root.Pocket.pocket(t)) return;
 
-  if (overBin(ev)) { T().bin(id); return; }
+  /* and anything let go over the open toolbox goes back in it — off the
+     table, one Ctrl+Z from coming back */
+  if (overBox(ev) && T().mayUseBox()) {
+    T().bin(id);
+    if (root.Inspector) root.Inspector.said('Put away — Ctrl+Z brings it back');
+    return;
+  }
 
   /* A PIECE LET GO PAST THE RIM LIES AT THE RIM. Dragged up over the wall in
      the chair view, the pointer's point on the plane of the wood is a long way
@@ -456,12 +475,8 @@ function lineUnder(ev) {
   return null;
 }
 
-function overBin(ev) {
-  const b = doc.querySelector('.tb-bin');
-  if (!b || b.hidden) return false;
-  const r = b.getBoundingClientRect();
-  return ev.clientX >= r.left && ev.clientX <= r.right &&
-         ev.clientY >= r.top && ev.clientY <= r.bottom;
+function overBox(ev) {
+  return !!(ev && root.Hand && root.Hand.overPanel && root.Hand.overPanel(ev.clientX, ev.clientY));
 }
 
 function sceneUnder(ev, notId) {

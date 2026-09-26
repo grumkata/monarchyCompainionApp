@@ -260,14 +260,42 @@ function commit() {
 
 /* ══ RUNNING ONE — the options panel ══════════════════════════ */
 function panel() {
-  let el = doc.getElementById('sc-opts');
+  let el = doc.getElementById('sc-float');
   if (el) return el;
   el = doc.createElement('aside');
-  el.id = 'sc-opts';
+  el.id = 'sc-float';
   el.className = 'sc-opts';
   el.hidden = true;
   doc.body.appendChild(el);
   return el;
+}
+
+/* ── THE SAME ORDERS, DRAWN INTO THE MUSTER ────────────────────
+   The rows are the writ's own — a seal, a tally, a row of pennons — and
+   wired the same way; only where they are drawn is different. Plus the
+   two parts of the fight's setup worth changing mid-evening: the ground
+   it is fought on and how wide it is. */
+function ordersInto(host, sceneId) {
+  const s = T().get(sceneId);
+  if (!host || !s || s.kind !== 'scene') return;
+  const def = C().SCENES[s.scene];
+  const ter = s.setup && s.setup.terrain;
+  host.innerHTML =
+    `<span class="mu-k">Orders</span>
+     <div class="sc-opts-body">
+       <div class="sc-opt wide"><div class="sc-opt-text"><b>Terrain</b>
+         <i>${esc((C().TERRAINS[ter] || {}).blurb || '')}</i></div>
+         <span class="sc-choice">${C().TERRAIN_ORDER.map(k =>
+           `<button type="button" class="sc-pen${k === ter ? ' on' : ''}" data-setup="terrain"
+              data-val="${k}">${esc(C().TERRAINS[k].name)}</button>`).join('')}</span></div>
+       <div class="sc-opt"><div class="sc-opt-text"><b>Battlefield width</b><i>Slots across.</i></div>
+         ${tally('width', s.setup.width, 3, 14, 'data-setup')}</div>
+       ${def.options.map(k => optRow(k, C().OPTIONS[k], s.options[k])).join('')}
+     </div>`;
+  wireControls(host, (k, v) => {
+    if (k === 'terrain' || k === 'width') T().setSetup(sceneId, k, v);
+    else T().setOption(sceneId, k, v);
+  }, k => (k === 'terrain' || k === 'width') ? T().get(sceneId).setup[k] : T().get(sceneId).options[k]);
 }
 
 /* `ask` is true when the GM asked for this panel — made the scene, ran it,
@@ -279,6 +307,19 @@ function panel() {
    stay closed until the GM asks for it again. */
 function showOptions(sceneId, ask) {
   const s = T().get(sceneId);
+  /* ── A FIGHT'S ORDERS ARE IN THE MUSTER ────────────────────────
+     The writ floated over the right-hand side of the board, and on a fight
+     the right-hand side of the board is where the enemy's flank is. For a
+     combat scene the orders live in the tracker (72-muster.js), which is
+     docked at your left hand with everything else about running the fight;
+     asking for them opens it. The floating writ is for the scenes that have
+     no tracker — a map, a stage. */
+  if (s && s.kind === 'scene' && s.scene === 'combat' && root.Muster) {
+    const fl = doc.getElementById('sc-float'); if (fl) fl.hidden = true;
+    if (ask && T().mayUseBox()) root.Muster.open();
+    else root.Muster.paint();
+    return;
+  }
   const p = panel();
   if (!s || s.kind !== 'scene' || !T().mayUseBox()) { p.hidden = true; return; }
   if (ask) dismissed = null;
@@ -337,8 +378,8 @@ function optRow(key, def, val) {
   </div>`;
 }
 
-function hideOptions() { const p = doc.getElementById('sc-opts'); if (p) p.hidden = true; }
+function hideOptions() { const p = doc.getElementById('sc-float'); if (p) p.hidden = true; }
 
-root.SceneSetup = { make, close, showOptions, hideOptions };
+root.SceneSetup = { make, close, showOptions, hideOptions, ordersInto };
 
 })(window, document);

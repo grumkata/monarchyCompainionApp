@@ -663,6 +663,97 @@ function Client(server, uid, name, opts) {
       Array.isArray((bobs('a').ent || {}).cond) || (bobs('a').ent || {}).cond === undefined);
   }
 
+  /* == EIGHT PLAYERS AND A GM ==================================
+     grumkata: "make sure it works for up to 8 players it runs smoothly".
+     Nine clients on a server that answers the way Firebase does, all of them
+     putting things down and moving them, and the heartbeat that every one of
+     them sends every four seconds. */
+  {
+    const S = Server({ firebase: true });
+    const gm = Client(S, 'u-gm', 'Grum');
+    const PIC = 'data:image/png;base64,' + 'Q'.repeat(60000);
+    gm.TableModel.put({ id: 'map', kind: 'art', name: 'The map', src: PIC, x: 50 });
+    gm.TableModel.put({ id: 'orc', kind: 'token', name: 'Orc', x: 100, ent: { hp: 9, cond: [] } });
+    const word = await gm.Session.host('t8', { name: 'Eight' });
+    const ps = [];
+    for (let i = 1; i <= 8; i++) {
+      const c = Client(S, 'u-p' + i, 'P' + i);
+      await c.Session.join(word);
+      ps.push(c);
+    }
+    const all = [gm].concat(ps);
+    T('eight players and a GM all get a seat', all.every(c => c.Session.seating().length === 9));
+
+    /* everybody at once: each player lays a note and moves it, the GM moves
+       the orc, and the writes land interleaved */
+    ps.forEach((c, i) => c.TableModel.put({ id: 'n' + i, kind: 'note', by: c.Session.uid, x: i }));
+    ps.forEach((c, i) => c.TableModel.move('n' + i, 1000 + i));
+    gm.TableModel.move('orc', 777);
+    const want = gm.TableModel.ids();
+    T('after everybody moves at once, every table shows the same wood',
+      all.every(c => c.TableModel.ids() === want) && want.split(' ').length === 10);
+    T('and every note is where its owner left it',
+      ps.every((c, i) => want.indexOf('n' + i + '@' + (1000 + i)) >= 0));
+    T('a picture reaches the table whole, not as the fingerprint it is compared by',
+      (S.read('tables/' + word + '/board/things/map') || {}).src === PIC);
+
+    /* the roll-call: a heartbeat is not news, a turned head is only a stir,
+       and only somebody arriving or changing their face is a new roster */
+    const whats = [];
+    const was = gm.dispatchEvent;
+    gm.dispatchEvent = e => { whats.push(e.detail && e.detail.what); return was(e); };
+    for (const c of ps) await c.Net.update('tables/' + word + '/who/' + c.Session.uid, { seen: Date.now() });
+    T('eight heartbeats wake nothing on the GM\'s table', whats.length === 0);
+    await ps[0].Session.look(20);
+    T('a player turning their head is a stir, not a new roster', whats.join(' ') === 'stir');
+    whats.length = 0;
+    await ps[1].Session.point(10, 20, '#123456');
+    T('and so is a point', whats.join(' ') === 'stir');
+    whats.length = 0;
+    ps[2].localStorage.setItem('monarchy.me.v1', JSON.stringify({ name: 'P3 the Bold' }));
+    await ps[2].Session.refresh();
+    T('a new name is a new roster', whats.join(' ') === 'who');
+    whats.length = 0;
+    await ps[7].Session.leave();
+    T('and somebody leaving is too, and the ring closes up',
+      whats.join(' ') === 'who' && gm.Session.seating().length === 8);
+    gm.dispatchEvent = was;
+
+    /* a blink is not a departure: their connection drops (the server clears
+       their presence) and nobody else's figure should move for it */
+    const ring = () => gm.Session.seating().map(s => s.uid + '@' + Math.round(s.at)).join(' ');
+    const before = ring();
+    S.write('tables/' + word + '/who/u-p4', null);
+    T('a player whose connection blinks keeps their chair, and nobody moves',
+      ring() === before && !gm.Session.members.some(m => m.uid === 'u-p4'));
+    await settle();
+    T('and when they are back they are in it', ring() === before &&
+      gm.Session.members.some(m => m.uid === 'u-p4'));
+  }
+
+  /* == THE GM'S APP CLOSES MID-GAME =============================
+     A crash is not "Stop hosting": the table stays live and the players stay
+     sat at it. Hosting it again used to make a new word, so the GM came back
+     to an empty room while everybody waited at the old one. */
+  {
+    const S = Server({ firebase: true });
+    const gm = Client(S, 'u-gm', 'Grum');
+    const bob = Client(S, 'u-bob', 'Bob');
+    const word = await gm.Session.host('tc', { name: 'Crash' });
+    await bob.Session.join(word);
+    /* the same machine, started again: its store survives, its session does not */
+    const again = Client(S, 'u-gm', 'Grum');
+    again.localStorage.setItem('monarchy.hosted.v1', gm.localStorage.getItem('monarchy.hosted.v1'));
+    const back = await again.Session.host('tc', { name: 'Crash' });
+    T('a GM hosting the same table again takes back the same word', back === word);
+    T('and the players still sitting at it have their GM back',
+      bob.Session.live && bob.Session.members.some(m => m.uid === 'u-gm'));
+    const cal = Client(S, 'u-cal', 'Cal');
+    cal.localStorage.setItem('monarchy.hosted.v1', JSON.stringify({ tc: word }));
+    const other = await cal.Session.host('tc', {});
+    T('but a word is never taken over by somebody who did not host it', other !== word);
+  }
+
   /* == THE GM HANDS OUT THE PENS, AND ANYONE CAN POINT =========
      grumkata: players "draw on the table if allowed by gm [...] or point at
      things on the table". Permission lives on meta, which only the host
