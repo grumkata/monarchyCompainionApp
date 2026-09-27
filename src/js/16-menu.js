@@ -1693,7 +1693,21 @@ function sendWord(){
   const STEP = { connecting: 'reaching the table…', finding: 'finding the table…',
                  seating: 'taking a seat…' };
   let failed = null, word = null, ids = [];
-  const work = () => window.Session.join(w, st => Hr.say(STEP[st] || '')).then(wd => {
+  /* A JOIN THAT NEVER ANSWERS. Firebase's reads and writes do not time out —
+     on a line that stalls they wait for ever — and the cover's own ceiling
+     used to lift onto "You are at null" while the join carried on behind it,
+     later dropping the player into a table from the hall, or leaving them
+     "already at a table" for every retry. Given up here, before the ceiling,
+     and a join that lands after that is walked straight back out of. */
+  let late = false;
+  const tryJoin = () => {
+    const j = window.Session.join(w, st => Hr.say(STEP[st] || ''))
+      .then(wd => { if (late) { window.Session.leave(); throw new Error('late'); } return wd; });
+    const slow = new Promise((_, no) => setTimeout(() => { late = true;
+      no(new Error('The table did not answer — check your connection and try again')); }, 15000));
+    return Promise.race([j, slow]);
+  };
+  const work = () => tryJoin().then(wd => {
     word = wd; ids = bring();
     Hr.say('the table is set');
     const heard = (window.BoardNet && window.BoardNet.heard) ? window.BoardNet.heard() : null;
@@ -1702,7 +1716,7 @@ function sendWord(){
   }).catch(e => { failed = e; });
   Hr.wipe(work, { title: w, sub: STEP.connecting, ceiling: 20000 }).then(() => {
     joining = false;
-    if (failed) { render(); return toast(failed.message || 'That did not work'); }
+    if (failed || !word) { render(); return toast((failed && failed.message) || 'That did not work'); }
     said(word, ids);
   });
 }
