@@ -34,7 +34,10 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
   const site = await serve();
   const wait = ms => pg.waitForTimeout(ms);
-  await pg.goto(site.url + '/monarchy.html'); await wait(1400);
+  await pg.goto(site.url + '/monarchy.html');
+  /* started = the loading screen has gone (it now rehearses a table first) */
+  await pg.waitForFunction(() => !document.getElementById('boot'), null, { timeout: 30000 });
+  await wait(300);
 
   /* ══ THE ENGINE ════════════════════════════════════════════ */
 

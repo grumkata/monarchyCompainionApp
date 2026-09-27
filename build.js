@@ -729,6 +729,7 @@ const COVER_DRIVER = `<script>
       raf2(function(){ B.send('covered'); });
     }, COVER);
   });
+  B.on('say', function(t){ var i = host && host.querySelector('.hr-card i'); if (i) i.textContent = t; });
   B.on('lift', function(){
     var h = hostUp();
     h.classList.add('lifting');                  /* the card rides out on the cloth */

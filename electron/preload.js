@@ -42,5 +42,6 @@ contextBridge.exposeInMainWorld('AppCover', {
   progress(u) { ipcRenderer.send('app-cover:progress', u); },
   ready() { ipcRenderer.send('app-cover:ready'); },
   wipe(o) { return ipcRenderer.invoke('app-cover:wipe', o); },
+  say(text) { ipcRenderer.send('app-cover:say', text); },
   lift() { return ipcRenderer.invoke('app-cover:lift'); }
 });

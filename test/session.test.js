@@ -218,6 +218,40 @@ function Client(server, uid, name, opts) {
     T('and nobody can join it afterwards', /no table/.test(after || ''));
   }
 
+  /* ══ TWO TABLES AT ONCE ═════════════════════════════════════
+     grumkata, 2026-09-27, after the join was made to read and write in
+     parallel: "does this change make it so multiple tables running at once
+     no longer work?" Two GMs host at the same moment on one database, a
+     player joins each through the new join (with the line warmed first, as
+     the Join screen does), and each must be at their own table and only
+     their own — and closing one must leave the other running. */
+  {
+    const S = Server({ firebase: true });
+    const ann = Client(S, 'u-ann', 'Ann'), ben = Client(S, 'u-ben', 'Ben');
+    const pia = Client(S, 'u-pia', 'Pia'), quin = Client(S, 'u-quin', 'Quin');
+    const [wA, wB] = await Promise.all([ann.Session.host('ta', { name: 'Ann\'s' }),
+                                        ben.Session.host('tb2', { name: 'Ben\'s' })]);
+    await Promise.all([pia.Session.warm(), quin.Session.warm()]);
+    T('the warm-up writes nothing to the tables', !S.read('tables/__warm'));
+    await Promise.all([pia.Session.join(wA), quin.Session.join(wB)]);
+    const at = c => c.Session.seating().map(s => s.uid).sort().join(' ');
+    T('two tables hosted at once can each be joined, at the same moment',
+      wA !== wB && pia.Session.live && quin.Session.live);
+    T('and each player is at their own GM\'s table',
+      pia.Session.tableId === 'ta' && quin.Session.tableId === 'tb2'
+      && pia.Session.word === wA && quin.Session.word === wB);
+    T('with only that table\'s people round it',
+      at(ann) === 'u-ann u-pia' && at(pia) === 'u-ann u-pia'
+      && at(ben) === 'u-ben u-quin' && at(quin) === 'u-ben u-quin');
+    T('each seat is written under its own table\'s word',
+      !!S.read('tables/' + wA + '/who/u-pia') && !S.read('tables/' + wB + '/who/u-pia')
+      && !!S.read('tables/' + wB + '/who/u-quin') && !S.read('tables/' + wA + '/who/u-quin'));
+    await ann.Session.leave();
+    T('closing one table leaves the other running, with its people still at it',
+      S.read('tables/' + wA + '/meta').live === false && S.read('tables/' + wB + '/meta').live === true
+      && quin.Session.live && at(quin) === 'u-ben u-quin');
+  }
+
   /* ══ THE RING, WITH REAL CLIENTS ════════════════════════════ */
   {
     const S = Server();

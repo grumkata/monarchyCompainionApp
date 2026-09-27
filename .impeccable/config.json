@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "test/session.test.js"
+        ],
+        "createdAt": "2026-09-27T20:16:42.710Z",
+        "reason": "Claude, from the code: test/session.test.js:837 is a hostile dice fixture ('<img>' as a coin result) proving Session.diceOf strips non-dice; not rendered markup"
+      }
+    ]
+  }
+}

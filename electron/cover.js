@@ -21,6 +21,7 @@
 //   app   -> 'app-cover:progress' u     the parse, 0..1      -> cover
 //   app   -> 'app-cover:ready'          the app is standing  -> cover lifts
 //   app   => 'app-cover:wipe' {…}       raise the Bend, resolves once covered
+//   app   -> 'app-cover:say' text       change the card's line while it is up
 //   app   => 'app-cover:lift'           take it off, resolves once gone
 // The view is hidden whenever nothing is over the app, because a view on top
 // takes the mouse even where it is transparent.
@@ -93,6 +94,7 @@ ipcMain.handle('app-cover:wipe', (e, o) => {
   send('wipe', o || {});
   return p;
 });
+ipcMain.on('app-cover:say', (e, text) => { if (wiping) send('say', String(text || '')); });
 ipcMain.handle('app-cover:lift', () => {
   if (!view) return { ok: false };
   const p = awaitReply('lifted').then(r => { wiping = false; show(false); return r; });

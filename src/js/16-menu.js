@@ -154,7 +154,10 @@ function take(id){
   /* a screen is entered at its beginning, not wherever you left it a week
      ago — the one exception being that the flag maker keeps its bench */
   if (id === 'set'){ setTab = 'you'; netPasting = false; }
-  if (id === 'join'){ needName = false; }
+  /* the line to the tables is opened as the Join screen comes up, so the
+     word is typed while it connects rather than waited on after (06-session.js warm) */
+  if (id === 'join'){ needName = false;
+    if (window.Session && window.Session.warm) window.Session.warm(); }
   at = id; path = []; paint();
   screen.style.setProperty('--field', H.TINCT[b.arms.a]);
   screen.dataset.house = H.TNAME[b.arms.a] || '';     /* up the edge, 00-hall.css */
@@ -1664,20 +1667,43 @@ function sendWord(){
               return toast('What shall we call you?'); }
     me.name = n; saveM(); paintArms(); }
   joining = true; joinSaid = w; render();
-  window.Session.join(w).then(word => {
+  /* the characters you chose come to the table with you */
+  const bring = () => { const ids = window.SheetsNet ? bringing() : [];
+                        ids.forEach(id => window.SheetsNet.bring(id)); return ids; };
+  const said = (word, ids) => toast('You are at ' + word + (ids.length
+    ? ' — ' + ids.length + (ids.length === 1 ? ' character' : ' characters') + ' brought' : ''));
+  /* the table you have joined is the one you walk into — a guest table
+     the GM's board is mirrored into (60-board-net.js), not the GM's own
+     save id, which on this machine is nobody's table */
+  const guest = word => (window.BoardNet && window.BoardNet.tableId) || ('guest-' + word);
+  const Hr = window.Herald, Sh = window.Shell;
+  if (!Hr || !Hr.wipe || !Sh || !Sh.under) {
+    return window.Session.join(w).then(word => {
+      joining = false; said(word, bring()); Sh.openTable(guest(word));
+    }).catch(e => { joining = false; render(); toast(e && e.message ? e.message : 'That did not work'); });
+  }
+  /* ── THE COVER COMES DOWN WHEN THE SEAL IS PRESSED ─────────
+     grumkata: joining "takes so much time and has no indication of if
+     you're joining or the game froze". It went over the wire with nothing
+     on screen but a seal that had gone a little grey, then walked into the
+     table, then the GM's board arrived on the wood a moment later. Now the
+     Bend is drawn at once, over the Join screen, and its card says how far
+     the join has got; it lifts on the table only when the board has been
+     heard (or on the Join screen again, with the reason, if it fails). */
+  const STEP = { connecting: 'reaching the table…', finding: 'finding the table…',
+                 seating: 'taking a seat…' };
+  let failed = null, word = null, ids = [];
+  const work = () => window.Session.join(w, st => Hr.say(STEP[st] || '')).then(wd => {
+    word = wd; ids = bring();
+    Hr.say('the table is set');
+    const heard = (window.BoardNet && window.BoardNet.heard) ? window.BoardNet.heard() : null;
+    return Promise.all([Sh.under('table', guest(wd)),
+                        heard && Promise.race([heard, new Promise(r => setTimeout(r, 5000))])]);
+  }).catch(e => { failed = e; });
+  Hr.wipe(work, { title: w, sub: STEP.connecting, ceiling: 20000 }).then(() => {
     joining = false;
-    /* the characters you chose come to the table with you */
-    const ids = window.SheetsNet ? bringing() : [];
-    ids.forEach(id => window.SheetsNet.bring(id));
-    toast('You are at ' + word + (ids.length
-      ? ' — ' + ids.length + (ids.length === 1 ? ' character' : ' characters') + ' brought' : ''));
-    /* the table you have joined is the one you walk into — a guest table
-       the GM's board is mirrored into (60-board-net.js), not the GM's own
-       save id, which on this machine is nobody's table */
-    window.Shell.openTable((window.BoardNet && window.BoardNet.tableId) || ('guest-' + word));
-  }).catch(e => {
-    joining = false; render();
-    toast(e && e.message ? e.message : 'That did not work');
+    if (failed) { render(); return toast(failed.message || 'That did not work'); }
+    said(word, ids);
   });
 }
 

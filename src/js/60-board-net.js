@@ -426,7 +426,16 @@ if (M()) M().on((st, why) => { if (why === 'load') loaded(); else push(); });
 
 /* the combat sheet changes the fight without going through the model's
    change hook (40-combat-scene.js) — it says so here instead */
-root.BoardNet = { push: sendNow, soon: push, guestId, canon,
+/* THE BOARD HAS BEEN HEARD: the table's first answer (even "nothing on it")
+   has arrived. A join keeps its cover up until then, so a player walks in to
+   the table as it stands, not to empty wood that fills in around them. */
+function heard() {
+  return new Promise(res => {
+    const look = () => (last !== undefined || !word) ? res() : root.setTimeout(look, 50);
+    look();
+  });
+}
+root.BoardNet = { push: sendNow, soon: push, guestId, canon, heard,
                   get wired() { return !!word; },
                   /* the local table to walk into to see this board */
                   get tableId() { return want; } };

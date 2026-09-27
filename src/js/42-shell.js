@@ -195,6 +195,17 @@ function warmTable() {
 
 const openTable = id => show('table', id);
 const backToHall = () => show('hall');
+/* INTO A TABLE UNDER A COVER THAT IS ALREADY UP. A join raises the Bend the
+   moment the seal is pressed, before there is any table to go to
+   (16-menu.js sendWord), and walks in at the end of it; a second wipe
+   inside the first would be taken as the first's "latest", never run.
+   Resolves once the table has drawn, like the Bend's own walk-in. */
+function under(where, tableId) {
+  const name = where === 'table' ? tableName(tableId) : '';
+  const p = swap(where, tableId, true);
+  if (where === 'table') nameHud(name);
+  return p;
+}
 
 /* ══ A DRESS REHEARSAL, UNDER THE LOADING SCREEN ═══════════════
    grumkata: "still really laggy when generating the table — why not preload
@@ -330,7 +341,7 @@ function seat(n) {
 }
 
 /* the tavern hangs your arms behind your seat (27-table-gl.js) */
-root.Shell = { show, openTable, backToHall, rehearse, livery, arms: readArms, seat,
+root.Shell = { show, openTable, backToHall, under, rehearse, livery, arms: readArms, seat,
                get at() { return at; } };
 
 })(window, document);

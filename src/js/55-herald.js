@@ -330,7 +330,12 @@ const COVER = 440, HOLD = 900, TAIL = 320, UNCOVER = 720, CEILING = 6000;
 let wiping = null;
 function wipe(mid, o) {
   o = o || {};
-  if (reduced() || !doc.body) { mid(); return Promise.resolve(); }
+  /* no cover, but still the work's own promise: a caller waiting on the
+     wipe (a join) is waiting on what was done under it */
+  if (reduced() || !doc.body) {
+    let r; try { r = mid(); } catch (e) { console.error(e); }
+    return Promise.resolve(r).then(() => {}, e => { console.error(e); });
+  }
   if (wiping) { wiping.mid = mid; wiping.o = o; return wiping.done; }  /* latest wins */
   const job = wiping = { mid, o };
   job.done = root.AppCover ? over(job) : inPage(job);
@@ -363,7 +368,8 @@ async function over(job) {
   const ready = (work && typeof work.then === 'function')
     ? work.catch(e => { console.error(e); }) : Promise.resolve();
   /* at least HOLD on screen, TAIL after the work, never beyond CEILING */
-  await Promise.race([Promise.all([ready.then(() => wait(TAIL)), held]), wait(CEILING)]);
+  await Promise.race([Promise.all([ready.then(() => wait(TAIL)), held]),
+                      wait(job.o.ceiling || CEILING)]);
   try { await root.AppCover.lift(); } catch (e) {}
   wiping = null;
 }
@@ -413,7 +419,7 @@ function inPage(job) {
         }, UNCOVER + 40);
       };
       /* and never behind the curtain for ever, whatever `mid` does */
-      const guard = setTimeout(lift, CEILING);
+      const guard = setTimeout(lift, job.o.ceiling || CEILING);
       Promise.all([ready.then(() => new Promise(r => setTimeout(r, TAIL))), held]).then(lift);
       });
     }, COVER);
@@ -589,6 +595,19 @@ function start() { hostUp(); watchDice(); watchCombat(); watchDrift(); }
 if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', start);
 else start();
 
-root.Herald = { wipe, proclaim, burst, burstOn, get busy() { return !!wiping; } };
+/* ══ WHAT THE CARD SAYS, WHILE IT IS UP ══════════════════════
+   The line under the name, changed mid-wipe: a join tells the player how far
+   it has got ("finding the table…", "taking a seat…") instead of leaving a
+   still card that could as easily be a frozen app (grumkata: "no indication
+   of if you're joining or the game froze"). Said to whichever cover is up. */
+function say(text) {
+  const t = String(text || '');
+  if (wiping) wiping.o.sub = t;
+  const i = host && host.querySelector('.hr-card i');
+  if (i) i.textContent = t;
+  if (root.AppCover && root.AppCover.say) { try { root.AppCover.say(t); } catch (e) {} }
+}
+
+root.Herald = { wipe, say, proclaim, burst, burstOn, get busy() { return !!wiping; } };
 
 })(window, document);

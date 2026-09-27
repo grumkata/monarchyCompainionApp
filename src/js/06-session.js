@@ -163,32 +163,54 @@ function host(id, opts) {
 }
 
 /* ══ JOINING ═══════════════════════════════════════════════════ */
-function join(w) {
+/* ── ONE ROUND TRIP TO FIND IT, ONE TO SIT DOWN ────────────────
+   grumkata: "joining the table takes so much time". Measured on the wire:
+   it was sign-in, then SIX requests one after another — the table, who is
+   at it, the seat ledger, a write, your own old place, and a write carrying
+   your whole likeness — about 100ms each after a first of 350–450ms, and
+   the likeness as long as it takes to upload. None of the three reads
+   depends on another, so they go together (four reads at once came back in
+   55–200ms); the two writes go together; and the likeness follows once you
+   are seated (sit below). `step` is told how far it has got, for whoever
+   is showing the player that something is happening (16-menu.js). */
+function join(w, step) {
   if (live()) return Promise.reject(new Error('already at a table'));
   const want = tidy(w);
   if (!want) return Promise.reject(new Error('no word'));
+  const tell = s => { try { if (step) step(s); } catch (e) {} };
+  const at = k => Net().get('tables/' + want + '/' + k);
+  tell('connecting');
   return Net().start()
-    .then(() => Net().get('tables/' + want + '/meta'))
-    .then(m => {
+    .then(() => { tell('finding'); return Promise.all([at('meta'), at('who'), at('seats')]); })
+    .then(([m, who, book]) => {
       if (!m || !m.live) throw new Error('no table is sitting under that word');
-      return Net().get('tables/' + want + '/who').then(who => {
-        const here = asList(who).filter(p => p.uid === uid() || Net().fresh(p.seen));
-        /* THE CAP IS ON PEOPLE, NOT ON PLACES. Eleven in the room; the
-           ledger may hold more names than that over an evening, and
-           somebody who left should not keep a chair warm against the
-           limit. Your own uid never counts against you — rejoining is
-           not arriving. */
-        const already = here.some(p => p.uid === uid());
-        if (!already && Ring().full(here)) throw new Error('that table is full');
-        word = want;
-        /* the host rejoining their own table is still its GM */
-        role = (m.host === uid()) ? 'gm' : 'player';
-        tableId = m.id; meta = m;
-        return claim();
-      });
+      const here = asList(who).filter(p => p.uid === uid() || Net().fresh(p.seen));
+      /* THE CAP IS ON PEOPLE, NOT ON PLACES. Eleven in the room; the
+         ledger may hold more names than that over an evening, and
+         somebody who left should not keep a chair warm against the
+         limit. Your own uid never counts against you — rejoining is
+         not arriving. */
+      const already = here.some(p => p.uid === uid());
+      if (!already && Ring().full(here)) throw new Error('that table is full');
+      word = want;
+      /* the host rejoining their own table is still its GM */
+      role = (m.host === uid()) ? 'gm' : 'player';
+      tableId = m.id; meta = m;
+      tell('seating');
+      /* your own old place came back with `who`; no need to ask again */
+      const was = (who && typeof who === 'object' && who[uid()]) || null;
+      return claim(book || {}, was);
     })
     .then(() => { listen(); say('joined'); return word; })
     .catch(e => { unwind(); throw e; });
+}
+
+/* Open the line before it is needed: signing in and the first request on a
+   fresh connection were most of a join (measured 240–890ms and 340–450ms).
+   16-menu.js calls this when the Join screen comes up, so by the time the
+   word is typed the line is already open. Harmless to call again. */
+function warm() {
+  return Net().start().then(() => Net().get('tables/__warm/meta')).catch(() => {});
 }
 
 /* -- A JOIN THAT FAILS HALFWAY --------------------------------
@@ -214,9 +236,11 @@ function unwind() {
    they do race, they end up with the same number and 04-ring.js breaks the
    tie by uid, identically on every machine. A collision is untidy, not
    wrong; the order still agrees everywhere, which is the requirement. */
-function claim() {
+function claim(known, was) {
   const led = 'tables/' + word + '/seats';
-  return Net().get(led).then(book => {
+  /* a join has the ledger (and your old place) already, from its one read */
+  const got = known ? Promise.resolve(known) : Net().get(led);
+  return got.then(book => {
     book = book || {};
     let n = book[uid()];
     if (typeof n !== 'number') {
@@ -224,17 +248,26 @@ function claim() {
       Object.keys(book).forEach(k => { if (typeof book[k] === 'number' && book[k] > n) n = book[k]; });
       n += 1;
     }
-    return Net().set(led + '/' + uid(), n).then(() => sit(n));
+    /* the ledger and the seat together: they are two different nodes and
+       the seat already carries the number */
+    return Promise.all([Net().set(led + '/' + uid(), n),
+                        known ? sit(n, was) : sit(n)]);
   });
 }
 
 /* ── taking a place ───────────────────────────────────────────
    `n` is the arrival number from the ledger above. Written as one object
    so a client never exists at the table half-formed. */
-function sit(n) {
+function sit(n, known) {
   const at = 'tables/' + word + '/who/' + uid();
-  return Net().get(at).then(was => {
-    const me = mine();
+  return (arguments.length > 1 ? Promise.resolve(known) : Net().get(at)).then(was => {
+    const full = mine();
+    /* SEATED FIRST, LIKENESS AFTER. `body` is a full-length portrait as a
+       data URI, hundreds of kilobytes, and the seat waited for all of it to
+       upload before anybody arrived anywhere. The place is taken with
+       everything but the pictures; refresh() sends those the moment the
+       write is done, and everybody's figure gains its face a beat later. */
+    const me = Object.assign({}, full, { body: '', pic: '' });
     const node = Object.assign({}, me, {
       uid: uid(),
       role: role,
@@ -249,6 +282,8 @@ function sit(n) {
       /* the server's own promise to clear this seat if we vanish */
       Net().vanishOnDisconnect(at);
       startBeat();
+      /* and now the pictures, without anybody waiting on them */
+      if (full.body || full.pic) refresh().catch(() => {});
     });
   });
 }
@@ -611,7 +646,7 @@ function seating() {
   return Ring().seating(kept.length ? members.concat(kept) : members, uid());
 }
 
-root.Session = { host, join, leave, talk, bring, takeBack, seating, refresh,
+root.Session = { host, join, warm, leave, talk, bring, takeBack, seating, refresh,
                  makeWord, tidy, diceOf, allow, allowed, point, look,
                  get live() { return live(); },
                  get word() { return word; },

@@ -15,7 +15,12 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   pg.on('pageerror', e => { bad.push('pageerror'); console.log('FAIL  pageerror ' + e.message); });
   const site = await serve();
   const wait = ms => pg.waitForTimeout(ms);
-  await pg.goto(site.url + '/monarchy.html'); await wait(2400);
+  await pg.goto(site.url + '/monarchy.html');
+  /* started = the loading screen has gone, not a fixed time: boot now
+     rehearses a table behind it (42-shell.js rehearse), which on the
+     software renderer under a full test run can outlast any guess */
+  await pg.waitForFunction(() => !document.getElementById('boot'), null, { timeout: 30000 });
+  await wait(300);
 
   T('the herald is up, with its layer in the page', await pg.evaluate(() =>
     !!window.Herald && !!document.getElementById('herald')));
