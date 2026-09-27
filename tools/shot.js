@@ -5,7 +5,7 @@
      npx electron tools/shot.js table         # a table, from above
      npx electron tools/shot.js chest out.png # framed on the chest
      npx electron tools/shot.js box           # the toolbox open
-     npx electron tools/shot.js bar           # the hand bar
+     npx electron tools/shot.js bar           # the hand: dock open, one held
      npx electron tools/shot.js tables        # a hall cloth: tables, chars,
                                               #   settings, join, arms
 
@@ -49,7 +49,14 @@ const VIEWS = {
   table: 'true',
   chest: 'Table3D.frame(document.getElementById("tb-anchor"))',
   box:   'Toolbox.open()',
-  bar:   'Hand && Hand.show && Hand.show()',
+  /* the hand is the dock now (47-hand.js) and Hand.show wants the kinds, so
+     open it the way the app does, take something out, and point at the
+     middle of the wood so it is carried there rather than parked at 0,0 */
+  bar:   `Toolbox.open();
+          Hand.take(Toolbox.options('models')[0] || Toolbox.options('notes')[0]);
+          var r = document.getElementById('vp').getBoundingClientRect();
+          document.dispatchEvent(new PointerEvent('pointermove',
+            { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }))`,
   /* leaning right in, at the shortest lens the view allows. This is the
      view that catches anything clipped by the near plane: the floor runs
      under the camera and out towards you, so a near plane that does not

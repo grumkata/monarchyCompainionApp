@@ -248,7 +248,7 @@ function apply(win) {
 const enabled = () => app.isPackaged || !!TEST_BASE;
 
 module.exports = {
-  load, check, apply, enabled, newer,
+  load, check, apply, enabled, newer, pick,
   get running() { return running; },
   get ready() { return ready; }
 };

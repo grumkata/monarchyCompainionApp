@@ -395,11 +395,14 @@ root.addEventListener('monarchy:where', e => {
   }
   doc.body.classList.remove('reading');
 });
+/* UNDER THE BEND, NOT AFTER IT. This used to wait 2.5s "after the Bend has
+   come off" and then freeze the table for ~300ms in plain sight — measured,
+   on the walk-in where the hall never had a quiet moment to warm it. The
+   cover exists to hide exactly this. 'monarchy:where' is dispatched from
+   42-shell.js swap(), which runs inside the Bend's `mid` with the cloth
+   down, so warming here is paid behind the cloth. */
 root.addEventListener('monarchy:where', e => {
-  if (!e.detail || e.detail.at !== 'table' || warmed) return;
-  const later = () => (root.requestIdleCallback ? root.requestIdleCallback(warm, { timeout: 4000 })
-                                                : setTimeout(warm, 200));
-  setTimeout(later, 2500);                 /* after the Bend has come off */
+  if (e.detail && e.detail.at === 'table') warm();
 });
 
 function toast(m) {

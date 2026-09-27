@@ -29,3 +29,18 @@ contextBridge.exposeInMainWorld('AppUpdate', {
      and reinstall — updater.js decides which, the page does not need to */
   restartNow() { ipcRenderer.send('update-restart-now'); }
 });
+
+// window.AppCover: the loading screen the SHELL lays over this page, in a
+// process of its own (electron/cover.js), so it is up before this page has
+// drawn anything and keeps moving while this page is busy. The page reports
+// how far its parse has got and when it is standing, and asks for the cover
+// over a transition. wipe() and lift() resolve { ok:true } once the cover has
+// actually done it, and { ok:false } when there is no cover (a page older
+// than the shell's cover) — the page then uses its own. Like AppUpdate, it is
+// undefined wherever this preload is not attached, and every caller checks.
+contextBridge.exposeInMainWorld('AppCover', {
+  progress(u) { ipcRenderer.send('app-cover:progress', u); },
+  ready() { ipcRenderer.send('app-cover:ready'); },
+  wipe(o) { return ipcRenderer.invoke('app-cover:wipe', o); },
+  lift() { return ipcRenderer.invoke('app-cover:lift'); }
+});

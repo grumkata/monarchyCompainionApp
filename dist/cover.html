@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monarchy</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   20-shell.css — the only UNSCOPED stylesheet.
+
+   Everything else is confined to `body.at-hall` or `body.at-table`
+   by tools/scope-css.js. These rules have to reach across that
+   line, so they live here and are deliberately few.
+══════════════════════════════════════════════════════════════ */
+html, body { height: 100%; margin: 0; overflow: hidden; background: #0a0705; }
+
+/* ══ THE MOTION VOCABULARY ═════════════════════════════════
+   Three curves and three durations, named, and used everywhere — so the
+   hall and the table agree about what a press feels like instead of each
+   sheet picking a number.
+
+   THESE ARE NOT NEW. `--pop` is the curve already on `.seal .wax` in
+   00-hall.css and `--settle` is the one already on the cloth fall; this
+   block only gives them names and puts them where both halves can reach
+   them, which per rule 5 is this file. The wax seal was the only control
+   in the app that already had real feel, and the point of the pass is to
+   spread what it was doing rather than invent a second dialect.
+
+   WHICH CURVE WHEN, because getting this backwards is most of what makes
+   motion feel wrong:
+
+     --pop     overshoots past its target and comes back. For something
+               ARRIVING or being GRABBED — it reads as life. Never for
+               something leaving: an element that overshoots on its way
+               out looks like it was flung.
+     --settle  decelerates into its target and stops. For something
+               COMING TO REST, and for every hover.
+     --snap    fast, slightly eased, no overshoot. For a PRESS, which has
+               to feel immediate above all else — a press that eases in
+               reads as lag, and the whole value of a press state is that
+               it happens the instant the finger lands. */
+:root{
+  --pop:    cubic-bezier(.3, 1.6, .5, 1);
+  --settle: cubic-bezier(.16, .84, .24, 1);
+  --snap:   cubic-bezier(.2, .9, .35, 1);
+  --t-press: .07s;     /* a press must beat the eye, not animate for it */
+  --t-hover: .16s;
+  --t-move:  .26s;
+  --t-wipe:  .22s;     /* the counterchange sweep — see BLAZON below */
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BLAZON — THE LOOK OF THE WHOLE APP, IN ONE PLACE
+   STYLE.md is the long form. This is the part the browser reads.
+
+   Persona 5 is recognisable from one frame because its theme IS its
+   graphic system: a strict palette, one shape language, type used as
+   image. Monarchy's theme is heraldry, and heraldry already is a
+   graphic system — a thousand years old, with rules. So the app takes
+   heraldry's rules instead of inventing a style:
+
+     · THE TINCTURES are the palette. Nothing else. Two metals (Or,
+       Argent), the colours, and Sable. The values below are
+       12-heraldry.js's TINCT, copied exactly — the banners in the hall
+       are painted from that table, and the chrome has to be the same
+       paint. test/tincture.test.js fails the build if they drift.
+     · THE RULE OF TINCTURE is the contrast rule. Metal on colour,
+       colour on metal, never metal on metal or colour on colour. It
+       is why a herald could read a shield across a field, and it is
+       why Argent text on any colour here clears 4.5:1. Or on a colour
+       only clears 3:1, so Or on a colour is for DISPLAY type only;
+       Or on Sable clears 7:1 and may be any size.
+     · THREE SURFACES, never mixed:
+         Sable  — chrome. Every bar, button, panel, toast. Always dark,
+                  whatever the table's theme, the way P5's UI is always
+                  red and black whichever world it is laid over.
+         Cloth  — navigation. The hall's screens, dyed the tincture of
+                  the banner you took down (00-hall.css --field).
+         Vellum — records. The sheet, papers, the battle mat. Sable
+                  ink, and Gules for headings: RUBRICATION, the red a
+                  scribe used for the parts you should find first.
+     · THE BEND is the signature line — the heraldic diagonal. Anything
+       that is chosen, hovered or live is COUNTERCHANGED along a bend:
+       an Or band sweeps in on the diagonal and the ink flips to Sable.
+       That sweep is this app's equivalent of P5's red slash, and it is
+       the one piece of motion every control shares.
+══════════════════════════════════════════════════════════════ */
+:root{
+  /* ── the tinctures (= 12-heraldry.js TINCT) ── */
+  --m-gules:#a3232b; --m-azure:#27508f; --m-vert:#2b6940; --m-purpure:#67326f;
+  --m-sable:#171310; --m-tenne:#8a4a1e; --m-murrey:#6d2038; --m-bleu:#5d7fa8;
+  --m-or:#c9a227;    --m-argent:#ded8c8;
+
+  /* ── the same paint, lit and shaded, for things with depth ── */
+  /* shaded gold leans warm — Or darkened straight toward black goes olive */
+  --m-or-hi:#ecd27a;  --m-or-lo:#86621c;
+  --m-argent-hi:#f4efe2; --m-argent-lo:#a39c8b;
+  --m-gules-hi:#c9443a; --m-gules-lo:#5c1016;
+  --m-sable-2:#221c16;   /* a raised panel */
+  --m-sable-3:#30271e;   /* a raised panel under the pointer */
+  --m-sable-0:#0b0907;   /* a well, a slot, anything sunk */
+
+  /* ── vellum: the ground a record is written on ── */
+  --m-vellum:#efe4c8; --m-vellum-2:#e2d3ad; --m-vellum-3:#cdb98e;
+  --m-ink:#1c140c;       /* sable ink */
+  --m-ink-2:#4a3a28; --m-ink-3:#7a6a55;
+  --m-rubric:var(--m-gules);
+
+  /* ── roles: what a rule should reach for ── */
+  --m-voice:var(--m-or);            /* headings, the live thing */
+  --m-text:var(--m-argent);         /* reading, on chrome and cloth */
+  --m-quiet:rgba(222,216,200,.56);  /* the second line */
+  --m-hush:rgba(222,216,200,.34);   /* the third */
+  --m-line:rgba(201,162,39,.34);    /* a hairline of gilt */
+  --m-line-hi:rgba(201,162,39,.8);
+  /* YOUR LIVERY. The accent the chrome wears is the field of your own arms
+     — 42-shell.js sets it from them. Gules until you have any. */
+  --m-house:var(--m-gules);
+  --m-house-ink:var(--m-argent);
+
+  /* ── type: four voices, and each has one job ──
+       mark   the name of the thing — "Monarchy", a person's name
+       cap    engraved capitals — every label, button and heading
+       hand   the book's own voice — anything you read as a sentence
+       tally  a number you act on — rounds, dice, counts
+     The family names are the real fonts; the @font-face blocks below
+     alias each one onto something every Windows machine already has
+     until the real files are in src/assets/fonts. */
+  --m-f-mark:'UnifrakturMaguntia','Old English Text MT','Sitka Banner',serif;
+  --m-f-cap:'Cinzel','Constantia',serif;
+  --m-f-hand:'Crimson Text','Sitka Text','Palatino Linotype',Georgia,serif;
+  --m-f-tally:'Barlow Condensed','Bahnschrift SemiCondensed','Bahnschrift',sans-serif;
+  --m-track:.2em;       /* the one letter-spacing for engraved capitals */
+
+  /* ── the cuts: the only shapes a panel or a control may take ── */
+  --m-plaque:polygon(8px 0,calc(100% - 8px) 0,100% 100%,0 100%);
+  --m-cut:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);
+  --m-pennon:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%);
+  /* a lozenge — the dice are lozengy (12-combat.css) */
+  --m-lozenge:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  /* WAX: every commitment is a seal. The outline and the melt are shared so
+     the hall's seal and the table's Roll are visibly the same wax. */
+  --m-wax:polygon(50% 0%,63% 5%,77% 3%,88% 13%,96% 25%,94% 39%,100% 52%,93% 64%,
+    95% 77%,84% 86%,74% 96%,60% 93%,50% 100%,38% 95%,25% 97%,15% 86%,5% 77%,8% 62%,
+    0% 51%,7% 38%,4% 24%,16% 14%,25% 4%,37% 7%);
+  --m-wax-melt:radial-gradient(circle at 34% 26%,#d4574a,var(--m-gules) 44%,var(--m-gules-lo) 100%);
+
+  /* ── the counterchange. Used as the FIRST background layer, parked off
+     to the right at rest (background-position 102%) and swept to 0 when
+     the thing is hovered, chosen or live. See STYLE.md for the recipe. ── */
+  --m-sweep:linear-gradient(115deg,var(--m-or) 0 50%,transparent calc(50% + .5px));
+  /* the same cut, for a control that is ALREADY Or at rest: your livery
+     sweeps over the metal instead, and the ink flips to --m-house-ink */
+  --m-sweep-house:linear-gradient(115deg,var(--m-house) 0 50%,transparent calc(50% + .5px));
+  --m-sweep-size:260% 100%;
+
+  /* ── the frame: a Sable rule outside a gilt one, and corner marks at
+     3px — the "layered frame" from grumkata's references. The marks sit on
+     the BEND SINISTER (top right, bottom left) because --m-cut takes the
+     other two corners: cuts on one diagonal, marks on the other, so a panel
+     can wear both and neither eats the other. ── */
+  --m-frame:inset 0 0 0 1px var(--m-sable), inset 0 0 0 2px rgba(201,162,39,.55);
+  --m-marks:
+    linear-gradient(var(--m-or),var(--m-or)) calc(100% - 5px) 5px / 12px 2px no-repeat,
+    linear-gradient(var(--m-or),var(--m-or)) calc(100% - 5px) 5px / 2px 12px no-repeat,
+    linear-gradient(var(--m-or),var(--m-or)) 5px calc(100% - 5px) / 12px 2px no-repeat,
+    linear-gradient(var(--m-or),var(--m-or)) 5px calc(100% - 5px) / 2px 12px no-repeat;
+  --m-lift:0 14px 34px rgba(0,0,0,.62);
+}
+
+/* ══ THE TYPE, ALIASED ═════════════════════════════════════════
+   Before this, not one of these four families was ever loaded — there
+   was no @font-face and no link anywhere — so 205 rules asking for
+   Cinzel and Crimson Text were all quietly getting Times New Roman,
+   which is most of why the app read as a web page.
+
+   Each family is declared once here, and its src list is tried in
+   order: an installed copy, then the bundled file (tools/fetch-fonts.js
+   puts it in src/assets/fonts, build.js copies it beside the page),
+   then a face every Windows 10/11 machine ships with. So every existing
+   `font-family:'Cinzel'` rule starts working today without being
+   touched, and gets the real letters the moment the files exist.
+
+   Weight is split in two faces so a local fallback gets its REAL bold
+   rather than a smeared synthetic one. Unscoped by nature: tools/
+   scope-css.js passes @font-face through untouched. */
+@font-face{font-family:'Cinzel';font-weight:400 599;font-display:swap;
+  src:local('Cinzel'),url('assets/fonts/cinzel.woff2') format('woff2'),local('Constantia')}
+@font-face{font-family:'Cinzel';font-weight:600 900;font-display:swap;
+  src:local('Cinzel Bold'),url('assets/fonts/cinzel.woff2') format('woff2'),local('Constantia Bold')}
+@font-face{font-family:'Crimson Text';font-weight:400 599;font-style:normal;font-display:swap;
+  src:local('Crimson Text'),url('assets/fonts/crimson-text.woff2') format('woff2'),
+      local('Sitka Text'),local('Palatino Linotype')}
+@font-face{font-family:'Crimson Text';font-weight:400 599;font-style:italic;font-display:swap;
+  src:local('Crimson Text Italic'),url('assets/fonts/crimson-text-italic.woff2') format('woff2'),
+      local('Sitka Text Italic'),local('Palatino Linotype Italic')}
+@font-face{font-family:'Crimson Text';font-weight:600 900;font-style:normal;font-display:swap;
+  src:local('Crimson Text SemiBold'),url('assets/fonts/crimson-text-bold.woff2') format('woff2'),
+      local('Palatino Linotype Bold')}
+@font-face{font-family:'UnifrakturMaguntia';font-display:swap;
+  src:local('UnifrakturMaguntia'),url('assets/fonts/unifraktur-maguntia.woff2') format('woff2'),
+      local('Old English Text MT'),local('Sitka Banner')}
+@font-face{font-family:'Barlow Condensed';font-weight:400 599;font-display:swap;
+  src:local('Barlow Condensed Medium'),url('assets/fonts/barlow-condensed.woff2') format('woff2'),
+      local('Bahnschrift SemiCondensed')}
+@font-face{font-family:'Barlow Condensed';font-weight:600 900;font-display:swap;
+  src:local('Barlow Condensed Bold'),url('assets/fonts/barlow-condensed-bold.woff2') format('woff2'),
+      local('Bahnschrift SemiCondensed')}
+
+/* ══ THE COUNTERCHANGE, AS A CLASS ═════════════════════════════
+   For new markup. Existing controls get the same recipe written into
+   their own (scoped) rules, because a bare class here loses to their
+   two-class selectors — see rule 5 in PROJECT.md. */
+.m-cc{
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
+  color:var(--m-text);
+  transition:background-position var(--t-wipe) var(--settle),
+             color var(--t-wipe) var(--settle), transform var(--t-press) var(--snap);
+}
+.m-cc:hover, .m-cc.on, .m-cc[aria-pressed="true"]{ background-position:0 0; color:var(--m-sable); }
+/* the keyboard gets the same sweep plus a ring, never just the ring */
+:focus-visible{ outline:2px solid var(--m-or); outline-offset:2px; }
+
+/* ══ PRESSES ═════════════════════════════════════════════
+   There was ONE `:active` rule in the entire application before this — a
+   count worth recording, because it is the single biggest reason the UI
+   felt dead to the hand. A control that does not move when you push it
+   gives you no confirmation that the push registered, so every click is
+   followed by a half-beat of waiting to see whether anything happened.
+   Hover states cannot do this job: a touch or a fast click never shows
+   one, and a hover tells you where the pointer is, not that you acted.
+
+   It is deliberately tiny — one pixel down and a whisker of scale. The
+   press is felt, not watched, and anything big enough to admire is big
+   enough to get in the way of the fiftieth click. */
+button:active:not(:disabled), [role="button"]:active { transform: translateY(1px); }
+button, [role="button"] { transition: transform var(--t-press) var(--snap); }
+
+/* ══ AND SOMEONE WHO ASKED FOR NONE OF IT ═════════════════════
+   Unscoped on purpose so it reaches both halves at once. Transitions are
+   cut to almost nothing rather than to zero: `transition:none` makes
+   state changes snap hard enough to be their own kind of jarring, and a
+   1ms transition still fires transitionend for anything listening. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+#hall-app, #table-app { position: fixed; inset: 0; }
+body.at-table #hall-app { display: none; }
+body.at-hall  #table-app { display: none; }
+
+/* The WebGL layers append themselves to <body>, not into either wrapper —
+   gl.js (#gl), scene.js (#gl2) and 27-table-gl.js (#tgl) all do — so hiding
+   the wrapper does not hide them. They belong to the table. */
+body.at-hall #gl, body.at-hall #gl2, body.at-hall #tgl { display: none !important; }
+/* and so do the chat dock (moved out of #table-app so it can stand over
+   the field — 28-table-boot.js) and the table's own chrome of 2026-09-25:
+   the toolbox dock, the GM's rail, the inspector, the muster */
+body:not(.at-table) > .chatdock, body:not(.at-table) > .tbx, body:not(.at-table) > .gmr,
+body:not(.at-table) > .insp, body:not(.at-table) > .muster, body:not(.at-table) > .war,
+body:not(.at-table) > .tbx-pill { display: none !important; }
+
+/* the way back, on the table */
+/* ══ THE TABLE'S MENU ═════════════════════════════════════
+   grumkata: "the table needs a real menu not random buttons all over the
+   place [...] make it an escape key and menu button in the top left that
+   THEN brings you to menu".
+
+   There was a Back pennon in one corner and a Theme and a Fit in the other.
+   Three buttons, three corners, no relationship between them, and the one
+   decision that mattered — hosting — was not on this screen at all. Now
+   there is a mark in the top left, Escape opens it, and everything that is
+   a decision about this table is behind it.
+
+   The mark is three bars, which is the one icon nobody has to be taught.
+   `html body` because 12-combat.css opens with `*{padding:0}` scoped to
+   `body.at-table *`, which outranks a bare class. */
+html body .tm-open {
+  position: fixed; left: 16px; top: 14px; z-index: 941; display: none;
+  width: 42px; height: 38px; padding: 0; border: 0; cursor: pointer;
+  flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  background: var(--m-marks), var(--m-sable);
+  box-shadow: inset 0 0 0 1px var(--m-line), var(--m-lift);
+  clip-path: var(--m-pennon);
+  transition: box-shadow var(--t-hover) var(--settle);
+}
+html body.at-table .tm-open { display: flex; }
+html body .tm-open i {
+  display: block; width: 17px; height: 2px; background: var(--m-or);
+  transition: width var(--t-hover) var(--settle), background var(--t-hover) var(--settle);
+}
+html body .tm-open:hover { box-shadow: inset 0 0 0 1px var(--m-or), var(--m-lift); }
+html body .tm-open:hover i:nth-child(2) { width: 11px; }
+html body.menuing .tm-open i { background: var(--m-argent-hi); }
+
+/* the menu itself: a scrim you can shut it on, and one card */
+html body .tmenu {
+  position: fixed; inset: 0; z-index: 1400; display: flex;
+  align-items: flex-start; justify-content: flex-start;
+  padding: 62px 0 0 16px; background: rgba(6,4,3,.52);
+  animation: tm-in .16s var(--settle);
+}
+html body .tmenu[hidden] { display: none; }
+@keyframes tm-in { from { opacity: 0 } }
+html body .tm-card {
+  width: 306px; padding: 0 0 6px;
+  background: var(--m-marks), linear-gradient(176deg, var(--m-sable-2), var(--m-sable) 64%);
+  box-shadow: var(--m-frame), var(--m-lift);
+  animation: tm-card .22s var(--pop) both;
+}
+@keyframes tm-card { from { opacity: 0; transform: translateY(-10px) } }
+
+html body .tm-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 14px 16px 10px; box-shadow: inset 0 -1px 0 var(--m-line);
+}
+html body .tm-head b {
+  font-family: var(--m-f-mark); font-weight: 400; font-size: 25px; line-height: 1;
+  color: var(--m-argent-hi);
+}
+/* the word is the thing somebody in the room is waiting for you to read
+   out, so it is set like a thing to be read out */
+html body .tm-word {
+  font-family: var(--m-f-cap); font-size: 15px; font-weight: 700;
+  letter-spacing: .26em; color: var(--m-sable); background: var(--m-or);
+  padding: 3px 4px 3px 10px; clip-path: var(--m-pennon);
+}
+html body .tm-who {
+  padding: 8px 16px 2px; font-family: var(--m-f-cap); font-size: 9px;
+  font-weight: 700; letter-spacing: var(--m-track); text-transform: uppercase;
+  color: var(--m-quiet);
+}
+html body .tm-rows { padding: 8px 8px 0; }
+html body .tm-row {
+  display: block; width: 100%; text-align: left; cursor: pointer; border: 0;
+  padding: 11px 14px; background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat,
+                                 transparent;
+  transition: background-position var(--t-wipe) var(--settle),
+              color var(--t-wipe) var(--settle);
+}
+/* THE LABEL IS THE BUTTON. It used to be a <span> inside it, and when the
+   sub-notes were stripped out the span went with them — leaving every row
+   inheriting the button default, which is black, on a Sable card. The type
+   lives on the button itself now, so there is nothing left to fall off. */
+html body .tm-row {
+  font-family: var(--m-f-cap); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--m-text);
+}
+/* the one row that is the reason you opened the card */
+html body .tm-row.is-or { color: var(--m-or); }
+html body .tm-row.is-gules { color: var(--m-gules-hi); }
+html body .tm-row:hover { background-position: 0 0; color: var(--m-sable); }
+html body .tm-row.is-gules:hover {
+  background: var(--m-gules); color: var(--m-argent-hi);
+}
+/* an answer to the button you just pressed, next to that button — not
+   thrown across the screen in 124px type, which is what it used to be */
+html body .tm-note {
+  margin: 10px 14px 2px; padding: 9px 11px;
+  font-family: var(--m-f-hand); font-style: italic; font-size: 14px;
+  line-height: 1.45; color: var(--m-text);
+  background: rgba(0,0,0,.34); box-shadow: inset 3px 0 0 var(--m-or);
+}
+html body .tm-note.bad { color: var(--m-gules-hi); box-shadow: inset 3px 0 0 var(--m-gules); }
+html body .tm-row.busy { opacity: .5; pointer-events: none; }
+html body .tm-say {
+  margin: 10px 16px 6px; padding-top: 10px; box-shadow: inset 0 1px 0 var(--m-line);
+  font-family: var(--m-f-hand); font-style: italic; font-size: 14px;
+  color: var(--m-quiet);
+}
+html body .tm-say b { font-style: normal; color: var(--m-or); letter-spacing: .12em; }
+
+/* SETTINGS, ON THE MENU'S OWN CARD (59-table-menu.js drawSettings). The
+   same switches as the hall's Settings cloth, drawn the same way — a row of
+   pennons with every choice in sight, the chosen one counterchanged — in the
+   card's narrower measure. */
+html body .tm-card.tm-set { width: 340px; max-height: calc(100vh - 80px); overflow-y: auto; }
+html body .tm-grp {
+  padding: 14px 16px 4px; font-family: var(--m-f-cap); font-size: 9px; font-weight: 700;
+  letter-spacing: var(--m-track); text-transform: uppercase; color: var(--m-or);
+}
+html body .tm-opt { padding: 6px 16px 8px; }
+html body .tm-opt > span {
+  display: block; margin-bottom: 6px; font-family: var(--m-f-hand); font-size: 14px;
+  color: var(--m-text);
+}
+html body .tm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+html body .tm-chip {
+  flex: 1 1 auto; min-width: 44px; padding: 6px 8px; border: 0; cursor: pointer;
+  font-family: var(--m-f-cap); font-size: 10px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--m-quiet); background: rgba(0,0,0,.34);
+  box-shadow: inset 0 0 0 1px var(--m-line);
+  transition: color var(--t-hover) var(--settle), box-shadow var(--t-hover) var(--settle);
+}
+html body .tm-chip:hover { color: var(--m-argent-hi); box-shadow: inset 0 0 0 1px var(--m-or); }
+html body .tm-chip.on { color: var(--m-sable); background: var(--m-or); box-shadow: none; }
+html body .tm-set .tm-rows { padding-top: 12px; }
+
+/* ══════════════════════════════════════════════════════════════
+   PAPERS — a record open at the table, on your own end.
+   Unscoped because it must sit over either half, and because the
+   record's own stylesheet is scoped INTO it (see build.js).
+   Built from the design language's own vocabulary: a plaque that
+   rides the edge, a layered frame, a patterned ground — not a
+   flat panel with a hairline border.
+══════════════════════════════════════════════════════════════ */
+#tp {
+  /* wide enough for the record at its own 900 where the window allows it;
+     45-papers.js fitLeaf() scales it down where it does not */
+  position: fixed; right: 316px; top: 14px; bottom: 14px; width: min(944px, calc(100vw - 340px));
+  z-index: 930; display: flex; flex-direction: column;
+  /* vellum, with the faint lattice every record is ruled on */
+  background:
+    repeating-linear-gradient(45deg, rgba(28,20,12,.04) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, rgba(28,20,12,.04) 0 2px, transparent 2px 7px),
+    linear-gradient(176deg, var(--m-vellum-2) 0%, var(--m-vellum-3) 100%);
+  border: 3px solid var(--m-sable);
+  box-shadow: inset 0 0 0 2px var(--m-or-lo), inset 0 0 0 4px rgba(201,162,39,.45),
+              0 26px 70px rgba(0,0,0,.6);
+  color: var(--m-ink);
+}
+#tp[hidden] { display: none !important; }
+/* corner marks — four, at 3px inset, per the design language */
+#tp::before {
+  content: ''; position: absolute; inset: 3px; pointer-events: none; z-index: 2;
+  background:
+    linear-gradient(var(--m-sable),var(--m-sable)) left top / 14px 2px no-repeat,
+    linear-gradient(var(--m-sable),var(--m-sable)) left top / 2px 14px no-repeat,
+    linear-gradient(var(--m-sable),var(--m-sable)) right bottom / 14px 2px no-repeat,
+    linear-gradient(var(--m-sable),var(--m-sable)) right bottom / 2px 14px no-repeat;
+}
+/* the head is chrome, so it is Sable — with your livery down its edge */
+.tp-head {
+  flex: 0 0 auto; position: relative; height: 30px; margin: 0 0 6px;
+  border-bottom: 2px solid var(--m-or-lo);
+  background: var(--m-sable);
+  box-shadow: inset 0 -3px 0 var(--m-house);
+}
+/* the title is a plaque riding ON the border, never a row inside a box */
+.tp-head .plaque {
+  position: absolute; left: 16px; top: 9px;
+  padding: 6px 20px 5px; background: var(--m-or);
+  clip-path: var(--m-plaque); color: var(--m-sable);
+  font-family: var(--m-f-cap); font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  box-shadow: inset 0 1px 0 var(--m-or-hi);
+}
+.tp-x {
+  position: absolute; right: 8px; top: 5px; width: 20px; height: 20px;
+  display: grid; place-items: center; cursor: pointer; font-size: 10px;
+  color: var(--m-quiet); background: transparent; border: 1px solid var(--m-line);
+  transition: background var(--t-hover) var(--settle), color var(--t-hover) var(--settle);
+}
+.tp-x:hover { color: var(--m-argent-hi); background: var(--m-gules); border-color: var(--m-gules-hi); }
+.tp-leaf { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 20px; }
+
+/* choosing which record, when there is more than one */
+.tp-pickers { padding: 26px 18px; display: flex; flex-direction: column; gap: 10px; }
+.tp-pick {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; align-items: baseline;
+  padding: 12px 16px; cursor: pointer; text-align: left; color: var(--m-ink);
+  background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-vellum);
+  border: 2px solid var(--m-sable);
+  box-shadow: inset 4px 0 0 var(--m-rubric), 0 4px 10px rgba(0,0,0,.3);
+  transition: background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle);
+}
+/* on vellum the sweep is Or over ink: metal under colour, still lawful */
+.tp-pick:hover { background-position: 0 0; }
+.tp-pick b { font-family: var(--m-f-cap); font-size: 14px; font-weight: 600; }
+.tp-pick i { grid-column: 1; font-family: var(--m-f-hand); font-size: 12px; opacity: .6; }
+.tp-pick span {
+  grid-row: 1 / span 2; font-family: var(--m-f-tally); font-size: 14px; font-weight: 600;
+  letter-spacing: .06em; opacity: .75;
+}
+
+/* ── THE BIN: A THING ON THE TABLE ────────────────────────────
+   grumkata: "take the bin and remove it from being stuck to the screen
+   instead imbed it into the table just like the chest bottom left is
+   prefrable". So it is a prop on the wood like the chest — 23-table3d.js
+   positions it by data-x/data-y, and this element is only the invisible rect
+   that 27-table-gl.js draws the real basket over. It pans, tilts and zooms
+   with the table for free, and it cannot be lost off the edge of the screen
+   because the camera is clamped to the table.
+
+   It shows NOTHING of its own. grumkata: "from the bin there should be no
+   ui" — no count, no badge, nothing to open. The basket is the whole of it,
+   and its shadow is a real one thrown by the light in 27-table-gl.js rather
+   than a soft grey oval painted under the middle of the box. */
+.tb-bin { cursor: pointer; }
+.tb-bin, .tb-bin .face { box-shadow: none; background: transparent; }
+.tb-bin[hidden] { display: none !important; }
+.tb-bin-face { position: relative; }
+.tb-bin:hover { filter: brightness(1.16); }
+/* the one thing it does say: that letting go here will do something */
+.tb-bin.over { filter: brightness(1.34) saturate(1.5); }
+.tb-bin.over .tb-bin-face::after {
+  content: ''; position: absolute; inset: 8%;
+  border: 2px solid #b84230; border-radius: 50%;
+  box-shadow: 0 0 26px rgba(184,66,48,.6); pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE HERALD — 55-herald.js's two layers. Unscoped: they cover both
+   halves, and sit under only the loading screen (z 100000).
+══════════════════════════════════════════════════════════════ */
+#herald-gl { position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: 99990; pointer-events: none; display: none; }
+#herald-gl.on { display: block; }
+/* ══ THE COVER IS NOT PART OF WHAT IT COVERS ══════════════════
+   grumkata: "its laggy because your putting them on the same layer so when
+   the table lags the loading screen lags even though the reason it exists is
+   to mask the lag".
+
+   That is the whole bug, stated better than any of my measurements managed.
+   A loading screen that shares a rendering fate with the thing it is loading
+   is not a loading screen, it is a second symptom.
+
+   `contain` is what separates them. `paint` means nothing inside this
+   element can affect anything outside it and nothing outside can invalidate
+   what is inside — so the table building itself underneath, adding props,
+   resizing canvases and repainting sixty thousand triangles, cannot dirty
+   one pixel of the cloth on top. `layout` and `style` stop the same traffic
+   going the other way. `will-change: transform` then asks for its own
+   compositor layer outright, rather than hoping a heuristic offers one.
+
+   Between them: the cover is painted once, into its own texture, and after
+   that the main thread can be as busy as it likes. */
+#herald { position: fixed; inset: 0; z-index: 99991; pointer-events: none;
+  overflow: hidden; contain: layout paint style; will-change: transform; }
+/* nothing is clicked twice through a cloth that is still moving */
+#herald.wiping { pointer-events: auto; cursor: progress; }
+
+/* ── THE CLOTH. Drawn by CSS on purpose, not as a fallback: this is one
+   `transform` keyframe, so the compositor runs it on its own thread and it
+   keeps moving while the main thread is blocked by the very work the cloth
+   is covering. The shader version froze and then jump-cut, which is what
+   grumkata saw as the transition being "basically skipped". See 55-herald.js. */
+#herald .hr-veil { position: absolute; top: 0; bottom: 0; left: 0; width: 100vw;
+  transform: translateX(calc(-100vw - 80vh));
+  /* THE POINT OF THE WHOLE THING. Chrome only runs a transform animation on
+     the compositor when the element has its own layer, and it will not give
+     one to a huge clipped div on a hunch. Without this the cloth animates on
+     the main thread like everything else — measured: seventeen frames painted
+     during a 400ms block and two distinct pictures among them, which is a
+     freeze and a jump, which is what "basically skipped" looks like. */
+  will-change: transform; backface-visibility: hidden; z-index: 0; }
+/* THE CLOTH: a band cut on the bend (skewed the 25 degrees every bend in the
+   app runs at), wide enough that at rest it covers the screen at every row.
+   Sable, woven with a diaper of gilt lozenges; a band of your livery inside
+   each edge; a gilt rule on the edge itself, and outside it the DANCETTY
+   teeth — a heraldic line of partition, where a plain cut would be a web
+   page's. The teeth are conic-gradient triangles, painted once with the rest
+   of the layer, so they cost nothing to move. */
+#herald .hr-cloth { position: absolute; top: -12vh; bottom: -12vh; left: -32vh; right: -32vh;
+  transform: skewX(-25deg);
+  background:
+    repeating-linear-gradient(45deg, rgba(201,162,39,.075) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(-45deg, rgba(201,162,39,.075) 0 1px, transparent 1px 34px),
+    linear-gradient(90deg, var(--m-house) 0 5vw, var(--m-sable) 5vw calc(100% - 5vw), var(--m-house) calc(100% - 5vw));
+  box-shadow: inset 4px 0 0 var(--m-or), inset -4px 0 0 var(--m-or); }
+#herald .hr-cloth::before, #herald .hr-cloth::after { content: ''; position: absolute; top: 0; bottom: 0; width: 16px; }
+#herald .hr-cloth::before { right: 100%;
+  background: conic-gradient(from 45deg at 0 50%, var(--m-or) 90deg, transparent 0) 0 0 / 16px 32px; }
+#herald .hr-cloth::after { left: 100%;
+  background: conic-gradient(from 225deg at 100% 50%, var(--m-or) 90deg, transparent 0) 0 0 / 16px 32px; }
+/* AND EVERYTHING ELSE IN THE HERALD SITS ABOVE IT, said outright. Promoting
+   the cloth to its own compositor layer (the will-change above) is what lets
+   it keep moving while the main thread is blocked — and it also lifts it out
+   of the plain document paint order it used to share with its siblings, so
+   the title card went behind the cloth and the transition covered the screen
+   in silence. Painted once, found by looking at it. */
+#herald .hr-card, #herald .hr-cry, #herald .hr-sparks, #herald .hr-dust { z-index: 1; }
+#herald.wiping .hr-veil { animation: hr-veil-in .42s cubic-bezier(.5,0,.85,.4) forwards; }
+/* an EVEN draw off, not --settle: that curve puts two thirds of the travel in
+   the first sixth of the time, so the cloth was gone in about one frame and
+   the uncover read as a cut (filmed, 2026-09-26). .72s = UNCOVER in 55-herald.js */
+#herald.lifting .hr-veil { animation: hr-veil-out .72s cubic-bezier(.55,0,.35,1) forwards; }
+@keyframes hr-veil-in  { from { transform: translateX(calc(-100vw - 80vh)); } to { transform: translateX(0); } }
+@keyframes hr-veil-out { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 80vh)); } }
+
+/* ── gold leaf rising through the cloth while it is across ── */
+#herald .hr-dust { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  transition: opacity .3s var(--settle); }
+#herald.carded .hr-dust { opacity: 1; }
+#herald .hr-dust i { position: absolute; left: var(--x); bottom: -10px; width: var(--s); height: var(--s);
+  background: var(--m-or-hi); opacity: 0; transform: translateY(0) rotate(45deg);
+  will-change: transform, opacity; }
+#herald.wiping .hr-dust i { animation: hr-dust var(--d) linear var(--t) infinite; }
+@keyframes hr-dust { 0% { opacity: 0; transform: translateY(0) rotate(45deg); }
+  15% { opacity: .8; } 75% { opacity: .45; }
+  100% { opacity: 0; transform: translateY(-100vh) rotate(315deg); } }
+
+/* ── the name of where you are going, while the cloth is across ── */
+#herald .hr-card { position: absolute; left: 50%; top: 50%; text-align: center; white-space: nowrap;
+  transform: translate(-50%, -50%) scale(.9); opacity: 0;
+  transition: opacity .18s var(--settle), transform .5s var(--pop); }
+#herald.carded .hr-card { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+/* THE SUN behind the name — the loading screen's, turning — and YOUR ARMS
+   turning in above it: the herald announcing who is arriving where */
+#herald .hr-sun { position: absolute; left: 50%; top: 50%; width: 760px; height: 760px;
+  margin: -380px 0 0 -380px; z-index: -1; pointer-events: none; opacity: 0;
+  transition: opacity .45s var(--settle); will-change: transform; }
+#herald .hr-sun svg { display: block; width: 100%; height: 100%; }
+#herald.carded .hr-sun { opacity: .42; }
+/* IN the sun, not above it. The card is centred on the screen and the name
+   is the middle of it, so a sun centred on the card sat behind the NAME and
+   your arms floated over its top edge (grumkata: "the banner floats awkwardly
+   above where it usually is"). When there are arms, the sun is centred on the
+   shield (half of its 154px) and the name hangs under them both. */
+#herald .hr-card:has(.hr-arms:not([hidden])) .hr-sun { top: 77px; }
+#herald.wiping .hr-sun { animation: hr-sun 60s linear infinite; }
+@keyframes hr-sun { to { transform: rotate(360deg); } }
+#herald .hr-arms { display: block; width: 128px; height: 154px; margin: 0 auto 22px; opacity: 0;
+  transform: perspective(600px) rotateY(-80deg) scale(.9);
+  transition: opacity .25s var(--settle), transform .7s var(--pop);
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.7)); }
+#herald .hr-arms[hidden] { display: none; }
+#herald .hr-arms svg { display: block; width: 128px; height: 154px; }
+#herald.carded .hr-arms { opacity: 1; transform: perspective(600px) rotateY(0) scale(1); }
+/* the name is SLAMMED in on a slant, the one gesture the Cry already borrows */
+#herald.carded .hr-card b { animation: hr-name .6s var(--pop) both; }
+@keyframes hr-name { from { opacity: 0; transform: scale(1.22) skewX(-10deg); } }
+#herald .hr-card b { display: block; font-family: var(--m-f-mark); font-weight: 400;
+  font-size: clamp(52px, 7.4vw, 112px); line-height: 1; color: var(--m-argent-hi);
+  text-shadow: 0 4px 0 rgba(0,0,0,.6), 0 0 70px rgba(0,0,0,.85); }
+/* the lozenge rule again — the app's one ornament, under its names */
+#herald .hr-card b::after { content: ''; display: block; width: 340px; height: 13px; margin: 20px auto 12px;
+  background:
+    linear-gradient(45deg, transparent 35%, var(--m-or) 35% 65%, transparent 65%) center / 13px 13px no-repeat,
+    linear-gradient(90deg, transparent, var(--m-or) 36%, transparent 46%, transparent 54%, var(--m-or) 64%, transparent)
+      center / 100% 1px no-repeat; }
+/* ── AND ONE THING THAT NEVER STOPS ─────────────────────────
+   The same trick the boot screen uses, and for the same reason: a gilt
+   sweep on `transform` alone, which the compositor runs on its own thread
+   and keeps running while the main thread is blocked solid by the work
+   behind the cloth. It is the difference between a screen that is waiting
+   and a screen that has died — and on this side of the cover, those are the
+   only two things the player can tell apart. */
+#herald .hr-work { display: block; width: 260px; height: 3px; margin: 22px auto 0;
+  background: rgba(201,162,39,.16); overflow: hidden; position: relative;
+  opacity: 0; transition: opacity .2s var(--settle); }
+#herald.carded .hr-work { opacity: 1; }
+#herald .hr-work::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--m-or-hi), transparent);
+  transform: translateX(-100%); will-change: transform;
+  animation: hr-work 1.15s linear infinite; }
+@keyframes hr-work { to { transform: translateX(100%) } }
+@media (prefers-reduced-motion: reduce){ #herald .hr-work::after, #herald .hr-sun,
+  #herald .hr-dust i, #herald.carded .hr-card b { animation: none } }
+
+#herald .hr-card i { font-family: var(--m-f-hand); font-style: italic; font-size: 23px;
+  color: var(--m-or-hi); letter-spacing: .03em; text-shadow: 0 2px 10px #000; }
+
+/* ── THE CRY: a Sable band slammed across on a bend ──
+   The hem is the tone (your livery unless the moment has its own colour)
+   with gilt outside it; the title carries a hard offset shadow in the same
+   tone — the one borrowed P5 gesture, in heraldic colours. */
+#herald .hr-cry { position: absolute; inset: 0; }
+/* absolutely placed and centred by hand: a grid will not centre an item
+   wider than itself, so a 160vw band started at the left edge and the
+   words ran off the right */
+#herald .hr-band { --tone: var(--m-house); position: absolute; left: -30vw; width: 160vw;
+  top: 50%; translate: 0 -50%; padding: 30px 0 26px;
+  text-align: center;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 17px, rgba(201,162,39,.08) 17px 18px),
+    repeating-linear-gradient(-45deg, transparent 0 17px, rgba(201,162,39,.08) 17px 18px),
+    var(--m-sable);
+  box-shadow: 0 -10px 0 var(--tone), 0 10px 0 var(--tone),
+              0 -14px 0 var(--m-or), 0 14px 0 var(--m-or),
+              0 34px 90px rgba(0,0,0,.75);
+  transform: rotate(-7deg);
+  animation: hr-band-in .38s var(--pop) both,
+             hr-band-out .34s cubic-bezier(.5,0,.85,.4) forwards;
+  animation-delay: 0s, calc(.38s + var(--hold, 900ms)); }
+@keyframes hr-band-in  { from { transform: rotate(-7deg) translateX(-105%) scaleY(.3); } }
+@keyframes hr-band-out { to { transform: rotate(-7deg) translateX(105%) scaleY(.5); opacity: .3; } }
+#herald .hr-title { display: inline-block; font-family: var(--m-f-cap); font-weight: 900;
+  font-size: clamp(46px, 7.4vw, 124px); line-height: 1; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--m-argent-hi);
+  text-shadow: .06em .06em 0 var(--tone), 0 0 40px rgba(0,0,0,.6);
+  animation: hr-slam .52s var(--pop) .06s both; }
+#herald .hr-title::first-letter { font-family: var(--m-f-mark); font-weight: 400; color: var(--m-or);
+  font-size: 1.32em; letter-spacing: .02em; text-transform: none; }
+@keyframes hr-slam { from { transform: scale(1.7) skewX(-16deg); opacity: 0; } }
+#herald .hr-sub { margin-top: 10px; font-family: var(--m-f-hand); font-style: italic;
+  font-size: clamp(18px, 1.9vw, 28px); color: var(--m-or-hi); letter-spacing: .03em;
+  animation: hr-rise .42s var(--settle) .2s both; }
+@keyframes hr-rise { from { transform: translateY(12px); opacity: 0; } }
+
+/* ── gilt: lozenges of gold leaf thrown off a seal ── */
+#herald .hr-sparks i { position: absolute; display: block; pointer-events: none;
+  background: linear-gradient(135deg, var(--m-or-hi), var(--m-or) 55%, var(--m-or-lo));
+  box-shadow: 0 0 7px rgba(236,210,122,.75); }
+
+/* ══════════════════════════════════════════════════════════════
+   THE SHEET ON THE WOOD (45-papers.js)
+
+   A record is a real prop on the table now. It wears the record's own
+   stylesheet — 01-sheet.css is scoped to `.tp`, which both the sheet and
+   the reading carry — so what lies on the wood is the actual leaf, at the
+   size a sheet of paper is on a table this big: legible as YOUR sheet,
+   unreadable as words, exactly like a character sheet across a table.
+══════════════════════════════════════════════════════════════ */
+.tp-paper { cursor: pointer; }
+/* A4 ON A TABLE MEASURED IN MILLIMETRES: 210 x 297, two units to the mm.
+   The record is LAID OUT at its natural 900px and then scaled down onto
+   the sheet, so what lies on the wood is the real record at the real size
+   of a piece of paper — small, legible as yours, not readable as words.
+   That is what picking it up is for (45-papers.js). */
+.tp-paper .tp-face {
+  width: 420px; height: 594px; overflow: hidden;
+  background: transparent; box-shadow: none;
+  /* the sheet is looked at out here, not written on: every field inside it
+     belongs to the reading, which is where the pointer can reach them */
+  pointer-events: none;
+}
+.tp-paper .tp-face > * {
+  width: 900px; transform: scale(0.4667); transform-origin: top left;
+}
+.tp-paper .deck { padding: 0; }
+.tp-paper:hover .tp-face { filter: brightness(1.06); }
+/* it lifts a little under the pointer, the way a sheet does when you go for it */
+.tp-paper .tp-face { transition: filter var(--t-hover) var(--settle); }
+
+/* the table goes quiet while you are reading */
+#tp-scrim {
+  position: fixed; inset: 0; z-index: 925; background: rgba(6,4,3,.55);
+  backdrop-filter: blur(1.5px);
+}
+#tp-scrim[hidden] { display: none !important; }
+#tp .tp-head { display: flex; align-items: center; }
+#tp .tp-x + .tp-x { right: 8px; }
+#tp .tp-head .tp-x:first-of-type { right: 34px; }
+
+/* ══ THE GRADE, IN BOTH ROOMS ══════════════════════════════════
+   The table was graded — warm pool against cool shadow, halation round
+   the lamp, a falloff that desaturates, and grain over the lot — and the
+   hall was not, which is most of why the two 3D scenes did not feel like
+   one app. The tile and the recipe live here now; each room supplies its
+   own light position. */
+.m-grain{
+  background-image:url(data:image/png;base64,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);
+  background-repeat:repeat;
+  background-size:96px 96px;
+}
+
+</style>
+<style>html,body{background:transparent!important}</style>
+</head>
+<body>
+<script>window.__coverPage = true;</script>
+
+<div id="boot">
+  <div class="boot-bend"></div>
+  <div class="boot-dust"><i style="--x:4.0%;--s:7.6px;--d:9.02s;--t:-2.95s"></i><i style="--x:71.1%;--s:5.7px;--d:9.31s;--t:-10.53s"></i><i style="--x:73.5%;--s:5.7px;--d:11.79s;--t:-8.90s"></i><i style="--x:79.1%;--s:4.2px;--d:9.62s;--t:-9.91s"></i><i style="--x:68.2%;--s:3.3px;--d:11.79s;--t:-6.55s"></i><i style="--x:88.9%;--s:7.0px;--d:7.86s;--t:-7.18s"></i><i style="--x:88.9%;--s:6.4px;--d:11.51s;--t:-8.08s"></i><i style="--x:87.9%;--s:7.5px;--d:9.61s;--t:-4.70s"></i><i style="--x:81.0%;--s:4.7px;--d:8.07s;--t:-4.17s"></i><i style="--x:43.4%;--s:4.5px;--d:13.56s;--t:-7.80s"></i><i style="--x:71.1%;--s:7.4px;--d:7.41s;--t:-3.83s"></i><i style="--x:55.6%;--s:5.5px;--d:9.95s;--t:-2.70s"></i><i style="--x:87.6%;--s:3.3px;--d:9.56s;--t:-4.82s"></i><i style="--x:65.1%;--s:7.6px;--d:10.60s;--t:-2.32s"></i><i style="--x:41.3%;--s:4.4px;--d:9.55s;--t:-5.94s"></i><i style="--x:34.6%;--s:5.7px;--d:11.30s;--t:-3.27s"></i><i style="--x:87.4%;--s:5.3px;--d:13.04s;--t:-8.89s"></i><i style="--x:62.4%;--s:5.6px;--d:10.53s;--t:-9.65s"></i></div>
+  <div class="boot-in">
+    <div class="boot-roll">
+      <div class="boot-sun"><svg viewBox="-1 -1 2 2" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><radialGradient id="msun-g" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"><stop offset=".12" style="stop-color:var(--m-or-hi,#ecd27a);stop-opacity:.95"/><stop offset=".5" style="stop-color:var(--m-or,#c9a227);stop-opacity:.55"/><stop offset="1" style="stop-color:var(--m-or,#c9a227);stop-opacity:0"/></radialGradient></defs><path fill="url(#msun-g)" d="M0.1497 -0.0098L1.0000 0.0000L0.1497 0.0098ZM0.1463 0.0331L0.1767 0.0407L0.2070 0.0491L0.2371 0.0580L0.2672 0.0670L0.2974 0.0753L0.3280 0.0824L0.3590 0.0878L0.3902 0.0920L0.4216 0.0956L0.4527 0.1002L0.4832 0.1074L0.5128 0.1186L0.5413 0.1345L0.5685 0.1544L0.5948 0.1766L0.6209 0.1983L0.6481 0.2162L0.6773 0.2276L0.7093 0.2307L0.7439 0.2254L0.7799 0.2138L0.8158 0.2000L0.8142 0.2066L0.7769 0.2242L0.7395 0.2393L0.7036 0.2477L0.6703 0.2475L0.6401 0.2387L0.6125 0.2231L0.5861 0.2035L0.5599 0.1832L0.5328 0.1648L0.5045 0.1501L0.4749 0.1396L0.4442 0.1327L0.4129 0.1281L0.3812 0.1241L0.3498 0.1193L0.3188 0.1128L0.2885 0.1044L0.2587 0.0945L0.2293 0.0837L0.1999 0.0726L0.1705 0.0618L0.1410 0.0513ZM0.1312 0.0726L0.8413 0.5406L0.1206 0.0892ZM0.1052 0.1069L0.1266 0.1298L0.1476 0.1532L0.1681 0.1770L0.1886 0.2008L0.2095 0.2241L0.2314 0.2466L0.2545 0.2680L0.2786 0.2883L0.3030 0.3083L0.3266 0.3290L0.3484 0.3516L0.3673 0.3771L0.3826 0.4058L0.3948 0.4372L0.4049 0.4701L0.4152 0.5025L0.4283 0.5323L0.4467 0.5577L0.4720 0.5776L0.5040 0.5918L0.5405 0.6015L0.5782 0.6094L0.5733 0.6140L0.5324 0.6086L0.4928 0.6011L0.4580 0.5888L0.4301 0.5706L0.4095 0.5469L0.3946 0.5188L0.3830 0.4881L0.3720 0.4568L0.3592 0.4267L0.3433 0.3990L0.3241 0.3742L0.3019 0.3518L0.2780 0.3310L0.2536 0.3105L0.2298 0.2894L0.2072 0.2672L0.1862 0.2438L0.1666 0.2194L0.1476 0.1944L0.1289 0.1692L0.1101 0.1441L0.0909 0.1193ZM0.0711 0.1321L0.4154 0.9096L0.0532 0.1402ZM0.0307 0.1468L0.0364 0.1777L0.0413 0.2087L0.0457 0.2398L0.0501 0.2709L0.0551 0.3018L0.0613 0.3326L0.0692 0.3630L0.0784 0.3932L0.0882 0.4232L0.0969 0.4534L0.1030 0.4842L0.1051 0.5158L0.1025 0.5482L0.0957 0.5813L0.0865 0.6144L0.0776 0.6472L0.0725 0.6793L0.0743 0.7107L0.0848 0.7411L0.1040 0.7703L0.1295 0.7982L0.1569 0.8252L0.1503 0.8264L0.1188 0.7999L0.0896 0.7721L0.0669 0.7429L0.0533 0.7126L0.0488 0.6814L0.0515 0.6498L0.0584 0.6177L0.0660 0.5854L0.0715 0.5531L0.0731 0.5213L0.0703 0.4900L0.0638 0.4592L0.0550 0.4288L0.0455 0.3983L0.0368 0.3677L0.0298 0.3369L0.0249 0.3058L0.0215 0.2746L0.0191 0.2433L0.0170 0.2120L0.0147 0.1808L0.0119 0.1495ZM-0.0116 0.1496L-0.1423 0.9898L-0.0310 0.1468ZM-0.0536 0.1401L-0.0655 0.1691L-0.0781 0.1979L-0.0911 0.2264L-0.1043 0.2549L-0.1169 0.2837L-0.1282 0.3129L-0.1380 0.3428L-0.1466 0.3732L-0.1546 0.4037L-0.1636 0.4338L-0.1751 0.4630L-0.1904 0.4907L-0.2101 0.5166L-0.2337 0.5407L-0.2594 0.5636L-0.2846 0.5864L-0.3063 0.6107L-0.3217 0.6380L-0.3293 0.6693L-0.3289 0.7042L-0.3226 0.7415L-0.3141 0.7791L-0.3203 0.7765L-0.3325 0.7371L-0.3421 0.6980L-0.3453 0.6612L-0.3404 0.6283L-0.3274 0.5996L-0.3080 0.5745L-0.2849 0.5512L-0.2610 0.5281L-0.2389 0.5040L-0.2203 0.4780L-0.2058 0.4502L-0.1946 0.4208L-0.1856 0.3904L-0.1771 0.3597L-0.1678 0.3292L-0.1570 0.2995L-0.1444 0.2707L-0.1304 0.2426L-0.1155 0.2150L-0.1003 0.1876L-0.0854 0.1600L-0.0708 0.1322ZM-0.0906 0.1196L-0.6549 0.7557L-0.1055 0.1067ZM-0.1208 0.0889L-0.1465 0.1069L-0.1727 0.1243L-0.1991 0.1412L-0.2256 0.1581L-0.2517 0.1755L-0.2770 0.1939L-0.3015 0.2137L-0.3250 0.2347L-0.3483 0.2560L-0.3722 0.2765L-0.3976 0.2948L-0.4255 0.3099L-0.4561 0.3210L-0.4890 0.3285L-0.5230 0.3339L-0.5565 0.3394L-0.5878 0.3482L-0.6156 0.3628L-0.6389 0.3850L-0.6575 0.4146L-0.6723 0.4494L-0.6854 0.4856L-0.6893 0.4801L-0.6782 0.4404L-0.6651 0.4022L-0.6480 0.3695L-0.6260 0.3445L-0.5996 0.3275L-0.5697 0.3168L-0.5376 0.3097L-0.5051 0.3032L-0.4734 0.2948L-0.4438 0.2830L-0.4165 0.2675L-0.3912 0.2488L-0.3672 0.2281L-0.3434 0.2068L-0.3192 0.1862L-0.2940 0.1671L-0.2678 0.1496L-0.2409 0.1336L-0.2134 0.1185L-0.1858 0.1036L-0.1583 0.0884L-0.1311 0.0730ZM-0.1408 0.0516L-0.9595 0.2817L-0.1464 0.0327ZM-0.1497 0.0095L-0.1810 0.0107L-0.2124 0.0112L-0.2438 0.0112L-0.2752 0.0110L-0.3066 0.0116L-0.3379 0.0134L-0.3692 0.0168L-0.4003 0.0217L-0.4314 0.0270L-0.4626 0.0314L-0.4939 0.0331L-0.5255 0.0306L-0.5572 0.0235L-0.5890 0.0120L-0.6205 -0.0019L-0.6516 -0.0153L-0.6827 -0.0249L-0.7140 -0.0276L-0.7456 -0.0215L-0.7772 -0.0066L-0.8085 0.0146L-0.8391 0.0379L-0.8394 0.0312L-0.8086 0.0038L-0.7770 -0.0212L-0.7449 -0.0395L-0.7129 -0.0486L-0.6814 -0.0487L-0.6505 -0.0415L-0.6197 -0.0302L-0.5888 -0.0180L-0.5577 -0.0080L-0.5264 -0.0018L-0.4950 -0.0001L-0.4636 -0.0022L-0.4322 -0.0066L-0.4007 -0.0117L-0.3692 -0.0159L-0.3377 -0.0184L-0.3062 -0.0189L-0.2749 -0.0178L-0.2436 -0.0157L-0.2123 -0.0133L-0.1810 -0.0112L-0.1497 -0.0095ZM-0.1464 -0.0327L-0.9595 -0.2817L-0.1408 -0.0516ZM-0.1311 -0.0730L-0.1581 -0.0889L-0.1848 -0.1054L-0.2112 -0.1224L-0.2375 -0.1395L-0.2642 -0.1560L-0.2915 -0.1714L-0.3197 -0.1854L-0.3485 -0.1982L-0.3776 -0.2105L-0.4061 -0.2237L-0.4334 -0.2392L-0.4586 -0.2583L-0.4815 -0.2815L-0.5020 -0.3083L-0.5210 -0.3370L-0.5399 -0.3652L-0.5609 -0.3901L-0.5857 -0.4092L-0.6156 -0.4212L-0.6503 -0.4258L-0.6881 -0.4248L-0.7264 -0.4218L-0.7230 -0.4276L-0.6823 -0.4340L-0.6422 -0.4379L-0.6053 -0.4359L-0.5734 -0.4263L-0.5469 -0.4094L-0.5248 -0.3866L-0.5050 -0.3604L-0.4856 -0.3335L-0.4648 -0.3082L-0.4418 -0.2861L-0.4163 -0.2677L-0.3888 -0.2525L-0.3600 -0.2392L-0.3308 -0.2265L-0.3020 -0.2130L-0.2741 -0.1980L-0.2474 -0.1815L-0.2216 -0.1636L-0.1964 -0.1449L-0.1714 -0.1260L-0.1462 -0.1073L-0.1208 -0.0889ZM-0.1055 -0.1067L-0.6549 -0.7557L-0.0906 -0.1196ZM-0.0708 -0.1322L-0.0849 -0.1602L-0.0984 -0.1886L-0.1114 -0.2172L-0.1244 -0.2458L-0.1379 -0.2741L-0.1525 -0.3018L-0.1687 -0.3288L-0.1860 -0.3551L-0.2038 -0.3812L-0.2207 -0.4077L-0.2352 -0.4355L-0.2462 -0.4653L-0.2528 -0.4971L-0.2556 -0.5307L-0.2561 -0.5652L-0.2568 -0.5991L-0.2610 -0.6314L-0.2715 -0.6609L-0.2902 -0.6871L-0.3168 -0.7098L-0.3492 -0.7294L-0.3831 -0.7476L-0.3771 -0.7506L-0.3394 -0.7340L-0.3035 -0.7156L-0.2735 -0.6939L-0.2519 -0.6687L-0.2388 -0.6401L-0.2325 -0.6090L-0.2300 -0.5762L-0.2282 -0.5431L-0.2244 -0.5106L-0.2170 -0.4796L-0.2055 -0.4503L-0.1906 -0.4226L-0.1735 -0.3959L-0.1559 -0.3694L-0.1389 -0.3424L-0.1235 -0.3148L-0.1100 -0.2864L-0.0980 -0.2574L-0.0869 -0.2281L-0.0761 -0.1987L-0.0650 -0.1693L-0.0536 -0.1401ZM-0.0310 -0.1468L-0.1423 -0.9898L-0.0116 -0.1496ZM0.0119 -0.1495L0.0152 -0.1807L0.0191 -0.2119L0.0237 -0.2429L0.0283 -0.2740L0.0322 -0.3051L0.0349 -0.3364L0.0359 -0.3678L0.0355 -0.3993L0.0346 -0.4309L0.0348 -0.4623L0.0376 -0.4936L0.0444 -0.5245L0.0561 -0.5549L0.0719 -0.5847L0.0901 -0.6139L0.1079 -0.6428L0.1218 -0.6722L0.1289 -0.7028L0.1274 -0.7350L0.1172 -0.7684L0.1006 -0.8024L0.0819 -0.8360L0.0886 -0.8353L0.1113 -0.8009L0.1316 -0.7661L0.1451 -0.7317L0.1496 -0.6987L0.1452 -0.6676L0.1337 -0.6380L0.1180 -0.6091L0.1016 -0.5803L0.0873 -0.5509L0.0767 -0.5207L0.0706 -0.4899L0.0682 -0.4586L0.0681 -0.4269L0.0686 -0.3950L0.0683 -0.3632L0.0663 -0.3316L0.0623 -0.3004L0.0567 -0.2695L0.0502 -0.2389L0.0434 -0.2082L0.0369 -0.1776L0.0307 -0.1468ZM0.0532 -0.1402L0.4154 -0.9096L0.0711 -0.1321ZM0.0909 -0.1193L0.1105 -0.1438L0.1306 -0.1679L0.1513 -0.1916L0.1719 -0.2152L0.1921 -0.2393L0.2112 -0.2641L0.2290 -0.2900L0.2458 -0.3167L0.2621 -0.3438L0.2792 -0.3701L0.2984 -0.3949L0.3210 -0.4172L0.3472 -0.4365L0.3766 -0.4530L0.4077 -0.4677L0.4383 -0.4825L0.4659 -0.4997L0.4884 -0.5215L0.5045 -0.5494L0.5140 -0.5830L0.5184 -0.6206L0.5209 -0.6590L0.5261 -0.6548L0.5267 -0.6136L0.5249 -0.5733L0.5176 -0.5371L0.5036 -0.5069L0.4830 -0.4831L0.4574 -0.4644L0.4286 -0.4486L0.3992 -0.4332L0.3712 -0.4162L0.3461 -0.3966L0.3243 -0.3740L0.3053 -0.3489L0.2880 -0.3223L0.2712 -0.2952L0.2538 -0.2686L0.2350 -0.2432L0.2148 -0.2190L0.1935 -0.1961L0.1714 -0.1738L0.1491 -0.1517L0.1270 -0.1295L0.1052 -0.1069ZM0.1206 -0.0892L0.8413 -0.5406L0.1312 -0.0726ZM0.1410 -0.0513L0.1707 -0.0613L0.2007 -0.0706L0.2308 -0.0794L0.2610 -0.0881L0.2909 -0.0975L0.3205 -0.1080L0.3495 -0.1202L0.3780 -0.1336L0.4063 -0.1475L0.4350 -0.1604L0.4646 -0.1709L0.4956 -0.1774L0.5281 -0.1795L0.5617 -0.1775L0.5958 -0.1730L0.6296 -0.1689L0.6621 -0.1685L0.6929 -0.1747L0.7215 -0.1894L0.7476 -0.2126L0.7716 -0.2418L0.7945 -0.2728L0.7966 -0.2664L0.7748 -0.2315L0.7515 -0.1985L0.7258 -0.1720L0.6977 -0.1542L0.6676 -0.1453L0.6358 -0.1434L0.6031 -0.1457L0.5700 -0.1486L0.5373 -0.1495L0.5056 -0.1465L0.4750 -0.1393L0.4455 -0.1285L0.4166 -0.1154L0.3878 -0.1017L0.3587 -0.0888L0.3292 -0.0775L0.2992 -0.0681L0.2688 -0.0604L0.2381 -0.0536L0.2075 -0.0470L0.1768 -0.0402L0.1463 -0.0331Z"/></svg></div>
+      <div class="boot-sun far"><svg viewBox="-1 -1 2 2" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><radialGradient id="msun-g" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"><stop offset=".12" style="stop-color:var(--m-or-hi,#ecd27a);stop-opacity:.95"/><stop offset=".5" style="stop-color:var(--m-or,#c9a227);stop-opacity:.55"/><stop offset="1" style="stop-color:var(--m-or,#c9a227);stop-opacity:0"/></radialGradient></defs><path fill="url(#msun-g)" d="M0.1497 -0.0098L1.0000 0.0000L0.1497 0.0098ZM0.1463 0.0331L0.1767 0.0407L0.2070 0.0491L0.2371 0.0580L0.2672 0.0670L0.2974 0.0753L0.3280 0.0824L0.3590 0.0878L0.3902 0.0920L0.4216 0.0956L0.4527 0.1002L0.4832 0.1074L0.5128 0.1186L0.5413 0.1345L0.5685 0.1544L0.5948 0.1766L0.6209 0.1983L0.6481 0.2162L0.6773 0.2276L0.7093 0.2307L0.7439 0.2254L0.7799 0.2138L0.8158 0.2000L0.8142 0.2066L0.7769 0.2242L0.7395 0.2393L0.7036 0.2477L0.6703 0.2475L0.6401 0.2387L0.6125 0.2231L0.5861 0.2035L0.5599 0.1832L0.5328 0.1648L0.5045 0.1501L0.4749 0.1396L0.4442 0.1327L0.4129 0.1281L0.3812 0.1241L0.3498 0.1193L0.3188 0.1128L0.2885 0.1044L0.2587 0.0945L0.2293 0.0837L0.1999 0.0726L0.1705 0.0618L0.1410 0.0513ZM0.1312 0.0726L0.8413 0.5406L0.1206 0.0892ZM0.1052 0.1069L0.1266 0.1298L0.1476 0.1532L0.1681 0.1770L0.1886 0.2008L0.2095 0.2241L0.2314 0.2466L0.2545 0.2680L0.2786 0.2883L0.3030 0.3083L0.3266 0.3290L0.3484 0.3516L0.3673 0.3771L0.3826 0.4058L0.3948 0.4372L0.4049 0.4701L0.4152 0.5025L0.4283 0.5323L0.4467 0.5577L0.4720 0.5776L0.5040 0.5918L0.5405 0.6015L0.5782 0.6094L0.5733 0.6140L0.5324 0.6086L0.4928 0.6011L0.4580 0.5888L0.4301 0.5706L0.4095 0.5469L0.3946 0.5188L0.3830 0.4881L0.3720 0.4568L0.3592 0.4267L0.3433 0.3990L0.3241 0.3742L0.3019 0.3518L0.2780 0.3310L0.2536 0.3105L0.2298 0.2894L0.2072 0.2672L0.1862 0.2438L0.1666 0.2194L0.1476 0.1944L0.1289 0.1692L0.1101 0.1441L0.0909 0.1193ZM0.0711 0.1321L0.4154 0.9096L0.0532 0.1402ZM0.0307 0.1468L0.0364 0.1777L0.0413 0.2087L0.0457 0.2398L0.0501 0.2709L0.0551 0.3018L0.0613 0.3326L0.0692 0.3630L0.0784 0.3932L0.0882 0.4232L0.0969 0.4534L0.1030 0.4842L0.1051 0.5158L0.1025 0.5482L0.0957 0.5813L0.0865 0.6144L0.0776 0.6472L0.0725 0.6793L0.0743 0.7107L0.0848 0.7411L0.1040 0.7703L0.1295 0.7982L0.1569 0.8252L0.1503 0.8264L0.1188 0.7999L0.0896 0.7721L0.0669 0.7429L0.0533 0.7126L0.0488 0.6814L0.0515 0.6498L0.0584 0.6177L0.0660 0.5854L0.0715 0.5531L0.0731 0.5213L0.0703 0.4900L0.0638 0.4592L0.0550 0.4288L0.0455 0.3983L0.0368 0.3677L0.0298 0.3369L0.0249 0.3058L0.0215 0.2746L0.0191 0.2433L0.0170 0.2120L0.0147 0.1808L0.0119 0.1495ZM-0.0116 0.1496L-0.1423 0.9898L-0.0310 0.1468ZM-0.0536 0.1401L-0.0655 0.1691L-0.0781 0.1979L-0.0911 0.2264L-0.1043 0.2549L-0.1169 0.2837L-0.1282 0.3129L-0.1380 0.3428L-0.1466 0.3732L-0.1546 0.4037L-0.1636 0.4338L-0.1751 0.4630L-0.1904 0.4907L-0.2101 0.5166L-0.2337 0.5407L-0.2594 0.5636L-0.2846 0.5864L-0.3063 0.6107L-0.3217 0.6380L-0.3293 0.6693L-0.3289 0.7042L-0.3226 0.7415L-0.3141 0.7791L-0.3203 0.7765L-0.3325 0.7371L-0.3421 0.6980L-0.3453 0.6612L-0.3404 0.6283L-0.3274 0.5996L-0.3080 0.5745L-0.2849 0.5512L-0.2610 0.5281L-0.2389 0.5040L-0.2203 0.4780L-0.2058 0.4502L-0.1946 0.4208L-0.1856 0.3904L-0.1771 0.3597L-0.1678 0.3292L-0.1570 0.2995L-0.1444 0.2707L-0.1304 0.2426L-0.1155 0.2150L-0.1003 0.1876L-0.0854 0.1600L-0.0708 0.1322ZM-0.0906 0.1196L-0.6549 0.7557L-0.1055 0.1067ZM-0.1208 0.0889L-0.1465 0.1069L-0.1727 0.1243L-0.1991 0.1412L-0.2256 0.1581L-0.2517 0.1755L-0.2770 0.1939L-0.3015 0.2137L-0.3250 0.2347L-0.3483 0.2560L-0.3722 0.2765L-0.3976 0.2948L-0.4255 0.3099L-0.4561 0.3210L-0.4890 0.3285L-0.5230 0.3339L-0.5565 0.3394L-0.5878 0.3482L-0.6156 0.3628L-0.6389 0.3850L-0.6575 0.4146L-0.6723 0.4494L-0.6854 0.4856L-0.6893 0.4801L-0.6782 0.4404L-0.6651 0.4022L-0.6480 0.3695L-0.6260 0.3445L-0.5996 0.3275L-0.5697 0.3168L-0.5376 0.3097L-0.5051 0.3032L-0.4734 0.2948L-0.4438 0.2830L-0.4165 0.2675L-0.3912 0.2488L-0.3672 0.2281L-0.3434 0.2068L-0.3192 0.1862L-0.2940 0.1671L-0.2678 0.1496L-0.2409 0.1336L-0.2134 0.1185L-0.1858 0.1036L-0.1583 0.0884L-0.1311 0.0730ZM-0.1408 0.0516L-0.9595 0.2817L-0.1464 0.0327ZM-0.1497 0.0095L-0.1810 0.0107L-0.2124 0.0112L-0.2438 0.0112L-0.2752 0.0110L-0.3066 0.0116L-0.3379 0.0134L-0.3692 0.0168L-0.4003 0.0217L-0.4314 0.0270L-0.4626 0.0314L-0.4939 0.0331L-0.5255 0.0306L-0.5572 0.0235L-0.5890 0.0120L-0.6205 -0.0019L-0.6516 -0.0153L-0.6827 -0.0249L-0.7140 -0.0276L-0.7456 -0.0215L-0.7772 -0.0066L-0.8085 0.0146L-0.8391 0.0379L-0.8394 0.0312L-0.8086 0.0038L-0.7770 -0.0212L-0.7449 -0.0395L-0.7129 -0.0486L-0.6814 -0.0487L-0.6505 -0.0415L-0.6197 -0.0302L-0.5888 -0.0180L-0.5577 -0.0080L-0.5264 -0.0018L-0.4950 -0.0001L-0.4636 -0.0022L-0.4322 -0.0066L-0.4007 -0.0117L-0.3692 -0.0159L-0.3377 -0.0184L-0.3062 -0.0189L-0.2749 -0.0178L-0.2436 -0.0157L-0.2123 -0.0133L-0.1810 -0.0112L-0.1497 -0.0095ZM-0.1464 -0.0327L-0.9595 -0.2817L-0.1408 -0.0516ZM-0.1311 -0.0730L-0.1581 -0.0889L-0.1848 -0.1054L-0.2112 -0.1224L-0.2375 -0.1395L-0.2642 -0.1560L-0.2915 -0.1714L-0.3197 -0.1854L-0.3485 -0.1982L-0.3776 -0.2105L-0.4061 -0.2237L-0.4334 -0.2392L-0.4586 -0.2583L-0.4815 -0.2815L-0.5020 -0.3083L-0.5210 -0.3370L-0.5399 -0.3652L-0.5609 -0.3901L-0.5857 -0.4092L-0.6156 -0.4212L-0.6503 -0.4258L-0.6881 -0.4248L-0.7264 -0.4218L-0.7230 -0.4276L-0.6823 -0.4340L-0.6422 -0.4379L-0.6053 -0.4359L-0.5734 -0.4263L-0.5469 -0.4094L-0.5248 -0.3866L-0.5050 -0.3604L-0.4856 -0.3335L-0.4648 -0.3082L-0.4418 -0.2861L-0.4163 -0.2677L-0.3888 -0.2525L-0.3600 -0.2392L-0.3308 -0.2265L-0.3020 -0.2130L-0.2741 -0.1980L-0.2474 -0.1815L-0.2216 -0.1636L-0.1964 -0.1449L-0.1714 -0.1260L-0.1462 -0.1073L-0.1208 -0.0889ZM-0.1055 -0.1067L-0.6549 -0.7557L-0.0906 -0.1196ZM-0.0708 -0.1322L-0.0849 -0.1602L-0.0984 -0.1886L-0.1114 -0.2172L-0.1244 -0.2458L-0.1379 -0.2741L-0.1525 -0.3018L-0.1687 -0.3288L-0.1860 -0.3551L-0.2038 -0.3812L-0.2207 -0.4077L-0.2352 -0.4355L-0.2462 -0.4653L-0.2528 -0.4971L-0.2556 -0.5307L-0.2561 -0.5652L-0.2568 -0.5991L-0.2610 -0.6314L-0.2715 -0.6609L-0.2902 -0.6871L-0.3168 -0.7098L-0.3492 -0.7294L-0.3831 -0.7476L-0.3771 -0.7506L-0.3394 -0.7340L-0.3035 -0.7156L-0.2735 -0.6939L-0.2519 -0.6687L-0.2388 -0.6401L-0.2325 -0.6090L-0.2300 -0.5762L-0.2282 -0.5431L-0.2244 -0.5106L-0.2170 -0.4796L-0.2055 -0.4503L-0.1906 -0.4226L-0.1735 -0.3959L-0.1559 -0.3694L-0.1389 -0.3424L-0.1235 -0.3148L-0.1100 -0.2864L-0.0980 -0.2574L-0.0869 -0.2281L-0.0761 -0.1987L-0.0650 -0.1693L-0.0536 -0.1401ZM-0.0310 -0.1468L-0.1423 -0.9898L-0.0116 -0.1496ZM0.0119 -0.1495L0.0152 -0.1807L0.0191 -0.2119L0.0237 -0.2429L0.0283 -0.2740L0.0322 -0.3051L0.0349 -0.3364L0.0359 -0.3678L0.0355 -0.3993L0.0346 -0.4309L0.0348 -0.4623L0.0376 -0.4936L0.0444 -0.5245L0.0561 -0.5549L0.0719 -0.5847L0.0901 -0.6139L0.1079 -0.6428L0.1218 -0.6722L0.1289 -0.7028L0.1274 -0.7350L0.1172 -0.7684L0.1006 -0.8024L0.0819 -0.8360L0.0886 -0.8353L0.1113 -0.8009L0.1316 -0.7661L0.1451 -0.7317L0.1496 -0.6987L0.1452 -0.6676L0.1337 -0.6380L0.1180 -0.6091L0.1016 -0.5803L0.0873 -0.5509L0.0767 -0.5207L0.0706 -0.4899L0.0682 -0.4586L0.0681 -0.4269L0.0686 -0.3950L0.0683 -0.3632L0.0663 -0.3316L0.0623 -0.3004L0.0567 -0.2695L0.0502 -0.2389L0.0434 -0.2082L0.0369 -0.1776L0.0307 -0.1468ZM0.0532 -0.1402L0.4154 -0.9096L0.0711 -0.1321ZM0.0909 -0.1193L0.1105 -0.1438L0.1306 -0.1679L0.1513 -0.1916L0.1719 -0.2152L0.1921 -0.2393L0.2112 -0.2641L0.2290 -0.2900L0.2458 -0.3167L0.2621 -0.3438L0.2792 -0.3701L0.2984 -0.3949L0.3210 -0.4172L0.3472 -0.4365L0.3766 -0.4530L0.4077 -0.4677L0.4383 -0.4825L0.4659 -0.4997L0.4884 -0.5215L0.5045 -0.5494L0.5140 -0.5830L0.5184 -0.6206L0.5209 -0.6590L0.5261 -0.6548L0.5267 -0.6136L0.5249 -0.5733L0.5176 -0.5371L0.5036 -0.5069L0.4830 -0.4831L0.4574 -0.4644L0.4286 -0.4486L0.3992 -0.4332L0.3712 -0.4162L0.3461 -0.3966L0.3243 -0.3740L0.3053 -0.3489L0.2880 -0.3223L0.2712 -0.2952L0.2538 -0.2686L0.2350 -0.2432L0.2148 -0.2190L0.1935 -0.1961L0.1714 -0.1738L0.1491 -0.1517L0.1270 -0.1295L0.1052 -0.1069ZM0.1206 -0.0892L0.8413 -0.5406L0.1312 -0.0726ZM0.1410 -0.0513L0.1707 -0.0613L0.2007 -0.0706L0.2308 -0.0794L0.2610 -0.0881L0.2909 -0.0975L0.3205 -0.1080L0.3495 -0.1202L0.3780 -0.1336L0.4063 -0.1475L0.4350 -0.1604L0.4646 -0.1709L0.4956 -0.1774L0.5281 -0.1795L0.5617 -0.1775L0.5958 -0.1730L0.6296 -0.1689L0.6621 -0.1685L0.6929 -0.1747L0.7215 -0.1894L0.7476 -0.2126L0.7716 -0.2418L0.7945 -0.2728L0.7966 -0.2664L0.7748 -0.2315L0.7515 -0.1985L0.7258 -0.1720L0.6977 -0.1542L0.6676 -0.1453L0.6358 -0.1434L0.6031 -0.1457L0.5700 -0.1486L0.5373 -0.1495L0.5056 -0.1465L0.4750 -0.1393L0.4455 -0.1285L0.4166 -0.1154L0.3878 -0.1017L0.3587 -0.0888L0.3292 -0.0775L0.2992 -0.0681L0.2688 -0.0604L0.2381 -0.0536L0.2075 -0.0470L0.1768 -0.0402L0.1463 -0.0331Z"/></svg></div>
+      <figure class="boot-arms me" style="--i:0"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl0-cp-h1"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl0-wv-h1" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl0-cp-h1)"><rect width="176" height="211" fill="#a3232b"/><g transform="translate(44,53.06) scale(0.1719)" fill="#c9a227"><path d="M123.885 20.447c-10.348.467-21.337 3.146-32.194 5.366l62.492 65.628-21.645.188c-29.376.187-75.695 6.154-103.555 22.303l31.756 51.576-40.625 21.098v56.577l46.54 26.32-46.54 40.076v32.268c28.217-1.233 60.63.636 89.135-8.907l31.902-10.658-21.828 25.586c-18.76 22-29.782 55.133-50.736 87.713 31.91-2.394 63.352-7.65 96.8-25.81l16.026-8.683-9.746 77.124c26.333-12.19 52.103-28.923 71.178-49.055 22.683-23.94 35.713-50.49 33.36-72.71l-.074-.75c-18.488-12.687-32.26-31.173-39.236-54.18-8.414-27.753-5.867-62.33 6.643-101.145-26.406-4.04-46.536-14.637-57.307-30.11-12.33-17.716-14.222-39.26-7.738-57.018 6.483-17.758 22.29-32.165 43.437-33.4 20.558-1.195 44.48 10.033 69.972 36.102 11.368 4.11 21.73 8.034 31.14 11.94 2.434-21.395-1.46-38.033-10.408-52.9-8.41-13.975-23.217-26.43-41.1-38.582l4.27 42.888-16.425-10.985C222.37 43.57 168.973 18.49 123.885 20.597l.002-.225zm100.387 77.997c-.436.008-.866 0-1.29 0h-.002c-13.54.785-22.545 9.105-26.937 21.135-4.393 12.03-3.243 27.353 5.51 39.93 8.755 12.576 25.128 23.158 53.548 24.784l12.595.69-4.344 11.827c-14.837 40.46-16.242 73.928-8.577 99.212 7.66 25.267 24.04 42.795 47.305 52.56h.037l108.59 38.474c5.65-11.9 11.672-23.813 17.988-35.71-4.997 2.188-10.513 3.41-16.32 3.41-22.52 0-40.78-18.262-40.78-40.782 0-22.518 18.26-40.78 40.78-40.78 20.66 0 37.697 15.373 40.373 35.3 10.666-18.062 21.885-36 33.48-53.683l-103.224-52.377-4.746-5.732c-3.93-13.556-11.515-23.32-26.39-33.324-14.876-10.002-37.034-19.57-67.784-30.623l-2.08-.767-1.53-1.607c-23.283-24.532-42.7-32.278-56.202-32.024zm119.04 89.93c8.272 0 14.657 6.387 14.657 14.657 0 8.274-6.387 14.688-14.658 14.688-8.27 0-14.687-6.414-14.687-14.687 0-8.27 6.416-14.655 14.687-14.655z"/></g><rect width="176" height="211" fill="url(#rl0-wv-h1)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure><template class="boot-later"><figure class="boot-arms" style="--i:1"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl1-cp-h2"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl1-wv-h2" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl1-cp-h2)"><rect width="176" height="211" fill="#27508f"/><g transform="translate(22,30.04) scale(0.1134)" fill="#c9a227"><path d="M256 24c-31.466 48-62.932 96-62.932 160 0 56.794 37.144 113.568 45.514 148h34.836c8.37-34.432 45.514-91.206 45.514-148 0-64-31.466-112-62.932-160zM98.637 206c-47.2 0-78.664 32-78.664 80 0 32 22.115 63.526 62.93 64-15.732-16 .002-64 31.468-64 31.89 0 56.58 21.916 69.253 46h33.828c-13.744-47.52-49.108-126-118.813-126zm314.726 0c-69.705 0-105.07 78.48-118.814 126h33.827c12.673-24.084 37.362-46 69.252-46 31.465 0 47.2 48 31.466 64 40.816-.474 62.93-32 62.93-64 0-48-31.464-80-78.663-80zM153.076 350c-38.705 0-54.44 16-54.44 48 0 16 15.734 48 47.2 48 35.4 0 61.948-27 73.01-54h-35.682c-4.657 3.57-11.5 6-21.596 6-15.733 0-31.464-32-8.492-48zm37.694 0c.017.064.03.127.048.19-13.29 2.16-12.694 23.343 1.793 23.79v.02H319.39l-.003-.02c14.486-.447 15.083-21.63 1.792-23.79.017-.063.03-.126.048-.19H190.77zm168.154 0c22.972 16 7.24 48-8.492 48-10.096 0-16.94-2.43-21.596-6h-35.682c11.062 27 37.61 54 73.01 54 31.466 0 47.2-32 47.2-48 0-32-15.735-48-54.44-48zm-118.656 42c-15.733 16-15.734 48-31.467 64l31.468-16c0 16 0 32 15.732 48 15.733-16 15.732-32 15.732-48l31.467 16c-15.734-16-15.735-48-31.468-64h-31.464z"/></g><g transform="translate(95.92,30.04) scale(0.1134)" fill="#c9a227"><path d="M256 24c-31.466 48-62.932 96-62.932 160 0 56.794 37.144 113.568 45.514 148h34.836c8.37-34.432 45.514-91.206 45.514-148 0-64-31.466-112-62.932-160zM98.637 206c-47.2 0-78.664 32-78.664 80 0 32 22.115 63.526 62.93 64-15.732-16 .002-64 31.468-64 31.89 0 56.58 21.916 69.253 46h33.828c-13.744-47.52-49.108-126-118.813-126zm314.726 0c-69.705 0-105.07 78.48-118.814 126h33.827c12.673-24.084 37.362-46 69.252-46 31.465 0 47.2 48 31.466 64 40.816-.474 62.93-32 62.93-64 0-48-31.464-80-78.663-80zM153.076 350c-38.705 0-54.44 16-54.44 48 0 16 15.734 48 47.2 48 35.4 0 61.948-27 73.01-54h-35.682c-4.657 3.57-11.5 6-21.596 6-15.733 0-31.464-32-8.492-48zm37.694 0c.017.064.03.127.048.19-13.29 2.16-12.694 23.343 1.793 23.79v.02H319.39l-.003-.02c14.486-.447 15.083-21.63 1.792-23.79.017-.063.03-.126.048-.19H190.77zm168.154 0c22.972 16 7.24 48-8.492 48-10.096 0-16.94-2.43-21.596-6h-35.682c11.062 27 37.61 54 73.01 54 31.466 0 47.2-32 47.2-48 0-32-15.735-48-54.44-48zm-118.656 42c-15.733 16-15.734 48-31.467 64l31.468-16c0 16 0 32 15.732 48 15.733-16 15.732-32 15.732-48l31.467 16c-15.734-16-15.735-48-31.468-64h-31.464z"/></g><g transform="translate(58.96,101.78) scale(0.1134)" fill="#c9a227"><path d="M256 24c-31.466 48-62.932 96-62.932 160 0 56.794 37.144 113.568 45.514 148h34.836c8.37-34.432 45.514-91.206 45.514-148 0-64-31.466-112-62.932-160zM98.637 206c-47.2 0-78.664 32-78.664 80 0 32 22.115 63.526 62.93 64-15.732-16 .002-64 31.468-64 31.89 0 56.58 21.916 69.253 46h33.828c-13.744-47.52-49.108-126-118.813-126zm314.726 0c-69.705 0-105.07 78.48-118.814 126h33.827c12.673-24.084 37.362-46 69.252-46 31.465 0 47.2 48 31.466 64 40.816-.474 62.93-32 62.93-64 0-48-31.464-80-78.663-80zM153.076 350c-38.705 0-54.44 16-54.44 48 0 16 15.734 48 47.2 48 35.4 0 61.948-27 73.01-54h-35.682c-4.657 3.57-11.5 6-21.596 6-15.733 0-31.464-32-8.492-48zm37.694 0c.017.064.03.127.048.19-13.29 2.16-12.694 23.343 1.793 23.79v.02H319.39l-.003-.02c14.486-.447 15.083-21.63 1.792-23.79.017-.063.03-.126.048-.19H190.77zm168.154 0c22.972 16 7.24 48-8.492 48-10.096 0-16.94-2.43-21.596-6h-35.682c11.062 27 37.61 54 73.01 54 31.466 0 47.2-32 47.2-48 0-32-15.735-48-54.44-48zm-118.656 42c-15.733 16-15.734 48-31.467 64l31.468-16c0 16 0 32 15.732 48 15.733-16 15.732-32 15.732-48l31.467 16c-15.734-16-15.735-48-31.468-64h-31.464z"/></g><rect width="176" height="211" fill="url(#rl1-wv-h2)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template><template class="boot-later"><figure class="boot-arms" style="--i:2"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl2-cp-h3"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl2-wv-h3" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl2-cp-h3)"><rect width="176" height="211" fill="#c9a227"/><path d="M88,0 L88,105.5 L176,105.5 L176,0 Z" fill="#a3232b"/><path d="M0,105.5 L88,105.5 L88,211 L0,211 Z" fill="#a3232b"/><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#171310" stroke-width="26.4"/><rect width="176" height="211" fill="url(#rl2-wv-h3)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template><template class="boot-later"><figure class="boot-arms" style="--i:3"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl3-cp-h4"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl3-wv-h4" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl3-cp-h4)"><rect width="176" height="211" fill="#2b6940"/><path d="M0,0 L176,0 L176,42.2 L0,42.2 Z" fill="#c9a227"/><g transform="translate(44,53.06) scale(0.1719)" fill="#ded8c8"><path d="M76.465 73.324c-16.696 10.814-24.31 28.1-23.647 44.938.664 16.837 8.676 33.327 21.393 46.06 1.265 1.266 2.596 2.48 3.962 3.66-6.772 11.33-17.072 12.974-25.512 10.586-4.85-1.372-8.708-4.328-10.676-7.86-1.967-3.534-2.67-7.755.055-14.26l-17.24-7.22c-4.57 10.91-3.87 22.082.858 30.573 4.73 8.492 12.865 14.19 21.914 16.75 15.546 4.4 34.89-1.218 46.02-18.22 8.568 4.33 18.18 7.156 28.428 7.986.676 11.475 4.846 22.184 11.634 31.79-6.064 2.136-11.192 6.248-14.42 11.61-8.616 14.312-2.927 35.32 17.545 49.546l10.665-15.348c-15.297-10.63-14.877-20.11-12.2-24.56 1.34-2.225 3.435-3.745 6.835-4.122 2.942-.325 7.056.338 12.09 3.4 2.958 2.186 6.07 4.265 9.318 6.222 16.108 9.698 35.805 16.807 57.666 20.578-8.085 6.224-13.812 14.285-18.125 23.445-32.812-8.59-64.65-.154-94.98 34.63 31.59 7.23 62.19 8.758 90.403-3.44l37.96 106.415c4.404 16.44 32.492 16.902 37.023 0l38.19-107.068c28.615 12.89 59.722 11.447 91.856 4.092-30.527-35.005-62.578-43.322-95.61-34.457-4.212-9.323-10.003-17.065-17.64-22.962 23.48-3.564 44.62-10.94 61.715-21.234 3.647-2.196 7.118-4.546 10.395-7.032 4.38-2.353 8.002-2.883 10.658-2.59 3.4.377 5.495 1.897 6.834 4.122 2.678 4.45 3.1 13.93-12.2 24.56l10.665 15.348c20.47-14.227 26.16-35.234 17.544-49.547-3.177-5.278-8.2-9.34-14.14-11.5 6.82-9.616 11.017-20.34 11.708-31.832 10.273-.694 19.92-3.39 28.547-7.608 11.174 16.657 30.315 22.136 45.726 17.776 9.05-2.56 17.186-8.258 21.916-16.75 4.73-8.49 5.426-19.663.857-30.573l-17.24 7.22c2.725 6.506 2.023 10.727.055 14.26-1.967 3.533-5.827 6.49-10.677 7.86-8.265 2.34-18.312.807-25.084-9.895 1.652-1.39 3.24-2.84 4.75-4.35 12.717-12.733 20.73-29.223 21.392-46.06.664-16.838-6.95-34.124-23.646-44.938L429.85 89.01c11.61 7.52 15.573 17.276 15.13 28.515-.442 11.24-6.222 23.858-15.94 33.59-14.804 14.823-37.444 23.673-64.16 12.772 6.135-3.766 11.356-9.778 14.567-17.617l-17.293-7.084c-2.673 6.526-6.154 9.016-10.043 10.123-3.887 1.105-8.706.464-13.106-1.996-8.8-4.92-15.577-15.34-8.467-31.55l-17.113-7.508c-9.727 22.175-1.276 43.15 13.22 53.326l-.064.072c15.934 13.58 32.233 20.995 47.748 23.71-5.807 15.017-14.117 23.457-22.94 28.003-9.28 4.783-19.567 5.284-28.773 2.78-9.206-2.505-17.03-8.12-21.066-14.44-4.037-6.32-5.028-12.746-.87-20.894l-16.65-8.495c-6.945 13.616-5.262 28.437 1.767 39.446 7.028 11.01 18.657 18.81 31.912 22.416 3.39.922 6.906 1.558 10.493 1.882-19.513 8.518-43.958 13.754-70.484 13.754-25.172 0-48.48-4.706-67.468-12.464 2.604-.36 5.162-.886 7.652-1.563 13.255-3.606 24.886-11.408 31.914-22.417 7.03-11.01 8.71-25.83 1.764-39.445l-16.646 8.494c4.157 8.15 3.166 14.573-.87 20.894-4.035 6.32-11.86 11.936-21.066 14.44-9.206 2.504-19.49 2.002-28.773-2.78-9.087-4.684-17.627-13.502-23.452-29.378 15.617-2.462 32.07-9.685 48.17-23.15 15.274-9.814 24.522-31.367 14.51-54.192l-17.113 7.508c7.11 16.21.332 26.63-8.467 31.55-4.4 2.46-9.217 3.1-13.105 1.995-3.89-1.108-7.372-3.597-10.045-10.124l-17.293 7.084c3.182 7.77 8.34 13.746 14.404 17.517-26.822 11.052-49.555 2.195-64.402-12.672-9.72-9.732-15.5-22.35-15.942-33.59-.443-11.24 3.523-20.996 15.133-28.515l-10.16-15.686z"/></g><rect width="176" height="211" fill="url(#rl3-wv-h4)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template><template class="boot-later"><figure class="boot-arms" style="--i:4"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl4-cp-h5"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl4-wv-h5" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl4-cp-h5)"><rect width="176" height="211" fill="#67326f"/><g transform="translate(44,53.06) scale(0.1719)" fill="#ded8c8"><path d="M97.812 23.375v92.875l46.22 51.72V351h-25.845L94.594 491.906H414.53L390.938 351h-25.875V167.97l46.22-51.72V23.375h-53.938v43.97H324.5v-43.97h-53.938v43.97h-32.437v-43.97h-53.938v43.97H151.75v-43.97H97.812zm73.75 152.875h18.688v50.22h-18.688v-50.22zm73.594 0h18.688v50.22h-18.688v-50.22zm74.156 0H338v50.22h-18.688v-50.22z"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#c9a227" stroke-width="26.4"/><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#ded8c8" stroke-width="26.4" stroke-dasharray="33.44 33.44"/><rect width="176" height="211" fill="url(#rl4-wv-h5)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template><template class="boot-later"><figure class="boot-arms" style="--i:5"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl5-cp-h6"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl5-wv-h6" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl5-cp-h6)"><rect width="176" height="211" fill="#c9a227"/><path d="M0,0 L43.47,0 L176,167.53 L176,211 L132.53,211 L0,43.47 Z" fill="#27508f"/><g transform="translate(44,53.06) scale(0.1719)" fill="#171310"><path d="M343.313 22.22c-57.33 0-61.26 36.153-91.125 54.874C154.782 42.52 133.115 221.496 169.844 330c-15.396 31.924-30.736 75.9-43.813 134.906 56.828 30.66 119.124 38.655 182.22 9.906-6.2-37.715-14.18-68.858-21.97-95.375 25.025-12.63 59.594-14.573 86.5 14.407.24-28.626-19.022-40.956-40.53-42.25l-22.03-47.313c42.606-45.056 74.38-100.18 57.905-157.06-10.303-38.45 58.203-62.225 122.344-53.75-24.523-21.164-55.99-30.482-85.845-33.876-8.843-21.763-32.616-37.375-61.313-37.375zm10.968 21.936c9.808 0 17.783 7.944 17.783 17.75 0 9.807-7.974 17.75-17.782 17.75-9.807 0-17.75-7.943-17.75-17.75 0-9.806 7.945-17.75 17.75-17.75zm-58.092 274.25l16.28 34.938c-11.62 2.698-22.325 8.217-29.312 15.687-3.298-10.84-6.498-20.903-9.47-30.28 7.58-6.45 15.128-13.253 22.502-20.344z"/></g><rect width="176" height="211" fill="url(#rl5-wv-h6)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template><template class="boot-later"><figure class="boot-arms" style="--i:6"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl6-cp-h7"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl6-wv-h7" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl6-cp-h7)"><rect width="176" height="211" fill="#ded8c8"/><path d="M0,211 L88,92.84 L176,211 Z" fill="#a3232b"/><g transform="translate(22,30.04) scale(0.1134)" fill="#c9a227"><path d="M281.31 21.217L239.997 127.13l76.01 103.673 97.135-7.532-3.1-79.284-78.2-12.468-1.61 41.535 29.11 7.568-.766-14.1 18.662-1.012 2.15 39.635-68.41-17.788 3.004-77.61 68.65 10.946-2.456-86.044-98.863-13.43zM243.63 66.39l-73.702 39.917L195.885 243.7l141.306 80.704 154.447-80.037-11.252-142.205-79.617-.988.642 22.512 26.705 4.257 4.403 112.57-125.436 9.727-88.227-120.338 24.774-63.51zm-93.107 88.706c-2.992-.017-6.01.004-9.054.06-9.456.174-19.425.853-29.44 1.594 9.427 13.32 18.694 26.165 30.157 35.938 7.894 6.73 16.835 12.308 28.075 16.056l-10.1-53.453c-3.184-.11-6.396-.176-9.64-.194zm25.57 84.51c-14.278 5.27-27.16 13.25-39.437 23.55-17.875 14.995-34.273 35.22-50.625 58.47 56.9 2.6 100.16-6.41 147.316-35.01l-54.223-30.966-3.03-16.045zm270.854 48.968l-50.64 26.244c27.874 20.83 54.865 27.206 90.162 28.557-8.76-21.213-22.617-39.484-39.523-54.8zm-189.853 4.895c-14.566 9.75-28.84 17.8-43.156 24.342.37 10.843 2.813 19.703 6.968 26.47-29.49 37.69-61.714 72.017-96.78 102.843-17.584-1.215-24.577-19.137-17.845-37.344-22.758 18.074-30.427 42.166-20 68.376-6.832 5.23-13.75 10.354-20.78 15.344h45.344c25.65-20.11 49.915-41.82 72.844-65.094 29.485 9.192 54.05-1.51 69.625-27.97-14.975 8.052-31.217 5.627-37.438-6.686 9.653-11.06 19.037-22.436 28.156-34.125 7.25 1.21 15.586.57 24.72-2.03-8.863-17.974-13.326-39.19-11.656-64.126zm18.133 17.065c1.205 25.213 10.463 44.01 24.648 60.12 17.914 20.346 44.73 35.942 73.625 50.814 7.79-33.575 9.555-62.664-2.05-93.77l-34.692 17.978-61.53-35.143z"/></g><g transform="translate(95.92,30.04) scale(0.1134)" fill="#c9a227"><path d="M281.31 21.217L239.997 127.13l76.01 103.673 97.135-7.532-3.1-79.284-78.2-12.468-1.61 41.535 29.11 7.568-.766-14.1 18.662-1.012 2.15 39.635-68.41-17.788 3.004-77.61 68.65 10.946-2.456-86.044-98.863-13.43zM243.63 66.39l-73.702 39.917L195.885 243.7l141.306 80.704 154.447-80.037-11.252-142.205-79.617-.988.642 22.512 26.705 4.257 4.403 112.57-125.436 9.727-88.227-120.338 24.774-63.51zm-93.107 88.706c-2.992-.017-6.01.004-9.054.06-9.456.174-19.425.853-29.44 1.594 9.427 13.32 18.694 26.165 30.157 35.938 7.894 6.73 16.835 12.308 28.075 16.056l-10.1-53.453c-3.184-.11-6.396-.176-9.64-.194zm25.57 84.51c-14.278 5.27-27.16 13.25-39.437 23.55-17.875 14.995-34.273 35.22-50.625 58.47 56.9 2.6 100.16-6.41 147.316-35.01l-54.223-30.966-3.03-16.045zm270.854 48.968l-50.64 26.244c27.874 20.83 54.865 27.206 90.162 28.557-8.76-21.213-22.617-39.484-39.523-54.8zm-189.853 4.895c-14.566 9.75-28.84 17.8-43.156 24.342.37 10.843 2.813 19.703 6.968 26.47-29.49 37.69-61.714 72.017-96.78 102.843-17.584-1.215-24.577-19.137-17.845-37.344-22.758 18.074-30.427 42.166-20 68.376-6.832 5.23-13.75 10.354-20.78 15.344h45.344c25.65-20.11 49.915-41.82 72.844-65.094 29.485 9.192 54.05-1.51 69.625-27.97-14.975 8.052-31.217 5.627-37.438-6.686 9.653-11.06 19.037-22.436 28.156-34.125 7.25 1.21 15.586.57 24.72-2.03-8.863-17.974-13.326-39.19-11.656-64.126zm18.133 17.065c1.205 25.213 10.463 44.01 24.648 60.12 17.914 20.346 44.73 35.942 73.625 50.814 7.79-33.575 9.555-62.664-2.05-93.77l-34.692 17.978-61.53-35.143z"/></g><g transform="translate(58.96,101.78) scale(0.1134)" fill="#c9a227"><path d="M281.31 21.217L239.997 127.13l76.01 103.673 97.135-7.532-3.1-79.284-78.2-12.468-1.61 41.535 29.11 7.568-.766-14.1 18.662-1.012 2.15 39.635-68.41-17.788 3.004-77.61 68.65 10.946-2.456-86.044-98.863-13.43zM243.63 66.39l-73.702 39.917L195.885 243.7l141.306 80.704 154.447-80.037-11.252-142.205-79.617-.988.642 22.512 26.705 4.257 4.403 112.57-125.436 9.727-88.227-120.338 24.774-63.51zm-93.107 88.706c-2.992-.017-6.01.004-9.054.06-9.456.174-19.425.853-29.44 1.594 9.427 13.32 18.694 26.165 30.157 35.938 7.894 6.73 16.835 12.308 28.075 16.056l-10.1-53.453c-3.184-.11-6.396-.176-9.64-.194zm25.57 84.51c-14.278 5.27-27.16 13.25-39.437 23.55-17.875 14.995-34.273 35.22-50.625 58.47 56.9 2.6 100.16-6.41 147.316-35.01l-54.223-30.966-3.03-16.045zm270.854 48.968l-50.64 26.244c27.874 20.83 54.865 27.206 90.162 28.557-8.76-21.213-22.617-39.484-39.523-54.8zm-189.853 4.895c-14.566 9.75-28.84 17.8-43.156 24.342.37 10.843 2.813 19.703 6.968 26.47-29.49 37.69-61.714 72.017-96.78 102.843-17.584-1.215-24.577-19.137-17.845-37.344-22.758 18.074-30.427 42.166-20 68.376-6.832 5.23-13.75 10.354-20.78 15.344h45.344c25.65-20.11 49.915-41.82 72.844-65.094 29.485 9.192 54.05-1.51 69.625-27.97-14.975 8.052-31.217 5.627-37.438-6.686 9.653-11.06 19.037-22.436 28.156-34.125 7.25 1.21 15.586.57 24.72-2.03-8.863-17.974-13.326-39.19-11.656-64.126zm18.133 17.065c1.205 25.213 10.463 44.01 24.648 60.12 17.914 20.346 44.73 35.942 73.625 50.814 7.79-33.575 9.555-62.664-2.05-93.77l-34.692 17.978-61.53-35.143z"/></g><rect width="176" height="211" fill="url(#rl6-wv-h7)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template><template class="boot-later"><figure class="boot-arms" style="--i:7"><svg xmlns="http://www.w3.org/2000/svg" width="176" height="211" viewBox="0 0 176 211"><defs><clipPath id="rl7-cp-h8"><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z"/></clipPath><pattern id="rl7-wv-h8" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0,0 H9 M4.5,0 V9" stroke="#000" stroke-opacity=".055" stroke-width="1.6"/><path d="M0,4.5 H9" stroke="#fff" stroke-opacity=".035" stroke-width="1.6"/></pattern></defs><g clip-path="url(#rl7-cp-h8)"><rect width="176" height="211" fill="#171310"/><path d="M71.28,0 L71.28,211 L104.72,211 L104.72,0 Z" fill="#c9a227"/><path d="M0,55.02 L176,55.02 L176,88.46 L0,88.46 Z" fill="#c9a227"/><g transform="translate(44,53.06) scale(0.1719)" fill="#a3232b"><path d="M188.28 59.47c-19.086 0-34.56 15.468-34.56 34.56 0 16.077 10.983 29.57 25.843 33.44l-35.344 81.936c15.877 2.885 27.905 16.784 27.905 33.5 0 18.806-15.23 34.063-34.03 34.063-18.802 0-34.032-15.258-34.032-34.064 0-13.37 7.703-24.924 18.906-30.5l-50.814-79.22c8.007-5.82 13.22-15.24 13.22-25.905 0-17.693-14.314-32.06-32-32.06-17.688 0-32.032 14.37-32.032 32.06 0 17.693 14.344 32.032 32.03 32.032.734 0 1.468-.014 2.188-.062l41.907 227h316l41.936-227c.72.048 1.455.063 2.188.063 17.686 0 32.03-14.34 32.03-32.032 0-17.693-14.344-32.06-32.03-32.06-17.687 0-32.03 14.37-32.03 32.06-.002 10.723 5.286 20.187 13.373 26l-50.656 79.532c10.778 5.72 18.126 17.04 18.126 30.094 0 18.806-15.23 34.063-34.03 34.063s-34.032-15.258-34.032-34.064c0-17.11 12.602-31.267 29.03-33.687l-34.75-81.532c15.275-3.577 26.657-17.287 26.657-33.657 0-19.094-15.474-34.56-34.56-34.56-19.09 0-34.564 15.468-34.564 34.56 0 14.798 9.308 27.415 22.375 32.345L268 202.345c14.62 4.52 25.25 18.112 25.25 34.218 0 19.796-16.053 35.843-35.844 35.843-19.79 0-35.812-16.047-35.812-35.844 0-15.158 9.403-28.102 22.687-33.343l-44.124-76.72c13.234-4.845 22.688-17.552 22.688-32.47 0-19.094-15.475-34.56-34.563-34.56zM97.438 384.936c-23.978 3.763-22.86 39.844 4.188 39.844h6.656l.064.345h294.28l.063-.344h7.625c26.034 0 27.88-35.928 4.313-39.842H97.437z"/></g><rect width="176" height="211" fill="url(#rl7-wv-h8)"/></g><path d="M2.5,2.5 H173.5 V121.97999999999999 C173.5,171.42 125.61999999999999,196.14 88,208.5 C50.38,196.14 2.5,171.42 2.5,121.97999999999999 Z" fill="none" stroke="#0d0906" stroke-width="5" stroke-opacity=".8"/></svg></figure></template>
+    </div>
+    <div class="boot-name">Monarchy</div>
+    <div class="boot-bar"><i></i><u></u></div>
+    <div class="boot-say">the heralds are summoned&hellip;</div>
+  </div>
+</div>
+<template id="m-sun"><svg viewBox="-1 -1 2 2" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><radialGradient id="msun-g" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"><stop offset=".12" style="stop-color:var(--m-or-hi,#ecd27a);stop-opacity:.95"/><stop offset=".5" style="stop-color:var(--m-or,#c9a227);stop-opacity:.55"/><stop offset="1" style="stop-color:var(--m-or,#c9a227);stop-opacity:0"/></radialGradient></defs><path fill="url(#msun-g)" d="M0.1497 -0.0098L1.0000 0.0000L0.1497 0.0098ZM0.1463 0.0331L0.1767 0.0407L0.2070 0.0491L0.2371 0.0580L0.2672 0.0670L0.2974 0.0753L0.3280 0.0824L0.3590 0.0878L0.3902 0.0920L0.4216 0.0956L0.4527 0.1002L0.4832 0.1074L0.5128 0.1186L0.5413 0.1345L0.5685 0.1544L0.5948 0.1766L0.6209 0.1983L0.6481 0.2162L0.6773 0.2276L0.7093 0.2307L0.7439 0.2254L0.7799 0.2138L0.8158 0.2000L0.8142 0.2066L0.7769 0.2242L0.7395 0.2393L0.7036 0.2477L0.6703 0.2475L0.6401 0.2387L0.6125 0.2231L0.5861 0.2035L0.5599 0.1832L0.5328 0.1648L0.5045 0.1501L0.4749 0.1396L0.4442 0.1327L0.4129 0.1281L0.3812 0.1241L0.3498 0.1193L0.3188 0.1128L0.2885 0.1044L0.2587 0.0945L0.2293 0.0837L0.1999 0.0726L0.1705 0.0618L0.1410 0.0513ZM0.1312 0.0726L0.8413 0.5406L0.1206 0.0892ZM0.1052 0.1069L0.1266 0.1298L0.1476 0.1532L0.1681 0.1770L0.1886 0.2008L0.2095 0.2241L0.2314 0.2466L0.2545 0.2680L0.2786 0.2883L0.3030 0.3083L0.3266 0.3290L0.3484 0.3516L0.3673 0.3771L0.3826 0.4058L0.3948 0.4372L0.4049 0.4701L0.4152 0.5025L0.4283 0.5323L0.4467 0.5577L0.4720 0.5776L0.5040 0.5918L0.5405 0.6015L0.5782 0.6094L0.5733 0.6140L0.5324 0.6086L0.4928 0.6011L0.4580 0.5888L0.4301 0.5706L0.4095 0.5469L0.3946 0.5188L0.3830 0.4881L0.3720 0.4568L0.3592 0.4267L0.3433 0.3990L0.3241 0.3742L0.3019 0.3518L0.2780 0.3310L0.2536 0.3105L0.2298 0.2894L0.2072 0.2672L0.1862 0.2438L0.1666 0.2194L0.1476 0.1944L0.1289 0.1692L0.1101 0.1441L0.0909 0.1193ZM0.0711 0.1321L0.4154 0.9096L0.0532 0.1402ZM0.0307 0.1468L0.0364 0.1777L0.0413 0.2087L0.0457 0.2398L0.0501 0.2709L0.0551 0.3018L0.0613 0.3326L0.0692 0.3630L0.0784 0.3932L0.0882 0.4232L0.0969 0.4534L0.1030 0.4842L0.1051 0.5158L0.1025 0.5482L0.0957 0.5813L0.0865 0.6144L0.0776 0.6472L0.0725 0.6793L0.0743 0.7107L0.0848 0.7411L0.1040 0.7703L0.1295 0.7982L0.1569 0.8252L0.1503 0.8264L0.1188 0.7999L0.0896 0.7721L0.0669 0.7429L0.0533 0.7126L0.0488 0.6814L0.0515 0.6498L0.0584 0.6177L0.0660 0.5854L0.0715 0.5531L0.0731 0.5213L0.0703 0.4900L0.0638 0.4592L0.0550 0.4288L0.0455 0.3983L0.0368 0.3677L0.0298 0.3369L0.0249 0.3058L0.0215 0.2746L0.0191 0.2433L0.0170 0.2120L0.0147 0.1808L0.0119 0.1495ZM-0.0116 0.1496L-0.1423 0.9898L-0.0310 0.1468ZM-0.0536 0.1401L-0.0655 0.1691L-0.0781 0.1979L-0.0911 0.2264L-0.1043 0.2549L-0.1169 0.2837L-0.1282 0.3129L-0.1380 0.3428L-0.1466 0.3732L-0.1546 0.4037L-0.1636 0.4338L-0.1751 0.4630L-0.1904 0.4907L-0.2101 0.5166L-0.2337 0.5407L-0.2594 0.5636L-0.2846 0.5864L-0.3063 0.6107L-0.3217 0.6380L-0.3293 0.6693L-0.3289 0.7042L-0.3226 0.7415L-0.3141 0.7791L-0.3203 0.7765L-0.3325 0.7371L-0.3421 0.6980L-0.3453 0.6612L-0.3404 0.6283L-0.3274 0.5996L-0.3080 0.5745L-0.2849 0.5512L-0.2610 0.5281L-0.2389 0.5040L-0.2203 0.4780L-0.2058 0.4502L-0.1946 0.4208L-0.1856 0.3904L-0.1771 0.3597L-0.1678 0.3292L-0.1570 0.2995L-0.1444 0.2707L-0.1304 0.2426L-0.1155 0.2150L-0.1003 0.1876L-0.0854 0.1600L-0.0708 0.1322ZM-0.0906 0.1196L-0.6549 0.7557L-0.1055 0.1067ZM-0.1208 0.0889L-0.1465 0.1069L-0.1727 0.1243L-0.1991 0.1412L-0.2256 0.1581L-0.2517 0.1755L-0.2770 0.1939L-0.3015 0.2137L-0.3250 0.2347L-0.3483 0.2560L-0.3722 0.2765L-0.3976 0.2948L-0.4255 0.3099L-0.4561 0.3210L-0.4890 0.3285L-0.5230 0.3339L-0.5565 0.3394L-0.5878 0.3482L-0.6156 0.3628L-0.6389 0.3850L-0.6575 0.4146L-0.6723 0.4494L-0.6854 0.4856L-0.6893 0.4801L-0.6782 0.4404L-0.6651 0.4022L-0.6480 0.3695L-0.6260 0.3445L-0.5996 0.3275L-0.5697 0.3168L-0.5376 0.3097L-0.5051 0.3032L-0.4734 0.2948L-0.4438 0.2830L-0.4165 0.2675L-0.3912 0.2488L-0.3672 0.2281L-0.3434 0.2068L-0.3192 0.1862L-0.2940 0.1671L-0.2678 0.1496L-0.2409 0.1336L-0.2134 0.1185L-0.1858 0.1036L-0.1583 0.0884L-0.1311 0.0730ZM-0.1408 0.0516L-0.9595 0.2817L-0.1464 0.0327ZM-0.1497 0.0095L-0.1810 0.0107L-0.2124 0.0112L-0.2438 0.0112L-0.2752 0.0110L-0.3066 0.0116L-0.3379 0.0134L-0.3692 0.0168L-0.4003 0.0217L-0.4314 0.0270L-0.4626 0.0314L-0.4939 0.0331L-0.5255 0.0306L-0.5572 0.0235L-0.5890 0.0120L-0.6205 -0.0019L-0.6516 -0.0153L-0.6827 -0.0249L-0.7140 -0.0276L-0.7456 -0.0215L-0.7772 -0.0066L-0.8085 0.0146L-0.8391 0.0379L-0.8394 0.0312L-0.8086 0.0038L-0.7770 -0.0212L-0.7449 -0.0395L-0.7129 -0.0486L-0.6814 -0.0487L-0.6505 -0.0415L-0.6197 -0.0302L-0.5888 -0.0180L-0.5577 -0.0080L-0.5264 -0.0018L-0.4950 -0.0001L-0.4636 -0.0022L-0.4322 -0.0066L-0.4007 -0.0117L-0.3692 -0.0159L-0.3377 -0.0184L-0.3062 -0.0189L-0.2749 -0.0178L-0.2436 -0.0157L-0.2123 -0.0133L-0.1810 -0.0112L-0.1497 -0.0095ZM-0.1464 -0.0327L-0.9595 -0.2817L-0.1408 -0.0516ZM-0.1311 -0.0730L-0.1581 -0.0889L-0.1848 -0.1054L-0.2112 -0.1224L-0.2375 -0.1395L-0.2642 -0.1560L-0.2915 -0.1714L-0.3197 -0.1854L-0.3485 -0.1982L-0.3776 -0.2105L-0.4061 -0.2237L-0.4334 -0.2392L-0.4586 -0.2583L-0.4815 -0.2815L-0.5020 -0.3083L-0.5210 -0.3370L-0.5399 -0.3652L-0.5609 -0.3901L-0.5857 -0.4092L-0.6156 -0.4212L-0.6503 -0.4258L-0.6881 -0.4248L-0.7264 -0.4218L-0.7230 -0.4276L-0.6823 -0.4340L-0.6422 -0.4379L-0.6053 -0.4359L-0.5734 -0.4263L-0.5469 -0.4094L-0.5248 -0.3866L-0.5050 -0.3604L-0.4856 -0.3335L-0.4648 -0.3082L-0.4418 -0.2861L-0.4163 -0.2677L-0.3888 -0.2525L-0.3600 -0.2392L-0.3308 -0.2265L-0.3020 -0.2130L-0.2741 -0.1980L-0.2474 -0.1815L-0.2216 -0.1636L-0.1964 -0.1449L-0.1714 -0.1260L-0.1462 -0.1073L-0.1208 -0.0889ZM-0.1055 -0.1067L-0.6549 -0.7557L-0.0906 -0.1196ZM-0.0708 -0.1322L-0.0849 -0.1602L-0.0984 -0.1886L-0.1114 -0.2172L-0.1244 -0.2458L-0.1379 -0.2741L-0.1525 -0.3018L-0.1687 -0.3288L-0.1860 -0.3551L-0.2038 -0.3812L-0.2207 -0.4077L-0.2352 -0.4355L-0.2462 -0.4653L-0.2528 -0.4971L-0.2556 -0.5307L-0.2561 -0.5652L-0.2568 -0.5991L-0.2610 -0.6314L-0.2715 -0.6609L-0.2902 -0.6871L-0.3168 -0.7098L-0.3492 -0.7294L-0.3831 -0.7476L-0.3771 -0.7506L-0.3394 -0.7340L-0.3035 -0.7156L-0.2735 -0.6939L-0.2519 -0.6687L-0.2388 -0.6401L-0.2325 -0.6090L-0.2300 -0.5762L-0.2282 -0.5431L-0.2244 -0.5106L-0.2170 -0.4796L-0.2055 -0.4503L-0.1906 -0.4226L-0.1735 -0.3959L-0.1559 -0.3694L-0.1389 -0.3424L-0.1235 -0.3148L-0.1100 -0.2864L-0.0980 -0.2574L-0.0869 -0.2281L-0.0761 -0.1987L-0.0650 -0.1693L-0.0536 -0.1401ZM-0.0310 -0.1468L-0.1423 -0.9898L-0.0116 -0.1496ZM0.0119 -0.1495L0.0152 -0.1807L0.0191 -0.2119L0.0237 -0.2429L0.0283 -0.2740L0.0322 -0.3051L0.0349 -0.3364L0.0359 -0.3678L0.0355 -0.3993L0.0346 -0.4309L0.0348 -0.4623L0.0376 -0.4936L0.0444 -0.5245L0.0561 -0.5549L0.0719 -0.5847L0.0901 -0.6139L0.1079 -0.6428L0.1218 -0.6722L0.1289 -0.7028L0.1274 -0.7350L0.1172 -0.7684L0.1006 -0.8024L0.0819 -0.8360L0.0886 -0.8353L0.1113 -0.8009L0.1316 -0.7661L0.1451 -0.7317L0.1496 -0.6987L0.1452 -0.6676L0.1337 -0.6380L0.1180 -0.6091L0.1016 -0.5803L0.0873 -0.5509L0.0767 -0.5207L0.0706 -0.4899L0.0682 -0.4586L0.0681 -0.4269L0.0686 -0.3950L0.0683 -0.3632L0.0663 -0.3316L0.0623 -0.3004L0.0567 -0.2695L0.0502 -0.2389L0.0434 -0.2082L0.0369 -0.1776L0.0307 -0.1468ZM0.0532 -0.1402L0.4154 -0.9096L0.0711 -0.1321ZM0.0909 -0.1193L0.1105 -0.1438L0.1306 -0.1679L0.1513 -0.1916L0.1719 -0.2152L0.1921 -0.2393L0.2112 -0.2641L0.2290 -0.2900L0.2458 -0.3167L0.2621 -0.3438L0.2792 -0.3701L0.2984 -0.3949L0.3210 -0.4172L0.3472 -0.4365L0.3766 -0.4530L0.4077 -0.4677L0.4383 -0.4825L0.4659 -0.4997L0.4884 -0.5215L0.5045 -0.5494L0.5140 -0.5830L0.5184 -0.6206L0.5209 -0.6590L0.5261 -0.6548L0.5267 -0.6136L0.5249 -0.5733L0.5176 -0.5371L0.5036 -0.5069L0.4830 -0.4831L0.4574 -0.4644L0.4286 -0.4486L0.3992 -0.4332L0.3712 -0.4162L0.3461 -0.3966L0.3243 -0.3740L0.3053 -0.3489L0.2880 -0.3223L0.2712 -0.2952L0.2538 -0.2686L0.2350 -0.2432L0.2148 -0.2190L0.1935 -0.1961L0.1714 -0.1738L0.1491 -0.1517L0.1270 -0.1295L0.1052 -0.1069ZM0.1206 -0.0892L0.8413 -0.5406L0.1312 -0.0726ZM0.1410 -0.0513L0.1707 -0.0613L0.2007 -0.0706L0.2308 -0.0794L0.2610 -0.0881L0.2909 -0.0975L0.3205 -0.1080L0.3495 -0.1202L0.3780 -0.1336L0.4063 -0.1475L0.4350 -0.1604L0.4646 -0.1709L0.4956 -0.1774L0.5281 -0.1795L0.5617 -0.1775L0.5958 -0.1730L0.6296 -0.1689L0.6621 -0.1685L0.6929 -0.1747L0.7215 -0.1894L0.7476 -0.2126L0.7716 -0.2418L0.7945 -0.2728L0.7966 -0.2664L0.7748 -0.2315L0.7515 -0.1985L0.7258 -0.1720L0.6977 -0.1542L0.6676 -0.1453L0.6358 -0.1434L0.6031 -0.1457L0.5700 -0.1486L0.5373 -0.1495L0.5056 -0.1465L0.4750 -0.1393L0.4455 -0.1285L0.4166 -0.1154L0.3878 -0.1017L0.3587 -0.0888L0.3292 -0.0775L0.2992 -0.0681L0.2688 -0.0604L0.2381 -0.0536L0.2075 -0.0470L0.1768 -0.0402L0.1463 -0.0331Z"/></svg></template>
+<style>
+/* Blazon's first frame. The tokens are 20-shell.css's — that sheet is in
+   <head>, so they already resolve here.
+
+   ══ WHAT CAN MOVE WHILE THE PAGE IS BUSY ══════════════════════
+   Only what the compositor can do by itself: transform and opacity, on
+   their own layers. So everything that moves here — the turning shield, the
+   sun, the bend, the gold leaf, the shimmer on the bar — is one of those two
+   and carries on through a two-second parse freeze. The bar's own width
+   cannot: it is laid out, so it advances in steps, one per script, weighted
+   by bytes and eased over a long curve so that it looks deliberate. */
+/* the same isolation as the Bend's cover, for the same reason: this is up
+   because the page is busy, so it must not share a layer with the page */
+#boot{contain:layout paint style;will-change:transform;
+  position:fixed;inset:0;z-index:100000;display:flex;overflow:hidden;
+  align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%,#2c1e10 0%,#150f09 44%,var(--m-sable-0,#0a0705) 80%);
+  font-family:var(--m-f-hand,Georgia,serif);
+  transition:opacity .5s ease}
+/* the Bend's cloth, faintly: a lattice of lozenges (a diaper) over the dark */
+#boot::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(45deg,rgba(201,162,39,.05) 0 1px,transparent 1px 40px),
+             repeating-linear-gradient(-45deg,rgba(201,162,39,.05) 0 1px,transparent 1px 40px);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 42%,#000 12%,transparent 72%);
+          mask-image:radial-gradient(ellipse at 50% 42%,#000 12%,transparent 72%)}
+.boot-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;
+  will-change:transform,opacity;
+  transition:transform .62s cubic-bezier(.5,0,.85,.4),opacity .42s ease}
+/* the screen lifts the way the Bend's cloth does rather than just fading:
+   the same exit, so the first thing the app does and everything after it
+   agree about how a cover comes off */
+#boot.gone{opacity:0;pointer-events:none}
+#boot.gone .boot-in{transform:translateY(-26px) scale(.97);opacity:0}
+
+/* ── THE SUN, turning behind the shield: two of it, one large and slow, one
+   larger, fainter and the other way, so the rays shimmer as they cross ── */
+.boot-sun{position:absolute;left:50%;top:44%;width:620px;height:620px;transform:translate(-50%,-50%);
+  pointer-events:none;opacity:.34;will-change:transform;animation:bootsun 80s linear infinite}
+/* centred by translate, not margins: the hall's reset (body.at-hall *{margin:0})
+   outranks a bare class and put the first sun off in a corner */
+.boot-sun.far{width:1100px;height:1100px;opacity:.12;
+  animation-duration:150s;animation-direction:reverse}
+.boot-sun svg{display:block;width:100%;height:100%}
+@keyframes bootsun{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* ── THE ROLL. Eight coats on one spot, each turning in on its edge, held,
+   and turning away as the next comes round — the whole roll every 14.4s,
+   each coat's turn 1.8s later than the last (--i). ── */
+.boot-roll{position:relative;width:176px;height:252px;perspective:900px}
+.boot-arms{position:absolute;left:0;top:0;width:176px;margin:0;opacity:0;
+  transform:rotateY(-78deg) scale(.94);backface-visibility:hidden;will-change:transform,opacity;
+  animation:bootturn 14.4s cubic-bezier(.2,.7,.2,1) infinite both;
+  animation-delay:calc(var(--i) * 1.8s)}
+.boot-arms svg{display:block;width:176px;height:211px;filter:drop-shadow(0 12px 18px rgba(0,0,0,.65))}
+@keyframes bootturn{
+  0%{opacity:0;transform:rotateY(-78deg) scale(.94)}
+  2.5%{opacity:1;transform:rotateY(0) scale(1)}
+  11%{opacity:1;transform:rotateY(0) scale(1)}
+  13.5%{opacity:0;transform:rotateY(78deg) scale(.94)}
+  100%{opacity:0;transform:rotateY(78deg) scale(.94)}}
+
+/* ── THE COUNTERCHANGE, across the whole screen: the gilt band every hovered
+   and chosen thing in the app wears, passing along the bend ── */
+.boot-bend{position:absolute;top:-50%;left:0;width:26vw;height:200%;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(236,210,122,.05) 38%,rgba(236,210,122,.11) 50%,rgba(236,210,122,.05) 62%,transparent);
+  transform:translateX(-40vw) rotate(25deg);will-change:transform;
+  animation:bootbend 6s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes bootbend{0%{transform:translateX(-40vw) rotate(25deg)}
+  60%,100%{transform:translateX(125vw) rotate(25deg)}}
+
+/* ── GOLD LEAF: the Herald's burst, slowed to a drift ── */
+.boot-dust{position:absolute;inset:0;pointer-events:none}
+.boot-dust i{position:absolute;left:var(--x);bottom:-12px;width:var(--s);height:var(--s);
+  background:var(--m-or-hi,#ecd27a);opacity:0;transform:translateY(0) rotate(45deg);
+  will-change:transform,opacity;animation:bootdust var(--d) linear var(--t) infinite}
+@keyframes bootdust{0%{opacity:0;transform:translateY(0) rotate(45deg)}
+  12%{opacity:.75}75%{opacity:.4}
+  100%{opacity:0;transform:translateY(-104vh) rotate(315deg)}}
+
+/* ── the name, and the lozenge rule drawing out under it ── */
+.boot-name{position:relative;font-family:var(--m-f-mark,serif);font-size:58px;line-height:1;
+  color:var(--m-argent-hi,#e8dfc8);letter-spacing:.02em;
+  text-shadow:0 3px 0 rgba(0,0,0,.6),0 0 40px rgba(201,120,40,.35);
+  will-change:transform,opacity;animation:bootname 1s cubic-bezier(.16,.84,.24,1) both}
+.boot-name::after{content:'';display:block;width:240px;height:11px;margin:14px auto 0;
+  background:
+    linear-gradient(45deg,transparent 35%,var(--m-or,#c9a227) 35% 65%,transparent 65%) center/11px 11px no-repeat,
+    linear-gradient(90deg,transparent,var(--m-or,#c9a227) 36%,transparent 46%,transparent 54%,var(--m-or,#c9a227) 64%,transparent) center/100% 1px no-repeat;
+  animation:bootrule .9s cubic-bezier(.16,.84,.24,1) .35s both}
+@keyframes bootname{from{opacity:0;transform:translateY(14px) scale(1.08)}}
+@keyframes bootrule{from{opacity:0;transform:scaleX(0)}}
+
+/* ── the bar: gilt on a track cut on the bend, and a shimmer that never stops ── */
+.boot-bar{position:relative;width:236px;height:6px;background:rgba(201,162,39,.14);
+  overflow:hidden;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
+.boot-bar i{display:block;height:100%;width:100%;transform:scaleX(0);transform-origin:left center;
+  background:linear-gradient(90deg,var(--m-house,#a3232b),var(--m-or-lo,#8a6a20) 30%,var(--m-or-hi,#e0c169));
+  /* a long, late-settling curve, so a big script's jump glides in instead of
+     snapping — and so two ticks close together read as one movement. On
+     transform, not width (STYLE.md §6⅓): width is laid out, so every tick
+     cost a layout and the glide could not run on the compositor. */
+  will-change:transform;transition:transform .7s cubic-bezier(.16,.84,.24,1)}
+/* THE ONE THING THAT NEVER STOPS. A gilt sweep running the length of the
+   track on transform alone, so the compositor keeps drawing it even while
+   the main thread is parsing and the bar itself cannot move. */
+.boot-bar u{position:absolute;inset:0;display:block;
+  background:linear-gradient(90deg,transparent,rgba(255,236,190,.5),transparent);
+  transform:translateX(-100%);will-change:transform;
+  animation:bootsweep 1.5s linear infinite}
+@keyframes bootsweep{to{transform:translateX(100%)}}
+.boot-say{font-size:13px;font-style:italic;color:rgba(222,216,200,.5);letter-spacing:.04em}
+
+@media (prefers-reduced-motion:reduce){
+  .boot-sun,.boot-bend,.boot-dust i,.boot-bar u,.boot-name,.boot-name::after{animation:none}
+  .boot-bend,.boot-dust,.boot-bar u{opacity:0}
+  .boot-arms{animation:none;opacity:0;transform:none}
+  .boot-arms.me{opacity:1}
+}
+</style>
+<script>
+(function(){
+  /* IN THE DESKTOP APP THE SHELL DRAWS THIS SCREEN, in a process of its own
+     laid over this page (electron/cover.js) — so this page's copy is never
+     seen, and drawing it would only slow the parse it exists to cover. */
+  if (!window.__coverPage && window.AppCover) {
+    var own = document.getElementById('boot');
+    if (own) own.style.display = 'none';
+  }
+  /* the rest of the roll, each coat hung a little before its turn, in step
+     with the first (whose turn began when this ran) */
+  var t0 = performance.now();
+  [].forEach.call(document.querySelectorAll('#boot template.boot-later'), function(t, k){
+    var i = k + 1;
+    setTimeout(function(){
+      var f = t.content.firstElementChild; if (!f) return;
+      f.style.animationDelay = (i * 1.8 - (performance.now() - t0) / 1000).toFixed(3) + 's';
+      t.parentNode.insertBefore(f, t);
+    }, Math.max(0, i * 1800 - 700));
+  });
+  /* YOUR ARMS FIRST. Nothing that can draw a coat has been read yet, so
+     42-shell.js leaves the last one it drew here; the first slot of the roll
+     is swapped for it, and the bar wears your livery. */
+  try {
+    var mine = JSON.parse(localStorage.getItem('monarchy.boot.v1') || 'null');
+    var slot = document.querySelector('#boot .boot-arms.me');
+    if (mine && mine.svg && slot) {
+      slot.innerHTML = mine.svg;
+      if (mine.house) document.documentElement.style.setProperty('--m-house', mine.house);
+    }
+  } catch (e) {}
+  /* The words change as the work does, because "Loading..." for eight
+     seconds tells you nothing and reads as a hang. */
+  var SAY = [[0,'the heralds are summoned\u2026'],[.18,'the roll of arms is read\u2026'],
+             [.38,'the banners are hung\u2026'],[.58,'the hearth is lit\u2026'],
+             [.78,'the table is laid\u2026']];
+  var bar, say, shown = 0;
+  /* n and of are BYTES parsed, not files done (see the marker in build.js) */
+  window.__boot = function(n, of){
+    bar = bar || document.querySelector('#boot .boot-bar i');
+    say = say || document.querySelector('#boot .boot-say');
+    var u = of ? n / of : 0;
+    /* never backwards, and never quite full until the page really is: the
+       last few per cent belong to the styles resolving and the first paint,
+       which happen after the final script and are not nothing */
+    u = Math.max(shown, Math.min(u, 1) * 0.94);
+    shown = u;
+    if (bar) bar.style.transform = 'scaleX(' + u.toFixed(4) + ')';
+    if (say) for (var i = SAY.length - 1; i >= 0; i--)
+      if (u >= SAY[i][0]) { say.innerHTML = SAY[i][1]; break; }
+    /* and the shell's own copy of this screen (cover.html, electron/cover.js)
+       is told how far the parse has got, because it is the one being seen */
+    if (!window.__coverPage && window.AppCover) window.AppCover.progress(u);
+  };
+  /* Gone when the page is actually usable, not when the bar looks full:
+     the last script still has to run, styles resolve and the first frame
+     paint. Two animation frames after load is that moment. */
+  var finishing = false;
+  function done(){
+    var b = document.getElementById('boot');
+    if (!b || finishing) return;
+    finishing = true;
+    var i = b.querySelector('.boot-bar i');
+    if (i) i.style.transform = 'scaleX(1)';
+    /* THE TAVERN IS BUILT UNDER THE LOADING SCREEN, not after it. It is the
+       same room whichever table is opened, and it was left to the first
+       quiet moment in the hall — measured, a 600ms freeze of the hall a few
+       seconds after the loading screen had gone (grumkata: "the whole reason
+       loading screens exist is to mask the lag"). Here it is behind the
+       cover, and the hall that comes up has nothing left to build. */
+    var rehearsed = Promise.resolve();
+    if (!window.__coverPage) {
+      try { if (window.TableBoot && window.TableBoot.warm) window.TableBoot.warm(); } catch (e) {}
+      /* AND A TABLE IS LAID ONCE AND PUT AWAY, still under this screen, so
+         the first one anybody opens is not the first one ever drawn
+         (42-shell.js rehearse — measured, that first draw was the lag).
+         Capped: a rehearsal that hangs must not hold the loading screen up. */
+      try {
+        if (window.Shell && window.Shell.rehearse)
+          rehearsed = Promise.race([window.Shell.rehearse(),
+                                    new Promise(function(r){ setTimeout(r, 4000); })]);
+      } catch (e) {}
+    }
+    rehearsed.then(function(){
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        /* a beat on a full bar before it lifts — a bar that vanishes at 94%
+           reads as having given up rather than finished */
+        setTimeout(function(){
+          /* the app is standing: the shell's cover can come off it now */
+          if (!window.__coverPage && window.AppCover) window.AppCover.ready();
+          b.classList.add('gone');
+          setTimeout(function(){ b.remove(); }, 700);
+        }, 180);
+      }); });
+    });
+  }
+  /* IN THE SHELL'S COVER PAGE this screen is not the page's own — nothing is
+     loading in there — so it does not lift on its own 'load'. The shell lifts
+     it when the APP says it is ready (electron/cover.js). */
+  if (window.__coverPage) { window.__bootDone = done; return; }
+  if (document.readyState === 'complete') done();
+  else window.addEventListener('load', done);
+  /* and never, ever a permanent cover if something above throws */
+  setTimeout(done, 25000);
+})();
+</script>
+<script>
+(function(){
+  var B = window.CoverBridge; if (!B) return;
+  var COVER = 440, UNCOVER = 720, host = null;
+  var raf2 = function(f){ requestAnimationFrame(function(){ requestAnimationFrame(f); }); };
+  function hostUp(){
+    if (host) return host;
+    host = document.createElement('div'); host.id = 'herald';
+    var dust = '';
+    for (var i = 0; i < 14; i++) { var r = (i * 0.618034) % 1;
+      dust += '<i style="--x:' + (5 + r * 90).toFixed(1) + '%;--s:' + (3 + (i * 7) % 5) + 'px;--d:' +
+              (3.4 + (i * 0.37) % 2.2).toFixed(2) + 's;--t:' + (-(i * 0.53) % 3.4).toFixed(2) + 's"></i>'; }
+    host.innerHTML = '<div class="hr-veil"><div class="hr-cloth"></div><div class="hr-card">' +
+      '<span class="hr-sun"></span><span class="hr-arms"></span><b></b><i></i><u class="hr-work"></u></div>' +
+      '</div><div class="hr-dust">' + dust + '</div>';
+    var sun = document.getElementById('m-sun');
+    if (sun && sun.content) host.querySelector('.hr-sun').appendChild(sun.content.cloneNode(true));
+    document.body.appendChild(host);
+    return host;
+  }
+  B.on('boot-progress', function(u){ if (window.__boot) window.__boot(u * 1000, 1000); });
+  B.on('boot-done', function(){
+    if (window.__bootDone) window.__bootDone();
+    /* done() waits two frames and a 180ms beat, then the fade is .5s */
+    setTimeout(function(){ B.send('boot-lifted'); }, 900);
+  });
+  B.on('wipe', function(o){
+    o = o || {};
+    if (o.house) document.documentElement.style.setProperty('--m-house', o.house);
+    var h = hostUp();
+    h.classList.remove('lifting', 'carded');
+    void h.offsetWidth;                          /* so the veil runs from the start again */
+    h.classList.add('wiping');
+    setTimeout(function(){
+      var c = h.querySelector('.hr-card');
+      c.querySelector('b').textContent = o.title || '';
+      c.querySelector('i').textContent = o.sub || '';
+      var a = c.querySelector('.hr-arms');
+      a.innerHTML = o.arms || ''; a.hidden = !o.arms;
+      h.classList.add('carded');
+      raf2(function(){ B.send('covered'); });
+    }, COVER);
+  });
+  B.on('lift', function(){
+    var h = hostUp();
+    h.classList.add('lifting');                  /* the card rides out on the cloth */
+    setTimeout(function(){ h.classList.remove('wiping', 'lifting', 'carded'); B.send('lifted'); }, UNCOVER + 40);
+  });
+  /* two frames after load: the first has been drawn, the window can be seen */
+  var go = function(){ raf2(function(){ B.send('painted'); }); };
+  if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { setupAutoUpdater } = require('./updater');
 const Content = require('./content');
+const Cover = require('./cover');
 
 // Remove Electron's default application menu (File/Edit/View/Window/Help).
 Menu.setApplicationMenu(null);
@@ -20,6 +21,10 @@ function createWindow() {
     minHeight: 480,
     backgroundColor: '#0a0705', // the dark room the hall and the table both sit in — avoids a pale flash on load
     autoHideMenuBar: true,      // extra safety net on platforms where a menu bar can reappear
+    // NOT shown until the loading screen is painted over it (cover.js):
+    // shown at once, it was a black window for a quarter of a second and
+    // then a half-drawn loading screen that could not move
+    show: false,
     webPreferences: {
       nodeIntegration: false,   // the app is plain browser JS/HTML/CSS — no Node API surface needed
       contextIsolation: true,
@@ -42,8 +47,11 @@ function createWindow() {
     }
   });
 
-  /* the newest page this copy has — the one it shipped with, or a later one
-     fetched from the repo since (content.js) */
+  /* the loading screen, in its own view over the window (cover.js), which
+     shows the window once it is there to be seen; and underneath it, from the
+     same moment, the newest page this copy has — the one it shipped with, or
+     a later one fetched from the repo since (content.js) */
+  if (!Cover.attach(win, Content.pick().dir)) win.show();
   Content.load(win);
 
   // Uncomment while debugging a packaged build (also note: no default

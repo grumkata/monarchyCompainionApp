@@ -196,6 +196,28 @@ function warmTable() {
 const openTable = id => show('table', id);
 const backToHall = () => show('hall');
 
+/* ══ A DRESS REHEARSAL, UNDER THE LOADING SCREEN ═══════════════
+   grumkata: "still really laggy when generating the table — why not preload
+   the transition on bootup and not wait until a table is loaded to use it?"
+
+   Measured, that is exactly where the lag was: the FIRST table opened froze
+   for 117ms and 317ms (the GPU building its raster programs and taking the
+   room's textures for the first time), and a second table, opened straight
+   after, froze for nothing at all. The cost is the first time, not the
+   table. So the first time is had at boot, behind the loading screen: a blank
+   table that is never saved is laid, drawn until it has settled, and put
+   away again, and every table anybody actually opens takes the second,
+   quiet path (28-table-boot.js "a different table onto the same wood").
+   Only from the hall — walking straight in with ?table= is already a first
+   open under a cover. */
+const REHEARSAL = '__rehearsal';
+function rehearse() {
+  if (at !== 'hall' || !root.TableBoot || root.TableBoot.standing) return Promise.resolve();
+  let p;
+  try { p = swap('table', REHEARSAL, true); } catch (e) { console.error(e); p = null; }
+  return Promise.resolve(p).catch(() => {}).then(() => { swap('hall', null, false); });
+}
+
 /* THE WAY BACK IS IN THE MENU NOW (59-table-menu.js). There was a pennon
    pinned to the top-left corner of the table that did one thing, and
    grumkata is right that it was the wrong shape: leaving is a decision
@@ -308,7 +330,7 @@ function seat(n) {
 }
 
 /* the tavern hangs your arms behind your seat (27-table-gl.js) */
-root.Shell = { show, openTable, backToHall, livery, arms: readArms, seat,
+root.Shell = { show, openTable, backToHall, rehearse, livery, arms: readArms, seat,
                get at() { return at; } };
 
 })(window, document);

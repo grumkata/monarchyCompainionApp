@@ -64,9 +64,11 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
      only allowed if it survives the freeze it covers: every keyframe either
      screen uses may animate transform and opacity and nothing else. */
   const rollOf = page.slice(page.indexOf('<div id="boot">'), page.indexOf('<template id="m-sun">'));
-  const coats = [...rollOf.matchAll(/<figure class="boot-arms[^"]*"[^>]*>(<svg[\s\S]*?<\/svg>)<figcaption>([^<]+)<\/figcaption><\/figure>/g)];
-  T('the boot screen reads a roll of eight coats, each drawn and blazoned at build time',
-    coats.length === 8 && coats.every(m => /clip-path="url\(#rl\d-/.test(m[1]) && /,|Or|Gules|Azure/.test(m[2])));
+  /* no words under the coats (grumkata, 2026-09-27): the arms alone */
+  const coats = [...rollOf.matchAll(/<figure class="boot-arms[^"]*"[^>]*>(<svg[\s\S]*?<\/svg>)<\/figure>/g)];
+  T('the boot screen reads a roll of eight coats, each drawn at build time, with no caption under them',
+    coats.length === 8 && coats.every(m => /clip-path="url\(#rl\d-/.test(m[1]))
+    && !/<figcaption/.test(rollOf));
   T('and the sun in splendour is left as a template for the Bend to turn as well',
     /<template id="m-sun"><svg[^>]*viewBox="-1 -1 2 2"/.test(page));
   const frames = [...page.matchAll(/@keyframes\s+((?:boot|hr-)[\w-]*)\s*\{([\s\S]*?\})\s*\}/g)];
@@ -88,14 +90,13 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
       /* the screen is gone once the page loads, so what it said is caught as
          it says it */
       new MutationObserver(() => {
-        const f = document.querySelector('#boot .boot-arms.me figcaption');
-        if (f && /Test Herald/.test(f.textContent)) window.__meFirst = f.textContent;
+        if (document.querySelector('#boot .boot-arms.me #me-t')) window.__meFirst = true;
       }).observe(document, { childList: true, subtree: true });
     });
     await p0.goto(site0.url + '/monarchy.html');
     await p0.waitForTimeout(1500);
-    T('a player\'s own coat, left by the last session, is the first one read — with their name',
-      /Test Herald\s*Azure, a lion Or/.test(await p0.evaluate(() => window.__meFirst || '')));
+    T('a player\'s own coat, left by the last session, is the first one read',
+      await p0.evaluate(() => window.__meFirst === true));
     await p0.close();
   }
   const pg = await b.newPage({ viewport: { width: 1500, height: 950 } });
@@ -104,20 +105,28 @@ const T = (n, c) => { (c ? ok : bad).push(n); console.log((c ? '  ok  ' : 'FAIL 
   const wait = ms => pg.waitForTimeout(ms);
   await pg.goto(site.url + '/monarchy.html');
 
-  /* ══ THE ROOM GOES UP BEFORE ANYONE ASKS ═══════════════════ */
-  T('the room is raised while you are still in the hall', await pg.evaluate(() =>
+  /* ══ THE ROOM GOES UP, AND A TABLE IS REHEARSED, UNDER THE LOADING SCREEN ══
+     grumkata: "why not preload the transition on bootup and not wait until
+     a table is loaded". The first table ever drawn was the lag (a second one
+     froze for nothing), so boot lays a blank practice table behind the loading
+     screen and puts it away (42-shell.js rehearse). It must leave nothing of
+     yours behind: no save, no entry on your roll, and the hall is where you
+     are when the screen lifts. */
+  T('the room is raised, and the loading screen lifts, before anyone asks', await pg.evaluate(() =>
     new Promise(r => {
       const t0 = Date.now();
       const tick = () => {
-        if (window.TableBoot && window.TableBoot.raised) return r(true);
+        if (window.TableBoot && window.TableBoot.raised && !document.getElementById('boot')) return r(true);
         if (Date.now() - t0 > 20000) return r(false);
         setTimeout(tick, 120);
       };
       tick();
     })));
-  T('and no table has been laid on it yet — the room is not a table',
-    await pg.evaluate(() => window.TableBoot.standing === null));
-  T('the hall is still the hall while it happens', await pg.evaluate(() =>
+  T('a practice table was laid behind it and put away — never saved, never on your roll',
+    await pg.evaluate(() => window.TableBoot.standing === '__rehearsal'
+      && localStorage.getItem('monarchy.table.__rehearsal.v1') === null
+      && !/__rehearsal/.test(localStorage.getItem('monarchy.tables.v3') || '')));
+  T('and the hall is where you are when it lifts', await pg.evaluate(() =>
     document.body.classList.contains('at-hall')
     && !document.body.classList.contains('at-table')));
 

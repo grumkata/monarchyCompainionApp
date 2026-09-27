@@ -337,10 +337,18 @@ const ROLL = [
   { a: 'sable', ord: 'cross', ordT: 'or', chg: 'crown', chgT: 'gules' }
 ];
 const HER = heraldryInNode();
-const ROLL_HTML = ROLL.map((A, i) =>
-  `<figure class="boot-arms${i === 0 ? ' me' : ''}" style="--i:${i}">` +
-  reid(HER.armsSVG(A, { shape: 'shield', w: 176, h: 211 }), 'rl' + i + '-') +
-  `<figcaption>${escH(HER.blazonText(A))}</figcaption></figure>`).join('');
+/* ONE COAT DRAWN, SEVEN WAITING. Measured in the shell's cover, drawing all
+   eight coats up front was 270ms of a 420ms freeze on the loading screen's
+   very first frames — the one moment it must not stall. Only the first is on
+   screen then; the others turn in 1.8s apart. So they wait as <template>s
+   (parsed, never drawn) and the script below hangs each on the roll a little
+   before its turn. */
+const ROLL_HTML = ROLL.map((A, i) => {
+  const fig = `<figure class="boot-arms${i === 0 ? ' me' : ''}" style="--i:${i}">` +
+    /* no words under the coat (grumkata, 2026-09-27): the arms say it */
+    reid(HER.armsSVG(A, { shape: 'shield', w: 176, h: 211 }), 'rl' + i + '-') + `</figure>`;
+  return i === 0 ? fig : `<template class="boot-later">${fig}</template>`;
+}).join('');
 
 /* A SUN IN SPLENDOUR, the heraldic way: twenty-two rays round a face, straight
    and wavy by turns (rayonny), never a starburst. Drawn in a unit circle and
@@ -460,10 +468,6 @@ const LOADING = `
   animation:bootturn 14.4s cubic-bezier(.2,.7,.2,1) infinite both;
   animation-delay:calc(var(--i) * 1.8s)}
 .boot-arms svg{display:block;width:176px;height:211px;filter:drop-shadow(0 12px 18px rgba(0,0,0,.65))}
-.boot-arms figcaption{width:420px;margin:12px 0 0 -122px;text-align:center;white-space:nowrap;
-  font-style:italic;font-size:14px;letter-spacing:.02em;color:rgba(222,216,200,.72)}
-.boot-arms figcaption b{font-family:var(--m-f-cap,serif);font-style:normal;font-size:10px;font-weight:700;
-  letter-spacing:.2em;text-transform:uppercase;color:var(--m-or,#c9a227);margin-right:6px}
 @keyframes bootturn{
   0%{opacity:0;transform:rotateY(-78deg) scale(.94)}
   2.5%{opacity:1;transform:rotateY(0) scale(1)}
@@ -505,11 +509,13 @@ const LOADING = `
 /* ── the bar: gilt on a track cut on the bend, and a shimmer that never stops ── */
 .boot-bar{position:relative;width:236px;height:6px;background:rgba(201,162,39,.14);
   overflow:hidden;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
-.boot-bar i{display:block;height:100%;width:0;
+.boot-bar i{display:block;height:100%;width:100%;transform:scaleX(0);transform-origin:left center;
   background:linear-gradient(90deg,var(--m-house,#a3232b),var(--m-or-lo,#8a6a20) 30%,var(--m-or-hi,#e0c169));
   /* a long, late-settling curve, so a big script's jump glides in instead of
-     snapping — and so two ticks close together read as one movement */
-  transition:width .7s cubic-bezier(.16,.84,.24,1)}
+     snapping — and so two ticks close together read as one movement. On
+     transform, not width (STYLE.md §6⅓): width is laid out, so every tick
+     cost a layout and the glide could not run on the compositor. */
+  will-change:transform;transition:transform .7s cubic-bezier(.16,.84,.24,1)}
 /* THE ONE THING THAT NEVER STOPS. A gilt sweep running the length of the
    track on transform alone, so the compositor keeps drawing it even while
    the main thread is parsing and the bar itself cannot move. */
@@ -529,6 +535,24 @@ const LOADING = `
 </style>
 <script>
 (function(){
+  /* IN THE DESKTOP APP THE SHELL DRAWS THIS SCREEN, in a process of its own
+     laid over this page (electron/cover.js) — so this page's copy is never
+     seen, and drawing it would only slow the parse it exists to cover. */
+  if (!window.__coverPage && window.AppCover) {
+    var own = document.getElementById('boot');
+    if (own) own.style.display = 'none';
+  }
+  /* the rest of the roll, each coat hung a little before its turn, in step
+     with the first (whose turn began when this ran) */
+  var t0 = performance.now();
+  [].forEach.call(document.querySelectorAll('#boot template.boot-later'), function(t, k){
+    var i = k + 1;
+    setTimeout(function(){
+      var f = t.content.firstElementChild; if (!f) return;
+      f.style.animationDelay = (i * 1.8 - (performance.now() - t0) / 1000).toFixed(3) + 's';
+      t.parentNode.insertBefore(f, t);
+    }, Math.max(0, i * 1800 - 700));
+  });
   /* YOUR ARMS FIRST. Nothing that can draw a coat has been read yet, so
      42-shell.js leaves the last one it drew here; the first slot of the roll
      is swapped for it, and the bar wears your livery. */
@@ -536,10 +560,7 @@ const LOADING = `
     var mine = JSON.parse(localStorage.getItem('monarchy.boot.v1') || 'null');
     var slot = document.querySelector('#boot .boot-arms.me');
     if (mine && mine.svg && slot) {
-      var esc = function(s){ return String(s || '').replace(/[&<>"]/g, function(c){
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-      slot.innerHTML = mine.svg + '<figcaption><b>' + esc(mine.name || 'Your arms') + '</b>' +
-                       esc(mine.blazon) + '</figcaption>';
+      slot.innerHTML = mine.svg;
       if (mine.house) document.documentElement.style.setProperty('--m-house', mine.house);
     }
   } catch (e) {}
@@ -559,27 +580,59 @@ const LOADING = `
        which happen after the final script and are not nothing */
     u = Math.max(shown, Math.min(u, 1) * 0.94);
     shown = u;
-    if (bar) bar.style.width = (u * 100).toFixed(2) + '%';
+    if (bar) bar.style.transform = 'scaleX(' + u.toFixed(4) + ')';
     if (say) for (var i = SAY.length - 1; i >= 0; i--)
       if (u >= SAY[i][0]) { say.innerHTML = SAY[i][1]; break; }
+    /* and the shell's own copy of this screen (cover.html, electron/cover.js)
+       is told how far the parse has got, because it is the one being seen */
+    if (!window.__coverPage && window.AppCover) window.AppCover.progress(u);
   };
   /* Gone when the page is actually usable, not when the bar looks full:
      the last script still has to run, styles resolve and the first frame
      paint. Two animation frames after load is that moment. */
+  var finishing = false;
   function done(){
     var b = document.getElementById('boot');
-    if (!b) return;
+    if (!b || finishing) return;
+    finishing = true;
     var i = b.querySelector('.boot-bar i');
-    if (i) i.style.width = '100%';
-    requestAnimationFrame(function(){ requestAnimationFrame(function(){
-      /* a beat on a full bar before it lifts — a bar that vanishes at 94%
-         reads as having given up rather than finished */
-      setTimeout(function(){
-        b.classList.add('gone');
-        setTimeout(function(){ b.remove(); }, 700);
-      }, 180);
-    }); });
+    if (i) i.style.transform = 'scaleX(1)';
+    /* THE TAVERN IS BUILT UNDER THE LOADING SCREEN, not after it. It is the
+       same room whichever table is opened, and it was left to the first
+       quiet moment in the hall — measured, a 600ms freeze of the hall a few
+       seconds after the loading screen had gone (grumkata: "the whole reason
+       loading screens exist is to mask the lag"). Here it is behind the
+       cover, and the hall that comes up has nothing left to build. */
+    var rehearsed = Promise.resolve();
+    if (!window.__coverPage) {
+      try { if (window.TableBoot && window.TableBoot.warm) window.TableBoot.warm(); } catch (e) {}
+      /* AND A TABLE IS LAID ONCE AND PUT AWAY, still under this screen, so
+         the first one anybody opens is not the first one ever drawn
+         (42-shell.js rehearse — measured, that first draw was the lag).
+         Capped: a rehearsal that hangs must not hold the loading screen up. */
+      try {
+        if (window.Shell && window.Shell.rehearse)
+          rehearsed = Promise.race([window.Shell.rehearse(),
+                                    new Promise(function(r){ setTimeout(r, 4000); })]);
+      } catch (e) {}
+    }
+    rehearsed.then(function(){
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        /* a beat on a full bar before it lifts — a bar that vanishes at 94%
+           reads as having given up rather than finished */
+        setTimeout(function(){
+          /* the app is standing: the shell's cover can come off it now */
+          if (!window.__coverPage && window.AppCover) window.AppCover.ready();
+          b.classList.add('gone');
+          setTimeout(function(){ b.remove(); }, 700);
+        }, 180);
+      }); });
+    });
   }
+  /* IN THE SHELL'S COVER PAGE this screen is not the page's own — nothing is
+     loading in there — so it does not lift on its own 'load'. The shell lifts
+     it when the APP says it is ready (electron/cover.js). */
+  if (window.__coverPage) { window.__bootDone = done; return; }
   if (document.readyState === 'complete') done();
   else window.addEventListener('load', done);
   /* and never, ever a permanent cover if something above throws */
@@ -612,6 +665,98 @@ fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
    from GitHub and checks it against the hash in update.json (below), so a
    page that changes on the way in is a page that never installs. */
 fs.writeFileSync(path.join(__dirname, 'dist/monarchy.html'), html.replace(/\r\n?/g, '\n'));
+
+/* ══ THE COVER, IN A PAGE OF ITS OWN ═══════════════════════════
+   grumkata, 2026-09-26: "you get a black screen and then a millisecond of a
+   buggy loading screen … the whole reason loading screens exist is to mask
+   the lag". Filmed: the window was black for a quarter of a second, then the
+   loading screen appeared half-drawn and did not move for 850ms, because it
+   lived INSIDE the page it was covering — it could not be painted before that
+   page's first frame, and it froze whenever that page was busy, which is the
+   only time it is ever on screen.
+
+   So the shell (electron/cover.js) lays this page OVER the app, in a process
+   of its own. It is a few kilobytes: it is up before the app has started to
+   load, and nothing the app does can stop it moving. It is the same screen —
+   the same stylesheet, the same roll of arms, the same Bend and card as the
+   Herald's — driven by the shell instead of by itself:
+     boot-progress / boot-done   the loading screen, told how far the app is
+     wipe {title,sub,arms,house} the Bend over a transition; replies 'covered'
+                                 once the cloth is across and the card painted
+     lift                        takes it off; replies 'lifted'
+   A browser, or an Electron window without the shell (tools/shot.js, the
+   tests), never loads this, and the app's own copies do the work instead. */
+const COVER_DRIVER = `<script>
+(function(){
+  var B = window.CoverBridge; if (!B) return;
+  var COVER = 440, UNCOVER = 720, host = null;
+  var raf2 = function(f){ requestAnimationFrame(function(){ requestAnimationFrame(f); }); };
+  function hostUp(){
+    if (host) return host;
+    host = document.createElement('div'); host.id = 'herald';
+    var dust = '';
+    for (var i = 0; i < 14; i++) { var r = (i * 0.618034) % 1;
+      dust += '<i style="--x:' + (5 + r * 90).toFixed(1) + '%;--s:' + (3 + (i * 7) % 5) + 'px;--d:' +
+              (3.4 + (i * 0.37) % 2.2).toFixed(2) + 's;--t:' + (-(i * 0.53) % 3.4).toFixed(2) + 's"></i>'; }
+    host.innerHTML = '<div class="hr-veil"><div class="hr-cloth"></div><div class="hr-card">' +
+      '<span class="hr-sun"></span><span class="hr-arms"></span><b></b><i></i><u class="hr-work"></u></div>' +
+      '</div><div class="hr-dust">' + dust + '</div>';
+    var sun = document.getElementById('m-sun');
+    if (sun && sun.content) host.querySelector('.hr-sun').appendChild(sun.content.cloneNode(true));
+    document.body.appendChild(host);
+    return host;
+  }
+  B.on('boot-progress', function(u){ if (window.__boot) window.__boot(u * 1000, 1000); });
+  B.on('boot-done', function(){
+    if (window.__bootDone) window.__bootDone();
+    /* done() waits two frames and a 180ms beat, then the fade is .5s */
+    setTimeout(function(){ B.send('boot-lifted'); }, 900);
+  });
+  B.on('wipe', function(o){
+    o = o || {};
+    if (o.house) document.documentElement.style.setProperty('--m-house', o.house);
+    var h = hostUp();
+    h.classList.remove('lifting', 'carded');
+    void h.offsetWidth;                          /* so the veil runs from the start again */
+    h.classList.add('wiping');
+    setTimeout(function(){
+      var c = h.querySelector('.hr-card');
+      c.querySelector('b').textContent = o.title || '';
+      c.querySelector('i').textContent = o.sub || '';
+      var a = c.querySelector('.hr-arms');
+      a.innerHTML = o.arms || ''; a.hidden = !o.arms;
+      h.classList.add('carded');
+      raf2(function(){ B.send('covered'); });
+    }, COVER);
+  });
+  B.on('lift', function(){
+    var h = hostUp();
+    h.classList.add('lifting');                  /* the card rides out on the cloth */
+    setTimeout(function(){ h.classList.remove('wiping', 'lifting', 'carded'); B.send('lifted'); }, UNCOVER + 40);
+  });
+  /* two frames after load: the first has been drawn, the window can be seen */
+  var go = function(){ raf2(function(){ B.send('painted'); }); };
+  if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
+})();
+</script>`;
+const cover = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monarchy</title>
+<style>
+${R('src/css/20-shell.css')}
+</style>
+<style>html,body{background:transparent!important}</style>
+</head>
+<body>
+<script>window.__coverPage = true;</script>
+${LOADING}
+${COVER_DRIVER}
+</body>
+</html>
+`;
+fs.writeFileSync(path.join(__dirname, 'dist/cover.html'), cover.replace(/\r\n?/g, '\n'));
 
 /* The pictures have to travel with the page. electron/main.js does
    loadFile(dist/monarchy.html), so `assets/tex/x.jpg` resolves next to it —

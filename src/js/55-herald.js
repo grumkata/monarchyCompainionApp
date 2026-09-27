@@ -248,10 +248,13 @@ function hostUp() {
     dust += `<i style="--x:${(5 + r * 90).toFixed(1)}%;--s:${(3 + (i * 7) % 5)}px;` +
             `--d:${(3.4 + (i * 0.37) % 2.2).toFixed(2)}s;--t:${(-(i * 0.53) % 3.4).toFixed(2)}s"></i>`;
   }
-  host.innerHTML = '<div class="hr-veil"><div class="hr-cloth"></div></div>' +
-                   '<div class="hr-dust">' + dust + '</div>' +
+  /* the card is ON the cloth (inside .hr-veil), so it goes when the cloth
+     goes — left behind as a fading overlay, the name hung in the air over
+     the table the cloth had just uncovered (filmed, 2026-09-26) */
+  host.innerHTML = '<div class="hr-veil"><div class="hr-cloth"></div>' +
                    '<div class="hr-card"><span class="hr-sun"></span><span class="hr-arms"></span>' +
-                   '<b></b><i></i><u class="hr-work"></u></div>' +
+                   '<b></b><i></i><u class="hr-work"></u></div></div>' +
+                   '<div class="hr-dust">' + dust + '</div>' +
                    '<div class="hr-cry"></div><div class="hr-sparks"></div>';
   if (sun && sun.content) host.querySelector('.hr-sun').appendChild(sun.content.cloneNode(true));
   doc.body.appendChild(host);
@@ -261,15 +264,19 @@ function hostUp() {
 /* your coat, over the name of where you are going — the herald announces
    who is arriving. Drawn fresh each time (it may have changed in the maker),
    and left out entirely while you have none. */
-function armsInto(el) {
+function armsMarkup() {
   const H = root.Heraldry;
   let arms = null;
   try { arms = (JSON.parse(root.localStorage.getItem('monarchy.me.v1')) || {}).arms || null; }
   catch (e) {}
   const has = !!(H && arms && H.blazoned && H.blazoned(arms));
-  el.innerHTML = has ? H.armsSVG(arms, { shape: 'shield', w: 84, h: 101, edge: 3 })
+  return has ? H.armsSVG(arms, { shape: 'shield', w: 128, h: 154, edge: 4 })
     .replace(/id="/g, 'id="hr-').replace(/url\(#/g, 'url(#hr-').replace(/href="#/g, 'href="#hr-') : '';
-  el.hidden = !has;
+}
+function armsInto(el) {
+  const m = armsMarkup();
+  el.innerHTML = m;
+  el.hidden = !m;
 }
 
 /* ══ THE BEND ══════════════════════════════════════════════════
@@ -308,23 +315,73 @@ function armsInto(el) {
 
    The shader stays where it still earns its place: behind a proclamation
    (the Cry below), which fires when nothing else is happening. */
-const COVER = 380, HOLD = 300, UNCOVER = 560, CEILING = 6000;
+/* grumkata, 2026-09-26: "so laggy the loading screen is skipped". Filmed on
+   the real GPU, the card was up for 0.4–0.9s and FROZEN for most of it (the
+   table's first draw stalls the GPU too, so even the compositor stops), then
+   the cloth whipped off in about a frame. So:
+     COVER    the card waits until the cloth has actually covered (the veil
+              takes 420ms; at 380 the name hung over the hall for a beat)
+     HOLD     the card is up for at least this long, whatever the work did
+     TAIL     and for this long AFTER the work, so the sun is seen turning
+              before it goes, not only a frozen frame
+     UNCOVER  = the veil-out keyframe in 20-shell.css, which is an even draw
+              now instead of --settle's front-loaded whip */
+const COVER = 440, HOLD = 900, TAIL = 320, UNCOVER = 720, CEILING = 6000;
 let wiping = null;
 function wipe(mid, o) {
   o = o || {};
   if (reduced() || !doc.body) { mid(); return Promise.resolve(); }
   if (wiping) { wiping.mid = mid; wiping.o = o; return wiping.done; }  /* latest wins */
   const job = wiping = { mid, o };
+  job.done = root.AppCover ? over(job) : inPage(job);
+  return job.done;
+}
+
+/* ══ THE SHELL'S COVER ═════════════════════════════════════════
+   grumkata: "the whole reason loading screens exist is to mask the lag in
+   transitions". Everything below this box is the cover drawn in THIS page,
+   and filmed on the real GPU it froze whenever this page was busy — which is
+   the only time a cover is on screen. In the desktop app the shell has a
+   cover of its own, in its own process, laid over this page (electron/
+   cover.js, dist/cover.html): the same cloth and card, which nothing done
+   here can stop. So: ask for it, and do the work only once it answers that
+   it is across; lift it once the work is done. If it is not there (a shell
+   older than the cover), fall back to drawing it here. */
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function over(job) {
+  let r = null;
+  try {
+    r = await root.AppCover.wipe({
+      title: job.o.title || '', sub: job.o.sub || '', arms: armsMarkup(),
+      house: getComputedStyle(doc.documentElement).getPropertyValue('--m-house').trim()
+    });
+  } catch (e) { r = null; }
+  if (!r || !r.ok) return inPage(job);
+  const held = wait(HOLD);                 /* the card is up: count from now */
+  let work;
+  try { work = job.mid(); } catch (e) { console.error(e); }
+  const ready = (work && typeof work.then === 'function')
+    ? work.catch(e => { console.error(e); }) : Promise.resolve();
+  /* at least HOLD on screen, TAIL after the work, never beyond CEILING */
+  await Promise.race([Promise.all([ready.then(() => wait(TAIL)), held]), wait(CEILING)]);
+  try { await root.AppCover.lift(); } catch (e) {}
+  wiping = null;
+}
+
+/* the cover drawn in this page: the browser, and any shell without its own */
+function inPage(job) {
   const h = hostUp();
   h.classList.add('wiping');
 
-  job.done = new Promise(res => {
+  return new Promise(res => {
     setTimeout(() => {
       const card = h.querySelector('.hr-card');
       card.querySelector('b').textContent = job.o.title || '';
       card.querySelector('i').textContent = job.o.sub || '';
       armsInto(card.querySelector('.hr-arms'));
       h.classList.add('carded');
+      /* counted from the card going up, not from the work coming back */
+      const held = new Promise(r => setTimeout(r, HOLD));
       /* ══ AND ONLY THEN THE WORK ══════════════════════════════
          Adding a class does not put anything on screen. The pixels change at
          the next frame, and `mid` blocks the thread that would have drawn
@@ -347,21 +404,20 @@ function wipe(mid, o) {
       const lift = () => {
         if (lifted) return;
         lifted = true; clearTimeout(guard);
-        h.classList.remove('carded');
+        /* 'carded' stays until the cloth is off: the card rides out on it */
         h.classList.add('lifting');
         setTimeout(() => {
-          h.classList.remove('wiping', 'lifting');
+          h.classList.remove('wiping', 'lifting', 'carded');
           wiping = null;
           res();
         }, UNCOVER + 40);
       };
       /* and never behind the curtain for ever, whatever `mid` does */
       const guard = setTimeout(lift, CEILING);
-      Promise.all([ready, new Promise(r => setTimeout(r, HOLD))]).then(lift);
+      Promise.all([ready.then(() => new Promise(r => setTimeout(r, TAIL))), held]).then(lift);
       });
     }, COVER);
   });
-  return job.done;
 }
 
 /* ══ THE CRY ═══════════════════════════════════════════════════
