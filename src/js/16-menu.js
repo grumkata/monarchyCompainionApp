@@ -161,8 +161,7 @@ function take(id){
   at = id; path = []; paint();
   screen.style.setProperty('--field', H.TINCT[b.arms.a]);
   screen.dataset.house = H.TNAME[b.arms.a] || '';     /* up the edge, 00-hall.css */
-  $('#device').innerHTML = H.ordinary(b.arms.ord, b.arms.ordT, 200, 400)
-                         + H.charge(b.arms.chg, b.arms.chgT, 200, 400, b.arms.chgN);
+  $('#device').innerHTML = H.device(b.arms, 200, 400);
   render(true);
   window.Hall.lock(true);
   screen.classList.add('on');
@@ -679,7 +678,7 @@ function keyBlock(){
    the six was credited — in the flag maker, where nobody looking for a
    licence would think to look. */
 const MADE_OF = [
-  ['Charges', 'game-icons.net', 'CC BY 3.0'],
+  ['Heraldic drawings', 'Wikimedia Commons artists, each named below', 'PD, CC0, CC BY, CC BY-SA'],
   ['The tavern', 'soiTavern', ''],
   ['Wood and furniture', 'WoodStuff — loafbrr', 'CC0'],
   ['Pieces', 'KayKit — Kay Lousberg', ''],
@@ -824,7 +823,22 @@ function paneAbout(){
     </div>
     <div class="made">${MADE_OF.map(([what, who, lic]) =>
       `<div class="maderow"><b>${esc(what)}</b><span>${esc(who)}</span>
-       <i>${esc(lic)}</i></div>`).join('')}</div>`;
+       <i>${esc(lic)}</i></div>`).join('')}</div>
+    ${madeHeraldry()}`;
+}
+/* EVERY HERALDIC DRAWING, BY NAME. They come from many hands on Wikimedia
+   Commons under several licences, and most of those licences make naming
+   the artist the condition of using the drawing — so each one is named,
+   folded away under one line rather than fifty on the page. The CC BY-SA
+   drawings stay CC BY-SA as recoloured here. */
+function madeHeraldry(){
+  const C = window.CHARGE_CREDITS || [], L = H.chargeList();
+  if (!C.length) return '';
+  return `<details class="madeall"><summary>The heraldic drawings, one by one</summary>
+    <div class="made">${C.map(c => `<div class="maderow"><b>${esc((L[c.k] || {}).n || c.k)}</b>
+      <span title="${esc(c.file || '')}">${esc(c.by || 'unknown')}</span><i>${esc(c.lic)}</i></div>`).join('')}</div>
+    <div class="note">Recoloured for Monarchy. The CC BY-SA drawings remain CC BY-SA.
+      Each is on Wikimedia Commons under its own file name.</div></details>`;
 }
 
 const PANE = { you: paneYou, look: paneLook, table: paneTable, keys: paneKeys,
@@ -885,8 +899,14 @@ const houseWord = A => H.named(A.a) ? H.tname(A.a) : 'Your own';
    So the cloth is the LIVERY (which is a colour by construction — never a
    metal, never Sable) with a ceiling put on how light it is allowed to be.
    Same coat, same feel, and the words on it stay readable. */
+/* grumkata: the backdrop "won't change correctly how I feel it should look" —
+   it was the LIVERY, taken from the charges first, so a gold banner with a
+   red dragon turned the whole screen red. It is the banner's own field now:
+   you are making this cloth, so you stand in front of it. Darkened, below,
+   so the writing on it stays readable whatever the field is. */
 function cloth(A){
-  const c = H.liveryOf(A) || (A && A.a === 'sable' ? '#3a3126' : H.TINCT.gules);
+  const f = A ? H.norm(A).a : 'sable';
+  const c = f === 'sable' ? '#3a3126' : H.col(f);
   const m = /^#([0-9a-f]{6})$/i.exec(String(c).trim());
   if (!m) return c;
   const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, bl = n & 255;
@@ -918,6 +938,12 @@ function cloth(A){
 let draft = null;
 let mkTab = 'field';
 let chgQ = '';
+let symSel = 0;          /* which of your symbols the Symbols bench is holding */
+let ordSel = 0;          /* and which of your ordinaries the Ordinary bench is */
+/* a bench key is a field of the coat, or a path into it: "syms.1.t" */
+const getK = k => String(k).split('.').reduce((o, x) => o == null ? o : o[x], draft);
+function setK(k, v){ const ks = String(k).split('.'), last = ks.pop();
+  const o = ks.reduce((o, x) => o == null ? o : o[x], draft); if (o != null) o[last] = v; }
 
 const SW = 46;
 /* a swatch takes a DRAWING FUNCTION rather than a string, because a fur has
@@ -931,7 +957,7 @@ function swatch(fn){
 
 function pickRow(title, key, opts, draw, extra){
   return `<div class="mk"><h3>${title}</h3><div class="swgrid">
-    ${Object.keys(opts).map(k => `<button class="sw${draft[key]===k?' on':''}"
+    ${Object.keys(opts).map(k => `<button class="sw${getK(key)===k?' on':''}"
       data-arm="${key}" data-v="${k}" title="${opts[k]}">${draw(k)}</button>`).join('')}
   </div>${extra||''}</div>`;
 }
@@ -957,7 +983,7 @@ function pickRow(title, key, opts, draw, extra){
    nothing over it, a divided field under an ordinary — so a row with no
    opinion shows none. */
 function tinctRow(title, key, base){
-  const v = draft[key], own = !H.named(v);
+  const v = getK(key), own = !H.named(v);
   const mine = own && /^#[0-9a-fA-F]{6}$/.test(String(v)) ? v : '#8a8a8a';
   /* furs are exempt, and always were; a colour of your own is not something
      the app has any business having an opinion about */
@@ -1003,49 +1029,114 @@ function paneField(){
     + tinctRow('First tincture', 'a')
     + tinctRow('Second tincture', 'b', draft.div !== 'plain' ? draft.a : null);
 }
+/* ── THE ORDINARIES ─────────────────────────────────────
+   grumkata: "i wanted more stacked ordinaries". The bench works as the
+   Symbols bench does: a row of the coat's ordinaries, drawn in the order
+   they are laid on — a chief and a bend, a saltire with a cross over it, a
+   canton in the corner — and one of them at a time: its shape, its edges,
+   its tincture. */
 function paneOrd(){
-  return pickRow('The ordinary', 'ord', H.ORDINARIES,
-      k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
-                  + H.ordinary(k, draft.ordT, SW, SW, draft.ordLine, c)))
-    + lineRow('Its edges', 'ordLine', H.ORD_LINEABLE[draft.ord],
-      k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
-                  + H.ordinary(draft.ord, draft.ordT, SW, SW, k, c)),
-      draft.ord === 'none'
-        ? 'Lay an ordinary over the field first and its edges can be cut any way you like.'
-        : `A ${H.ORDINARIES[draft.ord].replace(/^An? /,'').toLowerCase()} has no pair of
-           long straight edges to dress. A fess, a pale, a bend, a chief or a chevron does.`)
-    /* an ordinary lies straight on the field, so it answers to it — but
-       only a PLAIN field, which is the same condition tinctureWarning uses */
-    + tinctRow("The ordinary's tincture", 'ordT',
-               draft.div === 'plain' ? draft.a : null);
+  const ords = draft.ords || [];
+  if (ordSel >= ords.length) ordSel = Math.max(0, ords.length - 1);
+  const G = ords[ordSel], P = 'ords.' + ordSel;
+  const dark = `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`;
+  const row = `<div class="mk"><h3>Your ordinaries</h3><div class="symrow">
+      ${ords.map((g, i) => `<button class="sw sym${i===ordSel?' on':''}" data-ordsel="${i}"
+        title="${esc(H.ORDINARIES[g.o] || g.o)}">${swatch(c => dark + H.ordinary(g.o, g.t, SW, SW, g.line, c, g.n))}</button>`).join('')}
+      <button class="sw sym add" data-do="ordadd" title="Add an ordinary">${swatch(`<path d="M23,13 V33 M13,23 H33"
+        stroke="rgba(255,246,226,.6)" stroke-width="3" fill="none"/>`)}</button>
+    </div></div>`;
+  if (!G) return row;
+  /* "two bars" is a fess, twice — it is the How many below */
+  const kinds = Object.assign({}, H.ORDINARIES); delete kinds.none; delete kinds.fessDouble;
+  /* STACKED: grumkata, "like I should be able to do multiple up arrows" —
+     two or three chevrons one above another, bars, bendlets, pallets */
+  const many = H.STACKS[G.o] ? `<div class="mk"><h3>How many</h3><div class="swgrid">${[1, 2, 3].map(k =>
+    `<button class="sw${(G.n || 1) === k ? ' on' : ''}" data-arm="${P}.n" data-v="${k}" title="${['One','Two','Three'][k - 1]}">
+      ${swatch(c => dark + H.ordinary(G.o, G.t, SW, SW, G.line, c, k))}</button>`).join('')}</div></div>` : '';
+  return row + pickRow('Which', P + '.o', kinds, k => swatch(c => dark + H.ordinary(k, G.t, SW, SW, G.line, c)))
+    + many
+    + lineRow('Its edges', P + '.line', H.ORD_LINEABLE[G.o],
+      k => swatch(c => dark + H.ordinary(G.o, G.t, SW, SW, k, c)))
+    /* an ordinary lies on the field, so it answers to it — a plain one */
+    + tinctRow('Its tincture', P + '.t', draft.div === 'plain' ? draft.a : null)
+    + `<div class="row2"><button class="lk bad" data-do="orddel">Take this ordinary off</button></div>`;
+}
+/* ── THE SYMBOLS ─────────────────────────────────────────
+   grumkata: "there should also be the capability of having multiple
+   symbols in the flag in custom orientations… like a lion facing a unicorn
+   with a crown in the center and a wreath around it all".
+
+   So the bench holds a row of the coat's symbols, and one of them at a
+   time: which it is, where it stands (the heraldry places it — centre,
+   left, right, top, bottom, or around for a wreath), which way it looks,
+   how big, how many, and its tincture. Symbols at the sides face the
+   middle unless told otherwise, so a pair faces each other by default. */
+const WORDS = ['','One','Two','Three','Four','Five','Six'];
+/* A DRAWING IN THE ROW, DRAWN ONCE. The heraldic drawings are real ones —
+   the griffin alone is seventy kilobytes — and the row holds all of them,
+   redrawn on every click on the bench: eight hundred kilobytes of markup a
+   press. So each drawing, in each tincture, is made into an image the first
+   time it is asked for, and the row is little <img> tags after that. */
+const symImg = {};
+function symSwatch(k, t){
+  const key = k + '|' + t;
+  if (!symImg[key]){
+    const c = H.ctx(SW), inner = H.chargeAt(k, t, SW, SW, SW/2, SW/2, SW*0.86, c);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' +
+      SW + ' ' + SW + '"><defs>' + H.defs(c) + '</defs>' + inner + '</svg>';
+    try { symImg[key] = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); }
+    catch (e) { symImg[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); }
+  }
+  return `<img class="symimg" src="${symImg[key]}" alt="">`;
+}
+function chip(key, v, label, on){
+  return `<button class="num${on?' on':''}" data-arm="${key}" data-v="${v}">${label}</button>`;
 }
 function paneCharge(){
-  const L = H.chargeList();
+  const L = H.chargeList(), syms = draft.syms || [];
+  if (symSel >= syms.length) symSel = Math.max(0, syms.length - 1);
+  const S = syms[symSel], P = 'syms.' + symSel;
+  const row = `<div class="mk"><h3>Your symbols</h3><div class="symrow">
+      ${syms.map((x, i) => `<button class="sw sym${i===symSel?' on':''}" data-sym="${i}"
+        title="${esc((L[x.c] || {}).n || x.c)}">${swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
+          + H.chargeAt(x.c, x.t, SW, SW, SW/2, SW/2, SW*0.84, c))}</button>`).join('')}
+      <button class="sw sym add" data-do="symadd" title="Add a symbol">${swatch(`<path d="M23,13 V33 M13,23 H33"
+        stroke="rgba(255,246,226,.6)" stroke-width="3" fill="none"/>`)}</button>
+    </div></div>`;
+  if (!S) return row;
   const q = chgQ.trim().toLowerCase();
-  const keys = Object.keys(L).filter(k =>
-    !q || (L[k].n || k).toLowerCase().indexOf(q) >= 0);
-  const N = n => `<button class="num${(draft.chgN||1)===n?' on':''}"
-    data-arm="chgN" data-v="${n}">${['','One','Two','Three','Four','Five','Six'][n]}</button>`;
-  return `<div class="mk">
-    <h3>The charge <span class="mk-find"><input id="chgq" value="${esc(chgQ)}"
-      placeholder="find a charge" spellcheck="false"></span></h3>
+  const keys = Object.keys(L).filter(k => L[k].n && (!q || L[k].n.toLowerCase().indexOf(q) >= 0));
+  const def = H.chargeDef(S.c) || {};
+  const hasO = k => (draft.ords || []).some(g => g.o === k);
+  const places = Object.keys(H.PLACES).filter(p => (p !== 'around' || def.around) &&
+    (p !== 'chief' || hasO('chief') || S.at === 'chief') && (p !== 'canton' || hasO('canton') || S.at === 'canton') &&
+    (p !== 'on' || (draft.ords || []).some(g => !/^(chief|base|canton)$/.test(g.o)) || S.at === 'on'));
+  const face = S.face || (S.at === 'left' ? 'r' : S.at === 'right' ? 'l' : def.f || '');
+  const size = S.size || '';
+  return row + `<div class="mk">
+    <h3>Which <span class="mk-find"><input id="chgq" value="${esc(chgQ)}"
+      placeholder="find a symbol" spellcheck="false"></span></h3>
     <div class="swgrid tall">
-      <button class="sw${!draft.chg?' on':''}" data-arm="chg" data-v="" title="None">
-        ${swatch(`<path d="M13,13 L33,33 M33,13 L13,33" stroke="rgba(255,246,226,.38)"
-          stroke-width="3" fill="none"/>`)}</button>
-      ${keys.map(k => `<button class="sw${draft.chg===k?' on':''}"
-        data-arm="chg" data-v="${k}" title="${L[k].n}">
-        ${swatch(c => H.chargeAt(k, draft.chgT, SW, SW, SW/2, SW/2, SW*0.86, c))}</button>`).join('')}
+      ${keys.map(k => `<button class="sw${S.c===k?' on':''}" data-arm="${P}.c" data-v="${k}" title="${L[k].n}">
+        ${symSwatch(k, S.t)}</button>`).join('')}
     </div>
     ${keys.length ? '' : '<div class="note">Nothing by that name.</div>'}
   </div>
-  <div class="mk"><h3>How many</h3>
-    <div class="chips">${N(1)}${N(2)}${N(3)}${N(4)}${N(5)}${N(6)}</div></div>
-  ${draft.chgN > 1 ? pickRow('How they are ranged', 'chgA', H.ARRANGE,
+  <div class="mk"><h3>Where</h3><div class="chips">${places.map(p =>
+    chip(P + '.at', p, H.PLACES[p], S.at === p)).join('')}</div></div>
+  ${def.f && S.at !== 'around' ? `<div class="mk"><h3>Facing</h3><div class="chips">
+    ${chip(P + '.face', 'l', '\u2190 Left', face === 'l')}${chip(P + '.face', 'r', 'Right \u2192', face === 'r')}</div></div>` : ''}
+  ${S.at !== 'around' ? `<div class="mk"><h3>Size</h3><div class="chips">
+    ${chip(P + '.size', '', 'To fit', !size)}${Object.keys(H.SIZES).map(k => chip(P + '.size', k, H.SIZES[k], size === k)).join('')}
+    </div></div>` : ''}
+  ${S.at !== 'around' ? `<div class="mk"><h3>How many</h3><div class="chips">
+    ${(S.at === 'center' ? [1,2,3,4,5,6] : [1,2,3]).map(n => chip(P + '.n', n, WORDS[n], (S.n || 1) === n)).join('')}</div></div>` : ''}
+  ${S.at === 'center' && S.n > 1 ? pickRow('How they are ranged', P + '.how', H.ARRANGE,
       k => swatch(c => `<rect width="${SW}" height="${SW}" fill="rgba(0,0,0,.32)"/>`
-           + H.charge(draft.chg || 'lion', draft.chgT, SW, SW, draft.chgN, k, c))) : ''}
-  ${tinctRow("The charge's tincture", 'chgT',
-      draft.div === 'plain' && draft.ord === 'none' ? draft.a : null)}`;
+           + H.charge(S.c, S.t, SW, SW, S.n, k, c))) : ''}
+  ${tinctRow("Its tincture", P + '.t', draft.div === 'plain' && draft.ord === 'none' ? draft.a : null)}
+  <div class="row2"><button class="lk bad" data-do="symdel">Take this symbol off</button></div>`;
 }
 function paneBord(){
   return `<div class="mk"><h3>A bordure</h3><div class="chips">
@@ -1085,11 +1176,13 @@ function paneFlag(){
     </div>`;
 }
 const PANES = { field:paneField, ord:paneOrd, chg:paneCharge, bord:paneBord, flag:paneFlag };
-const TABS = [['field','Field'], ['ord','Ordinary'], ['chg','Charge'],
+const TABS = [['field','Field'], ['ord','Ordinary'], ['chg','Symbols'],
               ['bord','Border'], ['flag','Banner']];
 /* how many of this bench's choices are not the plain default — a tally on
    the pennon, so you can see where you have been */
 function tabTally(k){
+  if (k === 'chg') return (draft.syms || []).length ? `<i>${draft.syms.length}</i>` : '';
+  if (k === 'ord') return (draft.ords || []).length ? `<i>${draft.ords.length}</i>` : '';
   const D = H.DEFAULTS, n = ({
     field: ['div','a','b','line'], ord: ['ord','ordT','ordLine'],
     chg: ['chg','chgT','chgN','chgA'], bord: ['bord','bordT'], flag: ['hem','livery']
@@ -1206,7 +1299,7 @@ document.addEventListener('click', e => {
   const plate = e.target.closest('.plate[data-i]');
   const banner = plate && BANNERS[+plate.dataset.i];
   if (banner) return take(banner.id);
-  if (e.target.closest('#arms')){ draft = H.norm(me.arms); mkTab = 'field'; chgQ = ''; at = 'arms';
+  if (e.target.closest('#arms')){ draft = H.norm(me.arms); mkTab = 'field'; chgQ = ''; symSel = 0; ordSel = 0; at = 'arms';
     repaintMaker.tab = 'field';
     screen.style.setProperty('--field', cloth(draft));
     screen.dataset.house = houseWord(draft);
@@ -1251,12 +1344,23 @@ document.addEventListener('click', e => {
   const opt = e.target.closest('[data-opt]');
   if (opt){ window.Options.set(opt.dataset.opt, opt.dataset.v); return render(); }
 
+  /* one of your symbols, to the bench */
+  const os = e.target.closest('[data-ordsel]');
+  if (os && draft){ ordSel = +os.dataset.ordsel; return repaintMaker(); }
+  const sym = e.target.closest('[data-sym]');
+  if (sym && draft){ symSel = +sym.dataset.sym; chgQ = ''; return repaintMaker(); }
   const arm = e.target.closest('[data-arm]');
   if (arm){
     const k = arm.dataset.arm, v = arm.dataset.v;
     /* a count is a number; everything else is a name, and an empty name is
        a real answer — no bordure, no charge, livery taken from the coat */
-    draft[k] = k === 'chgN' ? +v : v;
+    setK(k, /(^chgN|\.n)$/.test(k) ? +v : v);
+    /* a wreath goes around; anything else that was around comes to the centre */
+    const sm = /^syms\.(\d+)\.c$/.exec(k);
+    if (sm){ const S = draft.syms[+sm[1]], d = H.chargeDef(v) || {};
+      if (d.around) S.at = 'around'; else if (S.at === 'around') S.at = 'center';
+      S.face = ''; }
+    if (/^syms\.\d+\.at$/.test(k)) setK(k.replace(/at$/, 'face'), '');
     /* changing the field or the ordinary can take its line of partition away
        with it, and a line left set on something that cannot show it is a
        setting you can neither see nor clear */
@@ -1288,7 +1392,7 @@ document.addEventListener('click', e => {
          the chosen state, so the field keeps its focus */
       return b.classList.toggle('on', i < 0);
     }
-    case 'arms':       draft = H.norm(me.arms); mkTab='field'; chgQ=''; at='arms';
+    case 'arms':       draft = H.norm(me.arms); mkTab='field'; chgQ=''; symSel=0; ordSel=0; at='arms';
                        repaintMaker.tab = 'field'; return render(true);
     case 'uploadarms': return $('#pickP').click();
     case 'uploadbody': return $('#pickB').click();
@@ -1310,6 +1414,30 @@ document.addEventListener('click', e => {
                        return toast('Likeness dropped');
     case 'droppic':    me.pic=''; saveM(); paintArms(); render(); return toast('Picture dropped');
     case 'randomarms': return rollArms();
+    /* a new symbol goes where there is room: the centre if it is free, then
+       the sides, then above — in a tincture that reads on the field */
+    case 'symadd': { const syms = draft.syms = draft.syms || [];
+      const taken = p => syms.some(S => S.at === p);
+      /* a second symbol makes a PAIR: the first goes left, the new one right,
+         facing each other — not a row of three with a hole in the middle */
+      let at;
+      if (syms.length === 1 && syms[0].at === 'center'){ syms[0].at = 'left'; syms[0].face = ''; at = 'right'; }
+      else at = ['center','left','right','top','bottom'].find(p => !taken(p)) || 'center';
+      const t = H.isMetal(draft.a) ? 'gules' : 'or';
+      syms.push({ c: at === 'top' ? 'crown' : at === 'center' ? 'lion' : 'unicorn', t, at });
+      symSel = syms.length - 1; chgQ = ''; draft = H.norm(draft); return repaintMaker(); }
+    /* a new ordinary is one the coat has not got yet, in a tincture that reads on the field */
+    case 'ordadd': { const ords = draft.ords = draft.ords || [];
+      const k = ['fess','chief','bend','chevron','pale','cross','saltire','canton','base']
+        .find(o => !ords.some(g => g.o === o)) || 'fess';
+      ords.push({ o: k, t: H.isMetal(draft.a) ? 'gules' : 'or', line: 'straight' });
+      ordSel = ords.length - 1; draft = H.norm(draft); return repaintMaker(); }
+    case 'orddel':  if (draft.ords && draft.ords.length){ draft.ords.splice(ordSel, 1);
+                      ordSel = Math.max(0, ordSel - 1); draft = H.norm(draft); }
+                    return repaintMaker();
+    case 'symdel':  if (draft.syms && draft.syms.length){ draft.syms.splice(symSel, 1);
+                      symSel = Math.max(0, symSel - 1); draft = H.norm(draft); }
+                    return repaintMaker();
     case 'takearms':   return takeArms();
     case 'fullscreen': return (document.documentElement.requestFullscreen
                        ? document.documentElement.requestFullscreen()
@@ -1349,7 +1477,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const d = e.target.dataset || {};
-  if (d.own){ draft[d.own] = e.target.value; return repaintMaker(); }
+  if (d.own && draft){ setK(d.own, e.target.value); return repaintMaker(); }
   /* the leaf never redraws while you write — only the numbers that moved do,
      so the caret stays exactly where you put it */
   if (d.p != null && at === 'sheet' && cur){
@@ -1600,7 +1728,7 @@ $('#pickP').addEventListener('change', function(){
 /* Heraldry.roll draws its tinctures WITHOUT REPLACEMENT, so a rolled coat
    never uses the same colour twice, and it alternates metal against colour so
    nothing sits on its own kind. */
-function rollArms(){ draft = H.roll(); repaintMaker(); }
+function rollArms(){ draft = H.roll(); symSel = 0; ordSel = 0; repaintMaker(); }
 function takeArms(){
   me.arms = H.norm(draft);
   const n = ($('#aname') || {}).value;

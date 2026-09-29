@@ -528,6 +528,11 @@ body.nograde #hgrade, body.nograde #hgrain{ display:none }
 .prev-flag{flex:0 0 auto;display:block;width:84px}
 .prev-flag svg{width:100%}
 .prev .card.pic .prev-pair{display:block}
+/* the coat's symbols, in a row on the Symbols bench, and a place to add one */
+.symrow{display:flex;flex-wrap:wrap;gap:6px}
+.sw.sym{width:54px}
+.sw.sym.add{border-style:dashed}
+.sw .symimg{width:100%;height:100%;display:block}
 /* the coat written out: the blazon is the real heraldry and the drawing is
    one reading of it, so the words go under the picture and not in a tooltip */
 .blazon{margin-top:14px;padding-top:12px;border-top:1px solid var(--m-line);
@@ -646,6 +651,10 @@ body.nograde #hgrade, body.nograde #hgrain{ display:none }
 /* four of the six packs are CC BY: attribution is a condition, not a
    courtesy, so it is set to be read rather than tucked into a corner */
 .made{margin-top:4px}
+.madeall{margin-top:14px}
+.madeall summary{cursor:pointer;font-family:var(--m-f-cap);font-size:10px;font-weight:700;
+  letter-spacing:var(--m-track);text-transform:uppercase;color:var(--m-or);padding:6px 0}
+.madeall .note{margin-top:8px}
 .maderow{display:grid;grid-template-columns:190px 1fr auto;gap:14px;align-items:baseline;
   padding:6px 0;border-bottom:1px solid rgba(255,214,150,.07)}
 .maderow:last-child{border-bottom:0}

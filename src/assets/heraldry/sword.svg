@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.0"
+   width="166.86885"
+   height="604.78003"
+   id="svg2"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs4" />
+  <path
+     d="m 62.72627,178.06629 h 41.41626 l -6,385.85793 -14.70812,33.35539 -14.70813,-33.35539 z"
+     style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:5;stroke-miterlimit:4;stroke-opacity:1"
+     id="rect2770" />
+  <path
+     d="M 81.42561,181.5485 82.92115,548.57975 87.42561,181.5485 Z"
+     style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:4;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     id="path2773" />
+  <path
+     id="rect4549"
+     style="fill:#fcef3c;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:5;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="m 84.62109,2.5 c -3.15234,0 -6.32028,3.27259 -9.38672,9.58398 -12.18874,3.62143 -20.5582,14.81009 -20.58984,27.52539 0.0119,7.42317 2.89063,14.55486 8.03516,19.90625 -5.84846,34.52265 -7.13913,72.4773 0.48047,105.04297 H 2.5 v 21.37891 h 161.86914 v -21.37891 h -60.6543 c 7.80305,-33.06803 7.30613,-71.70016 1.84375,-106.64453 4.28152,-5.14159 6.63854,-11.6139 6.66602,-18.30469 C 112.22523,27.92334 105.16167,17.3963 94.34766,12.9668 91.22196,6.00404 87.93211,2.5 84.62109,2.5 Z" />
+  <path
+     id="path4075"
+     style="fill:none;stroke:#000000;stroke-width:5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="m 63.16016,164.55859 h 40.55468 M 62.67969,59.51562 c 5.23585,5.42497 12.61991,8.88378 20.75488,8.88378 8.99987,0 16.84467,-4.01767 22.12402,-10.48534 M 94.34766,12.9668 C 87.76007,10.83855 81.29534,10.23384 75.23437,12.08398 m 8.19922,15.36914 c 6.71342,-8e-4 12.15531,5.44284 12.15235,12.15625 0,6.71102 -5.44036,12.15137 -12.15137,12.15137 -6.71101,0 -12.15137,-5.44035 -12.15137,-12.15137 -0.003,-6.71264 5.43775,-12.15597 12.15039,-12.15625 z m 9.16685,39.16266 14.90862,8.70765 M 61.6583,68.59922 109.31883,96.46483 M 59.6583,87.45782 109.1337,116.2797 m -50.28249,-9.35994 50.28249,29.4525 m -50.28249,-9.4525 47.90202,27.93064 m -47.09493,-7.39258 29.6682,17.32824" />
+</svg>

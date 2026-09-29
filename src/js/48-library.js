@@ -81,15 +81,15 @@ function spritePack() {
   };
 }
 
-/* the heraldic charges the flag maker draws with (game-icons.net,
-   CC BY 3.0 — the attribution lives in the flag maker) */
+/* the heraldic charges the flag maker draws with (Wikimedia Commons
+   drawings — every artist is credited in Settings) */
 function chargePack() {
   const C = G('CHARGES'); if (!C) return null;
   return {
     id: 'charges', name: 'Charges',
     items: Object.keys(C).map(k => ({
       id: 'charge:' + k, name: C[k].n || k,
-      svg: { v: C[k].v, d: C[k].d }
+      svg: { v: C[k].v, d: C[k].d, s: C[k].s }
     }))
   };
 }

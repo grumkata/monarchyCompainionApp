@@ -1,0 +1,418 @@
+{
+ "lionpassant": {
+  "file": "Meuble héraldique Léopard.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_L%C3%A9opard.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "eagle": {
+  "file": "Meuble héraldique Aigle éployée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Aigle_%C3%A9ploy%C3%A9e.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "griffin": {
+  "file": "MeubleHeraldique Griffon.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:MeubleHeraldique_Griffon.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "dragon": {
+  "file": "Meuble héraldique Dragon.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Dragon.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "boar": {
+  "file": "Meuble héraldique Sanglier passant.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Sanglier_passant.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "boarhead": {
+  "file": "Hures arrachées de sable.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Hures_arrach%C3%A9es_de_sable.svg",
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "author": "Bear17",
+  "uploader": "Bear17"
+ },
+ "bear": {
+  "file": "Ours en pied.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Ours_en_pied.svg",
+  "license": "CC BY 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+  "author": "Bvs-aca",
+  "uploader": "Bvs-aca"
+ },
+ "wolf": {
+  "file": "Meuble héraldique Loup ravissant.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Loup_ravissant.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "stag": {
+  "file": "Meuble héraldique Cerf passant.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Cerf_passant.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "horse": {
+  "file": "Meuble héraldique Cheval élancé1.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Cheval_%C3%A9lanc%C3%A91.svg",
+  "license": "CC0",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "bull": {
+  "file": "Meuble héraldique Boeuf.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Boeuf.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "goat": {
+  "file": "Meuble héraldique chèvre arrêtée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_ch%C3%A8vre_arr%C3%AAt%C3%A9e.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "raven": {
+  "file": "Meuble corbeau.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_corbeau.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "Henrysalome",
+  "uploader": "Henrysalome"
+ },
+ "swan": {
+  "file": "Meuble héraldique Cygne.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Cygne.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "owl": {
+  "file": "Héraldique meuble Chouette.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_Chouette.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "Bruno Vallette",
+  "uploader": "Bruno Vallette"
+ },
+ "serpent": {
+  "file": "Meuble héraldique Serpent.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Serpent.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "Bruno Vallette",
+  "uploader": "Bruno Vallette"
+ },
+ "dolphin": {
+  "file": "Dauphin hauriant (queue contournée).svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Dauphin_hauriant_(queue_contourn%C3%A9e).svg",
+  "license": "CC0",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "rose": {
+  "file": "Rose BVA.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Rose_BVA.svg",
+  "license": "CC BY-SA 2.5",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
+  "author": "Bruno Vallette, after Rinaldum",
+  "uploader": "File Upload Bot (Magnus Manske)"
+ },
+ "oakleaf": {
+  "file": "Héraldique meuble Feuille de chêne.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_Feuille_de_ch%C3%AAne.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "Spedona",
+  "uploader": "Spedona"
+ },
+ "acorn": {
+  "file": "Meuble héraldique Gland tigé et feuillé.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Gland_tig%C3%A9_et_feuill%C3%A9.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "wheat": {
+  "file": "Meuble gerbe d'avoine.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_gerbe_d'avoine.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Chatsam",
+  "uploader": "Chatsam"
+ },
+ "tree": {
+  "file": "Meuble héraldique Orme arraché.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Orme_arrach%C3%A9.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "crownsharp": {
+  "file": "Meuble héraldique couronne antique.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_couronne_antique.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "helm": {
+  "file": "Meuble héraldique heaume 1.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_heaume_1.svg",
+  "license": "CC0",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "author": "Thom.lanaud",
+  "uploader": "Thom.lanaud"
+ },
+ "sword": {
+  "file": "Meuble Héraldique épée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_H%C3%A9raldique_%C3%A9p%C3%A9e.svg",
+  "license": "CC BY 1.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/1.0",
+  "author": "Yorick",
+  "uploader": "Yorick"
+ },
+ "swords": {
+  "file": "Meuble Héraldique deux épée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_H%C3%A9raldique_deux_%C3%A9p%C3%A9e.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "BenduKiwi",
+  "uploader": "BenduKiwi"
+ },
+ "axe": {
+  "file": "Hache.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Hache.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "Zardoz91",
+  "uploader": "Zardoz91"
+ },
+ "mace": {
+  "file": "Meuble héraldique Masse d'arme.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Masse_d'arme.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "author": "Etxeko",
+  "uploader": "Etxeko"
+ },
+ "spears": {
+  "file": "Meuble héraldique Fer de lance.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Fer_de_lance.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "ZigeunerAlt",
+  "uploader": "ZigeunerAlt"
+ },
+ "tower": {
+  "file": "Meuble Héraldique Tour ajourée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_H%C3%A9raldique_Tour_ajour%C3%A9e.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Jean92 dit le Comte",
+  "uploader": "Jean92 dit le Comte"
+ },
+ "castle": {
+  "file": "Heraldique meuble chateau.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Heraldique_meuble_chateau.svg",
+  "license": "CC BY 1.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/1.0",
+  "author": "Rinaldum",
+  "uploader": "Rinaldum"
+ },
+ "gate": {
+  "file": "Meuble héraldique Porte fermée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Porte_ferm%C3%A9e.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "anchor": {
+  "file": "Meuble héraldique Ancre 03.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Ancre_03.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Sangjinhwa",
+  "uploader": "Sangjinhwa"
+ },
+ "bell": {
+  "file": "Héraldique meuble Cloche.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_Cloche.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "Spedona",
+  "uploader": "Spedona"
+ },
+ "keys": {
+  "file": "Clés en sautoir.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Cl%C3%A9s_en_sautoir.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "author": "Jean92 dit le Comte",
+  "uploader": "Jean92 dit le Comte"
+ },
+ "grail": {
+  "file": "Meuble héraldique Coupe couverte.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Coupe_couverte.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "gauntlet": {
+  "file": "Meuble héraldique Gantelet appaumé.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Gantelet_appaum%C3%A9.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "estoile": {
+  "file": "Héraldique meuble Estoile.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_Estoile.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "author": "ZigeunerAlt",
+  "uploader": "ZigeunerAlt"
+ },
+ "moon": {
+  "file": "Croissant d or.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Croissant_d_or.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "D2paysac",
+  "uploader": "D2paysac"
+ },
+ "sun": {
+  "file": "Héraldique meuble Soleil avec visage.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_Soleil_avec_visage.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Bruno Vallette",
+  "uploader": "Bruno Vallette"
+ },
+ "heart": {
+  "file": "Héraldique meuble coeur 1.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_coeur_1.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Glesker~commonswiki",
+  "uploader": "Glesker~commonswiki"
+ },
+ "skull": {
+  "file": "Crane de profil.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Crane_de_profil.svg",
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "author": "Jacques63",
+  "uploader": "Jacques63"
+ },
+ "crosslet": {
+  "file": "Croix recroisetée au pied fiché.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Croix_recroiset%C3%A9e_au_pied_fich%C3%A9.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Darkbob",
+  "uploader": "Darkbob"
+ },
+ "lymphad": {
+  "file": "Heraldique meuble nef.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Heraldique_meuble_nef.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "S@m",
+  "uploader": "S@m"
+ },
+ "harp": {
+  "file": "Héraldique meuble harpe.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:H%C3%A9raldique_meuble_harpe.svg",
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "author": "Celbusro",
+  "uploader": "Celbusro"
+ },
+ "escallop": {
+  "file": "Meuble héraldique Coquille 2.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Coquille_2.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "author": "ZigeunerAlt",
+  "uploader": "ZigeunerAlt"
+ },
+ "lion": {
+  "file": "Meuble héraldique Lion rampant 01.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Lion_rampant_01.svg",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "author": "Rinaldum",
+  "uploader": "Rinaldum"
+ },
+ "unicorn": {
+  "file": "Meuble héraldique Licorne cabrée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Licorne_cabr%C3%A9e.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "fleur": {
+  "file": "Meuble héraldique Fleur de lis.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Fleur_de_lis.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Syryatsu",
+  "uploader": "Syryatsu"
+ },
+ "crown": {
+  "file": "Meuble héraldique Couronne royale simplifiée.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Meuble_h%C3%A9raldique_Couronne_royale_simplifi%C3%A9e.svg",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+  "author": "Jpgibert",
+  "uploader": "Jpgibert"
+ },
+ "wreath": {
+  "file": "Olive wreath.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Olive_wreath.svg",
+  "license": "Public domain",
+  "licenseUrl": "",
+  "author": "Indolences",
+  "uploader": "Indolences"
+ },
+ "laurel": {
+  "file": "Greek Roman Laurel wreath vector.svg",
+  "page": "https://commons.wikimedia.org/wiki/File:Greek_Roman_Laurel_wreath_vector.svg",
+  "license": "CC0",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "author": "dalovar",
+  "uploader": "Dalovar"
+ }
+}
