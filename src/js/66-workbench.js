@@ -61,6 +61,13 @@ function fieldsFor(o, v, locked) {
       { f: 'entKind', type: 'choice', label: 'Size', locked,
         choices: [['unit', 'One'], ['large', 'Large'], ['form', 'Formation']] },
       form ? null : { f: 'hpMax', type: 'number', label: 'Health', min: 1, max: 999, locked },
+      /* THE REST OF WHAT A UNIT IS FOUGHT WITH — optional; blank leaves it unset.
+         They were only on the fight panel's card, so a person could be made but
+         not given a stamina or an armour until after they were on the field. */
+      form ? null : { f: 'sta', type: 'number', label: 'Stamina', min: 0, max: 99, opt: true },
+      form ? null : { f: 'str', type: 'number', label: 'Stress', min: 0, max: 99, opt: true },
+      form ? null : { f: 'av', type: 'number', label: 'Armour', min: 0, max: 99, opt: true },
+      form ? null : { f: 'move', type: 'number', label: 'Move', min: 0, max: 99, opt: true },
       form ? { f: 'bodies', type: 'number', label: 'Bodies', min: 1, max: 60 } : null,
       form ? { f: 'hpea', type: 'number', label: 'Health each', min: 1, max: 99 } : null,
       form ? { f: 'skl', type: 'text', label: 'Hits on', max: 4, short: 1, ph: '4+' } : null,
@@ -117,7 +124,7 @@ function read(t) {
   if (t.kind === 'token') {
     const e = t.ent || {};
     return { name: t.name, side: e.side || 'al', entKind: e.kind || 'unit',
-             hpMax: e.max, bodies: e.total, hpea: e.hpea, skl: e.skl, dmg: e.dmg,
+             hpMax: e.max, sta: e.sta, str: e.str, av: e.av, move: e.move, bodies: e.total, hpea: e.hpea, skl: e.skl, dmg: e.dmg,
              def: e.def, lead: e.lead, look: t.look || 'standee',
              src: t.src || '', art: t.art || '', fig: t.fig || '', info: t.info || '' };
   }
@@ -135,6 +142,7 @@ function write(t, f, val) {
   const M = T();
   if (t.kind === 'token' && root.Tokens) {
     const map = { name: 'name', side: 'side', entKind: 'entKind', hpMax: 'max', bodies: 'bodies',
+                  sta: 'sta', str: 'str', av: 'av', move: 'move',
                   hpea: 'hpea', skl: 'skl', dmg: 'dmg', def: 'def', lead: 'lead',
                   look: 'look', info: 'info' };
     if (f === 'face') root.Tokens.edit(t.id, val);
@@ -188,6 +196,11 @@ function open(el, target, hooks) {
     cur = { offer: o, v, hooks };
   }
   paint();
+  /* a counter made from nothing is named first: the cursor is already in the name */
+  if (cur && cur.offer && cur.offer.make && host) {
+    const nm = host.querySelector('.wb-in[data-f="name"]');
+    if (nm && !nm.readOnly) nm.focus({ preventScroll: true });
+  }
 }
 function fillForm(v) {
   if (v.bodies == null) v.bodies = 10;
@@ -216,13 +229,6 @@ function paint() {
   const edit = !!cur.id;
   const scene = o.kind === 'scene';
   const title = edit ? 'Editing' : (o.name || 'New');
-  /* BARE: just the thing and its choices — the war room (73-encounters.js)
-     edits a unit that is not on any table and has nowhere to be taken to */
-  if (cur.hooks.bare) {
-    host.innerHTML = `<div class="wb bare"><div class="wb-stage" id="wb-stage"></div>
-      <div class="wb-fields">${fields.map(field).join('')}</div></div>`;
-    paintStage(); wire(); return;
-  }
   host.innerHTML =
     `<div class="wb${edit ? ' editing' : ''}">
        <div class="wb-top">
@@ -236,7 +242,8 @@ function paint() {
          ? (o.kind !== 'scene' ? `<button class="wb-act" data-wb="dup">Duplicate</button>` : '') +
            `<button class="wb-act bad" data-wb="bin">Remove</button>`
          : scene
-         ? `<button class="wb-act go" data-wb="place">Set it down</button>`
+         ? `<button class="wb-act go" data-wb="place">Set it down</button>` +
+           (o.enc ? `<button class="wb-act bad" data-wb="delenc" title="Forget this prepared fight">Delete it</button>` : '')
          : `<button class="wb-act go" data-wb="take" title="Into your hand — then click the table">Take it</button>
             <button class="wb-act" data-wb="place" title="Straight onto the middle of the table">Put in the middle</button>`}
        </div>
@@ -379,6 +386,7 @@ function set(f, val, repaintAll) {
 }
 
 function num(fd, raw) {
+  if (fd.opt && String(raw).trim() === '') return '';          /* optional: blank means "not set" */
   const x = parseInt(raw, 10);
   if (!Number.isFinite(x)) return null;
   return Math.max(fd.min, Math.min(fd.max, x));
@@ -399,6 +407,7 @@ function wire() {
   });
   el.querySelectorAll('.wb-num').forEach(i => {
     if (i.readOnly) return;
+    i.addEventListener('focus', () => i.select());      /* typing replaces it, rather than extending it */
     i.addEventListener('change', () => {
       const n = num(fd(i.dataset.f), i.value);
       if (n != null) { i.value = n; set(i.dataset.f, n); }
@@ -453,6 +462,14 @@ function act(what) {
   if (what === 'place' && hooks.place) {
     hooks.place(o, v);
     if (o.kind === 'scene') back();
+    return;
+  }
+  if (what === 'delenc' && o.enc && root.Encounters) {
+    if (!root.confirm('Delete the prepared fight "' + (o.name || 'this one') + '"?')) return;
+    const id = o.enc;
+    back();
+    root.Encounters.remove(id);
+    if (root.Inspector) root.Inspector.said('Prepared fight deleted');
     return;
   }
   if (what === 'dup' && cur.id) {

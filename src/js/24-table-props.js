@@ -161,6 +161,9 @@ function repaint() {
     wire(el, t);
   });
 
+  /* a video's frame is new each time: the music's card says what is in it again, and lays the picture over it */
+  if (root.Music && root.Music.framed) root.Music.framed();
+
   /* every model on the wood, handed to the layer that can actually draw it */
   if (root.TableGL && root.TableGL.sync) {
     root.TableGL.sync(st.things.filter(t => t.kind === 'model' && t.model)
@@ -182,6 +185,22 @@ function face(t, st) {
   const def = t.kind === 'scene' ? C().SCENES[t.scene] : null;
   const live = st.active === t.id;
   const w = Math.round((t.w || 260) * (t.scale || 1));
+
+  /* ── A VIDEO IS A SCREEN ON THE WOOD ──────────────────────────
+     grumkata: "videos should be on the table". This face is only the frame, the
+     place the picture goes (`.vid-screen`) and a chin with its name. YouTube's
+     player is NOT in here: a prop is rebuilt whenever the table changes, and a
+     player that is rebuilt is a video that starts again. 74-music.js keeps the one
+     player and lays it over `.vid-screen` wherever the table has put that. */
+  if (t.kind === 'video') {
+    const vh = Math.round((t.h || 760) * (t.scale || 1));
+    return `<div class="face t3-face t3-bare t3-vid-face" style="width:${w}px;height:${vh}px">
+        <div class="vid-bezel grip">
+          <div class="vid-screen"><i class="vid-c0"></i><i class="vid-c1"></i><i class="vid-c2"></i><i class="vid-c3"></i></div>
+          <div class="vid-chin grip"><b class="vid-title"></b></div>
+        </div>
+      </div>`;
+  }
 
   /* ── A SCENE ON THE WOOD IS THE SCENE ────────────────────────
      It used to be a brown card listing its own settings back at you,
@@ -355,7 +374,10 @@ function wire(el, t) {
     };
     note.addEventListener('pointerdown', e => {
       if (note.isContentEditable) { e.stopPropagation(); return; }
-      if (!mine()) return;
+      /* LEFT PRESSES ONLY. This counted a press of any button and swallowed
+         the second, so a double right-click — the gesture that peeks at a
+         note (23-table3d.js) — opened it for writing instead */
+      if (e.button !== 0 || !mine()) return;
       const now = performance.now();
       if (tap.id === t.id && now - tap.t < 450 &&
           Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 7) {
@@ -389,7 +411,11 @@ function wire(el, t) {
     run.addEventListener('pointerup', e => {
       const near = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 5;
       from = null;
-      if (near && mine() && T().state.active !== t.id) { e.stopPropagation(); T().activate(t.id); }
+      if (near && mine() && T().state.active !== t.id) {
+        e.stopPropagation();
+        if (t.scene !== 'combat') { if (root.Inspector) root.Inspector.said('That kind of scene is coming in a later update'); return; }
+        T().activate(t.id);
+      }
     });
   }
   /* raising is the model's business, so the order survives a reload —

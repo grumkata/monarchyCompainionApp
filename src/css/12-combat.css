@@ -821,78 +821,6 @@ body{display:block;padding:0}
    spawned relative to its rect, which is what keeps them where they landed
    while you pan and zoom — but it draws nothing whatsoever. */
 .dicetray{position:absolute;transform:translateZ(2px);pointer-events:none}
-/* ══ THE ROLLER ══ */
-/* BLAZON: the roller is part of the hanging, so Sable too. Each die is a
-   small plaque you counterchange by pointing at it; a die you have picked
-   up stays counterchanged, with how many you hold on a Gules tab. */
-.dicebar{border-top:1px solid var(--m-line);padding:12px 8px 12px 22px;
-  background:linear-gradient(180deg,rgba(0,0,0,.25),transparent 60%);
-  display:flex;flex-direction:column;gap:8px}
-/* LOZENGY. The dice are not a grid of keys: they are lozenges, set the way
-   a lozengy field is — the second row sits in the notches of the first —
-   on a half-cell grid, each die two half-cells wide and two tall. The
-   clip-path is also the hit area, so the overlapping boxes never steal
-   each other's clicks. The gilt outline is the button's own ground; the
-   Sable face (and the counterchange) is ::before, a lozenge a hair inside. */
-.dtypes{display:grid;grid-template-columns:repeat(9,29px);grid-template-rows:repeat(3,24px);
-  gap:0;justify-content:center;margin:2px 0 4px}
-.dtypes button{position:relative;isolation:isolate;font-family:var(--m-f-tally);font-size:13.5px;
-  font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 0 3px;cursor:pointer;
-  color:var(--m-text);border:0;background:rgba(201,162,39,.5);clip-path:var(--m-lozenge);
-  transition:color var(--t-wipe) var(--settle),transform var(--t-press) var(--snap),
-    background-color var(--t-hover) var(--settle)}
-.dtypes button::before{content:'';position:absolute;inset:0;z-index:-1;
-  clip-path:polygon(50% 2px,calc(100% - 2.6px) 50%,50% calc(100% - 2px),2.6px 50%);
-  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-2);
-  transition:background-position var(--t-wipe) var(--settle)}
-.dtypes button:nth-child(1){grid-area:1/1/3/3} .dtypes button:nth-child(2){grid-area:1/3/3/5}
-.dtypes button:nth-child(3){grid-area:1/5/3/7} .dtypes button:nth-child(4){grid-area:1/7/3/9}
-.dtypes button:nth-child(5){grid-area:2/2/4/4} .dtypes button:nth-child(6){grid-area:2/4/4/6}
-.dtypes button:nth-child(7){grid-area:2/6/4/8} .dtypes button:nth-child(8){grid-area:2/8/4/10}
-.dtypes button:hover,.dtypes button.has{color:var(--m-sable);background-color:var(--m-or-hi)}
-.dtypes button:hover::before,.dtypes button.has::before{background-position:0 0}
-.dtypes button:active{transform:scale(.92)}
-/* how many you hold is written in the lozenge's foot, in Gules on the gilt */
-.dtypes button.has{padding-bottom:13px}
-.dtypes button.has::after{content:attr(data-n);position:absolute;left:50%;bottom:5px;
-  transform:translateX(-50%);font-family:var(--m-f-tally);font-size:11px;font-weight:700;
-  line-height:1;color:var(--m-gules)}
-.dpool{font-family:var(--m-f-tally);font-size:16px;font-weight:600;letter-spacing:.06em;color:var(--m-or);
-  background:var(--m-sable-0);border:0;padding:5px 10px;min-height:28px;
-  box-shadow:inset 0 0 0 1px var(--m-line),inset 0 2px 5px rgba(0,0,0,.7)}
-.dpool.empty{font-family:var(--m-f-hand);font-style:italic;font-size:13px;font-weight:400;
-  letter-spacing:0;color:var(--m-hush)}
-.drow{display:flex;align-items:center;gap:6px}
-.dmod{display:flex;align-items:center;gap:5px;font-family:var(--m-f-cap);font-size:8.5px;
-  font-weight:700;letter-spacing:var(--m-track);text-transform:uppercase;color:var(--m-quiet)}
-.dmod input{width:46px;background:var(--m-sable-0);border:0;color:var(--m-or);
-  font-family:var(--m-f-tally);font-size:15px;font-weight:600;padding:4px 6px;outline:none;
-  box-shadow:inset 0 0 0 1px var(--m-line),inset 0 2px 5px rgba(0,0,0,.7)}
-.dmod input:focus{box-shadow:inset 0 0 0 1px var(--m-or),inset 0 2px 5px rgba(0,0,0,.7)}
-.dtog{display:flex;align-items:center;gap:5px;font-family:var(--m-f-cap);font-size:8.5px;
-  font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--m-quiet);
-  cursor:pointer;flex:1;line-height:1.25}
-.dtog input{accent-color:var(--m-or)}
-.dicebar button.droll,.dicebar button.dclear{font-family:var(--m-f-cap);font-size:9px;
-  font-weight:700;letter-spacing:var(--m-track);text-transform:uppercase;padding:8px 13px;cursor:pointer;
-  border:0;transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle),
-    transform var(--t-press) var(--snap)}
-.dicebar button.dclear{color:var(--m-quiet);
-  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, transparent;
-  box-shadow:inset 0 0 0 1px var(--m-line)}
-.dicebar button.dclear:hover{background-position:0 0;color:var(--m-sable)}
-/* THE ROLL IS A SEAL. Committing dice is a commitment, and every
-   commitment in Monarchy is pressed into wax — the same outline and melt as
-   the hall's seal (20-shell.css --m-wax), the same stamp, and 55-herald.js
-   throws gilt off it. */
-.dicebar button.droll{width:54px;height:54px;flex:0 0 auto;padding:0;margin:-6px 0 -6px 2px;
-  display:grid;place-items:center;color:var(--m-argent-hi);letter-spacing:.14em;
-  clip-path:var(--m-wax);background:var(--m-wax-melt);
-  text-shadow:0 1px 0 rgba(40,6,6,.7);
-  transition:transform .16s var(--pop),filter var(--t-hover) var(--settle)}
-.dicebar button.droll:hover{transform:scale(1.07) rotate(-4deg);filter:brightness(1.12)}
-.dicebar button.droll:active{transform:scale(.9) rotate(-1deg);
-  transition-duration:var(--t-press);transition-timing-function:var(--snap)}
 /* a roll in the chat log reads as a result, not as a sentence */
 .cl.roll{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
 .cl.roll b{width:100%}
@@ -910,6 +838,15 @@ body{display:block;padding:0}
 .rdice u{text-decoration:none;font-family:var(--m-f-tally);font-size:13px;color:var(--m-hush);padding:0 2px}
 .rtot{font-family:var(--m-f-tally);font-weight:700;font-size:22px;line-height:1;color:var(--m-or);
   margin-left:auto;padding-left:10px;border-left:1px solid var(--m-line)}
+/* several sets under one header: a row each, the total at the end of its row */
+.rset{display:flex;flex-wrap:wrap;align-items:center;gap:3px;width:100%;padding:3px 0;
+  border-top:1px solid rgba(255,255,255,.05)}
+.rset .rdice{flex:1 1 auto}
+/* a die the roll did not keep (4d6kh3): still there, struck out */
+.rdice i.gone{opacity:.38;text-decoration:line-through;box-shadow:none;background:transparent}
+/* a line only you see — why a roll was refused, the list of commands */
+.cl.sys{font-style:italic;opacity:.8}
+.cl.sys .stxt{color:var(--m-quiet)}
 /* ══ FALLBACK: no WebGL ══
    gl.js paints the pieces, so if it cannot start the DOM tokens must come back
    or the board is a grid of empty sockets. Restores the flat 2D pieces. */
@@ -1165,195 +1102,6 @@ body.field-on .fnames{display:block}
 .fname.sel b,.fname.sel i{color:var(--f-ink)}
 
 
-/* ══ THE COMBAT HUD ════════════════════════════════════════════
-   Painted in the same box of paints as the field — leaf, sun, sky, ink,
-   cream. No wood, no parchment, no bronze: those belong to the table view,
-   which is a different room and a different question.
-
-   Only one level is ever on screen. The bar is always there; a menu, a
-   confirmation or an aiming strip sits above it, never two at once, because
-   the thing you are mostly doing here is reading the board.
-   ══════════════════════════════════════════════════════════ */
-.abar{position:fixed;left:0;right:300px;bottom:0;z-index:1300;display:none;
-  font-family:var(--f-disp);pointer-events:none}
-.abar.on{display:block}
-.abar>*{pointer-events:auto}
-
-/* ── the bar itself ── */
-.abar-me,.asrcs,.abar-end{position:absolute;bottom:0;height:96px;
-  background:linear-gradient(180deg,#2c4423 0,#1b2c15 62%,#132009 100%);
-  box-shadow:inset 0 2px 0 var(--f-leaf),inset 0 3px 0 rgba(253,246,224,.35),
-             0 -8px 28px rgba(10,20,6,.45)}
-.abar-me{left:0;width:298px;display:flex;align-items:center;gap:11px;padding:0 14px;
-  clip-path:polygon(0 0,calc(100% - 22px) 0,100% 100%,0 100%)}
-.asrcs{left:286px;right:214px;display:flex;align-items:stretch;gap:7px;padding:11px 16px}
-.abar-end{right:0;width:200px;display:flex;align-items:center;gap:12px;padding:0 16px;
-  clip-path:polygon(22px 0,100% 0,100% 100%,0 100%);justify-content:flex-end}
-
-/* an image slot, ringed, breaking the top edge like every portrait in the app */
-.aport{width:54px;height:54px;flex:0 0 54px;border-radius:50%;margin-top:-14px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:17px;font-weight:700;color:var(--f-ink);
-  background:radial-gradient(circle at 38% 30%,#f6e9c4,#d9c48d);
-  box-shadow:0 0 0 3px var(--f-leaf),0 0 0 5px #16210f,0 4px 10px rgba(10,20,6,.5)}
-.awho{flex:1;min-width:0}
-.awho b{display:block;font-size:12px;font-weight:700;letter-spacing:.07em;
-  text-transform:uppercase;color:var(--f-cream);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
-.agauge{position:relative;height:11px;margin-bottom:4px;background:rgba(0,0,0,.45);
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 0 0 1px rgba(253,246,224,.16)}
-.agauge i{display:block;height:100%;transition:width .35s cubic-bezier(.2,.8,.3,1)}
-.agauge.hp i{background:linear-gradient(180deg,#f2889c,#c2314c)}
-.agauge.st i{background:linear-gradient(180deg,#ffc978,#c8761b)}
-.agauge u{position:absolute;inset:0;text-decoration:none;font-family:var(--f-num);
-  font-size:8.5px;line-height:11px;text-align:center;color:#fff;
-  text-shadow:0 1px 2px rgba(0,0,0,.8)}
-.apips{display:flex;flex-direction:column;gap:5px}
-.apip{border:none;cursor:pointer;font-family:var(--f-disp);font-size:7px;font-weight:700;
-  letter-spacing:.15em;text-transform:uppercase;padding:7px 9px;color:var(--f-ink);
-  background:linear-gradient(180deg,#ffd98a,#e0a02c);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 4px rgba(10,20,6,.4)}
-.apip.out{color:rgba(253,246,224,.3);background:rgba(0,0,0,.4);
-  box-shadow:inset 0 2px 5px rgba(0,0,0,.6)}
-
-/* ── the sources. Not abilities: your weapon, your Styles, your Arts. ── */
-.asrc{flex:1;min-width:0;border:none;cursor:pointer;text-align:left;
-  padding:9px 11px;color:var(--f-cream);font-family:var(--f-disp);
-  background:linear-gradient(180deg,#3d5c2c,#25381a);
-  box-shadow:inset 0 1px 0 rgba(253,246,224,.22),inset 0 0 0 1px rgba(0,0,0,.35),
-             0 2px 5px rgba(10,20,6,.4)}
-.asrc{transition:transform .12s,background .12s,box-shadow .12s}
-.asrc:hover{background:linear-gradient(180deg,#4a6f34,#2c4420);transform:translateY(-2px)}
-.asrc.on{background:linear-gradient(180deg,#ffc978,#d98f22);color:var(--f-ink);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 0 2px var(--f-cream)}
-/* TWO LINES FOR A NAME, because "Impervious Spearmanship" is a real Style and
-   truncating it to "IMPERVIOUS SPE…" tells the player nothing. The tiles are
-   equal width and there are never many of them, so the height is free. */
-.asrc b{display:block;font-size:10.5px;font-weight:700;letter-spacing:.05em;
-  text-transform:uppercase;line-height:1.18;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.asrc i{display:block;font-style:normal;font-size:8px;letter-spacing:.08em;
-  opacity:.7;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.asrc em{display:block;font-style:normal;font-size:6.5px;letter-spacing:.16em;
-  text-transform:uppercase;opacity:.55;margin-top:5px}
-/* several consequences of one moment, stacked under the one label */
-.aconf .alist{display:block}
-.aconf .alist + .alist{margin-top:3px}
-.asrc.k-weapon b{color:#dbe6f2}
-.asrc.k-art b{color:#ffdf95}
-.asrc.k-lore b{color:#c7d4ff}
-
-.amana{text-align:right}
-.amana b{display:block;font-family:var(--f-num);font-size:22px;color:var(--f-sky)}
-.amana i{display:block;font-style:normal;font-size:6.5px;letter-spacing:.14em;
-  text-transform:uppercase;color:rgba(253,246,224,.5)}
-.aend{border:none;cursor:pointer;font-family:var(--f-disp);font-size:8px;font-weight:700;
-  letter-spacing:.14em;text-transform:uppercase;line-height:1.5;padding:11px 13px;
-  color:var(--f-ink);background:linear-gradient(180deg,#a8de6a,#5f9c25);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 2px 6px rgba(10,20,6,.45)}
-.aend:hover{background:linear-gradient(180deg,#b9ea7c,#6fae2e)}
-
-/* ── LEVEL 1: what this Style does, in the book's own words ── */
-@keyframes arise{from{opacity:0;transform:translateY(14px) scale(.985)}
-                 to{opacity:1;transform:none}}
-.amenu{animation:arise .17s cubic-bezier(.2,.8,.3,1) both;
-  position:absolute;left:16px;bottom:104px;width:min(640px,52vw);
-  max-height:min(620px,68vh);
-  background:linear-gradient(180deg,rgba(30,46,22,.97),rgba(18,28,12,.97));
-  box-shadow:inset 0 0 0 1px rgba(168,222,106,.3),0 10px 34px rgba(8,16,4,.6)}
-.amenu>header{display:flex;align-items:baseline;gap:10px;padding:11px 14px 9px;
-  background:linear-gradient(180deg,#3d5c2c,#26391a);
-  box-shadow:inset 0 1px 0 rgba(253,246,224,.25)}
-.amenu>header b{font-size:11px;font-weight:700;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--f-cream)}
-.amenu>header span{flex:1;font-size:8px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--f-sun-l)}
-.ax{border:none;background:none;cursor:pointer;color:rgba(253,246,224,.6);
-  font-size:17px;line-height:1;padding:0 2px}
-.ax:hover{color:var(--f-cream)}
-.amenu ul{list-style:none;margin:0;padding:10px 14px 12px}
-/* more than five and it goes to two columns rather than growing a scrollbar */
-.amenu.two ul{column-count:2;column-gap:18px}
-.aitem{break-inside:avoid;margin-bottom:11px;cursor:pointer;padding:7px 9px;
-  background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(168,222,106,.14)}
-.aitem{transition:background .12s,box-shadow .12s,transform .12s}
-.aitem:hover{transform:translateX(2px);background:rgba(168,222,106,.12);
-  box-shadow:inset 0 0 0 1px rgba(168,222,106,.45)}
-.ahead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.ahead b{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
-  color:var(--f-cream)}
-.ahead em{font-style:normal;font-size:7px;letter-spacing:.11em;text-transform:uppercase;
-  color:var(--f-sun-l)}
-.aitem p{margin:5px 0 0;font-family:var(--f-flav);font-size:11.5px;line-height:1.4;
-  color:rgba(253,246,224,.78)}
-.aitem p.atrig{color:var(--f-sky);font-style:italic}
-.astop{display:block;margin-top:6px;font-size:7px;letter-spacing:.1em;
-  text-transform:uppercase;color:#ffb9a4}
-.aitem.cold{opacity:.55}
-.aitem.cold:hover{background:rgba(255,255,255,.03);cursor:default;
-  box-shadow:inset 0 0 0 1px rgba(168,222,106,.14)}
-.apass{padding:0 14px 13px}
-.apass h5{margin:0 0 6px;font-size:7px;letter-spacing:.2em;text-transform:uppercase;
-  color:rgba(253,246,224,.45)}
-.apass p{margin:0 0 5px;font-family:var(--f-flav);font-size:11px;line-height:1.4;
-  color:rgba(253,246,224,.62)}
-.apass b{font-family:var(--f-disp);font-size:9px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--f-leaf-l)}
-
-/* ── LEVEL 2: now the numbers ── */
-.aconf{animation:arise .17s cubic-bezier(.2,.8,.3,1) both;
-  position:absolute;left:16px;bottom:104px;width:min(430px,40vw);
-  background:linear-gradient(180deg,rgba(30,46,22,.98),rgba(16,26,10,.98));
-  box-shadow:inset 0 0 0 1px rgba(255,201,120,.4),0 12px 38px rgba(8,16,4,.65)}
-.aconf h4{margin:0;padding:12px 15px 10px;
-  background:linear-gradient(180deg,#ffc978,#d98f22);color:var(--f-ink);
-  font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.aconf h4 i{display:block;font-style:normal;font-size:7px;letter-spacing:.15em;
-  margin-top:3px;opacity:.72}
-.aconf.no h4{background:linear-gradient(180deg,#e0947f,#a8442c);color:#fff3ee}
-.aconf dl{margin:0;padding:12px 15px 6px;display:grid;
-  grid-template-columns:78px 1fr;gap:7px 12px;align-items:baseline}
-.aconf dt{font-size:7px;letter-spacing:.14em;text-transform:uppercase;
-  color:rgba(253,246,224,.45);text-align:right}
-.aconf dd{margin:0;font-family:var(--f-flav);font-size:12px;line-height:1.35;
-  color:var(--f-cream)}
-.aconf dd b{font-family:var(--f-num);font-size:15px;color:var(--f-sun-l)}
-.apath{display:block;font-family:var(--f-disp);font-size:6.5px;letter-spacing:.11em;
-  text-transform:uppercase;color:rgba(253,246,224,.42);margin-top:3px}
-.anote{font-size:10.5px;color:rgba(253,246,224,.5)}
-.atodo{margin:6px 15px 0;padding:6px 8px;font-size:7px;letter-spacing:.09em;
-  line-height:1.6;color:#ffd79a;background:rgba(200,140,40,.16);
-  box-shadow:inset 0 0 0 1px rgba(255,201,120,.3)}
-.aacts{display:flex;gap:8px;padding:12px 15px 14px}
-.ago,.aback{border:none;cursor:pointer;font-family:var(--f-disp);font-size:8px;
-  font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding:10px 16px}
-.ago{flex:1;color:var(--f-ink);background:linear-gradient(180deg,#a8de6a,#5f9c25);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
-.ago:hover{background:linear-gradient(180deg,#b9ea7c,#6fae2e)}
-.aback{color:rgba(253,246,224,.75);background:rgba(255,255,255,.07);
-  box-shadow:inset 0 0 0 1px rgba(253,246,224,.2)}
-.aback:hover{background:rgba(255,255,255,.14)}
-
-/* ── LEVEL 3: the menu is gone, the board is the interface ── */
-@keyframes aimpulse{0%,100%{box-shadow:0 0 0 2px var(--f-cream),0 8px 24px rgba(8,16,4,.55)}
-                    50%{box-shadow:0 0 0 2px var(--f-cream),0 0 22px 6px rgba(255,224,102,.55),
-                                  0 8px 24px rgba(8,16,4,.55)}}
-.aaim{animation:arise .17s cubic-bezier(.2,.8,.3,1) both,aimpulse 1.6s ease-in-out infinite .2s;
-  position:absolute;left:16px;bottom:104px;display:flex;align-items:center;gap:14px;
-  padding:11px 15px;background:linear-gradient(180deg,#ffc978,#d98f22);color:var(--f-ink);
-  box-shadow:0 0 0 2px var(--f-cream),0 8px 24px rgba(8,16,4,.55)}
-.aaim b{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
-.aaim span{font-size:8px;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
-.aaim .aback{color:var(--f-ink);background:rgba(0,0,0,.16);
-  box-shadow:inset 0 0 0 1px rgba(0,0,0,.28)}
-
-/* the field, while a target is being chosen */
-body.aiming .fname.dim{opacity:.32}
-body.aiming .fname.legal{background:linear-gradient(180deg,#ffe066,#e0a52c);
-  box-shadow:0 0 0 2px rgba(255,255,255,.85),0 4px 12px rgba(20,30,18,.5)}
-body.aiming .fname.legal b,body.aiming .fname.legal i{color:#2a2007;text-shadow:none}
-body.hud-on .hud.br{bottom:106px}
-
 /* ══ PRESSES, AT THE TABLE ════════════════════════════════
    The same rule 20-shell.css states for the hall, applied to the table's
    own controls. The selector list is not invented here — it is the one
@@ -1445,32 +1193,9 @@ body.locked-in #vp { cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA
 /* the field: a name has to be readable without selecting it */
 .fname b{font-size:11px}
 .fname i{font-size:11.5px}
-/* the HUD you act from */
-.awho b{font-size:13.5px}
-.agauge{height:14px}
-.agauge u{font-size:10.5px;line-height:14px}
-.apip{font-size:9.5px}
-.asrc b{font-size:12px}
-.asrc i{font-size:10px;opacity:.85}
-.asrc em{font-size:9px;opacity:.75}
-.amana i{font-size:9px;color:rgba(253,246,224,.72)}
-.aend{font-size:10px}
-.amenu>header b{font-size:12.5px}
-.amenu>header span{font-size:10px}
-.ahead b{font-size:11.5px}
-.ahead em{font-size:9.5px}
-.aitem p{font-size:13px;color:rgba(253,246,224,.9)}
-.astop{font-size:9.5px}
-.apass h5{font-size:9.5px;color:rgba(253,246,224,.7)}
-.apass p{font-size:12.5px;color:rgba(253,246,224,.82)}
-.apass b{font-size:10.5px}
-.aconf h4{font-size:13px}
-.aconf h4 i{font-size:9.5px}
-.aconf dt{font-size:9.5px;color:rgba(253,246,224,.7)}
-.aconf dd{font-size:13.5px}
-.apath{font-size:9px;color:rgba(253,246,224,.66)}
-.anote{font-size:12px;color:rgba(253,246,224,.75)}
-.atodo{font-size:9.5px}
-.ago,.aback{font-size:10px}
-.aaim b{font-size:12.5px}
-.aaim span{font-size:10px;opacity:.85}
+
+/* a die edited up to 6 by the skill's points (39-dice.js rollSkill) */
+.rdice i.up::before{content:'\2191';font-size:9px;margin-right:2px;opacity:.7}
+
+/* the camera is moving (23-table3d.js camMoving): a layer of its own, only for now */
+body.cam-moving #tbl{will-change:transform}

@@ -2,3 +2,16 @@ node_modules/
 release/
 *.log
 .DS_Store
+
+# Not needed to build or run the app. These stay on disk, just not on GitHub.
+*.md
+test/
+.impeccable/
+/shot-*.png
+/updater.js
+
+# tools/: build.js only needs these two. The rest are one-off asset bakers
+# and screenshot helpers.
+/tools/*
+!/tools/scope-css.js
+!/tools/pack-geometry.js

@@ -95,7 +95,13 @@ function show(t) {
   if (S.sug && typeof entById === 'function' && !entById(S.sug.id)) S.sug = null;
 
   const w = parseInt(t.setup && t.setup.width, 10);
-  const changed = Number.isFinite(w) && w !== S.width;
+  /* NOT THE FIRST TIME THIS FIGHT IS SHOWN. A player's copy starts at its own default
+     width, so the GM's perfectly good layout looked like "the width moved", every
+     line was re-centred on THEIR machine, and the new columns went back up to the
+     table as the player's first write — joining a table shuffled the GM's units.
+     A fight shown for the first time takes the width it is given and keeps its
+     units where they were put. */
+  const changed = again && Number.isFinite(w) && w !== S.width;
   if (Number.isFinite(w)) S.width = w;
   if (t.options && Number.isFinite(+t.options.mana)) S.mana = +t.options.mana;
 

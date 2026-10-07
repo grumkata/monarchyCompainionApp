@@ -40,7 +40,7 @@ const F = () => root.Figures;
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-let dock = null, kindsEl = null, shelf = null, find = null, grid = null, bench = null;
+let dock = null, kindsEl = null, shelf = null, find = null, grid = null, bench = null, audioEl = null;
 let foot = null, what = null, count = null, pill = null;
 let held = null;             /* { offer, variant, vi } */
 let kinds = [], sel = 0, openKind = null, opts = [];
@@ -66,6 +66,7 @@ function build() {
        <div class="tbx-tabs" id="tbx-tabs"></div>
      </div>
      <div class="tbx-grid" id="tbx-grid"></div>
+     <section class="tbx-audio" id="tbx-audio" hidden></section>
      <section class="tbx-bench" id="tbx-bench" hidden></section>
      <footer class="tbx-foot" id="tbx-foot"></footer>
      <div class="tbx-drop"><span>Let go to put it away</span></div>`;
@@ -75,6 +76,7 @@ function build() {
   find    = dock.querySelector('#tbx-q');
   grid    = dock.querySelector('#tbx-grid');
   bench   = dock.querySelector('#tbx-bench');
+  audioEl = dock.querySelector('#tbx-audio');
   foot    = dock.querySelector('#tbx-foot');
   what    = dock.querySelector('#tbx-what');
   count   = dock.querySelector('#tbx-count');
@@ -116,6 +118,7 @@ function show(list, openId) {
 function hide() {
   if (!dock) return;
   closeBench();
+  if (root.Music && root.Music.panel) root.Music.panel(null);       /* the audio panel stops painting while it is shut */
   dock.hidden = true;
   docked(false);
 }
@@ -134,7 +137,7 @@ const isUp = () => !!dock && !dock.hidden;
 function paintKinds() {
   kindsEl.innerHTML = kinds.map((k, n) =>
     `<button class="tbx-kind" data-n="${n}" title="${esc(k.name)}  (${n + 1})">
-       <span class="tbx-kfig">${F().html(k.fig, k.figv || {}, 40)}</span>
+       <span class="tbx-kfig${k.icon ? ' tbx-kico' : ''}">${k.icon || F().html(k.fig, k.figv || {}, 40)}</span>
        <b>${esc(k.name)}</b>
      </button>`).join('');
   kindsEl.querySelectorAll('.tbx-kind').forEach(b =>
@@ -156,10 +159,23 @@ function pickKind(k) {
   closeBench();
   openKind = k;
   sel = Math.max(0, kinds.indexOf(k));
-  opts = root.Toolbox.options(k.id) || [];
   q = ''; gsel = '';
   if (find) find.value = '';
   what.textContent = k.name;
+  /* THE AUDIO TAB HOLDS A PANEL, NOT THINGS: no shelf, no grid, nothing to carry out */
+  const aud = k.id === 'audio';
+  audioEl.hidden = !aud;
+  if (aud) {
+    opts = [];
+    grid.hidden = true; shelf.hidden = true; count.textContent = '';
+    foot.hidden = true;                                  /* "double-click to take it as it is" is about things */
+    if (root.Music && root.Music.panel) root.Music.panel(audioEl);
+    markSel();
+    return;
+  }
+  if (root.Music && root.Music.panel) root.Music.panel(null);
+  grid.hidden = false; foot.hidden = false;
+  opts = root.Toolbox.options(k.id) || [];
   paintGrid();
   markSel();
 }
@@ -194,6 +210,7 @@ function shown() {
 }
 
 function paintGrid() {
+  if (openKind && openKind.id === 'audio') return;
   const gs = groupsOf(opts);
   const big = opts.length > SHELF_AT;
   shelf.hidden = !(big || gs.length > 1);
@@ -210,11 +227,11 @@ function paintGrid() {
   const list = shown();
   count.textContent = list.length ? String(list.length) : '';
   grid.innerHTML = list.length ? list.map(o =>
-    `<button class="tbx-tile${o.custom ? ' custom' : ''}" data-id="${esc(optKey(o))}"
-             title="${esc(o.name || '')}">
+    `<button class="tbx-tile${o.custom ? ' custom' : ''}${o.soon ? ' soon' : ''}" data-id="${esc(optKey(o))}"
+             title="${esc(o.soon ? (o.name || '') + ' — coming in a later update' : (o.name || ''))}">
        <span class="tbx-fig">${F().html(o, o.v || {}, 88)}</span>
        ${o.custom ? '<span class="tbx-plus"></span>' : ''}
-       <i class="tbx-nm">${esc(o.name || '')}</i>
+       <i class="tbx-nm">${esc(o.name || '')}${o.soon ? ' <em class="tbx-soon">soon</em>' : ''}</i>
      </button>`).join('')
     : `<p class="tbx-none">Nothing here by that name.</p>`;
   grid.querySelectorAll('.tbx-tile').forEach(b => {
@@ -227,7 +244,7 @@ const optKey = o => o.id || ('custom:' + o.custom);
 /* the shelf is rebuilt when what is IN it changes under you — a picture you
    just added, a character you just made — but never under an open bench */
 function refresh() {
-  if (!openKind || !isUp()) return;
+  if (!openKind || !isUp() || openKind.id === 'audio') return;
   opts = root.Toolbox.options(openKind.id) || [];
   if (bench && !bench.hidden) return;
   paintGrid();
@@ -264,6 +281,7 @@ function wireTile(b, o) {
    you look at it — before it is anywhere. */
 function choose(o) {
   if (!o) return;
+  if (o.soon) { if (root.Inspector) root.Inspector.said((o.name || 'That') + ' is coming in a later update'); return; }
   if (o.act === 'open') { if (root.Papers) root.Papers.pick(); return; }
   if (o.custom === 'picture') {
     root.Pictures.ask(pic => {
@@ -282,7 +300,7 @@ function choose(o) {
 /* DOUBLE-CLICK TAKES IT AS IT IS, the way a palette works when you know
    what you want. A scene is set straight down; anything else is in your hand. */
 function quick(o) {
-  if (!o || o.custom || o.act === 'open') return;
+  if (!o || o.custom || o.soon || o.act === 'open') return;
   closeBench();
   if (o.act === 'make' && o.kind === 'scene') {
     root.Toolbox.take(o, null, null, Object.assign({}, o.v || {}));
@@ -312,6 +330,8 @@ function openBench(o) {
 /* the same bench, for a thing already on the wood (67-inspector.js) */
 function editThing(id) {
   if (!root.Workbench) return;
+  const th = root.TableModel && root.TableModel.get(id);
+  if (th && th.kind === 'video') return;                     /* a screen has no bench: its frame and the player are all there is */
   if (!isUp() && root.Toolbox) root.Toolbox.open();
   build();
   grid.hidden = true; shelf.hidden = true;
@@ -401,6 +421,10 @@ function take(o) {
    hand */
 function grab(o, dragging, variant) {
   const def = F().variantsFor(o);
+  /* a piece in your hand is put back with Escape, and Escape is ignored while a text
+     field has the keys: let go of the bench's name box (it is focused for a new counter) */
+  const was = doc.activeElement;
+  if (was && was !== doc.body && bench && bench.contains(was) && was.blur) was.blur();
   startFollow();
   held = { offer: o, variant: variant || startVariant(o),
            vi: def && def.list ? (def.start || 0) : -1, dragging: !!dragging };
@@ -615,7 +639,10 @@ function startFollow() {
   requestAnimationFrame(follow);
 }
 
-root.Hand = { mount, show, hide, isUp, take, grab, drop, put, refresh, say, step,
+/* turn to a tab by name (the Toolbox is already up) */
+function pick(id) { const k = kinds.find(x => x.id === id); if (k) pickKind(k); }
+
+root.Hand = { mount, show, hide, isUp, take, grab, drop, put, refresh, say, step, pick,
               choose, quick, openBench, editThing, closeBench, overPanel, over,
               repaint: () => { paintHeld(); paintFoot(); },
               get held() { return held; },

@@ -80,10 +80,17 @@ function make(spec) {
       max: hp,
       side: spec.side || (source === 'char' ? 'al' : 'en'),
       pc: false,
-      cond: []
+      cond: [],
+      q: true, f: true            /* a new unit has both actions; undefined drew it greyed out as already spent */
     };
   }
   if (spec.side) ent.side = spec.side;
+  /* stamina, stress, armour and movement, if the bench was given them */
+  if (ent.kind !== 'form') ['sta', 'str', 'av', 'move'].forEach(k => {
+    if (spec[k] == null || spec[k] === '') return;
+    const x = parseInt(spec[k], 10);
+    if (Number.isFinite(x)) ent[k] = Math.max(0, Math.min(99, x));
+  });
   /* ── A FORMATION IS A BODY OF TROOPS, WITH ITS OWN NUMBERS ──────
      This was the whole of the "straight up dont work" formation: a counter
      made as one got the fields of a PERSON — hp, max — and none of the six
@@ -171,6 +178,14 @@ function edit(id, next) {
     e.hp = Math.max(0, e.max - gone);
   }
   if (next.hp != null) e.hp = Math.max(0, Math.min(e.max, parseInt(next.hp, 10) || 0));
+  /* THE REST OF WHAT A UNIT IS FOUGHT WITH, as numbers the GM can type: stamina
+     and stress as they stand now, armour, and movement in lines. Blank takes
+     the number away rather than making it zero. */
+  ['sta', 'str', 'av', 'move'].forEach(k => {
+    if (next[k] == null) return;
+    if (next[k] === '') { delete e[k]; return; }
+    e[k] = Math.max(0, Math.min(99, parseInt(next[k], 10) || 0));
+  });
   /* A CHARACTER'S PICTURE BELONGS TO THE CHARACTER. Setting it on one of
      their counters sets it on the record, which then reaches every other
      counter of them and the chest's offer of them — rather than leaving four
@@ -189,6 +204,61 @@ function edit(id, next) {
   T().changed('token-edit');
   if (typeof render === 'function' && t.in) render();
   return true;
+}
+
+/* ── MANY AT ONCE ─────────────────────────────────────────────
+   A name, how many, which side — that many numbered counters standing in a
+   line of the running fight, in ONE undo. Before this, eight crows was eight
+   trips out of the box and eight drops onto a line, with the same name on
+   all of them. Numbering carries on from what is already on the field, and a
+   line that is full hands the rest to the next one back: a unit on a full
+   line is drawn nowhere at all (firstFree gives it a column past the edge). */
+function addMany(o) {
+  o = o || {};
+  const sc = T().activeScene();
+  const none = { made: [], short: 0 };
+  if (!sc || sc.scene !== 'combat' || !T().mayUseBox() || typeof S === 'undefined' || !S.lines) return none;
+  const side = o.side === 'al' ? 'al' : 'en';
+  const n = Math.max(1, Math.min(20, parseInt(o.n, 10) || 1));
+  const hp = Math.max(1, Math.min(999, parseInt(o.hp, 10) || 10));
+  const base = String(o.name || '').trim().replace(/\s+\d+$/, '').slice(0, 32)
+    || (side === 'al' ? 'Soldier' : 'Enemy');
+  const re = new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?: (\\d+))?$', 'i');
+  let count = 0, top = 0;
+  inScene(sc.id).forEach(t => {
+    const m = re.exec(t.name || ''); if (!m) return;
+    count++; top = Math.max(top, m[1] ? +m[1] : 1);
+  });
+  const numbered = n > 1 || count > 0;
+  let next = top + 1;
+
+  /* front to back: the enemy's frontline is the last of its lines in the
+     array (the Line is between the halves), the allies' is the first */
+  const mine = S.lines.filter(l => l.side === side);
+  const order = side === 'en' ? mine.slice().reverse() : mine;
+  let li = Math.max(0, order.findIndex(l => l.key === o.lineKey));
+  const used = {};
+  order.forEach(l => { used[l.key] = typeof usedIn === 'function' ? usedIn(l) : l.ents.length; });
+  const kind = o.entKind === 'large' ? 'large' : 'unit';
+  const span = kind === 'large' ? 2 : 1;
+  const made = [];
+  T().begin();
+  try {
+    for (let i = 0; i < n; i++) {
+      while (li < order.length && used[order[li].key] + span > S.width) li++;
+      if (li >= order.length) break;
+      const l = order[li];
+      const t = make({ source: 'npc', name: numbered ? base + ' ' + (next++) : base, side,
+                       entKind: kind, hp, max: hp, look: o.look || 'standee', fig: o.fig || '',
+                       x: 0, y: 0 });
+      t.in = sc.id; t.lineKey = l.key;
+      if (t.ent) { t.ent.side = side; t.ent.col = null; }      /* fill() finds it a slot */
+      used[l.key] += span;
+      made.push(t);
+    }
+  } finally { T().end(); }
+  T().changed('encounter');
+  return { made, short: n - made.length };
 }
 
 /* the record behind a token, if it has one */
@@ -338,7 +408,7 @@ function setSide(id, side) {
   T().changed('side'); return true;
 }
 
-root.Tokens = { make, edit, fill, harvest, toLine, toWood, rename, setSide, monoOf,
+root.Tokens = { make, edit, addMany, fill, harvest, toLine, toWood, rename, setSide, monoOf,
                 inScene, recordOf, refresh, formFields, LEADS };
 
 })(window, document);

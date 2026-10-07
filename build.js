@@ -126,7 +126,9 @@ const CSS = [
   ['src/css/13-table-ui.css','body.at-table'],
   /* the toolbox dock, the workbench, the counters, the tracker and the war
      room (2026-09-25) — last, so it wins over what it replaced */
-  ['src/css/14-war.css',     'body.at-table']
+  ['src/css/14-war.css',     'body.at-table'],
+  /* the player: Monarchy's own controls for what the GM plays (74-music.js, 77-player.js) */
+  ['src/css/15-player.css',  'body.at-table']
 ];
 
 const JS = [
@@ -174,7 +176,7 @@ const JS = [
   'src/js/32-combat-app.js',     // needs #field in the page: it renders on load
   'src/js/34-gl-pieces.js',      // the moulded counters
   'src/js/37-scene-field.js',    // the immersive field you drop into
-  'src/js/38-bar-hud.js',
+  'src/js/39-roll-parse.js',
   'src/js/39-dice.js',
 
   'src/js/21-table-content.js',  // ── the table ──
@@ -209,9 +211,13 @@ const JS = [
   'src/js/64-kit.js',            // the rail everyone has: sheets, notes, draw, point
   'src/js/66-workbench.js',      // everything a thing can be, chosen before it is put down
   'src/js/67-inspector.js',      // the one you have hold of: edit, duplicate, turn, remove
-  'src/js/68-gm-rail.js',        // the GM's rail: toolbox, the fight, prepared fights
+  'src/js/68-gm-rail.js',        // the GM's rail: toolbox, the fight, the music
   'src/js/72-muster.js',         // the fight run from one place: the roll, the card, the ground
-  'src/js/73-encounters.js',     // fights made before the evening, and the war room they are made in
+  'src/js/73-encounters.js',     // fights kept and brought back (the war room that made them is gone)
+  'src/js/74-music.js',          // the GM's music, played at every seat
+  'src/js/75-audio.js',          // plays the GM's own sound-board files (the app has no sounds of its own)
+  'src/js/77-player.js',         // Monarchy's own controls for the music and the video: the HUD and the deck
+  'src/js/76-soundboard.js',     // the GM's sound board: pads the GM builds, from the library or their own files
   'src/js/42-shell.js',          // ── which half you are looking at ──
   'src/js/16-menu.js'            // last: it boots the hall
 ];

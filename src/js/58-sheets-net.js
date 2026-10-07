@@ -162,7 +162,10 @@ function putHome(rec) {
     const i = list.findIndex(x => x.id === clean.id);
     if (i >= 0) list[i] = clean; else list.push(clean);
     root.localStorage.setItem(KEY, JSON.stringify(list));
-  } catch (e) {}
+  } catch (e) {
+    root.dispatchEvent(new CustomEvent('monarchy:savefail', { detail: { message:
+      'A character changed at the table could not be saved here — the store is full.' } }));
+  }
 }
 function mineAnd() {
   return Object.keys(shared).map(id => shared[id]);

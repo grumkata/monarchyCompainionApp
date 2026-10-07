@@ -547,10 +547,11 @@ function watchCombat() {
     const was = seen; seen = n;
     if (!stepped || !n.p) return;
     const tone = PHASE_TONE[n.p.toLowerCase()] || 'house';
-    if (n.r !== was.r)
+    if (n.r !== was.r) {
       proclaim('Round ' + String(n.r).padStart(2, '0'), { sub: n.p.toLowerCase() + ' act first', tone: 'or' });
-    else
+    } else {
       proclaim(n.p + ' Act', { sub: 'round ' + n.r, tone, hold: 700 });
+    }
   };
   const mo = new MutationObserver(check);
   mo.observe(round, { childList: true, characterData: true, subtree: true });

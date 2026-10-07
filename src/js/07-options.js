@@ -49,7 +49,10 @@ const KEYS = ['monarchy.opts.v1', 'monarchy.me.v1', 'monarchy.tables.v3',
   'monarchy.tavern.v3', 'monarchy.tavern.v4',
   'monarchy.character',
   /* your notes (62-pocket.js), and which characters you bring to a game */
-  'monarchy.pocket.v1', 'monarchy.bring.v1'];
+  'monarchy.pocket.v1', 'monarchy.bring.v1',
+  /* the music's volume (74-music.js), and which attribute you last rolled a
+     kind of skill with (45-papers.js) */
+  'monarchy.musicvol.v1', 'monarchy.rollattr.v1'];
 const PREFIX = /^monarchy\.table\./;
 
 /* ── what each one means, and what it is allowed to be ────────
@@ -75,7 +78,15 @@ const DEFS = {
   dice:  { g: 'The table', d: 'on', of: ['off', 'on'],
            t: 'Throw dice on the wood', say: { off: 'Off', on: 'On' } },
   bin:   { g: 'The table', d: 'off', of: ['off', 'on'],
-           t: 'Ask before binning', say: { off: 'Off', on: 'On' } }
+           t: 'Ask before binning', say: { off: 'Off', on: 'On' } },
+
+  /* ── SOUND (75-audio.js). The app makes none of its own any more (the room's ambience
+     and the effects were removed); this only lets a player mute the GM's SOUND BOARD.
+     The GM's music has its own volume, in its own tile ── */
+  sound:    { g: 'Sound', d: 'on', of: ['off', 'on'],
+              t: 'The GM’s sound board', say: { off: 'Off', on: 'On' } }
+  /* (`range` options — a slider — are still understood by this store and by the two
+     settings screens, should one be wanted again.) */
 };
 
 let vals = read();
@@ -84,7 +95,11 @@ function read() {
   try { saved = JSON.parse(root.localStorage.getItem(KEY)) || {}; } catch (e) {}
   const out = {};
   Object.keys(DEFS).forEach(k => {
-    out[k] = DEFS[k].of.indexOf(saved[k]) >= 0 ? saved[k] : DEFS[k].d;
+    const d = DEFS[k];
+    if (d.range) {                                   /* a number inside its range, or the default */
+      const n = parseInt(saved[k], 10);
+      out[k] = (n >= d.range[0] && n <= d.range[1]) ? String(n) : d.d;
+    } else out[k] = d.of.indexOf(saved[k]) >= 0 ? saved[k] : d.d;
   });
   return out;
 }
@@ -93,6 +108,8 @@ function write() {
 }
 
 const get = k => vals[k];
+/* a slider's value as a number */
+const num = k => parseFloat(vals[k]) || 0;
 const all = () => Object.assign({}, vals);
 
 /* how much of the cel shader is mixed in — 09-blazon3d.js multiplies its
@@ -116,7 +133,13 @@ function apply() {
 }
 
 function set(k, v) {
-  if (!DEFS[k] || DEFS[k].of.indexOf(v) < 0) return vals[k];
+  const d = DEFS[k];
+  if (!d) return vals[k];
+  if (d.range) {
+    const n = Math.round(parseFloat(v));
+    if (!(n >= d.range[0] - 1e-9)) return vals[k];
+    v = String(Math.min(d.range[1], Math.max(d.range[0], n)));
+  } else if (d.of.indexOf(v) < 0) return vals[k];
   vals[k] = v; write(); apply();
   root.dispatchEvent(new CustomEvent('monarchy:opts', { detail: { key: k, value: v } }));
   return v;
@@ -124,7 +147,7 @@ function set(k, v) {
 /* the next value round the ring — a setting with three states is a thing you
    press, not a thing you pick from a list */
 function next(k) {
-  const d = DEFS[k]; if (!d) return null;
+  const d = DEFS[k]; if (!d || d.range) return null;
   return set(k, d.of[(d.of.indexOf(vals[k]) + 1) % d.of.length]);
 }
 function reset() {
@@ -176,6 +199,27 @@ function forget() {
   return doomed.length;
 }
 
+/* ── THE OTHER HALF OF "TAKE A COPY" ──────────────────────────
+   A copy nobody can put back is not a copy. Writes back what dump() wrote:
+   only this app's own keys (never anything else in a shared origin), each as
+   it was, and returns how many. A file that is not a copy returns -1 and
+   changes nothing. */
+function restore(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return -1;
+  const keys = Object.keys(obj).filter(k => KEYS.indexOf(k) >= 0 || PREFIX.test(k));
+  if (!keys.length) return -1;
+  let n = 0;
+  keys.forEach(k => {
+    try {
+      const v = obj[k];
+      root.localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+      n++;
+    } catch (e) {}
+  });
+  vals = read();
+  return n;
+}
+
 /* the groups, in the order they are declared, so the screen is laid out by
    this file rather than by a second list somewhere else that can drift */
 function groups() {
@@ -189,8 +233,9 @@ function groups() {
   return out;
 }
 
-root.Options = { DEFS, KEYS, groups, get, set, next, all, apply, reset,
-                 celAmt, dump, weigh, forget, say: (k, v) => DEFS[k].say[v] };
+root.Options = { DEFS, KEYS, groups, get, num, set, next, all, apply, reset, restore,
+                 celAmt, dump, weigh, forget,
+                 say: (k, v) => (DEFS[k].say ? DEFS[k].say[v] : v) };
 
 if (doc.body) apply();
 else doc.addEventListener('DOMContentLoaded', apply);

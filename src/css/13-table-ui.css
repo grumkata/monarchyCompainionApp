@@ -1529,6 +1529,10 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 }
 /* the piece you are actually holding does not need a ring as well */
 .prop.t3-thing.lift.sel > .face{ outline-color:rgba(201,162,39,.45); }
+/* and a PEEK (23-table3d.js) is a clean view of the thing: the ring is for the
+   table, and flown in to 340% it is a picture frame round what you are reading */
+body.peeking .prop.t3-thing.sel > .face{ outline-color:transparent; box-shadow:none; }
+body.peeking .prop.t3-thing.sel > .face::after{ display:none; }
 
 
 /* ══ SOMEONE SAID SOMETHING ════════════════════════════════════
@@ -2015,3 +2019,12 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
   color:var(--m-sable); background:var(--ping); clip-path:var(--m-pennon); }
 @keyframes ping{ 0%{ transform:rotate(45deg) scale(.2); opacity:1 }
                  100%{ transform:rotate(45deg) scale(2.4); opacity:0 } }
+
+
+/* a note's heading, and the box that finds one (62-pocket.js, 64-kit.js) */
+.pk-ttl{ position:relative; z-index:1; display:block; font:700 10.5px/1.15 'Crimson Text',serif; color:#241a10;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
+.kit-find{ margin:2px 14px 6px; width:calc(100% - 28px); box-sizing:border-box; background:var(--m-sable-0, #100d0a);
+  border:0; outline:none; padding:5px 8px; color:var(--m-argent, #ded8c8);
+  font:italic 13px/1.2 'Crimson Text',serif; box-shadow:inset 0 0 0 1px var(--m-line, rgba(255,255,255,.14)); }
+.kit-find:focus{ box-shadow:inset 0 0 0 1px var(--m-or, #c9a227); }

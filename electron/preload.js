@@ -45,3 +45,10 @@ contextBridge.exposeInMainWorld('AppCover', {
   say(text) { ipcRenderer.send('app-cover:say', text); },
   lift() { return ipcRenderer.invoke('app-cover:lift'); }
 });
+
+// window.AppShell: what THIS copy of the program can do, for pages newer than
+// it. A page that depends on something added to the shell after 1.0 (the GM's
+// music needs the Referer fix in main.js) checks `api` and says "update the app"
+// instead of failing — see src/js/74-music.js. Undefined wherever this preload
+// is not attached; callers check.
+contextBridge.exposeInMainWorld('AppShell', { api: 2, youtube: true });

@@ -111,7 +111,8 @@ function fill(r){
 
 /* ══ THE ARITHMETIC ═══════════════════════════════════════════ */
 function av(r){
-  const a = r.armour.list.find(x => x.id === r.armour.equipped);
+  const ar = r.armour || {};                       /* an imported or older record may have none */
+  const a = (ar.list || []).find(x => x.id === ar.equipped);
   return a ? Math.max(1, parseFloat(a.av) || 1) : 1;
 }
 /* RESILIENCE, WHEREVER IT IS WRITTEN.
@@ -616,7 +617,8 @@ function slaCard(r, s, i){
     </div></div>`;
 }
 const wornName = r => {
-  const a = r.armour.list.find(x => x.id === r.armour.equipped);
+  const ar = r.armour || {};                       /* an imported or older record may have none */
+  const a = (ar.list || []).find(x => x.id === ar.equipped);
   return a ? (a.name || 'Unnamed Armour') : 'Unarmoured';
 };
 
@@ -855,8 +857,33 @@ function note(r){
     'HP ' + d.hp + ' · St ' + d.st + ' · Str ' + d.str;
 }
 
+/* ── ROLLING A SKILL YOU OWN ──────────────────────────────────
+   The rules (§4): the GM names the ACTIVE attribute for the action; you roll
+   that many d6; the skill's total is the budget you spend on editing the roll.
+   `chain` is the badge's own address — "cat:id[:id[:id]]" — so this reads the
+   tree rather than the number on screen (that number drops background
+   proficiency while you type; rollTotal does not). Returns what the roll
+   needs, or null if the skill is not there any more. */
+const ACTIVE = [['pro','Prowess'], ['nim','Nimble'], ['int','Intelligence'], ['cha','Charisma']];
+function skillRoll(r, chainKey){
+  const ids = String(chainKey || '').split(':'), cat = ids.shift();
+  let list = (r.skills || {})[cat]; const chain = [];
+  for (const id of ids){
+    const n = (list || []).find(x => x.id === id);
+    if (!n) return null;
+    chain.push(n); list = n.kids;
+  }
+  if (!chain.length) return null;
+  return { cat,
+    name: (chain[chain.length-1].n || '').trim() || 'A skill',
+    trail: chain.map(n => (n.n || '').trim() || '?').join(' › '),
+    total: rollTotal(profPaths(r), chain),
+    attrs: ACTIVE.map(a => ({ key: a[0], name: a[1], v: Math.max(0, Math.min(20, parseInt((r.attr || {})[a[0]], 10) || 0)) })),
+    def: cat === 'body' ? 'pro' : cat === 'mind' ? 'int' : 'cha' };
+}
+
 window.Sheet = { blank, fill, render, act, setPath, repaintNumbers, derived, note,
-                 keep, dropKept, mine, pool };
+                 keep, dropKept, mine, pool, skillRoll };
 })();
 
 /* ══════════════════════════════════════════════════════════════

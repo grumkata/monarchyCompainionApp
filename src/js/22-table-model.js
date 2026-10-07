@@ -548,7 +548,7 @@ const T = {
      is a whole evening. */
   duplicate(id) {
     const t = this.get(id);
-    if (!t || t.kind === 'scene') return null;
+    if (!t || t.kind === 'scene' || t.kind === 'video') return null;      /* one screen, one video */
     const copy = JSON.parse(JSON.stringify(t));
     delete copy.id; delete copy.z;
     copy.in = null; copy.lineKey = null; copy.locked = false;

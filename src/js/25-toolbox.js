@@ -72,9 +72,12 @@ function gate() {
 const isOpen = () => open_;
 function toggle() { open_ ? shut() : open(); }
 
-/* ══ THE SIX KINDS ════════════════════════════════════════════
-   The same six the chest held, in the same order, keyed 1-6. Each is
-   drawn as a real member of itself on its tab. */
+/* ══ THE SEVEN KINDS ══════════════════════════════════════════
+   The same six the chest held, in the same order, keyed 1-6, and a seventh that holds
+   no things at all — AUDIO: the music and videos the GM plays, and the sound board
+   (74-music.js). It was a separate button on the GM's rail; grumkata: "the music tab
+   shouldn't be a separate thing in the toolbox". Each of the six is drawn as a real
+   member of itself on its tab; the seventh is a note. */
 function KINDS() {
   const firstModel = (root.Library && root.Library.models.list()[0]) || null;
   const firstArt = (root.Library && root.Library.art.all()[0]) || null;
@@ -90,7 +93,9 @@ function KINDS() {
     { id: 'papers', name: 'Papers',
       fig: { kind: 'page' }, figv: { rule: 'set' } },
     { id: 'notes',  name: 'Notes',
-      fig: { kind: 'note' }, figv: { tint: 'cream' } }
+      fig: { kind: 'note' }, figv: { tint: 'cream' } },
+    { id: 'audio',  name: 'Audio',
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>' }
   ];
 }
 
@@ -105,6 +110,7 @@ function options(kind) {
     const out = Object.keys(C().SCENES).map(k => ({
       id: 'scene:' + k, kind: 'scene', scene: k, act: 'make',
       name: C().SCENES[k].name, g: 'new', gn: 'New',
+      soon: k !== 'combat',               /* exploration and stage are placeholders until a later update */
       v: k === 'combat' ? { width: 8, terrain: 'meadow' } : {}
     }));
     /* ── AND THE FIGHTS YOU MADE EARLIER ─────────────────────
@@ -190,8 +196,12 @@ function blankToken(what) {
   return {
     id: 'new:' + what, kind: 'token', act: 'place', make: what,
     name: form ? 'A formation' : 'Someone',
+    /* NO NAME TO START WITH. It was "Someone" / "Levies", already in the box, so a
+       click and a few letters made "SomeoneBrann" — and the name could not be
+       changed without deleting the old one first. Left empty it is the placeholder,
+       and an empty name is still "Someone" when the counter is put down. */
     v: { side: 'en', entKind: form ? 'form' : 'unit', look: 'standee',
-         hpMax: form ? 24 : 10, name: form ? 'Levies' : 'Someone',
+         hpMax: form ? 24 : 10, name: '',
          bodies: form ? 10 : undefined,
          src: '', art: '', fig: '', info: '' }
   };
@@ -205,13 +215,15 @@ function offerings() {
   return out;
 }
 
-function open() {
-  if (open_ || !T().mayUseBox()) return;
+function open(kindId) {
+  if (!T().mayUseBox()) return;
+  /* already up: asked for a tab, it turns to it */
+  if (open_) { if (kindId && root.Hand && root.Hand.pick) root.Hand.pick(kindId); return; }
   /* the box and the muster share the dock at your left hand */
-  if (root.Muster && root.Muster.isOpen()) root.Muster.close();
+  if (root.Muster && root.Muster.yieldDock) root.Muster.yieldDock();
   open_ = true;
   doc.body.classList.add('box-open');
-  if (root.Hand) root.Hand.show(KINDS());
+  if (root.Hand) root.Hand.show(KINDS(), kindId);
   if (root.GmRail) root.GmRail.paint();
 }
 
@@ -219,6 +231,7 @@ function shut() {
   open_ = false;
   doc.body.classList.remove('box-open');
   if (root.Hand) { root.Hand.drop(); root.Hand.hide(); }
+  if (root.Muster && root.Muster.reopen) root.Muster.reopen();      /* the fight, if it was the box's turn to borrow the dock */
   if (root.GmRail) root.GmRail.paint();
 }
 
@@ -251,6 +264,10 @@ function take(i, x, y, v) {
      and fitted to the fucking table". */
   if (i.act === 'make' && i.kind === 'scene') {
     if (root.Hand) root.Hand.drop();
+    if (i.soon || (i.scene && i.scene !== 'combat')) {
+      if (root.Inspector) root.Inspector.said('That kind of scene is coming in a later update');
+      return null;
+    }
     /* a PREPARED fight is the Encounters' to lay out — lines, men, ground */
     const pre = v.preset || i.enc;
     if (pre && root.Encounters) {
@@ -291,6 +308,7 @@ function take(i, x, y, v) {
       side: v.side || 'al',
       entKind: v.entKind || 'unit',
       hp: v.hpMax, max: v.hpMax,
+      sta: v.sta, str: v.str, av: v.av, move: v.move,
       bodies: v.bodies, hpea: v.hpea, dmg: v.dmg, skl: v.skl, def: v.def, lead: v.lead,
       look: v.look || 'standee', fig: v.fig || '',
       src: v.src || '', art: v.art || '', info: v.info || '',

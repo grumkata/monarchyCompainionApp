@@ -446,13 +446,13 @@ function render(){
      to make, and an ability they want to use. Both are things the GM answers. */
   document.getElementById('sugbar').innerHTML = sugHTML() +
     (window.__intentHTML ? window.__intentHTML() : '');
-  if (window.__abilityPanel) window.__abilityPanel();
-  setTimeout(placeSelbar, 0);
+  /* the selection bar is retired: the muster's card (72-muster.js) is the one
+     place a unit is read and changed. renderSel/placeSelbar below are dead and
+     safe to delete after 1.1 — they were left rather than cut at the last minute. */
   document.getElementById('round').textContent = String(S.round).padStart(2,'0');
   document.getElementById('mana').textContent = S.mana;
   [...document.querySelectorAll('.ph')].forEach((el,i)=>{
     el.className = 'ph' + (i===S.phase?' now' : i<S.phase?' done':''); });
-  renderSel();
 }
 
 function renderSel(){
@@ -678,7 +678,7 @@ document.addEventListener('click', ev => {
   const jump = ev.target.closest('[data-jump]');
   if (jump){ S.sel = jump.dataset.jump; render(); return; }
   const ent = ev.target.closest('.ent');
-  if (ent){ S.sel = (S.sel===ent.dataset.id) ? null : ent.dataset.id; render(); return; }
+  if (ent){ S.sel = ent.dataset.id; render(); return; }       /* Esc, or clicking off the ranks, lets go */
   /* CLICKING DOES NOT MOVE. A click used to double as "send the selected unit
      here", which meant selecting a unit turned every lit slot on the board into
      a live trigger you could set off by clicking to look at something. Moving a
@@ -689,7 +689,7 @@ document.addEventListener('click', ev => {
      let go of the unit whose sheet you are reading. */
   /* the muster (72-muster.js) is the same kind of chrome: choosing a unit on
      its roll must not be undone by this handler the moment the click lands */
-  if (ev.target.closest('#selbar,.topbar,.seldock,.abar,.ibar,.muster,.war,.insp')) return;
+  if (ev.target.closest('#selbar,.topbar,.seldock,.muster,.insp')) return;
   /* a click inside a rank is inert now that it does not move anything — losing
      the selection (and the reach shown with it) because you clicked near the
      line you were reading would be its own small annoyance. Click the piece
@@ -701,9 +701,19 @@ document.addEventListener('keydown', ev => {
   /* Space ends the turn — but not while someone is typing in chat. */
   const t = ev.target, tag = t && t.tagName;
   if (tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || (t && t.isContentEditable)) return;
-  if (ev.key==='Escape' && S.sel){ S.sel=null; render(); }
-  if (ev.key===' '){ ev.preventDefault(); endTurn(); }
+  /* Escape lets go of the unit and says so — otherwise the same press also
+     opens the table menu, which has "Stop hosting" in it */
+  if (ev.key==='Escape' && S.sel){ S.sel=null; render(); ev.preventDefault(); }
+  /* SPACE ENDS THE TURN FOR THE GM, IN A LIVE FIGHT, AT THE TABLE. It ran for
+     everyone, anywhere: a player's stray space applied Bleed and Blight and
+     moved the round on for the whole table, and after a fight was stood down
+     it kept changing the old one. Not on a focused button either — Space is
+     that button's own key. */
+  if (ev.key===' ' && tag!=='BUTTON' && tag!=='A' && isGM() && fighting()
+      && document.body.classList.contains('at-table')){ ev.preventDefault(); endTurn(); }
 });
+const fighting = () => { const M = window.TableModel, s = M && M.activeScene && M.activeScene();
+                         return !!(s && s.scene === 'combat'); };
 /* ══ PICKING A PIECE UP ══════════════════════════════════════
    Same mechanics as before — this is all presentation. The browser's own drag
    image is a flat snapshot of the element, and the element is transparent

@@ -15,8 +15,12 @@ const H = window.Heraldry;
 /* ══ THE STORE ════════════════════════════════════════════════ */
 const K = { tables:'monarchy.tables.v3', chars:'monarchy.chars.v2', me:'monarchy.me.v1' };
 const S = {
-  get(k, d){ try { const v = JSON.parse(localStorage.getItem(K[k])); return v==null?d:v; }
-             catch(e){ return d; } },
+  /* an unreadable value is set aside as <key>.bak before the default takes
+     its place — the next save would otherwise overwrite the only copy */
+  get(k, d){ let raw; try { raw = localStorage.getItem(K[k]);
+             const v = JSON.parse(raw); return v==null?d:v; }
+             catch(e){ try { if (raw) localStorage.setItem(K[k] + '.bak', raw); } catch(_){}
+                       return d; } },
   put(k, v){ try { localStorage.setItem(K[k], JSON.stringify(v)); }
              catch(e){ toast('The browser refused to save'); } }
 };
@@ -72,11 +76,6 @@ const BANNERS = [
     h:2.92, drop:.12,
     arms:{ div:'plain', a:'vert', b:'or', ord:'none', ordT:'or',
            chg:'lion', chgT:'or', chgN:1, bord:true, bordT:'or' } },
-  /* Per bend sable and tenne, a saltire Or */
-  { id:'shop', name:'The Workshop', flav:'what the game is made of', hem:'straight',
-    h:2.28, drop:.58, dead:true,
-    arms:{ div:'perBend', a:'sable', b:'tenne', ord:'saltire', ordT:'or',
-           chg:'', chgT:'or', chgN:1, bord:false, bordT:'or' } },
   /* Purpure, a tower Argent, a bordure Or */
   { id:'set', name:'Settings', flav:'the hall, and how it behaves', hem:'dagged',
     h:2.56, drop:.26,
@@ -120,6 +119,18 @@ let at = null;
 /* the views you came through. Back pops one; empty means back to the hall. */
 let path = [];
 let cur = null;                    /* the record open on the table, if any */
+/* THE TABLE WRITES THE SAME ROSTER. `chars` was read once, when the page
+   loaded, and every saveC() writes all of it back — so a sheet edited at the
+   table was quietly reverted by the next thing done in the hall (a new
+   sheet, an import, opening a different one). Coming back to the hall
+   re-reads what is actually stored. */
+window.addEventListener('monarchy:where', e => {
+  if (!e.detail || e.detail.at !== 'hall') return;
+  const stored = S.get('chars', null);
+  if (!Array.isArray(stored)) return;
+  chars = stored;
+  if (cur) cur = chars.find(c => c.id === cur.id) || cur;
+});
 function paint(){
   const onSheet = at === 'sheet';
   screen.classList.toggle('paper', onSheet);
@@ -427,11 +438,18 @@ function touch(){
    Nothing is picked blind and nothing is picked from a row of
    chips that pushes the page around.                          */
 const C = () => window.SheetCodex;
-function openCodex(k, arg, btn){
+/* `env` is the TABLE asking: { rec, done } — the sheet it is reading, and what to
+   do once something is picked. Without it this is the hall's own sheet. The
+   table's dead buttons ("Add Primary Skill", "Add Background"...) were dead
+   because only the hall knew how to open these. */
+function openCodex(k, arg, btn, env){
   const a = (arg || '').split(':');
+  const R = env ? env.rec : cur;
   const take = (verb, ctxArg) => entry => {
+    const val = entry ? (entry.value != null ? entry.value : entry) : (ctxArg||'');
+    if (env){ const got = window.Sheet.act(R, verb, val); if (got) env.done(got); return; }
     snap();
-    const out = window.Sheet.act(cur, verb, entry ? (entry.value != null ? entry.value : entry) : (ctxArg||''));
+    const out = window.Sheet.act(cur, verb, val);
     if (out){ if (out !== 'view'){ touch(); saveC(); } render(); }
     else past.pop(), paintUndo();
   };
@@ -440,14 +458,14 @@ function openCodex(k, arg, btn){
     /* a handful of names you already understand: a small menu at the button */
     case 'openp':
       return small(btn, 'Primary skills', C().skillNames(a[0], 'p',
-        { have:(cur.skills[a[0]]||[]).map(x => x.n) }), take('pickp:'+a[0]));
+        { have:(R.skills[a[0]]||[]).map(x => x.n) }), take('pickp:'+a[0]));
     case 'opens': {
-      const p = findSk(a[0], [a[1]]); if (!p) return true;
+      const p = findSk(a[0], [a[1]], R); if (!p) return true;
       return small(btn, 'Under ' + (p.n || 'this skill'), C().skillNames(a[0], 's',
         { prim:(p.n||'').trim(), have:(p.kids||[]).map(x=>x.n) }),
         take('picks:'+a[0]+':'+a[1])); }
     case 'opent': {
-      const p = findSk(a[0], [a[1]]), sx = findSk(a[0], [a[1], a[2]]);
+      const p = findSk(a[0], [a[1]], R), sx = findSk(a[0], [a[1], a[2]], R);
       if (!p || !sx) return true;
       return small(btn, 'Under ' + (sx.n || 'this skill'), C().skillNames(a[0], 't',
         { prim:(p.n||'').trim(), sec:(sx.n||'').trim(), have:(sx.kids||[]).map(x=>x.n) }),
@@ -491,8 +509,8 @@ function focusLast(k){
   const el = card.querySelector(pair[1]);
   if (el){ el.focus({preventScroll:true}); el.scrollIntoView({block:'center', behavior:'smooth'}); }
 }
-function findSk(cat, ids){
-  let n = null, list = (cur.skills[cat] || []);
+function findSk(cat, ids, rec){
+  let n = null, list = ((rec || cur).skills[cat] || []);
   ids.forEach(id => { n = list.find(x => x.id === id); list = n ? (n.kids || []) : []; });
   return n;
 }
@@ -555,7 +573,7 @@ VIEW.join = () => `
       placeholder="type your name"></div>` : ''}
   ${seated() ? '' : `<div class="f"><label>The table's word</label>
     <input id="word" maxlength="8" spellcheck="false" autocomplete="off" class="wordin"
-      placeholder="· · · · ·" value="${esc(joinSaid)}"></div>`}
+      placeholder="· · · · · ·" value="${esc(joinSaid)}"></div>`}
   ${chars.length ? `<div class="f"><label>Bring with you</label>
     <div class="chips">${chars.map(c => `<button class="num${bringing().includes(c.id) ? ' on' : ''}"
       data-do="bringpick" data-v="${esc(c.id)}">${esc(charName(c))}</button>`).join('')}</div></div>` : ''}
@@ -623,6 +641,8 @@ const KB = n => n < 1024 ? n + ' bytes'
 
 function optRow(k){
   const d = window.Options.DEFS[k], v = window.Options.get(k);
+  if (d.range) return `<div class="opt"><div class="opt-say"><b>${d.t}</b><em class="optv" data-for="${k}">${v}</em></div>
+    <input type="range" class="optrange" data-range="${k}" min="${d.range[0]}" max="${d.range[1]}" step="${d.range[2] || 1}" value="${v}"></div>`;
   return `<div class="opt">
     <div class="opt-say"><b>${d.t}</b></div>
     <div class="chips">${d.of.map(o =>
@@ -703,6 +723,7 @@ const SET = [
   ['you',   'You'],
   ['look',  'Display'],
   ['table', 'The table'],
+  ['sound', 'Sound'],
   ['keys',  'Keys'],
   ['net',   'Multiplayer'],
   ['data',  'What is kept'],
@@ -780,6 +801,11 @@ function paneTable(){
   return g ? g.keys.map(optRow).join('') : '';
 }
 
+function paneSound(){
+  const g = window.Options.groups().find(x => x.name === 'Sound');
+  return (g ? g.keys.map(optRow).join('') : '')
+    + `<div class="note">Monarchy makes no sound of its own. What you hear is what the GM plays: their music (which has its own volume, on the little player that appears when it plays) and the sounds on their sound board.</div>`;
+}
 function paneKeys(){ return keyBlock(); }
 
 function paneNet(){
@@ -808,6 +834,7 @@ function paneData(){
         about ${KB(w.bytes)}</em></div>
       <div class="chips">
         <button class="num" data-do="dumpall">Take a copy</button>
+        <button class="num" data-do="restoreall" title="Put back a copy you took earlier">Restore a copy</button>
         <button class="num${forgetArmed?' bad on':' bad'}" data-do="forgetall">${
           forgetArmed ? 'Press again to forget it all' : 'Forget everything'}</button>
       </div>
@@ -841,7 +868,7 @@ function madeHeraldry(){
       Each is on Wikimedia Commons under its own file name.</div></details>`;
 }
 
-const PANE = { you: paneYou, look: paneLook, table: paneTable, keys: paneKeys,
+const PANE = { you: paneYou, look: paneLook, table: paneTable, sound: paneSound, keys: paneKeys,
                net: paneNet, data: paneData, about: paneAbout };
 
 VIEW.set = () => `
@@ -1454,8 +1481,9 @@ document.addEventListener('click', e => {
     case 'netsave':    return saveNetCfg();
     case 'netclear':   window.Net.setCfg(null); netPasting = false; render();
                        return toast('Forgotten — restart to take effect');
-    case 'dumpall':    download('monarchy-everything', window.Options.dump());
+    case 'dumpall':    download('monarchy-everything-' + new Date().toISOString().slice(0, 10) + '.json', window.Options.dump());
                        return toast('A copy of everything is in your downloads');
+    case 'restoreall': return $('#pickAll').click();
     /* TWO PRESSES, and the second one says what it is about to do. This is
        the only door in the app that destroys something that cannot be got
        back, so it does not get a one-click confirm dialog people dismiss
@@ -1514,7 +1542,8 @@ function makeTable(){
   if (!v) return toast('Give it a name first');
   tables.unshift({ id:uid('t'), name:v, created:Date.now(), opened:0 });
   saveT();
-  setTimeout(() => { $('#roll').innerHTML = rollT(); $('#tname').value=''; }, 220);
+  setTimeout(() => { const r = $('#roll'), n = $('#tname');          /* the screen may have been left already */
+    if (r) r.innerHTML = rollT(); if (n) n.value=''; }, 220);
   toast('Raised ' + v);
 }
 function openTable(id){
@@ -1553,13 +1582,21 @@ function rename(row, item, put, redraw){
   const cell = row.querySelector('.t b');
   cell.outerHTML = '<input value="' + esc(item.name) + '" maxlength="60">';
   const inp = row.querySelector('.t input'); inp.focus(); inp.select();
-  const done = keep => { const v = inp.value.trim();
+  /* ONCE. Redrawing the row takes the box out of the page, and the browser answers
+     that with a blur — which used to commit what Escape had just thrown away (and
+     throw, redrawing from inside its own redraw) */
+  let over = false;
+  const done = keep => { if (over) return; over = true; const v = inp.value.trim();
     if (keep && v){ item.name = v;
       if (item.who) item.who.name = v;              /* the sheet is the name's home */
       if (item.who && window.Sheet) item.note = window.Sheet.note(item);
       put(); } redraw(); };
-  inp.addEventListener('keydown', ev => { if (ev.key==='Enter') done(true);
-                                          if (ev.key==='Escape') done(false); });
+  /* the key stops here: the box is gone by the time it would reach the hall's own
+     Escape ("go back a screen"), whose "is a rename open?" check then says no, and
+     cancelling a rename walked you out of the Tables */
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' || ev.key === 'Escape') { ev.stopPropagation(); done(ev.key === 'Enter'); }
+  });
   inp.addEventListener('blur', () => done(true));
 }
 
@@ -1672,6 +1709,31 @@ function readFile(f, isC){
 }
 $('#pickT').addEventListener('change', function(){ if (this.files[0]) readFile(this.files[0], false);
   this.value=''; });
+/* A SLIDER MOVES THE SETTING AS IT IS DRAGGED, and is not redrawn under the hand
+   (a redraw would drop it). Letting go plays the sound it controls, so the level is
+   something you hear and not something you guess. */
+document.addEventListener('input', e => {
+  const r = e.target.closest && e.target.closest('[data-range]'); if (!r) return;
+  window.Options.set(r.dataset.range, r.value);
+  const l = document.querySelector('.optv[data-for="' + r.dataset.range + '"]'); if (l) l.textContent = window.Options.get(r.dataset.range);
+});
+/* A COPY, PUT BACK. It replaces what is kept here with what the copy holds, so
+   the app reloads onto it rather than carrying on with two versions of
+   everything in memory. */
+$('#pickAll').addEventListener('change', function(){
+  const f = this.files[0]; this.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    let obj = null;
+    try { obj = JSON.parse(r.result); } catch (e) {}
+    const n = obj ? window.Options.restore(obj) : -1;
+    if (n < 0) return toast('That is not a copy made by Monarchy');
+    toast('Put back ' + n + ' thing' + (n === 1 ? '' : 's') + ' — reopening');
+    setTimeout(() => location.reload(), 900);
+  };
+  r.readAsText(f);
+});
 $('#pickC').addEventListener('change', function(){ if (this.files[0]) readFile(this.files[0], true);
   this.value=''; });
 /* A LIKENESS IS BIGGER THAN A COAT OF ARMS AND TRAVELS FURTHER. The arms
@@ -1865,11 +1927,17 @@ $('#undob').addEventListener('click', () => { typing = 0; undo(); });
 $('#redob').addEventListener('click', () => { typing = 0; redo(); });
 
 /* ══ UP ═══════════════════════════════════════════════════════ */
-window.Hall.init($('#hall'), BANNERS, def => take(def.id));
+/* no WebGL (or a driver too old for it) used to leave a black window and no word */
+try { window.Hall.init($('#hall'), BANNERS, def => take(def.id)); }
+catch (err) {
+  window.Shell.warn('The 3D hall could not start on this computer — WebGL is off or the graphics driver is too old. '
+    + 'Update the driver, then restart the app.', 60000, true);
+}
 paintArms();
 trackPlates();
 
 window.Menu = { at:() => at, tables:() => tables, chars:() => chars, me:() => me,
+  codex:(k, arg, btn, rec, done) => openCodex(k, arg, btn, { rec, done }),
   take, hang, toast, state:() => ({ at, tables:tables.length, chars:chars.length,
                              named:!!me.name, arms:me.arms }) };
 })();

@@ -3,43 +3,52 @@
     "tables": {
       "$word": {
         ".read": "auth != null",
-
         ".write": "auth != null && data.child('meta').child('host').val() === auth.uid",
-
         "meta": {
           ".write": "auth != null && (!data.exists() || data.child('host').val() === auth.uid)",
           ".validate": "newData.child('host').val() === auth.uid"
         },
-
         "seats": {
           "$uid": {
             ".write": "auth != null && $uid === auth.uid",
             ".validate": "newData.isNumber()"
           }
         },
-
         "who": {
           "$uid": {
             ".write": "auth != null && $uid === auth.uid",
-            ".validate": "newData.child('uid').val() === auth.uid"
+            ".validate": "newData.child('uid').val() === auth.uid && (!newData.child('pic').exists() || (newData.child('pic').isString() && newData.child('pic').val().length < 1500000)) && (!newData.child('body').exists() || (newData.child('body').isString() && newData.child('body').val().length < 1500000))"
           }
         },
-
         "chat": {
           "$msg": {
             ".write": "auth != null && !data.exists()",
-            ".validate": "newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 4000"
+            ".validate": "newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 4000 && (newData.child('kind').val() === 'say' || newData.child('kind').val() === 'emote' || newData.child('kind').val() === 'roll') && newData.child('who').isString() && newData.child('who').val().length <= 60 && (newData.child('role').val() !== 'gm' || root.child('tables').child($word).child('meta').child('host').val() === auth.uid)"
           }
         },
-
         "board": {
           ".write": "auth != null && root.child('tables').child($word).child('meta').child('live').val() === true"
         },
-
         "sheets": {
           "$id": {
             ".write": "auth != null && (!data.exists() || data.child('by').val() === auth.uid)",
             ".validate": "newData.child('by').val() === (data.exists() ? data.child('by').val() : auth.uid)"
+          }
+        },
+        "music": {
+          ".validate": "!newData.child('ids').hasChild('100')"
+        },
+        "video": {
+          "$screen": {
+            ".validate": "!newData.child('ids').hasChild('100')"
+          }
+        },
+        "fx": {
+          ".validate": "newData.child('id').isString() && newData.child('id').val().length <= 24 && (!newData.child('v').exists() || (newData.child('v').isNumber() && newData.child('v').val() >= 0 && newData.child('v').val() <= 1))"
+        },
+        "pads": {
+          "$pad": {
+            ".validate": "newData.child('d').isString() && newData.child('d').val().length < 1000000 && (!newData.child('n').exists() || (newData.child('n').isString() && newData.child('n').val().length <= 40))"
           }
         }
       }

@@ -70,6 +70,15 @@ function mount() {
   doc.addEventListener('pointerup', releaseChar);
   el.addEventListener('wheel', e => e.stopPropagation());
   el.addEventListener('click', onClick);
+  /* the filter redraws the card as you type, and redrawing takes the caret
+     away — so it is put back */
+  el.addEventListener('input', e => {
+    if (!e.target.matches || !e.target.matches('[data-find]')) return;
+    noteQ = e.target.value;
+    paint();
+    const i = card.querySelector('[data-find]');
+    if (i) { i.focus(); i.setSelectionRange(noteQ.length, noteQ.length); }
+  });
 
   doc.addEventListener('keydown', onKey);
   ['monarchy:kit', 'monarchy:pocket', 'monarchy:sheets', 'monarchy:opts']
@@ -112,6 +121,7 @@ function paint() {
   }
   const canDraw = !!(root.Ink && root.Ink.allowed());
   const tool = root.Ink && root.Ink.tool;
+  if (!busy() && root.Muster && root.Muster.reopen) root.Muster.reopen();
   rail.querySelectorAll('.kit-b').forEach(b => {
     const k = b.dataset.kit;
     const fight = T() && T().activeScene && T().activeScene();
@@ -211,11 +221,15 @@ function placeChar(id, sx, sy) {
 }
 
 /* ── NOTES ── */
+let noteQ = '';
 function notesCard() {
-  const l = root.Pocket ? root.Pocket.list() : [];
+  const all = root.Pocket ? root.Pocket.list() : [];
+  const q = noteQ.trim().toLowerCase();
+  const l = q ? all.filter(n => String(n.text || '').toLowerCase().includes(q)) : all;
   return `<div class="kit-h">Your notes<button class="kit-chip" data-do="newnote">New</button></div>
+    ${all.length > 3 ? `<input class="kit-find" data-find placeholder="Find a note" maxlength="40" value="${noteQ.replace(/"/g, '&quot;')}">` : ''}
     <div class="kit-notes">${l.map(n => root.Pocket.card(n)).join('') ||
-      '<p class="kit-none">Nothing in your pocket</p>'}</div>`;
+      `<p class="kit-none">${all.length ? 'No note says that' : 'Nothing in your pocket'}</p>`}</div>`;
 }
 
 /* ── DRAW ── */
@@ -241,8 +255,9 @@ function toggle(k) {
     if (root.Muster) root.Muster.toggle();
     return paint();
   }
-  /* the muster and a card share the space beside the rail */
-  if (root.Muster && root.Muster.isOpen()) root.Muster.close();
+  /* the muster and a card share the space beside the rail — the card borrows it,
+     and the muster comes back when nothing of the kit is open (paint) */
+  if (root.Muster && root.Muster.isOpen()) root.Muster.yieldDock();
   if (k === 'point') {
     const was = P && P.on;
     if (I) I.set(null);

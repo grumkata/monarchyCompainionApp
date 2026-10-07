@@ -63,6 +63,7 @@ function show(where, tableId, now) {
    with nothing over the screen — walking straight in from ?table=<id> — it
    is run in one go, because there is no animation to protect. */
 function swap(where, tableId, covered) {
+  const was = at;
   at = where;
   doc.body.classList.toggle('at-hall', where === 'hall');
   doc.body.classList.toggle('at-table', where === 'table');
@@ -340,8 +341,40 @@ function seat(n) {
   catch (e) { return 0; }
 }
 
+/* ══ WHEN SOMETHING GOES WRONG ═════════════════════════════════
+   Four places swallowed their failures: a full store, a lost graphics
+   context, an uncaught error, a refused promise. Players saw a table that
+   simply stopped doing things. One notice, in Blazon's own colours, that
+   says so — throttled, because a store that is full is full on every
+   keystroke. There is no menu bar to reload from, so it says what to do. */
+let warnT = 0, warnLast = 0;
+function warn(msg, ms, force) {
+  try { console.error('[monarchy] ' + msg); } catch (e) {}
+  const now = Date.now();
+  if (!force && now - warnLast < 10000) return;
+  warnLast = now;
+  let el = doc.getElementById('shell-warn');
+  if (!el) {
+    el = doc.createElement('div'); el.id = 'shell-warn';
+    el.setAttribute('role', 'alert'); doc.body.appendChild(el);
+  }
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(warnT); warnT = setTimeout(() => el.classList.remove('on'), ms || 7000);
+}
+const STUCK = ' If it looks stuck, go back to the hall and sit down again, or restart the app.';
+root.addEventListener('monarchy:savefail', e =>
+  warn((e.detail && e.detail.message) || 'Something could not be saved.', 14000));
+root.addEventListener('error', e => {
+  if (/ResizeObserver/.test((e && e.message) || '')) return;
+  warn('Something went wrong.' + STUCK);
+});
+root.addEventListener('unhandledrejection', () => warn('Something went wrong in the background.' + STUCK));
+/* webglcontextlost does not bubble; the capture phase on window still sees it */
+root.addEventListener('webglcontextlost', () =>
+  warn('The graphics card dropped a 3D view. It should come back by itself.' + STUCK), true);
+
 /* the tavern hangs your arms behind your seat (27-table-gl.js) */
-root.Shell = { show, openTable, backToHall, under, rehearse, livery, arms: readArms, seat,
+root.Shell = { show, openTable, backToHall, under, rehearse, livery, arms: readArms, seat, warn,
                get at() { return at; } };
 
 })(window, document);

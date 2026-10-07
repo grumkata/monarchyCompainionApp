@@ -68,6 +68,7 @@ function draw(list) {
            another client... which is exactly the assumption a chat line
            must NOT make. See scrub(). */
         d.innerHTML = scrub(m.text);
+        if (history) d.dataset.old = '1';
         if (!history) throwFor(m);
       } else if (m.kind === 'emote') {
         d.className = 'cl said emote';
@@ -79,6 +80,9 @@ function draw(list) {
                     + esc(m.text) + '</span>';
       }
       cb.appendChild(d);
+      /* AN EVENING IS THOUSANDS OF LINES and the dock kept every one, each a
+         node in a page that is redrawing a 3D table. The newest 300 stay. */
+      while (cb.childElementCount > 300) cb.removeChild(cb.firstElementChild);
     });
   cb.scrollTop = cb.scrollHeight;
 }
@@ -114,10 +118,14 @@ function throwFor(m) {
 const TAGS = { B: 1, I: 1, U: 1, SPAN: 1 };
 /* and the fight's own result line (38-bar-hud.js chat): hit or miss on the
    total, a die struck out or raised, what the blow did */
-const CLASSES = /^(rspec|rdice|rtot|cn|hi|lo|win|lose|gone|up|redit|did)$/;
+const CLASSES = /^(rspec|rdice|rset|rtot|cn|hi|lo|win|lose|gone|up|redit|did)$/;
 function scrub(html) {
-  const bin = doc.createElement('div');
-  bin.innerHTML = String(html || '');
+  /* PARSED IN A DOCUMENT THAT DOES NOTHING. A div in the live page starts
+     loading an <img> the moment innerHTML is set, and its onerror fires
+     before the walk below ever reaches it; a DOMParser document has no
+     browsing context, so nothing loads and nothing runs. */
+  const bin = new root.DOMParser()
+    .parseFromString('<body>' + String(html || '') + '</body>', 'text/html').body;
   const walk = node => {
     [...node.childNodes].forEach(n => {
       if (n.nodeType === 3) return;                       /* text is fine */

@@ -48,7 +48,17 @@ const gm = () => (typeof isGM === 'function' ? isGM() : true);
 const mine = e => (typeof canControl === 'function' ? canControl(e) : true);
 const PH = ['Players', 'Allies', 'Enemies'];
 
-let el = null, open_ = false, brush = null, showCond = false, amt = 5, wanted = false;
+/* `wanted` starts TRUE: a fight that is live at the table has its muster up for
+   everyone, GM and players, without anybody having to know to press F. Closing
+   it with the X is the one thing that turns it off, until the next fight. */
+let el = null, open_ = false, brush = null, showCond = false, amt = 5, wanted = true;
+/* the card's Move map is folded away until asked for; the Add units form is
+   open only when the field is empty or the GM opens it */
+let showMap = false, showAdd = false;
+let addName = '', addQty = 3, addHp = 10, addSide = 'en', addLine = '';
+const LEADS = ['Unbreakable', 'Stable', 'Wavering', 'Crumbling', 'Broken'];
+/* what a condition does, in the rules' own words — for a hover */
+const ruleOf = n => { const t = root.RULES && root.RULES.TOKENS && root.RULES.TOKENS[n]; return (t && t.text) || ''; };
 
 /* ══ MOUNT ════════════════════════════════════════════════════ */
 function mount() {
@@ -66,9 +76,30 @@ function mount() {
      that had just been chosen. */
   el.addEventListener('click', e => { onClick(e); e.stopPropagation(); });
   el.addEventListener('input', e => {
-    if (e.target.id === 'mu-amt') amt = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 1));
+    const id = e.target.id;
+    if (id === 'mu-amt') amt = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 1));
+    else if (id === 'mu-an') addName = e.target.value;
+    else if (id === 'mu-aq') addQty = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
+    else if (id === 'mu-ah') addHp = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 1));
   });
-  el.addEventListener('keydown', e => e.stopPropagation());
+  /* a number or a name typed on the card goes in through Tokens.edit, the one
+     door a counter is changed by */
+  el.addEventListener('change', e => {
+    if (e.target.id === 'mu-al') { addLine = e.target.value; return; }
+    const i = e.target.closest && e.target.closest('[data-mu-f]');
+    if (i && gm() && S.sel && root.Tokens) root.Tokens.edit(S.sel, { [i.dataset.muF]: i.value });
+  });
+  /* only typing is kept to itself — stopping every key meant Escape and
+     Space died after pressing any muster button, until you clicked elsewhere */
+  el.addEventListener('keydown', e => {
+    const t = e.target;
+    if (!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    e.stopPropagation();
+    if (e.key !== 'Enter') return;
+    if (t.id === 'mu-amt') { const b = el.querySelector('[data-mu="hurt"]'); if (b) b.click(); }   /* Enter takes it */
+    else if (/^mu-a[nqh]$/.test(t.id)) addUnits();
+    else if (t.dataset.muF) t.blur();                                      /* blur commits it */
+  });
 
   /* PAINTING THE GROUND: while a brush is up, a click on a slot of the
      board is a feature, not a selection */
@@ -94,10 +125,15 @@ function mount() {
      back (the redo) opens it again. A muster the GM closed stays closed. */
   T().on((st, why) => {
     if (why === 'activate') { const s = live(); if (s) { wanted = true; open(); } return; }
-    if (why === 'deactivate' || why === 'bin' || why === 'load') { if (!live()) { close(true); wanted = false; } return; }
+    /* no fight any more: shut quietly, and the NEXT fight is up by default again */
+    if (why === 'deactivate' || why === 'bin' || why === 'load') { if (!live()) { close(true); wanted = true; } return; }
     if (why !== 'select' && why !== 'move' && wanted && !open_ && live()) open();
   });
-  root.addEventListener('monarchy:where', e => { if (!e.detail || e.detail.at !== 'table') close(true); });
+  root.addEventListener('monarchy:where', e => {
+    if (!e.detail || e.detail.at !== 'table') { close(true); return; }
+    /* back at the table with a fight running: it is up again */
+    if (wanted && live()) setTimeout(open, 0);
+  });
   root.addEventListener('monarchy:session', e => {
     const w = (e.detail || {}).what;
     if (w === 'hosting' || w === 'joined' || w === 'left' || w === 'closed') paint();
@@ -110,10 +146,10 @@ function mount() {
 const live = () => { const s = T() && T().activeScene(); return s && s.scene === 'combat' ? s : null; };
 const isOpen = () => open_;
 function open() {
-  if (!el || !live()) return;
-  if (root.Toolbox && root.Toolbox.isOpen()) root.Toolbox.shut();
-  wanted = true;
+  if (!el || !live() || !doc.body.classList.contains('at-table')) return;
+  wanted = true; resume = false;
   open_ = true;
+  if (root.Toolbox && root.Toolbox.isOpen()) root.Toolbox.shut();
   el.hidden = false;
   const was = doc.body.classList.contains('muster-on');
   doc.body.classList.add('muster-on');
@@ -137,6 +173,18 @@ function close(quiet) {
   if (root.GmRail) root.GmRail.paint();
 }
 function toggle() { if (open_) { wanted = false; close(); } else { wanted = true; open(); } }
+/* THE TOOLBOX AND THE MUSTER SHARE ONE DOCK. Opening the box used to close the
+   muster for good — and "add a unit mid-fight" is exactly when the box is
+   opened. Now the box borrows the dock and gives it back when it shuts.
+   (Not a quiet close: `wanted` stays false meanwhile, or every change made
+   with the box open would pop the muster back over it.) */
+let resume = false;
+function yieldDock() { if (open_) { resume = true; close(); } }
+function reopen() {
+  if (!resume) return;
+  resume = false;
+  if (live() && doc.body.classList.contains('at-table')) { wanted = true; open(); }
+}
 
 /* ══ WHO ACTS WHEN ════════════════════════════════════════════
    The rules' order: players, then their allies, then the enemy. A player
@@ -167,7 +215,19 @@ function paint() {
      the field is let go of. */
   const a = doc.activeElement;
   if (a && el.contains(a) && a.tagName === 'INPUT') {
-    if (!pending) { pending = true; a.addEventListener('blur', () => { pending = false; paint(); }, { once: true }); }
+    if (!pending) {
+      pending = true;
+      a.addEventListener('blur', () => {
+        /* NOT AT ONCE. Clicking a button takes focus off the field on the way
+           DOWN; repainting then replaces the button before the mouse comes up,
+           and the click lands on nothing — type a number, press Take, and the
+           first press did nothing. Wait for the release (or most of a second). */
+        const go = () => { clearTimeout(t); doc.removeEventListener('pointerup', up, true); pending = false; paint(); };
+        const up = () => setTimeout(go, 0);
+        const t = setTimeout(go, 700);
+        doc.addEventListener('pointerup', up, { capture: true, once: true });
+      }, { once: true });
+    }
     return;
   }
   const G = gm();
@@ -201,11 +261,12 @@ function paint() {
        <b>${S.mana | 0}</b>
        ${G ? `<button class="mu-lz" data-mu="mana+">+</button>` : ''}</div>
      ${declared()}
-     <div class="mu-roll">${[0, 1, 2].map(p => group(p, all.filter(x => phaseOf(x.e) === p))).join('')}</div>
      ${sel ? card(sel) : `<div class="mu-card none">${all.length
          ? 'Choose someone on the roll or the board to see them here.'
-         : (G ? 'Nobody is on the field yet. Drag counters onto its lines, or take them out of the toolbox.'
+         : (G ? 'Nobody is on the field yet. Add some below.'
               : 'Nobody is on the field yet.')}</div>`}
+     ${G ? addForm(all.length === 0) : ''}
+     <div class="mu-roll">${[0, 1, 2].map(p => group(p, all.filter(x => phaseOf(x.e) === p))).join('')}</div>
      ${G ? ground() : ''}
      ${G ? `<section class="mu-orders" id="sc-opts"></section>` : ''}
      ${G ? `<footer class="mu-foot">
@@ -236,7 +297,7 @@ function row(e, l) {
   const cls = ['mu-row', e.side === 'en' ? 'en' : 'al', e.id === S.sel ? 'sel' : '',
                spent(e) ? 'spent' : '', down(e) ? 'down' : '', mine(e) ? 'mine' : ''].filter(Boolean).join(' ');
   const cond = (e.cond || []).slice(0, 4).map(c =>
-    `<i class="${typeof tokClass === 'function' ? tokClass(c.n) : 'n'}">${esc(c.n)}${c.c > 1 ? ' ' + c.c : ''}</i>`).join('');
+    `<i class="${typeof tokClass === 'function' ? tokClass(c.n) : 'n'}" title="${esc(ruleOf(c.n))}">${esc(c.n)}${c.c > 1 ? ' ' + c.c : ''}</i>`).join('');
   return `<button class="${cls}" data-mu="pick" data-id="${esc(e.id)}">
       ${L ? L.coin(who, 34) : ''}
       <span class="mu-who"><b>${esc(e.name)}</b><small>${esc(l.label)}${e.side !== l.side ? ' &middot; behind their lines' : ''}</small></span>
@@ -259,11 +320,16 @@ function declared() {
            : `<button class="mu-f" data-mu="dismiss">Withdraw</button>`}</div>`;
 }
 
-/* ── THE CARD ──────────────────────────────────────────────────── */
+/* ── THE CARD ────────────────────────────────────────────────────
+   The one place a unit is read and, by the GM, changed: health (and set it
+   outright), stamina, stress, armour and movement, what is on them with what
+   it does, who they are. Everyone else reads it and cannot touch it — the
+   board is where a player moves their own piece. Every typed field goes
+   through Tokens.edit. */
 function card(e) {
   const L = root.TokenLook;
   const l = typeof lineOf === 'function' ? lineOf(e.id) : null;
-  const may = mine(e);
+  const G = gm();
   const form = e.kind === 'form';
   const who = { name: e.name, side: e.side, entKind: e.kind, src: e.pic || '', art: e.art || '', fig: e.fig || '' };
   const kind = form ? 'Formation' : e.kind === 'large' ? 'Large' : e.pc ? 'Player' : 'Unit';
@@ -271,48 +337,131 @@ function card(e) {
   const FT = ft && C().FEATURES[ft.kind];
   const frac = form ? (e.alive | 0) / Math.max(1, e.total | 0) : (e.hp | 0) / Math.max(1, e.max | 0);
   const band = frac > .6 ? 'ok' : frac > .3 ? 'mid' : 'low';
-  const toks = typeof tokNames === 'function' ? tokNames() : [];
+  const toks = G && typeof tokNames === 'function' ? tokNames() : [];
   const thing = T().get(e.id);
+  const isPC = !!(thing && thing.source === 'char');
+  const cls = n => (typeof tokClass === 'function' ? tokClass(n) : 'n');
+
+  /* a stat is a field for the GM and a plain number for the table; one that
+     was never set shows as a dash for the GM and not at all to anyone else */
+  const num = (k, label, v, tip, max) => G
+    ? `<label class="mu-st" title="${esc(tip)}"><span>${label}</span><input class="mu-num" type="number" min="0" max="${max || 99}"
+         data-mu-f="${k}" value="${v == null ? '' : v | 0}" placeholder="&mdash;"></label>`
+    : (v == null ? '' : `<span class="mu-st" title="${esc(tip)}"><span>${label}</span><b>${v | 0}</b></span>`);
+  const txt = (k, label, v, tip) => G
+    ? `<label class="mu-st" title="${esc(tip)}"><span>${label}</span><input class="mu-num" type="text" maxlength="4"
+         data-mu-f="${k}" value="${esc(v)}"></label>`
+    : `<span class="mu-st" title="${esc(tip)}"><span>${label}</span><b>${esc(v)}</b></span>`;
+  /* the table sees its own side's numbers; the enemy's stay the GM's */
+  const stats = !(G || e.side === 'al') ? '' : form
+    ? `<div class="mu-stats">${num('bodies', 'Bodies', e.total, 'How many stand in the formation', 60)}${
+        num('hpea', 'HP each', e.hpea, 'Hit points of each body', 99)}${
+        num('dmg', 'Damage', e.dmg, 'Damage each hit does', 99)}${
+        txt('skl', 'Hit', e.skl, 'What the formation needs to hit (4+)')}${
+        txt('def', 'Defence', e.def, 'Defence against hits')}
+        <span class="mu-st" title="Leadership — how well they hold"><span>Morale</span>${G
+          ? `<button class="mu-lead" data-mu="lead">${esc(e.lead)}</button>` : `<b>${esc(e.lead)}</b>`}</span></div>`
+    : `<div class="mu-stats">${num('sta', 'Stamina', e.sta, 'Stamina left — spent on Style abilities, back after a rest')}${
+        num('str', 'Stress', e.str, 'Stress carried — builds under pressure')}${
+        num('av', 'Armour', e.av, 'Armour value')}${
+        num('move', 'Move', e.move, 'Lines crossed with a full action')}</div>`;
+
+  const name = G && !isPC
+    ? `<input class="mu-cn mu-name" data-mu-f="name" maxlength="40" value="${esc(e.name)}" spellcheck="false">`
+    : `<b class="mu-cn">${esc(e.name)}</b>`;
+  const hpset = G && !form
+    ? `<div class="mu-hpset"><span class="mu-k">Health</span>
+         <input class="mu-num" type="number" min="0" max="999" data-mu-f="hp" value="${e.hp | 0}"><i>/</i>
+         <input class="mu-num" type="number" min="1" max="999" data-mu-f="max" value="${e.max | 0}"
+           ${isPC ? 'readonly title="From their record"' : ''}></div>` : '';
+
   return `<div class="mu-card ${e.side === 'en' ? 'en' : 'al'}">
     <div class="mu-cid">
       ${L ? L.coin(who, 64) : ''}
-      <div><b class="mu-cn">${esc(e.name)}</b>
+      <div>${name}
         <i>${e.side === 'en' ? 'Enemy' : 'Ally'} &middot; ${kind}${l ? ' &middot; ' + esc(l.label) : ''}</i>
         ${FT ? `<i class="mu-on ft-${ft.kind}">In ${esc(FT.name.toLowerCase())} &mdash; ${esc(FT.note)}</i>` : ''}</div>
     </div>
     <div class="mu-life">
       <span class="mu-bar ${band}"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(0)}%"></i>
         <u>${form ? (e.alive | 0) + ' of ' + (e.total | 0) + ' standing' : (e.hp | 0) + ' / ' + (e.max | 0)}</u></span>
-      ${may ? `<div class="mu-hurt">
+      ${G ? `<div class="mu-hurt">
         <button class="mu-f bad" data-mu="hurt">${form ? 'Lose' : 'Take'}</button>
         <span class="mu-tally"><button class="mu-lz" data-mu="amt-">&minus;</button>
           <input id="mu-amt" type="number" min="1" max="999" value="${amt}">
           <button class="mu-lz" data-mu="amt+">+</button></span>
         <button class="mu-f go" data-mu="heal">${form ? 'Rally' : 'Heal'}</button>
       </div>` : ''}
+      ${hpset}
     </div>
+    ${stats}
     <div class="mu-acts">
       <span class="mu-k">Actions</span>
-      <button class="mu-act${e.q ? '' : ' used'}" data-mu="q" ${may ? '' : 'disabled'}>Quick${e.q ? '' : ' &mdash; spent'}</button>
-      <button class="mu-act${e.f ? '' : ' used'}" data-mu="f" ${may ? '' : 'disabled'}>Full${e.f ? '' : ' &mdash; spent'}</button>
+      <button class="mu-act${e.q ? '' : ' used'}" data-mu="q" ${G ? '' : 'disabled'}>Quick${e.q ? '' : ' &mdash; spent'}</button>
+      <button class="mu-act${e.f ? '' : ' used'}" data-mu="f" ${G ? '' : 'disabled'}>Full${e.f ? '' : ' &mdash; spent'}</button>
     </div>
     <div class="mu-conds">
       <span class="mu-k">Conditions</span>
       <div class="mu-chips">${(e.cond || []).map((c, i) =>
-        `<span class="mu-chip ${typeof tokClass === 'function' ? tokClass(c.n) : 'n'}">${esc(c.n)}<b>${c.c}</b>${may
+        `<span class="mu-chip ${cls(c.n)}" title="${esc(ruleOf(c.n))}">${esc(c.n)}<b>${c.c}</b>${G
           ? `<button data-mu="c-" data-i="${i}">&minus;</button><button data-mu="c+" data-i="${i}">+</button>` : ''}</span>`).join('')
         || '<em>None</em>'}
-        ${may && toks.length ? `<button class="mu-add${showCond ? ' on' : ''}" data-mu="addc">+ Condition</button>` : ''}</div>
-      ${may && showCond ? `<div class="mu-pick">${toks.map(n =>
-        `<button class="mu-chip ${typeof tokClass === 'function' ? tokClass(n) : 'n'}" data-mu="give" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
+        ${G && toks.length ? `<button class="mu-add${showCond ? ' on' : ''}" data-mu="addc">+ Condition</button>` : ''}</div>
+      ${G && showCond ? `<div class="mu-pick">${toks.map(n =>
+        `<button class="mu-chip ${cls(n)}" data-mu="give" data-n="${esc(n)}" title="${esc(ruleOf(n))}">${esc(n)}</button>`).join('')}</div>` : ''}
     </div>
-    ${may ? `<div class="mu-move"><span class="mu-k">Move to${gm() ? '' : ' &mdash; the GM allows it'}</span>${map(e, l)}</div>` : ''}
+    ${G && thing ? `<input class="mu-note" data-mu-f="info" maxlength="200" value="${esc(thing.info || '')}"
+        placeholder="GM notes (the table cannot see these)" spellcheck="false">` : ''}
+    ${G ? `<div class="mu-move"><button class="mu-add${showMap ? ' on' : ''}" data-mu="map">Move to&hellip;</button>${showMap ? map(e, l) : ''}</div>` : ''}
     <div class="mu-more">
-      ${gm() && thing ? `<button class="mu-f" data-mu="edit">Edit counter</button>` : ''}
-      ${thing && thing.char && root.Papers ? `<button class="mu-f" data-mu="record">Their record</button>` : ''}
-      ${gm() && thing ? `<button class="mu-f" data-mu="off">Off the field</button>` : ''}
+      ${G && thing ? `<button class="mu-f" data-mu="edit">Edit counter</button>` : ''}
+      ${thing && thing.char && root.Papers && (G || mine(e)) ? `<button class="mu-f" data-mu="record">Their record</button>` : ''}
+      ${G && thing ? `<button class="mu-f" data-mu="off">Off the field</button>` : ''}
     </div>
   </div>`;
+}
+
+/* ── ADD UNITS ───────────────────────────────────────────────────
+   A name, how many, how healthy, which side and where: that many numbered
+   counters standing in the fight, in one undo (Tokens.addMany). Folded to a
+   single button once there is somebody on the field. */
+const frontOf = side => {
+  const ls = S.lines.filter(l => l.side === side);
+  const f = side === 'en' ? ls[ls.length - 1] : ls[0];
+  return f ? f.key : '';
+};
+/* the line chosen, if it is still of the side chosen; otherwise the frontline */
+const lineFor = (key, side) => (S.lines.some(l => l.key === key && l.side === side) ? key : frontOf(side));
+function addForm(empty) {
+  if (!has()) return '';
+  if (!(showAdd || empty)) return `<div class="mu-addbar"><button class="mu-add" data-mu="addtog">+ Add units</button></div>`;
+  const ls = S.lines.filter(l => l.side === addSide);
+  const here = lineFor(addLine, addSide);
+  const used = l => (typeof usedIn === 'function' ? usedIn(l) : l.ents.length);
+  return `<section class="mu-addu">
+    <span class="mu-k">Add units${empty ? '' : ` <button class="mu-x2" data-mu="addtog" title="Fold away">&#10005;</button>`}</span>
+    <div class="mu-addrow">
+      <input class="mu-num wide" id="mu-an" placeholder="Name  (Goblin)" maxlength="32" value="${esc(addName)}" spellcheck="false">
+      <label class="mu-st" title="How many"><span>&times;</span><input class="mu-num" id="mu-aq" type="number" min="1" max="20" value="${addQty}"></label>
+      <label class="mu-st" title="Health each"><span>HP</span><input class="mu-num" id="mu-ah" type="number" min="1" max="999" value="${addHp}"></label>
+    </div>
+    <div class="mu-addrow">
+      <button class="mu-sd en${addSide === 'en' ? ' on' : ''}" data-mu="aside" data-s="en">Enemy</button>
+      <button class="mu-sd al${addSide === 'al' ? ' on' : ''}" data-mu="aside" data-s="al">Ally</button>
+      <select class="mu-num" id="mu-al" title="Which line">${ls.map(l =>
+        `<option value="${esc(l.key)}"${l.key === here ? ' selected' : ''}>${esc(l.label)} ${used(l)}/${S.width}</option>`).join('')}</select>
+      <button class="mu-f go" data-mu="addgo">Add</button>
+    </div>
+  </section>`;
+}
+function addUnits() {
+  if (!gm() || !root.Tokens || !live() || !has()) return;
+  const r = root.Tokens.addMany({ name: addName, n: addQty, hp: addHp, side: addSide,
+                                  lineKey: lineFor(addLine, addSide) });
+  if (!r.made.length) { say('No room on those lines'); return; }
+  S.sel = r.made[0].id; showCond = false;
+  say(r.made.length + (r.made.length === 1 ? ' unit' : ' units') + ' added' + (r.short ? ' — ' + r.short + ' had no room' : ''));
+  redraw();
 }
 
 /* THE FIELD AS A MAP. Every line, enemy at the top and allies at the
@@ -354,7 +503,7 @@ function onClick(ev) {
   const s = live();
   const e = S.sel && typeof entById === 'function' ? entById(S.sel) : null;
   if (what === 'close') { wanted = false; close(); return; }
-  if (what === 'pick') { S.sel = S.sel === b.dataset.id ? null : b.dataset.id; showCond = false; redraw(); return; }
+  if (what === 'pick') { S.sel = b.dataset.id; showCond = false; redraw(); return; }
   if (what === 'end' && typeof endTurn === 'function') { endTurn(); return; }
   if (what === 'phase' && gm()) { S.phase = +b.dataset.ph; redraw(); return; }
   if (what === 'round+' && gm()) { S.round++; redraw(); return; }
@@ -366,6 +515,15 @@ function onClick(ev) {
   if (what === 'allow' && typeof resolveSug === 'function') { resolveSug(true); return; }
   if (what === 'dismiss' && typeof resolveSug === 'function') { resolveSug(false); return; }
   if (what === 'brush') { brush = brush === b.dataset.k ? null : b.dataset.k; paint(); return; }
+  if (what === 'addtog') { showAdd = !showAdd; paint(); return; }
+  if (what === 'aside' && gm()) { addSide = b.dataset.s === 'al' ? 'al' : 'en'; addLine = ''; paint(); return; }
+  if (what === 'addgo') { addUnits(); return; }
+  if (what === 'map') { showMap = !showMap; paint(); return; }
+  if (what === 'record' && e && (gm() || mine(e))) {
+    const t = T().get(e.id);
+    if (t && t.char && root.Papers) { root.Papers.lay(t.char); root.Papers.read(); }
+    return;
+  }
   if (what === 'field') { intoField(); return; }
   if (what === 'save' && s && root.Encounters) {
     const got = root.Encounters.fromScene(s);
@@ -374,7 +532,11 @@ function onClick(ev) {
   }
   if (what === 'stand' && s) { T().deactivate(); close(); return; }
 
-  if (!e || !mine(e)) return;
+  if (!e || !gm()) return;           /* from here on it changes the unit: the GM's alone */
+  if (what === 'lead' && root.Tokens && e.kind === 'form') {
+    root.Tokens.edit(e.id, { lead: LEADS[(LEADS.indexOf(e.lead) + 1) % LEADS.length] });
+    return;
+  }
   if (what === 'amt+') { amt = Math.min(999, amt + 1); paint(); return; }
   if (what === 'amt-') { amt = Math.max(1, amt - 1); paint(); return; }
   if (what === 'hurt' || what === 'heal') {
@@ -403,11 +565,6 @@ function onClick(ev) {
      to the nearest clear ground, the same as a drop that lands roughly */
   if (what === 'go' && typeof move === 'function') { move(e.id, b.dataset.line, S.width / 2); return; }
   if (what === 'edit' && root.Hand) { root.Hand.editThing(e.id); return; }
-  if (what === 'record') {
-    const t = T().get(e.id);
-    if (t && t.char && root.Papers) { root.Papers.lay(t.char); root.Papers.read(); }
-    return;
-  }
   if (what === 'off' && root.Tokens) {
     const at = root.Table3D ? root.Table3D.middle() : { x: 1200, y: 780 };
     root.Tokens.toWood(e.id, at.x - 42, at.y - 58);
@@ -425,6 +582,6 @@ function intoField() {
   setTimeout(() => { if (!root.__field.on()) root.__field.set(true); }, 450);
 }
 
-root.Muster = { mount, open, close, toggle, isOpen, paint };
+root.Muster = { mount, open, close, toggle, yieldDock, reopen, isOpen, paint };
 
 })(window, document);

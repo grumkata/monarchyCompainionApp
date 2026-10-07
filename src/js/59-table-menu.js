@@ -60,6 +60,7 @@ function mount() {
   el.className = 'tmenu';
   el.hidden = true;
   el.addEventListener('click', onClick);
+  el.addEventListener('input', onRange);
   doc.body.appendChild(el);
 }
 
@@ -154,6 +155,9 @@ function drawSettings() {
           [['off', 'Windowed', !full], ['on', 'Full screen', full]])) : '') +
         g.keys.map(k => {
           const d = O.DEFS[k];
+          if (d.range) return opt(d.t + ' · ' + O.get(k),
+            '<input type="range" class="tm-range" data-range="' + k + '" min="' + d.range[0] + '" max="' + d.range[1] +
+            '" step="' + (d.range[2] || 1) + '" value="' + O.get(k) + '">');
           return opt(d.t, chips(k, d.of.map(v => [v, d.say[v], O.get(k) === v])));
         }).join('')
       ).join('') +
@@ -190,6 +194,15 @@ function tableName() {
 }
 
 /* ══ DOING THEM ════════════════════════════════════════════════ */
+/* a slider on the card: moved as it is dragged, played when let go; the card is NOT
+   redrawn under the hand (that would drop the slider) */
+function onRange(e) {
+  const r = e.target.closest && e.target.closest('[data-range]'); if (!r) return;
+  if (root.Options) root.Options.set(r.dataset.range, r.value);
+  const label = r.parentNode && r.parentNode.querySelector('span');
+  const d = root.Options && root.Options.DEFS[r.dataset.range];
+  if (label && d) label.textContent = d.t + ' · ' + root.Options.get(r.dataset.range);
+}
 function onClick(e) {
   /* the scrim: anywhere off the card shuts it, which is the other half of
      "Escape closes it" */
@@ -347,7 +360,15 @@ root.addEventListener('monarchy:session', e => {
   }
   if (open && d.what !== 'stir') draw();
 });
-root.addEventListener('monarchy:opts', () => { if (open && view === 'settings') draw(); });
+root.addEventListener('monarchy:opts', e => {
+  if (!(open && view === 'settings')) return;
+  /* A SLIDER BEING DRAGGED IS NOT A REASON TO REDRAW THE CARD. Every step of the drag
+     is an option change, and redrawing replaced the very slider under the hand: it moved
+     one notch and then would not move at all. Its own label is kept by onRange. */
+  const d = e && e.detail && root.Options && root.Options.DEFS[e.detail.key];
+  if (d && d.range) return;
+  draw();
+});
 doc.addEventListener('fullscreenchange', () => { if (open && view === 'settings') draw(); });
 root.addEventListener('monarchy:where', e => {
   if (!e.detail || e.detail.at !== 'table') shut(); else mount();

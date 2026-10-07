@@ -211,8 +211,21 @@ function stageZ() {
 root.__stageZ = stageZ;
 root.__persp = () => PERSP;
 
+/* WHILE THE CAMERA MOVES, THE TABLE IS A LAYER OF ITS OWN. A standing
+   will-change:transform pins the layer to one raster scale and every label goes
+   soft as you zoom in (12-combat.css); but with none, the whole preserve-3d
+   chain is re-rasterised on every zoom step — measured on the GM's machine at
+   10-14 frames a second locked in on a fight. Asked for only while the camera
+   is moving and let go 220ms after, it is 50 fps in motion and crisp at rest. */
+let camT = 0;
+function camMoving() {
+  doc.body.classList.add('cam-moving');
+  clearTimeout(camT);
+  camT = setTimeout(() => doc.body.classList.remove('cam-moving'), 220);
+}
 function apply() {
   if (!tbl) return;
+  camMoving();
   /* ── scale3d, NOT scale ──────────────────────────────────
      CSS `scale()` is TWO-DIMENSIONAL. It multiplies x and y and leaves z
      alone — and this is a 3D scene, so for years the table has been
@@ -361,31 +374,66 @@ function settle(p) {
                      { once: true });
 }
 
-function placeProp(p) {
+/* ── AND IT FACES YOU, WHICHEVER WAY YOU ARE LOOKING ──────────
+   grumkata: notes, sheets, dice and screens "look weird ... they are 2.5
+   projections and not true 3d, so the program continues to project them the
+   same way even when the camera is looking in wholly different ways".
+
+   Exactly that, for these. The hinge below stands a card up about ITS OWN
+   near edge — the edge toward where the card was put, which is the way you
+   were facing when nobody had turned their head. Turn your head (YAW) and
+   the whole table swings about your eye, the card with it, and the card is
+   left leaning toward a seat you are no longer looking from: a note, a
+   sheet or a screen drawn as a squashed parallelogram, a standee that cannot
+   see you.
+
+   So as you sit back the card ALSO swings about its own middle, the short way
+   round, until its foot is toward you — and from then on it is square to the
+   eye at every angle of the head, which is what "stands up to meet the eye"
+   always promised. Counters are left alone: the GL layer turns the figure
+   itself (27-table-gl.js) and measures this box. */
+const FACES_ITSELF = /\bt3-token\b/;
+const turnTo = a => ((a + 540) % 360 + 360) % 360 - 180;        /* the short way round */
+const isPeek = p => !!peeking && (p.dataset.id || p.id) === peeking.key;
+function spinOf(p) {
+  const r = +p.dataset.r || 0, u = camU;
+  let s = r;
+  if (u && !flatAlways(p) && !FACES_ITSELF.test(p.className)) s = r + turnTo(-yawNow() - r) * u;
+  /* a peeked piece is turned upright to you, whatever way up it was laid */
+  if (isPeek(p)) s = turnTo(s) * (1 - peekU);
+  return s;
+}
+
+function placeProp(p, h) {
   /* the GL layer paints models over these anchors, so moving one is a
      reason for it to draw a frame — see the note on idling in 27-table-gl */
   if (root.TableGL && root.TableGL.invalidate) root.TableGL.invalidate(3);
   const base =
     `translate3d(${p.dataset.x || 0}px,${p.dataset.y || 0}px,${p.dataset.z || 8}px) ` +
-    `rotate(${p.dataset.r || 0}deg)`;
+    `rotate(${spinOf(p).toFixed(2)}deg)`;
   const u = camU;
   if (!u || flatAlways(p)) { p.style.transform = base; return; }
   /* hinged about the edge nearest you, so the foot of the card stays where
      it was put and the face comes up to meet the eye */
-  const h = p.offsetHeight || 0;
+  if (h == null) h = p.offsetHeight || 0;
   p.style.transform = base +
     ` translate3d(0,${(h / 2).toFixed(1)}px,0)` +
     ` rotateX(${(-TILT * u).toFixed(2)}deg)` +
     ` translate3d(0,${(-h / 2).toFixed(1)}px,0)`;
 }
 /* every piece has to be re-placed when the angle changes, which is what
-   makes the standing-up continuous rather than a jump at the threshold */
-let propU = 0;
+   makes the standing-up continuous rather than a jump at the threshold —
+   and when the head turns, because that is the other thing they face */
+let propU = 0, propY = 0, propP = 0;
 function restandProps() {
-  if (Math.abs(camU - propU) < 0.004) return;
-  propU = camU;
+  const y = yawNow();
+  if (Math.abs(camU - propU) < 0.004 && Math.abs(y - propY) < 0.05 && peekU === propP) return;
+  propU = camU; propY = y; propP = peekU;
   const list = doc.querySelectorAll('#tbl .prop');
-  for (let i = 0; i < list.length; i++) placeProp(list[i]);
+  /* read every height, then write every transform: one layout, not one each */
+  const hs = [];
+  for (let i = 0; i < list.length; i++) hs.push(list[i].offsetHeight || 0);
+  for (let i = 0; i < list.length; i++) placeProp(list[i], hs[i]);
 }
 
 /* Fit against the VIEWPORT element, not the window: the shell's rails are
@@ -395,6 +443,7 @@ function restandProps() {
    bottom of the screen. (proto's note, and its fix) */
 function fitTable() {
   if (!vp) return;
+  if (peeking) unpeek(true);          /* the camera is about to be set down by hand */
   const VW = vp.clientWidth, VH = vp.clientHeight;
   const c = Math.cos(TILT * Math.PI / 180);
   if (!VW || !VH) return;
@@ -477,31 +526,57 @@ function frame(prop, pad) {
 
    Locked is not frozen: you can still move about and zoom in. Pull far
    enough away and the table tips back into 3D where you left it.        */
-function viewFor(prop) {
-  const save = { x: T.x, y: T.y, k: T.k, tilt: TILT };
-  const VW = vp.clientWidth, VH = vp.clientHeight;
+/* `up` is a peek: the head squared up and the piece turned upright for the
+   measurement, so what is measured is what will be seen. `reserve` is pixels
+   kept clear along the bottom of the view (a screen's deck goes there). */
+function viewFor(prop, up, reserve) {
+  const save = { x: T.x, y: T.y, k: T.k, tilt: TILT, yawK, peekU };
+  const VW = vp.clientWidth, VH = vp.clientHeight - (reserve || 0);
   /* offsetWidth/Height are untransformed table units, so this is measured,
      not predicted — the same trick fitTable() uses, for the same reason. */
   TILT = 0;
+  if (up) { yawK = 0; peekU = 1; }
   T.k = Math.min(VW / (prop.offsetWidth + 80), VH / (prop.offsetHeight + 80));
   T.x = 0; T.y = 0; apply();
   const r = prop.getBoundingClientRect(), vr = vp.getBoundingClientRect();
-  const out = { x: T.x + (VW - r.width) / 2 - (r.left - vr.left),
-                y: T.y + (VH - r.height) / 2 - (r.top - vr.top), k: T.k, tilt: 0 };
-  T.x = save.x; T.y = save.y; T.k = save.k; TILT = save.tilt; apply();
+  let ox = T.x + (VW - r.width) / 2 - (r.left - vr.left);
+  let oy = T.y + (VH - r.height) / 2 - (r.top - vr.top);
+  /* MEASURE, CORRECT, MEASURE. A piece stands a little proud of the wood, so
+     under perspective it moves on the screen by slightly MORE than the table
+     is moved — about one per cent, which is nothing for a scene half a table
+     away and fifty to two hundred pixels for a note flown in at 340%. The first
+     answer is therefore close and not exact; two more passes make it exact
+     (the same lesson fitTable() and frame() carry). */
+  for (let i = 0; i < 3; i++) {
+    T.x = ox; T.y = oy; apply();
+    const q = prop.getBoundingClientRect();
+    const ex = (VW - q.width) / 2 - (q.left - vr.left);
+    const ey = (VH - q.height) / 2 - (q.top - vr.top);
+    if (Math.abs(ex) < 0.5 && Math.abs(ey) < 0.5) break;
+    ox += ex; oy += ey;
+  }
+  const out = { x: ox, y: oy, k: T.k, tilt: 0 };
+  if (up) { out.yawK = 0; out.peekU = 1; }
+  T.x = save.x; T.y = save.y; T.k = save.k; TILT = save.tilt;
+  yawK = save.yawK; peekU = save.peekU; apply();
   return out;
 }
 function glide(to, done, toLens) {
-  const from = { x: T.x, y: T.y, k: T.k, tilt: TILT, lens: PERSP };
+  const from = { x: T.x, y: T.y, k: T.k, tilt: TILT, lens: PERSP, yawK, peekU };
   const L = toLens || PERSP;
   const t0 = performance.now(), DUR = 420;
-  anim = {};
+  /* this glide's own mark: a second glide started while one is running (a
+     peek let go of in the middle of its flight) must END the first, not
+     run beside it writing the same numbers */
+  const mine = anim = {};
   (function step(now) {
-    if (!anim) return;
+    if (anim !== mine) return;
     const u = Math.min(1, (now - t0) / DUR);
     const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
     T.x = from.x + (to.x - from.x) * e; T.y = from.y + (to.y - from.y) * e;
     T.k = from.k + (to.k - from.k) * e; TILT = from.tilt + (to.tilt - from.tilt) * e;
+    if (to.yawK != null) yawK = from.yawK + (to.yawK - from.yawK) * e;
+    if (to.peekU != null) peekU = from.peekU + (to.peekU - from.peekU) * e;
     PERSP = Math.round(from.lens + (L - from.lens) * e);
     if (vp) vp.style.perspective = PERSP + 'px';
     if (root.TableGL && root.TableGL.lens) root.TableGL.lens(PERSP);
@@ -581,12 +656,16 @@ const EYE_BACK = TABLE_M / 2 + 0.42; /* a hand's reach clear of the edge */
 const EYE_UP   = 0.70;               /* metres above the top of it */
 
 let lean = 0, seatDrop = 0, camU = 0;
+/* A PEEK (see below) squares the view up without forgetting where you were
+   looking: yawK takes the turn of your head out of the picture and puts it
+   back, and peekU turns the peeked piece upright. Both are 0..1 and glide. */
+let peeking = null, peekU = 0, yawK = 1;
 function viewU() { return lock ? 0 : lean; }
 /* Your head is only turned while you are IN the chair. Standing up over
    the wood squares the view back up on its own rather than leaving the
    room askew behind a table you are trying to work on — and the angle is
    remembered, so sitting back down puts you facing the bar again. */
-function yawNow() { return YAW * camU; }
+function yawNow() { return YAW * camU * yawK; }
 
 /* Sets the tilt, the lens and where the table sits for how far back you
    are. Applies nothing itself: apply() is also what the lock glide drives
@@ -710,6 +789,57 @@ function unlock(inPlace) {
   const back = before || { x: T.x, y: T.y, k: T.k, tilt: TILT3D };
   lock = null; before = null;
   if (inPlace) glideTilt(TILT3D); else glide(back);
+}
+
+/* ══ A PEEK ═══════════════════════════════════════════════════
+   grumkata: "certain objects like character sheets on the table, notes, and
+   videos should have the option for you to double right click and it is
+   projected to your screen to see it in a full normal view without having to
+   scroll in ... if you click out or scroll in any way it goes back to normal".
+
+   The gesture that locks a scene in, for the things you READ and WATCH. The
+   camera flies to the piece — table laid flat, head squared up, the piece
+   turned upright and fitted to the view — and what you see is the piece
+   itself, so a screen keeps playing and a note is exactly as written.
+
+   It is NOT a lock, and nothing is held: any press, any turn of the wheel or
+   Escape sets the camera down exactly where it was (a lock is for running a
+   fight and stays until you leave it on purpose). The one press that does not
+   count is on a screen's own deck, because those are its controls. */
+const PEEKABLE = /\bt3-note\b|\bt3-page\b|\bt3-art\b|\bt3-video\b|\btp-paper\b/;
+const peekable = p => PEEKABLE.test(p.className);
+function peek(p) {
+  if (peeking) return;
+  /* a peek never inherits a half-finished lean either: it lands where it was going */
+  stopZoom(); if (leanAnim) { lean = leanAnim.to; stopLean(); seatCam(); }
+  peeking = { key: p.dataset.id || p.id,
+              from: { x: T.x, y: T.y, k: T.k, tilt: TILT, yawK: 1, peekU: 0 } };
+  /* the ring that says "this is selected" is for the table: at 340% it is a
+     picture frame round the thing you are trying to read */
+  doc.body.classList.add('peeking');
+  /* a screen's deck (74-music.js) puts itself under the frame if it fits and
+     over the picture if it does not, and over the picture is the one place it
+     must never be — so the frame is fitted above room for it */
+  const deck = p.classList.contains('t3-video')
+    ? doc.querySelector('.mu-ui.deck[data-id="' + (p.dataset.id || '') + '"]') : null;
+  const reserve = deck && !deck.classList.contains('gone') ? deck.offsetHeight + 40 : 0;
+  glide(viewFor(p, true, reserve));
+}
+function unpeek(now) {
+  if (!peeking || (peeking.leaving && !now)) return;
+  const back = peeking.from;
+  peeking.leaving = true;
+  const end = () => {
+    peeking = null; peekU = 0; yawK = 1;
+    doc.body.classList.remove('peeking');
+    apply();
+  };
+  if (now) {                          /* walking away from the table: no flight */
+    anim = null;
+    T.x = back.x; T.y = back.y; T.k = back.k; TILT = back.tilt;
+    end(); return;
+  }
+  glide(back, end);
 }
 
 /* how far past the locked fit you push before you stop looking at the board
@@ -899,7 +1029,7 @@ function mount() {
      not props — nothing drags them and nothing paints them — so they have to
      be placed here or they sit at the plane's origin, on top of each other,
      and the table comes out with no width at all. */
-  doc.querySelectorAll('#tbl .tmark').forEach(placeProp);
+  doc.querySelectorAll('#tbl .tmark').forEach(m => placeProp(m));
 
   wire();
   fitTable();
@@ -970,7 +1100,10 @@ function wire() {
       if (p && p === rc.p && now - rc.t < 650 &&
           Math.hypot(e.clientX - rc.x, e.clientY - rc.y) < 12) {
         rc.t = 0; rc.p = null;
-        (lock === p) ? unlock(false) : lockIn(p);
+        /* a paper, a note, a picture or a screen is looked at and let go of;
+           anything else (a scene) is locked in and held */
+        if (peekable(p)) peek(p);
+        else (lock === p) ? unlock(false) : lockIn(p);
         e.preventDefault(); return;
       }
       rc = { t: now, x: e.clientX, y: e.clientY, p };
@@ -1165,6 +1298,29 @@ function wire() {
     if (e.key === ']') { e.preventDefault(); M.raise(t.id); return; }
     if (e.key === '[') { e.preventDefault(); M.lower(t.id); return; }
   });
+
+  /* ── AND ANYTHING YOU DO PUTS A PEEK BACK ──────────────────────
+     On the document, in the capture phase, so it runs before whatever the
+     press or the wheel was going to do. The press still goes on to do it
+     (the camera is already on its way home, and the table ignores presses
+     while it flies); the wheel does not — a scroll that ends a peek must not
+     also zoom the table. A screen's own deck is exempt: it is controls. */
+  doc.addEventListener('pointerdown', e => {
+    if (!peeking || peeking.leaving) return;
+    if (e.target.closest && e.target.closest('.mu-ui')) return;
+    unpeek();
+  }, true);
+  doc.addEventListener('wheel', e => {
+    if (!peeking) return;
+    if (e.target.closest && e.target.closest('.mu-ui')) return;
+    e.preventDefault(); e.stopPropagation();
+    unpeek();
+  }, { capture: true, passive: false });
+  doc.addEventListener('keydown', e => {
+    if (!peeking || e.key !== 'Escape') return;
+    e.preventDefault(); e.stopPropagation();
+    unpeek();
+  }, true);
 
   vp.addEventListener('wheel', e => {
     e.preventDefault();
@@ -1477,6 +1633,7 @@ function ontoWood(x, y, margin) {
    the kit, and the Bring button on it, are hidden (13-table-ui.css) — with
    nothing on screen saying why. */
 function standDown() {
+  if (peeking) unpeek(true);
   if (dg && dg.grouped && root.TableModel) root.TableModel.end();
   if (dg && dg.p) { dg.p.classList.remove('lift'); dg.p.dataset.z = (+dg.p.dataset.rest || 8); }
   dg = null; fdrag = null;
@@ -1488,8 +1645,36 @@ root.addEventListener('monarchy:where', e => {
   if (!e.detail || e.detail.at !== 'table') standDown();
 });
 
+/* ── THE CAMERA THE TABLE IS DRAWN WITH, FOR LAYERS DRAWN OVER IT ──
+   34-gl-pieces.js throws the dice with this, so they land on the wood the
+   table is actually showing instead of on a plane of their own. It is the
+   browser's own matrix for #tbl and #vp's perspective, read the way
+   screenToTable reads them — nothing re-derived, nothing to drift. All
+   in window pixels / table units. */
+function camera() {
+  const m = tblMatrix();
+  if (!vp || !m) return null;
+  const vr = vp.getBoundingClientRect();
+  return { m, persp: PERSP, left: vr.left, top: vr.top,
+           cx: vp.clientWidth * 0.5, cy: vp.clientHeight * ORIGIN_Y };
+}
+/* a point on or over the wood, as it is on the screen; null behind the lens */
+function toScreen(X, Y, Z) {
+  const c = camera(); if (!c) return null;
+  const m = c.m, z0 = Z || 0;
+  const vx = m[0] * X + m[4] * Y + m[8] * z0 + m[12];
+  const vy = m[1] * X + m[5] * Y + m[9] * z0 + m[13];
+  const vz = m[2] * X + m[6] * Y + m[10] * z0 + m[14];
+  const w = c.persp - vz;
+  if (!(w > 1)) return null;
+  return { x: c.left + c.cx + (vx - c.cx) * c.persp / w,
+           y: c.top + c.cy + (vy - c.cy) * c.persp / w };
+}
+
 root.Table3D = { mount, fit: fitTable, frame, place: placeProp, middle, MM, TABLE_M,
-                 screenToTable, onWood, ontoWood, standDown,
+                 screenToTable, onWood, ontoWood, standDown, camera, toScreen,
+                 unpeek, get peeking() { return !!peeking; },
+                 get yaw() { return yawNow(); },
                  TW, TH, get tiltDeg() { return TILT; }, get k() { return T.k; },
                  lockIn, unlock, get locked() { return lock; }, get tilt() { return TILT; } };
 

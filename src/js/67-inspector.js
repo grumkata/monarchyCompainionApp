@@ -33,7 +33,7 @@ const esc = s => String(s == null ? '' : s)
 
 let bar = null, shownId = null;
 
-const KIND = { token: 'Counter', note: 'Note', art: 'Picture', model: 'Model',
+const KIND = { token: 'Counter', note: 'Note', art: 'Picture', model: 'Model', video: 'Video',
                page: 'Page', ink: 'Drawing', scene: 'Scene' };
 
 function mount() {
@@ -58,7 +58,7 @@ function mount() {
     if (p.classList.contains('t3-note') || p.classList.contains('t3-ink')) return;
     const t = T().get(p.dataset.id);
     if (!t || !T().mayUseBox() || !T().mayTouch(t)) return;
-    if (t.kind === 'scene') return;
+    if (t.kind === 'scene' || t.kind === 'video') return;      /* a screen has no bench to open */
     e.preventDefault(); e.stopPropagation();
     edit(t.id);
   }, true);
@@ -79,11 +79,11 @@ function paint() {
   bar.innerHTML =
     `<span class="insp-k">${esc(KIND[t.kind] || t.kind)}</span>
      <b class="insp-n">${esc(name)}</b>
-     ${box && t.kind !== 'ink' ? `<button class="insp-b" data-i="edit" title="Change it  (double-click)">Edit</button>` : ''}
-     ${box && t.kind !== 'ink' ? `<button class="insp-b" data-i="dup" title="Another one, beside it">Duplicate</button>` : ''}
+     ${box && t.kind !== 'ink' && t.kind !== 'video' ? `<button class="insp-b" data-i="edit" title="Change it  (double-click)">Edit</button>` : ''}
+     ${box && t.kind !== 'ink' && t.kind !== 'video' ? `<button class="insp-b" data-i="dup" title="Another one, beside it">Duplicate</button>` : ''}
      ${box && turn ? `<button class="insp-b" data-i="turn" title="Turn it">Turn</button>` : ''}
      ${t.kind === 'token' && t.in ? '' : ''}
-     <button class="insp-b bad" data-i="bin" title="Take it off the table  (Delete)">Remove</button>
+     <button class="insp-b bad" data-i="bin" title="${t.kind === 'video' ? 'Take it off the table, and stop it  (Delete)' : 'Take it off the table  (Delete)'}">${t.kind === 'video' ? 'Take away' : 'Remove'}</button>
      <button class="insp-x" data-i="let" title="Let go of it  (Esc)">&#10005;</button>`;
 }
 

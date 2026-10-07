@@ -33,7 +33,11 @@ function roster() {
   } catch (e) { return []; }
 }
 function save(list) {
-  try { root.localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {}
+  try { root.localStorage.setItem(KEY, JSON.stringify(list)); }
+  catch (e) {
+    root.dispatchEvent(new root.CustomEvent('monarchy:savefail', { detail: { message:
+      'Your characters could not be saved — the store is full. Remove a large portrait or export a sheet.' } }));
+  }
 }
 function get(id) { return roster().find(c => c.id === id) || null; }
 
@@ -56,7 +60,8 @@ const nameOf = c => (c && ((c.who && c.who.name) || c.name)) || 'Unnamed';
    ceil(FOR x AV + Resilience) — so a token cannot disagree with the
    record it is. `pc` is what app.js reads to stand a piece on a plinth. */
 function combatant(c) {
-  const d = (root.Sheet && root.Sheet.derived) ? root.Sheet.derived(root.Sheet.fill(c))
+  const rec = root.Sheet && root.Sheet.fill ? root.Sheet.fill(c) : null;
+  const d = (root.Sheet && root.Sheet.derived) ? root.Sheet.derived(rec)
                                                : { hp: 10 };
   const nm = nameOf(c);
   return {
@@ -69,7 +74,14 @@ function combatant(c) {
     hp: d.hp, max: d.hp,
     side: 'al',                  /* a character starts on your side of the Line */
     pc: true,
-    cond: []
+    cond: [],
+    q: true, f: true,            /* both actions, so it is not drawn as already spent */
+    /* the rest of what the record says they are fought with — stamina and
+       stress as they stand (the GM changes them in a fight), armour, and
+       movement in lines by Dexterity (30-rules.js moveSpeed) */
+    sta: d.st, str: d.str, av: d.av,
+    move: (root.RULES && root.RULES.moveSpeed && rec && rec.attr)
+      ? root.RULES.moveSpeed({ attrs: { dexterity: +rec.attr.dex || 0 } }) : undefined
   };
 }
 

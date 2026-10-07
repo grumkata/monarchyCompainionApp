@@ -47,6 +47,14 @@ let rec = null;
 const el = () => doc.getElementById('tp');
 const paper = () => doc.getElementById('tp-paper');
 const current = () => rec;
+/* ANOTHER PLAYER'S SHEET IS FOR READING. The table's database refuses their
+   edits to anyone but the owner and the GM (firebase.rules.json), so a sheet
+   that let you type on it showed your change locally and then lost it. */
+function readOnly(r) {
+  const S = root.Session;
+  if (!r || !r.__shared || !(S && S.live) || r.__by === S.uid) return false;
+  return !(root.TableModel && root.TableModel.mayUseBox && root.TableModel.mayUseBox());
+}
 
 /* ══ A4, AND AT YOUR OWN PLACE ═════════════════════════════════
    Two units are one millimetre on this table (23-table3d.js), so a sheet
@@ -112,7 +120,9 @@ function makePaper() {
   p.addEventListener('pointerup', e => {
     const near = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 5;
     from = null;
-    if (near) return read();
+    /* only a LEFT press picks it up to read: a right press is the first half
+       of the double right-click that peeks at it (23-table3d.js) */
+    if (near) { if (!e.button) read(); return; }
     /* let go past the rim, it lies at the rim — not out in the room where
        nobody can see it or pick it up again */
     const D = root.Table3D;
@@ -179,10 +189,17 @@ function shell() {
     if (e.target.closest('[data-tp-away]')) return away();
     const pick = e.target.closest('[data-tp-open]');
     if (pick) return open(pick.dataset.tpOpen);
-    const r = current(); if (!r) return;
+    const r = current(); if (!r || readOnly(r)) return;
+    /* THE NUMBER BESIDE A SKILL IS A ROLL: press it, name the attribute. */
+    const badge = e.target.closest('.rolls[data-chain]');
+    if (badge) return rollMenu(badge);
     const step = e.target.closest('[data-s]');
     const onField = e.target.dataset && e.target.dataset.p != null;
     if (step && !onField) {
+      /* the pickers (Add Primary Skill, Add Background, Add Style...) are the hall's own */
+      if (/^open/.test(step.dataset.s) && root.Menu && root.Menu.codex
+          && root.Menu.codex(step.dataset.s, step.dataset.a || '', step, r,
+                             out => { if (out !== 'view') commit(r); paint(); })) return;
       const out = root.Sheet.act(r, step.dataset.s, step.dataset.a || '');
       if (out) { if (out !== 'view') commit(r); paint(); }
     }
@@ -191,7 +208,7 @@ function shell() {
   p.addEventListener('input', e => {
     const d = e.target.dataset || {};
     if (d.p == null) return;
-    const r = current(); if (!r) return;
+    const r = current(); if (!r || readOnly(r)) return;
     root.Sheet.setPath(r, d.p, e.target.value);
     /* the leaf never redraws while you write — only the numbers that moved do,
        so the caret stays where you put it (menu2.js's own rule) */
@@ -215,6 +232,49 @@ function shell() {
   return p;
 }
 
+/* ══ ROLLING A SKILL ══════════════════════════════════════════
+   The book has the GM name the active attribute for the action, so the badge
+   asks: four buttons, each the attribute and how many d6 it is. The one you
+   used last for this kind of skill (Body, Mind, Social) is lit, and starts as
+   Prowess, Intelligence, Charisma. */
+const RA_KEY = 'monarchy.rollattr.v1';
+const lastAttr = cat => { try { return (JSON.parse(root.localStorage.getItem(RA_KEY)) || {})[cat]; } catch (e) { return null; } };
+const keepAttr = (cat, k) => { try { const o = JSON.parse(root.localStorage.getItem(RA_KEY)) || {};
+                                     o[cat] = k; root.localStorage.setItem(RA_KEY, JSON.stringify(o)); } catch (e) {} };
+let menu = null, menuOff = null;
+function closeRollMenu() {
+  if (menu && menu.parentNode) menu.parentNode.removeChild(menu);
+  menu = null;
+  if (menuOff) { doc.removeEventListener('pointerdown', menuOff, true); menuOff = null; }
+}
+function rollMenu(badge) {
+  closeRollMenu();
+  const r = current();
+  if (!r || !root.Sheet || !root.Sheet.skillRoll || !root.Dice || !root.Dice.rollSkill) return;
+  const s = root.Sheet.skillRoll(r, badge.dataset.chain);
+  if (!s) return;
+  const pick = lastAttr(s.cat) || s.def;
+  menu = doc.createElement('div');
+  menu.className = 'tp-rm';
+  menu.innerHTML = `<span class="tp-rm-h"><b>${esc(s.name)}</b><i>skill ${s.total}</i></span>`
+    + s.attrs.map(a => `<button data-attr="${a.key}" class="${a.key === pick ? 'dflt' : ''}"${a.v ? '' : ' disabled'}>
+        <b>${a.v}d6</b>${esc(a.name)}</button>`).join('');
+  doc.body.appendChild(menu);
+  const b = badge.getBoundingClientRect(), m = menu.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(innerWidth - m.width - 8, b.left + b.width / 2 - m.width / 2)) + 'px';
+  menu.style.top = Math.max(8, Math.min(innerHeight - m.height - 8, b.bottom + 6)) + 'px';
+  menu.addEventListener('click', e => {
+    const a = e.target.closest('button[data-attr]'); if (!a || a.disabled) return;
+    const at = s.attrs.find(x => x.key === a.dataset.attr);
+    keepAttr(s.cat, at.key);
+    closeRollMenu();
+    root.Dice.rollSkill({ skill: s.name, trail: s.trail, attrName: at.name, pool: at.v, budget: s.total });
+  });
+  /* anywhere else lets it go; capture, because the sheet stops pointerdown */
+  menuOff = e => { if (!menu || !menu.contains(e.target)) closeRollMenu(); };
+  doc.addEventListener('pointerdown', menuOff, true);
+}
+
 /* THE RISE. Measured where it is going, animated from where the sheet
    actually lies — so it is the paper you pressed that comes up, not a
    panel that appeared. */
@@ -232,8 +292,23 @@ function rise(node, from, back) {
                                                : 'cubic-bezier(.16,.84,.24,1)' });
 }
 
+/* THE SHEET IS BIGGER THAN THE SPACE BETWEEN THE DOCKS. The reading is up to
+   944 wide and lies across the middle of the screen; the toolbox, the fight
+   panel and a player's kit card are docked on the left and sat ON TOP of its
+   left edge, swallowing the clicks — so the fields under them could not be
+   written in. (A fight panel that opens by itself made this the normal case.)
+   While a sheet is up, the docks step back; the fight panel returns with it. */
+function docksAway() {
+  if (root.Toolbox && root.Toolbox.isOpen()) root.Toolbox.shut();
+  if (root.Muster && root.Muster.isOpen()) root.Muster.yieldDock();
+  if (root.Kit && root.Kit.panel) root.Kit.close();
+}
+function docksBack() {
+  if (root.Muster && root.Muster.reopen) root.Muster.reopen();
+}
 function read() {
   if (!rec) return;
+  docksAway();
   const p = shell();
   const from = paper() && paper().getBoundingClientRect();
   openId = laidId;
@@ -253,6 +328,7 @@ function pick() {
   if (list.length === 1) return open(list[0].id);
   if (laidId) return read();            /* one is already at your end */
   const p = shell();
+  docksAway();
   p.hidden = false;
   doc.getElementById('tp-scrim').hidden = false;
   doc.body.classList.add('reading');
@@ -274,15 +350,38 @@ function open(id) {
   read();
 }
 
+/* A SHEET OPEN IN FRONT OF YOU WAS A SNAPSHOT. The reading kept the record it
+   was opened with, so when the GM changed your hit points (or you changed
+   them on another screen) your next keystroke wrote the old record back over
+   the new one. It is read again when the table's sheets change — but not
+   while you are typing in it, which would take the caret away. */
+root.addEventListener('monarchy:sheets', () => {
+  const p = el();
+  if (!openId || !p || p.hidden || !root.Characters) return;
+  const a = doc.activeElement;
+  if (a && p.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+  const r = root.Characters.get(openId);
+  if (!r) return;
+  rec = root.Sheet.fill(r); rec.id = openId;
+  paint();
+});
+
 function paint() {
   const p = el(); if (!p || !rec) return;
   p.innerHTML =
     `<div class="tp-head">
        <span class="plaque">${esc(root.Characters.nameOf(rec))}</span>
+       ${readOnly(rec) ? '<span class="tp-ro-note">Reading only &mdash; this is ' + esc(rec.__byName || 'another player') + '&rsquo;s sheet</span>' : ''}
        <button class="tp-x" data-tp-away title="Take it off the table">&#8615;</button>
        <button class="tp-x" data-tp-close title="Put it back down (Esc)">&#10005;</button>
      </div>
      <div class="tp-leaf" id="tp-leaf">${root.Sheet.render(rec)}</div>`;
+  const ro = readOnly(rec);
+  p.classList.toggle('tp-ro', ro);
+  if (ro) {
+    p.querySelectorAll('input,textarea').forEach(i => { i.readOnly = true; });
+    p.querySelectorAll('select,input[type=checkbox],input[type=radio]').forEach(i => { i.disabled = true; });
+  }
   fitLeaf();
 }
 
@@ -328,6 +427,7 @@ function close() {
     p.hidden = true;
     const s = doc.getElementById('tp-scrim'); if (s) s.hidden = true;
     doc.body.classList.remove('reading');
+    docksBack();
   };
   setTimeout(done, a ? 290 : 0);
   openId = null;

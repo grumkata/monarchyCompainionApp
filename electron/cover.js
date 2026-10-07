@@ -145,9 +145,18 @@ function attach(window, dir) {
      existed — still gets the cover off it, a beat after it has loaded */
   win.webContents.on('did-finish-load', () => setTimeout(bootDone, READY_AFTER_LOAD));
   /* and a reload of the app (restarting into a new page) is a load like any
-     other: the loading screen goes back up over it */
+     other: the loading screen goes back up over it.
+
+     ONLY OF THE PAGE ITSELF. This listened for `did-start-loading`, which Chromium
+     also raises when a frame INSIDE the page starts to load — and the GM's music is a
+     YouTube iframe. Playing a video put the loading screen back up over the whole window
+     (filmed from the OS: "the heralds are summoned…", with the video's sound playing
+     behind it), and it never came down, because what lowers it is the PAGE finishing
+     (`did-finish-load`), which an iframe never makes it do. A navigation of the main
+     frame, to a new document, is the one thing that means the app is starting again. */
   let first = true;
-  win.webContents.on('did-start-loading', () => {
+  win.webContents.on('did-start-navigation', details => {
+    if (!details.isMainFrame || details.isSameDocument) return;
     if (first) { first = false; return; }
     booting = true;
     show(true);

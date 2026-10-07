@@ -97,6 +97,41 @@ scene.add(key, fil, low);
   t.dispose(); pm.dispose();
 })();
 
+/* ══ THE DICE ARE SEEN THROUGH THE TABLE'S OWN CAMERA ═════════
+   grumkata: notes, sheets, dice and screens "look weird ... they are 2.5
+   projections and not true 3d, so the program continues to project them the
+   same way even when the camera is looking in wholly different ways".
+
+   For the dice that was literal. The throw was worked out on a tray of its
+   own, hung in the middle of the SCREEN, tilted to the angle the table had when
+   this file last looked (and with no combat sheet up it never looked again:
+   22 degrees for ever), seen through a fixed 2400 lens. Over the wood that was
+   near enough to pass. Sat in the chair, where the table is 78 degrees round
+   and the lens is a few hundred pixels, the tray was a pane of glass standing in
+   the air in front of the far wall: the dice hung in mid-room and never
+   touched the wood, and turn your head and they did not notice.
+
+   So they have a scene and a camera of their own, and the camera is the
+   table's: the same lens, the same vanishing point, the same turn of the head
+   (Table3D.camera). The throw is still worked out in its own units, untouched —
+   what moves is where those units are: the tray is laid ON THE WOOD, at the spot
+   in front of you the throw was made, square to where you were looking, and
+   it stays there. It pans, zooms and turns with the table, because it is on it. */
+const diceScene = new THREE.Scene();
+diceScene.add(new THREE.AmbientLight(0xffe9c8, 0.52));
+(function(){
+  const k = new THREE.DirectionalLight(0xfff2d8, 0.62); k.position.set(-700, 820, 1100);
+  const f = new THREE.DirectionalLight(0x93b6d8, 0.24); f.position.set( 800, 260,  700);
+  const l = new THREE.DirectionalLight(0xffd8a2, 0.50); l.position.set(-200,-760, 1400);
+  diceScene.add(k, f, l);
+})();
+diceScene.environment = scene.environment;
+/* every die, shadow and puff lives in here, so one matrix puts them all on the wood */
+const tray = new THREE.Group();
+tray.matrixAutoUpdate = false;
+diceScene.add(tray);
+const diceCam = new THREE.PerspectiveCamera(30, 1, 10, 30000);
+
 /* ── geometry ──────────────────────────────────────────────────
    Counter: a turned rim with flat printed caps, so the silhouette has
    a moulded edge instead of a hard cylinder.                        */
@@ -461,6 +496,34 @@ function markMesh(tex, size, at, normal){
   return m;
 }
 
+/* What a die is made of, for standing it on the wood: its corners (as the
+   extremes seen from sixty directions, which is all its height depends on), how far
+   its nearest flat face is from the middle (the height it lies at), and its reach. */
+function finishDie(group, lands, geo){
+  const pos = geo.attributes.position, uniq = [], seen = new Set();
+  for (let i = 0; i < pos.count; i++){
+    const key = pos.getX(i).toFixed(3) + ',' + pos.getY(i).toFixed(3) + ',' + pos.getZ(i).toFixed(3);
+    if (!seen.has(key)){ seen.add(key); uniq.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i))); }
+  }
+  const hull = [], pick = new Set(), N = 60;
+  for (let j = 0; j < N; j++){
+    const y = 1 - 2 * (j + .5) / N, r = Math.sqrt(1 - y*y), a = j * 2.399963;
+    const dv = new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r);
+    let best = -1, bd = -Infinity;
+    for (let i = 0; i < uniq.length; i++){ const dd = uniq[i].dot(dv); if (dd > bd){ bd = dd; best = i; } }
+    if (best >= 0 && !pick.has(best)){ pick.add(best); hull.push(uniq[best]); }
+  }
+  let R = 0; hull.forEach(p => { R = Math.max(R, p.length()); });
+  let inr = Infinity;
+  facesOf(geo).forEach(f => {
+    if (f.a < 1e-4) return;
+    let sup = -Infinity; hull.forEach(p => { sup = Math.max(sup, p.dot(f.n)); });
+    inr = Math.min(inr, sup);
+  });
+  if (!isFinite(inr) || inr <= 0.05) inr = R * 0.5;
+  return { group, lands, hull, R, inr };
+}
+
 const DIE = {};
 function buildDie(kind){
   if (DIE[kind]) return DIE[kind];
@@ -503,7 +566,7 @@ function buildDie(kind){
         if (best) lands[row[3]-1] = best.n.clone();
       });
     }
-    return (DIE[kind] = {group, lands});
+    return (DIE[kind] = finishDie(group, lands, geo));
   }
 
   /* ── hand-built d10 and d12 ── */
@@ -529,113 +592,252 @@ function buildDie(kind){
                        kind === 10 ? 0.58 : 0.66, f.c, f.n));
     lands[val-1] = f.n.clone();
   });
-  return (DIE[kind] = {group, lands});
+  return (DIE[kind] = finishDie(group, lands, geo));
 }
 
-/* ── live dice: a small rigid-body sim ─────────────────────────
-   Scripted arcs read as stiff because nothing is ever surprised. So the
-   dice are actually thrown: gravity, bounce, friction, walls, and dice
-   knocking into each other. All of it runs in the TRAY'S OWN UNITS — a
-   flat (x,y) on the board plus a height along the board normal — which
-   keeps the maths 2D-simple and means pan and zoom cost nothing.
+/* ── live dice: THROWN AHEAD OF TIME, THEN PLAYED ──────────────
+   The first version of this ran a sim live and, when a die finally stopped,
+   ROCKED it over onto the face the chat had printed. A sim of spheres knows
+   nothing about faces, so every die was lying on some other face and was nudged
+   round to the right one at the very end of the roll: "it jerkily forces itself
+   into the result".
 
-   The result is still decided before the throw. What the sim decides is
-   only where a die ends up and how it got there; when one finally slows
-   down it rocks over to its result face by the SHORTEST path from
-   wherever it happens to be lying, so settling reads as the die tipping
-   onto a face rather than snapping to one.
+   Now the whole throw is worked out in one go when the dice are made — gravity,
+   bounce, the friction of the felt, the walls, dice knocking into each other — and
+   RECORDED. Nothing in that sim depends on which face is which, so the die's own
+   axes are then turned by ONE fixed amount so that, at the instant it stops, the
+   face that was rolled is the one pointing up. Every moment before that is the
+   rolling the sim produced, unchanged, which simply happens to finish on the right
+   face; there is no step at the end that corrects anything. What is shown is that
+   recording. The number is still decided first, and the throw only has to end
+   on it.
+
+   A die also stands as tall as its own corners say (a cube tipped on an edge is
+   higher than one lying flat) and throws a shadow on the wood that tightens as it
+   comes down, so it reads as a thing on the table and not a picture over it.
 ═══════════════════════════════════════════════════════════════ */
 const rolling = [];
-let diceAnchor = null, restClock = 0, simAcc = 0;
+let playT = 0;
 
-const G       = 4400;   // table units / s², tuned to the tray, not to Earth
-const BOUNCE  = 0.42;   // how much of the fall comes back
-const SLIDE   = 0.86;   // speed kept through a real impact
+const DT      = 1/120;  // the throw is worked out at this step
+const SIM_MAX = 7;      // seconds; a throw that has not stopped by then is stopped
+const G       = 1800;   // table units / s², tuned to the tray, not to Earth
+const BOUNCE  = 0.46;   // how much of the fall comes back
+const SLIDE   = 0.88;   // speed kept through a real impact
 const IMPACT  = 90;     // below this, contact is resting — NOT a bounce
-const ROLLFRIC= 0.5;    // viscous part of the felt's drag
-const MU      = 0.30;   // Coulomb part — this is what makes a die STOP
-const ANGMU   = 26;     // rad/s^2, likewise for the spin
-const AIRDRAG = 0.18;
-const SPINDRAG= 1.1;
-const WALL    = 0.62;
-const HIT     = 0.5;    // die on die
-const ROLLCPL = 7;      // how hard motion drives spin, so they roll not slide
-const SLEEP_V = 22, SLEEP_W = 1.4, SETTLE_T = 0.20;
-const HOLD = 2.2, FADE = 0.85;
-/* ── HOW BIG A THROW IS ON THE WOOD ────────────────────────────
-   grumkata, after the first night with other people at the table: "dice
-   rolls need to be made bigger visually". The sim stays in the tray's own
-   units and is untouched — the bounces, the settling and the landing on the
-   face the chat printed all behave exactly as before; the whole throw is
-   simply drawn this much larger about the tray's centre. A real die is
-   fifteen millimetres on a table two metres across, which is honest and
-   invisible from a chair. */
-const DICE_SCALE = 2.8;
+const ROLLFRIC= 0.35;   // viscous part of the felt's drag
+const MU      = 0.22;   // Coulomb part — this is what makes a die STOP
+const ANGMU   = 15;     // rad/s^2, likewise for the spin
+const AIRDRAG = 0.12;
+const SPINDRAG= 0.6;
+const WALL    = 0.60;
+const HIT     = 0.55;   // die on die
+const ROLLCPL = 6;      // how hard motion drives spin, so they roll not slide
+const SLEEP_V = 18, SLEEP_W = 1.2, SETTLE_T = 0.12;
+const HOLD = 3.2, FADE = 0.8;
+/* ── WHERE, AND HOW BIG ────────────────────────────────────────
+   grumkata: "dice rolls need to be made bigger visually", and then, of this one,
+   "it looks ass". The throw used to be tied to a small tray lying on the table, so
+   it was as big as the table was zoomed: at the usual fit-the-table zoom a die was
+   forty pixels wide, thrown across a patch you could cover with a thumb.
+
+   Now it is tied to the SCREEN: the free part of the window (between the GM's rail
+   and the chat), and sized against the window's height, so a roll is the same size
+   in front of you wherever the table has been panned or however far it is zoomed. */
+function stage(){
+  const chat = document.querySelector('.chatdock');
+  const cr = chat && chat.offsetWidth ? chat.getBoundingClientRect() : null;
+  const right = cr && cr.left > 200 ? cr.left : W, left = Math.min(70, W * 0.1);
+  return { k: Math.max(0.55, Math.min(1.5, H / 980)) * 0.95, sx: (left + right) / 2, sy: H * 0.52, w: right - left };
+}
+
+/* ── WHERE ON THE WOOD, AND AT WHAT SIZE ───────────────────────
+   Decided ONCE, when the throw is made, and then left alone: a throw that
+   re-chose its place every frame would slide over the wood as you panned. The
+   spot is the one the old tray was aimed at — the middle of the free part of
+   the window, `stage()` — but ON THE WOOD: asked of the table's own
+   screen-to-table, and if that ray runs over the far rim or off into the room
+   (it does, sat in the chair) it is walked down the screen until it lands
+   on the wood. The tray's axes are turned against your head, so "up the
+   table" is away from you whichever way you are facing. `s` is table units per
+   unit of the throw, chosen so a die is as big on the screen there as it
+   always was (they were made bigger on purpose: "dice rolls need to be made
+   bigger visually"). Null, and the old screen tray is used, if there is no table
+   camera to ask. */
+let anchor = null;
+function anchorTray(){
+  const D = window.Table3D;
+  if (!D || !D.camera || !D.camera()) return null;
+  const st = stage();
+  let P = null;
+  for (let f = 0.52; f <= 0.97 && !P; f += 0.03){
+    const sy = H * f, w = D.screenToTable(st.sx, sy), back = D.toScreen(w.x, w.y, 0);
+    /* in front of the lens, on the wood, and really where it was asked for: a ray
+       above the horizon meets the plane behind the camera and projects elsewhere */
+    if (back && Math.abs(back.x - st.sx) < 3 && Math.abs(back.y - sy) < 3 && D.onWood(w.x, w.y, 500)) P = w;
+  }
+  const mid = { x: D.TW / 2, y: D.TH / 2 };
+  if (!P) P = mid;
+  const a = -(D.yaw || 0) * Math.PI / 180;
+  /* table units per unit of the throw that make a die as big on the screen at Q
+     as it always was; null if Q is behind the lens */
+  const sizeAt = Q => {
+    const A = D.toScreen(Q.x, Q.y, 0), B = D.toScreen(Q.x + 100 * Math.cos(a), Q.y + 100 * Math.sin(a), 0);
+    if (!A || !B) return null;
+    const ppu = Math.hypot(B.x - A.x, B.y - A.y) / 100;     /* screen pixels per table unit, across the throw */
+    return ppu > 1e-4 ? st.k / ppu : null;
+  };
+  /* ...BUT NEVER A THROW BIGGER THAN THE WOOD. Sat in the chair the table is a
+     few hundred pixels across, so a tray as big as the old one was on the screen
+     is wider than the table and spills over the far rim into the room — which is
+     exactly the dice hanging in front of the wall. The tray (and the way in over
+     the near edge, which is half as far again) has to fit on the wood; if it
+     cannot where the screen put it, it goes to the middle of the table, and if it
+     still cannot it is made smaller, which is what a table further away does. */
+  const T = trayHalf(), EXT = Math.hypot(T.x, T.y * 1.5);   /* the throw's own units */
+  const room = Q => (D.TW / 2 - 200 - Math.hypot(Q.x - mid.x, Q.y - mid.y)) / EXT;
+  let s = sizeAt(P);
+  if (s == null) return null;
+  if (s > room(P)){ P = mid; s = sizeAt(P); if (s == null) return null; }
+  s = Math.min(s, room(P));
+  return { x: P.x, y: P.y, a, s };
+}
+
+/* The tray's matrix, every frame: the throw's units -> the table's -> the screen's.
+   The dice are still placed by stepDice() in the old tray's frame (`Wold`: the
+   stage point, k pixels a unit, the board basis), so this is the one matrix that
+   takes that frame to the wood — `Wnew` · `Wold`⁻¹ — and nothing in the throw
+   had to change. (The layer's world is the table's CSS pixels about the vanishing
+   point, y up, which is what Mfl is.) */
+const _Mfl = new THREE.Matrix4(), _Mtb = new THREE.Matrix4(), _Mst = new THREE.Matrix4();
+const _Mo = new THREE.Matrix4(), _Mr = new THREE.Matrix4(), _Ms = new THREE.Matrix4();
+function placeTray(st, c){
+  const s = anchor.s, ca = Math.cos(anchor.a), sa = Math.sin(anchor.a);
+  _Mfl.set(1,0,0,-c.cx,   0,-1,0,c.cy,   0,0,1,0,   0,0,0,1);
+  _Mtb.fromArray(c.m);
+  /* the throw's x, up-table and up -> the table's x, y (which runs toward you) and z */
+  _Mst.set(s*ca,  s*sa, 0, anchor.x,
+           s*sa, -s*ca, 0, anchor.y,
+           0,     0,    s, 0,
+           0,     0,    0, 1);
+  tray.matrix.copy(_Mfl).multiply(_Mtb).multiply(_Mst);
+  _Mo.makeTranslation(st.sx - W/2, (H/2 - st.sy) + OY, 0);
+  _Ms.makeScale(st.k, st.k, st.k);
+  _Mr.makeBasis(BX, BY, BN);
+  _Mo.multiply(_Ms).multiply(_Mr);                          /* Wold */
+  tray.matrix.multiply(_Mo.invert());
+  tray.matrixWorldNeedsUpdate = true;
+}
+/* the camera: the table's lens, with the vanishing point where the table has it */
+function aimCam(c){
+  const P = c.persp;
+  diceCam.fov = 2 * Math.atan(H / (2 * P)) * 180 / Math.PI;
+  diceCam.aspect = W / H;
+  diceCam.near = Math.max(4, P * 0.05);
+  diceCam.far = P + 30000;
+  diceCam.position.set(0, 0, P);
+  diceCam.setViewOffset(W, H, W/2 - (c.left + c.cx), H/2 - (c.top + c.cy), W, H);
+  diceCam.updateProjectionMatrix();
+}
+/* the pieces first, then the dice over them through their own camera */
+function draw(){
+  renderer.render(scene, camera);
+  if (!rolling.length && !puffs.length) return;
+  const D = window.Table3D, c = anchor && D && D.camera && D.camera();
+  const ac = renderer.autoClear;
+  renderer.autoClear = false;
+  renderer.clearDepth();
+  if (c){ aimCam(c); placeTray(stage(), c); renderer.render(diceScene, diceCam); }
+  else { tray.matrix.identity(); tray.matrixWorldNeedsUpdate = true; renderer.render(diceScene, camera); }
+  renderer.autoClear = ac;
+}
 
 /* board basis: right, up-table, and the normal — the sim's three axes */
 const BX = new THREE.Vector3(1,0,0);
 const BY = new THREE.Vector3(0, Math.cos(TILT), -Math.sin(TILT));
 const BN = new THREE.Vector3(0, Math.sin(TILT),  Math.cos(TILT));
 const BOARDQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), BN);
+const SHQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), BN);   // a flat disc lying on the board
 
-/* Called whenever the page's tilt changes. Rebuilds every derived axis, and
-   re-derives the resting orientation of any die already lying down — a die that
-   settled at 22 degrees is not settled at 0. */
+/* Called whenever the page's tilt changes. A throw is recorded against the tilt it
+   was made at; playing it back at another is a turn of the whole thing about the
+   board's own axis (see pose()), so nothing is re-worked here. */
 function setTilt(t){
   TILT = t; AXIS = Math.PI/2 - TILT;
   UP.set(0, Math.sin(TILT), Math.cos(TILT));
   BY.set(0, Math.cos(TILT), -Math.sin(TILT));
   BN.copy(UP);
   BOARDQ.setFromUnitVectors(new THREE.Vector3(0,1,0), BN);
-  rolling.forEach(d => {
-    if (!d.endQ) return;
-    d.endQ = restingQuat(d);
-    if (d.asleep) d.q.copy(d.endQ);
-  });
+  SHQ.setFromUnitVectors(new THREE.Vector3(0,0,1), BN);
   dirty = 3;
 }
 
+/* how much room a throw has, in the throw's own units (a unit is k pixels) */
 function trayHalf(){
-  const w = (diceAnchor && diceAnchor.offsetWidth)  || 620;
-  const h = (diceAnchor && diceAnchor.offsetHeight) || 400;
-  return {x:w/2, y:h/2};
+  const st = stage();
+  return { x: st.w * 0.36 / st.k, y: H * 0.27 / st.k };
+}
+
+/* a soft dark spot, for under a die */
+let shadowTexture = null;
+const shadowGeo = new THREE.PlaneGeometry(1, 1);
+function shadowTex(){
+  if (shadowTexture) return shadowTexture;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 31);
+  g.addColorStop(0, 'rgba(0,0,0,.95)'); g.addColorStop(.5, 'rgba(0,0,0,.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  shadowTexture = new THREE.CanvasTexture(c);
+  return shadowTexture;
 }
 
 function spawnDie(kind, result, i, total){
   const proto = buildDie(kind);
   const obj = proto.group.clone(true);
   obj.traverse(o => { if (o.material){ o.material = o.material.clone(); o.material.transparent = true; } });
-  scene.add(obj);
+  obj.visible = false;
+  tray.add(obj);
+  const shadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial(
+    { map: shadowTex(), transparent: true, depthWrite: false, opacity: 0, toneMapped: false }));
+  shadow.renderOrder = -1; shadow.visible = false;
+  tray.add(shadow);
 
   const idx  = kind === 'coin' ? (result === 'Heads' ? 0 : 1) : result - 1;
   const land = proto.lands[idx] || proto.lands[0] || new THREE.Vector3(0,1,0);
 
-  /* a fistful shrinks so it still fits the tray */
-  const size = Math.min(30, Math.max(13, 30 * Math.sqrt(7 / Math.max(1,total))));
+  /* a fistful shrinks so it still fits the tray; and the pack's models all share one
+     unit radius, which makes a d20 look like a pea beside a d6 — each kind is brought
+     to the size it is in a hand */
+  const KSCALE = { 4: 1.05, 8: 1.2, 10: 1.2, 12: 1.2, 20: 1.3, coin: 1 };
+  const size = Math.min(34, Math.max(14, 34 * Math.sqrt(7 / Math.max(1,total)))) * (KSCALE[kind] || 1);
   const R = trayHalf();
-  const rad = size * (kind === 'coin' ? 0.72 : 0.66);
+  /* how far apart two of them stand, and how high one stands when it is lying flat:
+     from the model's own shape, not a guess */
+  const rad = size * (kind === 'coin' ? proto.R * 0.9 : proto.inr * 1.2);        /* room for a corner as well as a face */
+  const hr  = size * proto.inr;
 
   /* Thrown in over the near edge, fanning up-table — spread the launch across
      the width and vary every component, or a handful arrives as one clump and
      lands in a tidy diagonal, which is the other way fake dice give themselves
      away. */
   const lane = total > 1 ? (i / (total-1) - 0.5) : (Math.random()-.5);
-  rolling.push({
-    obj, land, rad, size, kind,
-    x: (lane * 0.62 - 0.12) * R.x * 2 + (Math.random()-.5) * size * 2,
-    y: -R.y * (1.10 + Math.random() * 0.30),
-    h:  size * (3.4 + Math.random() * 3.0),
-    vx: -60 + lane * 260 + (Math.random()-.5) * 320,
-    vy: 430 + Math.random() * 300,
-    vh: 70 + Math.random() * 170,
+  return {
+    obj, shadow, proto, land, rad, hr, size, kind,
+    x: (lane * 0.70 - 0.08) * R.x * 2 + (Math.random()-.5) * size * 2,
+    y: -R.y * (1.18 + Math.random() * 0.30),
+    h:  size * (2.5 + Math.random() * 2.2),
+    vx: -50 + lane * 220 + (Math.random()-.5) * 260,
+    vy: 430 + Math.random() * 250,
+    vh: 200 + Math.random() * 220,
     w: new THREE.Vector3(Math.random()-.5, Math.random()-.5, Math.random()-.5)
-         .normalize().multiplyScalar(19 + Math.random()*16),
+         .normalize().multiplyScalar(14 + Math.random()*14),
     q: new THREE.Quaternion().setFromEuler(new THREE.Euler(
          Math.random()*6, Math.random()*6, Math.random()*6)),
-    slow: 0, asleep: false, endQ: null, blend: 0,
-    delay: i * 0.045, t: 0
-  });
-  restClock = 0;
+    slow: 0, asleep: false, inside: false,
+    delay: i * Math.min(0.045, 0.6 / Math.max(1, total)),
+    start: 0, out: null, life: 0, ei: 0, ev: [], tr: null, bq0: null
+  };
 }
 
 /* the resting orientation nearest to how the die is already lying: put the
@@ -649,26 +851,26 @@ function restingQuat(d){
 }
 
 const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
-function simStep(dt){
+const _q2 = new THREE.Quaternion(), _qi = new THREE.Quaternion(), _u = new THREE.Vector3();
+/* one step of the throw. `bt` is how long since it began; what happens that a
+   person would HEAR or see kick up dust is written to `ev` with its time, to be
+   played when the recording reaches it. */
+function simStep(dt, list, bt, ev){
   const R = trayHalf();
-  const live = rolling.filter(d => d.t >= d.delay);
+  const live = list.filter(d => bt >= d.delay);
 
   live.forEach(d => {
     if (d.asleep) return;
-    const grounded = d.h <= d.rad + 0.5;
+    const grounded = d.h <= d.hr + 0.5;
 
     d.vh -= G * dt;
     d.h  += d.vh * dt;
-    if (d.h < d.rad){
-      d.h = d.rad;
+    if (d.h < d.hr){
+      d.h = d.hr;
       /* Only a real impact costs speed and spin. Resting contact must not, or
          the felt bills the die 120 times a second and it stops dead. */
       if (d.vh < -IMPACT){
-        /* THE ONE MOMENT THIS TABLE HAS THAT IS AN IMPACT. Reported before
-           the bounce is resolved, so `vh` is still the speed it arrived at
-           rather than the speed it leaves at — how hard it hit is the whole
-           of what the feedback is scaled by. */
-        impact(d, -d.vh);
+        ev.push({ d, t: bt, s: -d.vh, x: d.x, y: d.y });
         d.vh = -d.vh * BOUNCE;
         d.vx *= SLIDE; d.vy *= SLIDE;
         d.w.multiplyScalar(0.86);
@@ -698,10 +900,14 @@ function simStep(dt){
       }
     }
 
-    /* walls */
+    /* walls. The near one is a door the dice are thrown in through: it only shuts
+       behind a die once it is in. (It used to be shut from the first step, so a die
+       thrown from in front of the table was clamped inside in one frame and
+       appeared in the middle of the wood as if from nowhere.) */
+    if (!d.inside && (d.y > -R.y + d.rad + 1 || bt - d.delay > 1.5)) d.inside = true;
     if (d.x < -R.x + d.rad){ d.x = -R.x + d.rad; d.vx = Math.abs(d.vx)*WALL; d.w.z -= d.vx*0.03; }
     if (d.x >  R.x - d.rad){ d.x =  R.x - d.rad; d.vx = -Math.abs(d.vx)*WALL; d.w.z += d.vx*0.03; }
-    if (d.y < -R.y + d.rad){ d.y = -R.y + d.rad; d.vy = Math.abs(d.vy)*WALL; d.w.x += d.vy*0.03; }
+    if (d.inside && d.y < -R.y + d.rad){ d.y = -R.y + d.rad; d.vy = Math.abs(d.vy)*WALL; d.w.x += d.vy*0.03; }
     if (d.y >  R.y - d.rad){ d.y =  R.y - d.rad; d.vy = -Math.abs(d.vy)*WALL; d.w.x -= d.vy*0.03; }
   });
 
@@ -726,12 +932,10 @@ function simStep(dt){
       A.w.x += ny*kick; A.w.z -= nx*kick;
       B.w.x -= ny*kick; B.w.z += nx*kick;
       A.asleep = B.asleep = false; A.slow = B.slow = 0;
-      if (A.blend > 0) A.blend = 0;
-      if (B.blend > 0) B.blend = 0;
     }
   }
 
-  /* spin, then settle */
+  /* spin, and stopping */
   live.forEach(d => {
     if (d.asleep) return;
     const wl = d.w.length();
@@ -739,17 +943,72 @@ function simStep(dt){
       _q.setFromAxisAngle(_v.copy(d.w).normalize(), wl * dt);
       d.q.premultiply(_q);
     }
-    const still = d.h <= d.rad + 0.5 && Math.hypot(d.vx, d.vy) < SLEEP_V && wl < SLEEP_W;
+    const still = d.h <= d.hr + 0.5 && Math.hypot(d.vx, d.vy) < SLEEP_V && wl < SLEEP_W;
     d.slow = still ? d.slow + dt : 0;
-    if (d.slow > SETTLE_T){
-      if (!d.endQ) d.endQ = restingQuat(d);
-      d.blend = Math.min(1, d.blend + dt / 0.30);
-      d.q.slerp(d.endQ, d.blend < 1 ? 1 - Math.pow(1 - d.blend, 3) : 1);
-      const ease = Math.max(0, 1 - 9 * dt);
-      d.w.multiplyScalar(ease); d.vx *= ease; d.vy *= ease;
-      if (d.blend >= 1){ d.asleep = true; d.vx = d.vy = 0; d.w.set(0,0,0); }
-    }
+    if (d.slow > SETTLE_T){ d.asleep = true; d.vx = d.vy = 0; d.w.set(0,0,0); }
   });
+}
+
+/* WORK THE WHOLE THROW OUT, AND KEEP IT. */
+function bake(batch){
+  const ev = [];
+  const maxSteps = Math.round(SIM_MAX / DT);
+  batch.forEach(d => {
+    d.tr = { n: 0, p: new Float32Array((maxSteps + 2) * 3), q: new Float32Array((maxSteps + 2) * 4) };
+    d.bq0 = BOARDQ.clone();
+  });
+  let step = 0;
+  const lastDelay = batch.reduce((m, d) => Math.max(m, d.delay), 0);
+  while (step < maxSteps){
+    const bt = step * DT;
+    simStep(DT, batch, bt, ev);
+    batch.forEach(d => {
+      const p = d.tr.p, q = d.tr.q, s = step;
+      p[s*3] = d.x; p[s*3+1] = d.y; p[s*3+2] = d.h;
+      q[s*4] = d.q.x; q[s*4+1] = d.q.y; q[s*4+2] = d.q.z; q[s*4+3] = d.q.w;
+    });
+    step++;
+    if (bt > lastDelay + 0.2 && batch.every(d => d.asleep)) break;
+  }
+  const n = step;
+  /* the one fixed turn of each die's own axes that makes it end on its rolled face */
+  batch.forEach(d => {
+    d.tr.n = n;
+    const q = d.tr.q;
+    const last = new THREE.Quaternion(q[(n-1)*4], q[(n-1)*4+1], q[(n-1)*4+2], q[(n-1)*4+3]);
+    d.q.copy(last);
+    const B = last.clone().invert().multiply(restingQuat(d));
+    for (let s = 0; s < n; s++){
+      _q2.set(q[s*4], q[s*4+1], q[s*4+2], q[s*4+3]).multiply(B);
+      q[s*4] = _q2.x; q[s*4+1] = _q2.y; q[s*4+2] = _q2.z; q[s*4+3] = _q2.w;
+    }
+    d.life = n * DT + HOLD;
+    d.ev = ev.filter(e => e.d === d).sort((a, b) => a.t - b.t);
+  });
+}
+
+/* where a die is, and how it is lying, `t` seconds into its throw */
+const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qt = new THREE.Quaternion();
+function pose(d, t){
+  const tr = d.tr, f = Math.max(0, t) / DT;
+  const i0 = Math.min(tr.n - 1, Math.floor(f)), i1 = Math.min(tr.n - 1, i0 + 1);
+  const a = i0 >= tr.n - 1 ? 0 : f - i0;
+  const p = tr.p, q = tr.q;
+  d.x = p[i0*3]   + (p[i1*3]   - p[i0*3])   * a;
+  d.y = p[i0*3+1] + (p[i1*3+1] - p[i0*3+1]) * a;
+  let h = p[i0*3+2] + (p[i1*3+2] - p[i0*3+2]) * a;
+  _qa.set(q[i0*4], q[i0*4+1], q[i0*4+2], q[i0*4+3]);
+  _qb.set(q[i1*4], q[i1*4+1], q[i1*4+2], q[i1*4+3]);
+  _qa.slerp(_qb, a);
+  /* the throw was recorded at one tilt; at another the whole thing turns with the board */
+  _qt.copy(BOARDQ).multiply(_q2.copy(d.bq0).invert());
+  d.q.copy(_qt).multiply(_qa);
+  /* as high as its lowest corner says */
+  _qi.copy(d.q).invert(); _u.copy(BN).applyQuaternion(_qi);
+  let low = 0;
+  const hull = d.proto.hull;
+  for (let i = 0; i < hull.length; i++){ const s = hull[i].dot(_u); if (s < low) low = s; }
+  d.h = Math.max(h, -low * d.size);
 }
 
 /* ══ WHAT A DIE KICKS UP WHEN IT LANDS ═══════════════════════
@@ -778,6 +1037,9 @@ let dustMode = 'points';
 let puffs = [];
 
 function impact(d, speed) {
+  /* THE SOUND OF A DIE ON THE WOOD, as hard as it landed. It used to be a canned
+     clatter thrown at the whole roll the moment it was typed; now every bounce is
+     its own knock, so a roll sounds like what the dice are doing. */
   if (speed < MIN_HIT) return;
   const k = Math.min(1, (speed - MIN_HIT) / (REF_HIT - MIN_HIT));
   if (dustMode === 'sheet') return sheetPuff(d, k);
@@ -830,7 +1092,7 @@ function pointPuff(d, k) {
     blending: THREE.NormalBlending, toneMapped: false });
   const pts = new THREE.Points(g, m);
   pts.frustumCulled = false;
-  scene.add(pts);
+  tray.add(pts);
   puffs.push({ pts, st, x: d.x, y: d.y, h: d.rad * 0.35, t: 0,
                span: 0.62, k, a0: m.opacity });
 }
@@ -853,7 +1115,7 @@ function sheetPuff(d, k) {
   const m = new THREE.SpriteMaterial({ map, transparent: true,
     depthWrite: false, toneMapped: false, opacity: 0.95 });
   const sp = new THREE.Sprite(m);
-  scene.add(sp);
+  tray.add(sp);
   puffs.push({ sprite: sp, cells: sheetCells, x: d.x, y: d.y, h: d.rad * 0.6,
                t: 0, span: 0.55, k });
 }
@@ -866,7 +1128,7 @@ function stepPuffs(dt, k, cx, cy) {
     const P = puffs[i];
     P.t += dt;
     if (P.t >= P.span) {
-      scene.remove(P.pts || P.sprite);
+      tray.remove(P.pts || P.sprite);
       if (P.pts) { P.pts.geometry.dispose(); P.pts.material.dispose(); }
       else { P.sprite.material.map.dispose(); P.sprite.material.dispose(); }
       puffs.splice(i, 1); continue;
@@ -898,91 +1160,91 @@ function stepPuffs(dt, k, cx, cy) {
   }
 }
 
-function stepDice(dt, anchor){
-  /* a puff outlives the die that raised it — the last die can be gone from
-     `rolling` while its dust is still in the air, so the early-out has to
-     let the puffs finish rather than freezing them mid-fade */
-  if (!rolling.length) {
-    if (puffs.length) {
-      const TW0 = (diceAnchor && diceAnchor.offsetWidth) || 620;
-      stepPuffs(dt, (anchor ? anchor.width / TW0 : 0.55) * DICE_SCALE,
-                anchor ? anchor.left + anchor.width/2 - W/2 : 0,
-                anchor ? (H/2 - (anchor.top + anchor.height/2)) + OY : OY);
-      mark();
-    }
-    return;
-  }
-  const TWu = (diceAnchor && diceAnchor.offsetWidth) || 620;
-  const k  = (anchor ? anchor.width / TWu : 0.55) * DICE_SCALE;
-  const cx = anchor ? anchor.left + anchor.width/2 - W/2 : 0;
-  const cy = anchor ? (H/2 - (anchor.top + anchor.height/2)) + OY : OY;
+/* what the recording reaches: a die landing (a knock, and dust if it landed hard),
+   or one die meeting another (a knock) */
+function fireEvent(d, e){
+  impact({ x: e.x, y: e.y, rad: d.rad }, e.s);
+}
 
-  rolling.forEach(d => d.t += dt);
-  /* fixed sub-steps: a bounce resolved at a variable rate is a bounce that
-     behaves differently on every machine */
-  simAcc = Math.min(simAcc + dt, 0.1);
-  while (simAcc >= 1/120){ simStep(1/120); simAcc -= 1/120; }
+/* a new throw sweeps the last one off the wood */
+function retire(){ rolling.forEach(d => { if (d.out == null) d.out = playT; }); }
 
-  stepPuffs(dt, k, cx, cy);
+function dropDie(d){
+  tray.remove(d.obj); tray.remove(d.shadow);
+  d.obj.traverse(x => { if (x.material) x.material.dispose(); });
+  d.shadow.material.dispose();
+}
 
-  const allAsleep = rolling.every(d => d.asleep);
-  restClock = allAsleep ? restClock + dt : 0;
+function stepDice(dt){
+  playT += Math.min(dt, 0.05);
+  const st = stage(), k = st.k;
+  const cx = st.sx - W/2;
+  const cy = (H/2 - st.sy) + OY;
 
   for (let i = rolling.length - 1; i >= 0; i--){
-    const d = rolling[i];
-    if (d.t < d.delay){ d.obj.visible = false; continue; }
+    const d = rolling[i], t = playT - d.start;
+    let alpha = 1;
+    if (d.out != null) alpha = 1 - (playT - d.out) / 0.3;
+    else if (t > d.life) alpha = 1 - (t - d.life) / FADE;
+    if (alpha <= 0){ dropDie(d); rolling.splice(i, 1); continue; }
+    if (t < d.delay){ d.obj.visible = false; d.shadow.visible = false; continue; }
+
+    while (d.ei < d.ev.length && d.ev[d.ei].t <= t) fireEvent(d, d.ev[d.ei++]);
+    pose(d, t);
+
     d.obj.visible = true;
     d.obj.scale.setScalar(d.size * k);
     d.obj.quaternion.copy(d.q);
     _v.set(0,0,0).addScaledVector(BX, d.x).addScaledVector(BY, d.y).addScaledVector(BN, d.h);
     d.obj.position.set(cx + _v.x*k, cy + _v.y*k, _v.z*k);
+    d.obj.traverse(x => { if (x.material) x.material.opacity = alpha; });
 
-    if (restClock > HOLD){
-      const o = 1 - (restClock - HOLD) / FADE;
-      if (o <= 0){
-        scene.remove(d.obj);
-        d.obj.traverse(x => { if (x.material) x.material.dispose(); });
-        rolling.splice(i,1); continue;
-      }
-      d.obj.traverse(x => { if (x.material) x.material.opacity = o; });
-    }
+    /* its shadow: right under it when it is down, wider, fainter and thrown a
+       little down-table and to the right (the lamp is up and to the left) when
+       it is in the air */
+    const above = Math.max(0, d.h - d.hr), lift = above / d.size;
+    const spread = d.rad * (2.3 + 0.9 * lift);
+    _v.set(0,0,0).addScaledVector(BX, d.x + above * 0.24).addScaledVector(BY, d.y - above * 0.18).addScaledVector(BN, 0.5);
+    d.shadow.position.set(cx + _v.x*k, cy + _v.y*k, _v.z*k);
+    d.shadow.quaternion.copy(SHQ);
+    d.shadow.scale.set(spread * k, spread * k, 1);
+    d.shadow.material.opacity = 0.68 / (1 + lift / 1.2) * alpha;
+    d.shadow.visible = true;
   }
+  stepPuffs(dt, k, cx, cy);
 }
 
 window.GLDice = {
   /* which dust. 'points' ships; 'sheet' is here to be compared against it. */
   get dust(){ return dustMode; },
   set dust(v){ dustMode = (v === 'sheet') ? 'sheet' : 'points'; },
-  spawn(list){ list.forEach((d,i) => spawnDie(d.kind, d.result, i, list.length)); mark(); },
+  /* A throw: the whole of it is worked out here, now, and then played. */
+  spawn(list){
+    retire();
+    anchor = anchorTray();                 /* where on the wood this throw lies, and it stays there */
+    const batch = list.map((d,i) => spawnDie(d.kind, d.result, i, list.length));
+    bake(batch);
+    batch.forEach(d => { d.start = playT + 0.04; pose(d, 0); rolling.push(d); });
+    mark();
+  },
   busy(){ return rolling.length > 0; },
-  /* every settled die reports how squarely its declared face is pointing at the
-     ceiling — 1.0 means the number the chat printed is the number on top */
-  /* runs the sim in fixed slices with the clock held, so a throw can be
-     filmed or traced at exact times instead of at whatever rate rAF managed */
+  /* where on the wood the last throw lies, in table units (the tests check it is ON the wood) */
+  _anchor(){ return anchor && { x: anchor.x, y: anchor.y, s: anchor.s, reach: Math.hypot(trayHalf().x, trayHalf().y * 1.5) * anchor.s }; },
+  /* where every die is pointing, now (the tests watch it turn) */
+  _q(){ return rolling.map(d => d.q.toArray()); },
+  /* plays the throw on in fixed slices with the clock held, so it can be filmed
+     or traced at exact times instead of at whatever rate rAF managed */
   _advance(sec){
-    /* THE DUST IS PART OF THE SIM AND HAS TO BE ADVANCED WITH IT. Without
-       this the dice move in the fixed slices below while their puffs age on
-       real wall-clock time in stepDice — two clocks for one event, so a
-       throw filmed here lands with its dust either unborn or already spent,
-       and never at the moment it was raised. */
-    const a = diceAnchor && diceAnchor.getBoundingClientRect();
-    const TWu = (diceAnchor && diceAnchor.offsetWidth) || 620;
-    const pk = (a ? a.width / TWu : 0.55) * DICE_SCALE;
-    const pcx = a ? a.left + a.width / 2 - W / 2 : 0;
-    const pcy = a ? (H / 2 - (a.top + a.height / 2)) + OY : OY;
-    for (let n = Math.round(sec * 120); n > 0; n--){
-      rolling.forEach(d => d.t += 1/120);
-      simStep(1/120);
-      stepPuffs(1/120, pk, pcx, pcy);
-    }
-    if (rolling.every(d => d.asleep)) restClock += sec;
+    for (let n = Math.round(sec * 60); n > 0; n--) stepDice(1/60);
     mark();
   },
   _trace(){ return rolling.map(d => ({
     h:+d.h.toFixed(1), x:+d.x.toFixed(0), y:+d.y.toFixed(0),
-    v:+Math.hypot(d.vx,d.vy).toFixed(0), w:+d.w.length().toFixed(1), z:d.asleep?1:0 })); },
+    t:+(playT - d.start).toFixed(2), z:(playT - d.start) >= d.tr.n * DT ? 1 : 0 })); },
+  /* every die reports how squarely its rolled face is pointing at the ceiling —
+     1.0 means the number the chat printed is the number on top */
   audit(){ return rolling.map(d => ({
-    kind:d.kind, asleep:d.asleep,
+    kind:d.kind, asleep:(playT - d.start) >= d.tr.n * DT,
     up:+d.land.clone().applyQuaternion(d.q).dot(BN).toFixed(4),
     inTray: Math.abs(d.x) <= trayHalf().x + 1 && Math.abs(d.y) <= trayHalf().y + 1
   })); },
@@ -1060,7 +1322,7 @@ function _frame(ts){
      dirty flag never trips. app.js sets __animUntil while one is running. */
   if (window.__animUntil && (ts || 0) < window.__animUntil) dirty = 2;
   if (rolling.length){
-    stepDice(window.__diceFrozen ? 0 : dt, diceAnchor && diceAnchor.getBoundingClientRect());
+    stepDice(window.__diceFrozen ? 0 : dt);
     dirty = 2;
   }
   if (dirty <= 0) return;
@@ -1097,7 +1359,7 @@ function _frame(ts){
       const q = pool[i];
       q.disc.visible = q.shl.visible = q.plinth.visible = q.sh.visible = false;
     }
-    if (rolling.length || puffs.length) renderer.render(scene, camera);
+    if (rolling.length || puffs.length) draw();
     else renderer.clear();
     return;
   }
@@ -1197,10 +1459,9 @@ function _frame(ts){
     const p = pool[i];
     p.disc.visible = p.shl.visible = p.plinth.visible = p.sh.visible = false;
   }
-  renderer.render(scene, camera);
+  draw();
 }
 
-diceAnchor = document.querySelector('.dicetray');
 sizeCam();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{
   for (const k in capCache) delete capCache[k];

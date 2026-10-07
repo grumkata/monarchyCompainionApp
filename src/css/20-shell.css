@@ -253,7 +253,7 @@ body.at-hall #gl, body.at-hall #gl2, body.at-hall #tgl { display: none !importan
    the field — 28-table-boot.js) and the table's own chrome of 2026-09-25:
    the toolbox dock, the GM's rail, the inspector, the muster */
 body:not(.at-table) > .chatdock, body:not(.at-table) > .tbx, body:not(.at-table) > .gmr,
-body:not(.at-table) > .insp, body:not(.at-table) > .muster, body:not(.at-table) > .war,
+body:not(.at-table) > .insp, body:not(.at-table) > .muster,
 body:not(.at-table) > .tbx-pill { display: none !important; }
 
 /* the way back, on the table */
@@ -371,6 +371,10 @@ html body .tm-say b { font-style: normal; color: var(--m-or); letter-spacing: .1
    pennons with every choice in sight, the chosen one counterchanged — in the
    card's narrower measure. */
 html body .tm-card.tm-set { width: 340px; max-height: calc(100vh - 80px); overflow-y: auto; }
+/* long enough now (Sound) to scroll on a short window: a thin gold bar, not the browser's white one */
+html body .tm-card.tm-set::-webkit-scrollbar { width: 4px; }
+html body .tm-card.tm-set::-webkit-scrollbar-track { background: transparent; }
+html body .tm-card.tm-set::-webkit-scrollbar-thumb { background: rgba(201,162,39,.4); }
 html body .tm-grp {
   padding: 14px 16px 4px; font-family: var(--m-f-cap); font-size: 9px; font-weight: 700;
   letter-spacing: var(--m-track); text-transform: uppercase; color: var(--m-or);
@@ -719,9 +723,10 @@ html body .tm-set .tm-rows { padding-top: 12px; }
 .tp-paper .tp-face { transition: filter var(--t-hover) var(--settle); }
 
 /* the table goes quiet while you are reading */
+/* the table behind the reading is still the table: dimmed, not blurred — the
+   chat, the dice and the board stay legible while you read */
 #tp-scrim {
-  position: fixed; inset: 0; z-index: 925; background: rgba(6,4,3,.55);
-  backdrop-filter: blur(1.5px);
+  position: fixed; inset: 0; z-index: 925; background: rgba(6,4,3,.28);
 }
 #tp-scrim[hidden] { display: none !important; }
 #tp .tp-head { display: flex; align-items: center; }
@@ -739,3 +744,56 @@ html body .tm-set .tm-rows { padding-top: 12px; }
   background-repeat:repeat;
   background-size:96px 96px;
 }
+
+/* ══ THE NOTICE WHEN SOMETHING GOES WRONG (42-shell.js warn) ═══
+   Sable chrome, Argent text, a Gules rule — above the cloth and the herald,
+   because a full store is worth reading even in the middle of a wipe. */
+#shell-warn {
+  position: fixed; left: 50%; top: 14px; z-index: 99995; max-width: min(560px, 92vw);
+  transform: translate(-50%, -12px); opacity: 0; pointer-events: none;
+  padding: 10px 16px; background: var(--m-sable, #171310); color: var(--m-argent, #ded8c8);
+  border: 1px solid var(--m-gules, #a3232b); border-left-width: 5px;
+  font: 600 13px/1.4 'Barlow Condensed', 'Segoe UI', sans-serif; letter-spacing: .02em;
+  box-shadow: 0 6px 24px rgba(0,0,0,.55); transition: opacity .2s, transform .2s;
+}
+#shell-warn.on { opacity: 1; transform: translate(-50%, 0); }
+
+
+/* ══ A SKILL YOU CAN ROLL (45-papers.js rollMenu) ══════════════
+   At the table the number beside a skill is a button. In the hall it is
+   still only a number, so this is scoped to the table's own sheet. */
+#tp .rolls[data-chain] { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+#tp .rolls[data-chain]:hover { transform: scale(1.12); box-shadow: 0 0 0 2px var(--m-or); }
+.tp-rm {
+  position: fixed; z-index: 99000; display: flex; flex-wrap: wrap; gap: 4px; max-width: 250px; padding: 8px;
+  background: var(--m-sable); color: var(--m-argent); border: 1px solid var(--m-or);
+  box-shadow: 0 10px 30px rgba(0,0,0,.6);
+}
+.tp-rm-h { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  font: 700 11px/1 'Barlow Condensed', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--m-or); }
+.tp-rm-h i { font-style: normal; color: var(--m-quiet, #9a927f); }
+.tp-rm button { flex: 1 1 100px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; cursor: pointer;
+  padding: 7px 6px; background: transparent; color: var(--m-argent);
+  font: 600 11px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.tp-rm button b { font: 700 18px/1 'Barlow Condensed', sans-serif; color: var(--m-argent-hi, #fff); letter-spacing: 0; }
+.tp-rm button:hover:not(:disabled), .tp-rm button.dflt { background: var(--m-or); color: var(--m-sable); }
+.tp-rm button:hover:not(:disabled) b, .tp-rm button.dflt b { color: var(--m-sable); }
+.tp-rm button:disabled { opacity: .35; cursor: default; }
+
+
+/* ══ THE PICKERS, AT THE TABLE ═════════════════════════════════
+   The codex and its little menus belong to the sheet, and are drawn at z 60-70
+   — fine in the hall, under the reading panel (930) at the table. The portrait
+   buttons stay in the hall: nobody uploads a face mid-session. */
+body.at-table #codex, body.at-table #cropper { z-index: 950; }
+body.at-table #pickmenu { z-index: 960; }
+#tp [data-s="pic"] { display: none; }
+
+#tp.tp-ro [data-s], #tp.tp-ro .rolls { pointer-events: none; }
+#tp.tp-ro [data-s="addknack"], #tp.tp-ro .add-btn, #tp.tp-ro .skill-btn-light, #tp.tp-ro .skill-btn-dark,
+#tp.tp-ro .rm, #tp.tp-ro .rm-light, #tp.tp-ro .mv { display: none; }
+.tp-ro-note { margin-left: 14px; font: italic 600 13px/1 'Crimson Text', Georgia, serif; color: var(--m-gules); }
+
+/* a volume slider on the table's settings card (59-table-menu.js) */
+.tm-range { width: 100%; margin-top: 4px; accent-color: var(--m-or); cursor: pointer; }

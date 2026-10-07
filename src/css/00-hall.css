@@ -763,3 +763,7 @@ body.nograde #hgrade, body.nograde #hgrain{ display:none }
 .roll > .entry{ transition:transform var(--t-hover) var(--pop),
                            box-shadow var(--t-hover) var(--settle) }
 .roll > .entry:hover{ transform:translateX(4px) }
+
+/* a volume slider in Settings (16-menu.js optRow) */
+.optrange{ width:230px; align-self:center; accent-color:var(--m-or); cursor:pointer; }
+.opt-say em.optv{ display:inline-block; margin-left:10px; font-family:var(--m-f-tally); font-style:normal; font-size:14px; color:var(--m-or); }

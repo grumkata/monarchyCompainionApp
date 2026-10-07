@@ -1,0 +1,184 @@
+/* ══ THE PLAYER ══════════════════════════════════════════════════
+   74-music.js owns the YouTube player and the queue; 77-player.js draws these controls.
+   grumkata: "a ui fit for a videogame/vtt, not whatever bs it is". It is Monarchy's own
+   plate — sable, a hairline of gilt, notched corners, a wax seal to play — and it MOVES:
+   an equaliser while it plays, a gilded rail that fills, a title that breathes while it is
+   getting ready, a picture of what is on and what is next.
+
+   Two places, one drawing: the HUD at the top of the screen (music), and the DECK under the
+   video's frame on the table. */
+
+/* MUSIC: the HUD at the top of the screen. Its YouTube player is off the screen (a player that is display:none or
+   visibility:hidden does not start); there is no picture. */
+.mu-yt { position: fixed; right: 316px; top: 14px; z-index: 1300; display: flex; justify-content: flex-end; }
+.mu-yt.gone { left: -10000px; right: auto; top: 0; pointer-events: none; }
+.mu-yt-v { position: fixed; left: -10000px; top: 0; width: 240px; height: 240px; background: #000; }
+.mu-yt-v iframe { display: block; width: 100%; height: 100%; border: 0; pointer-events: none; }
+
+/* VIDEO: any number of screens on the table, each with a picture and a deck. Both layers are exactly the table's view and take
+   no pointer except where there is something to press. The pictures are over the wood (#vp is 860) and under the figures
+   (870) and the dice (900); the decks are over the figures and under the dice. */
+#mu-wood, #mu-decks { position: fixed; overflow: hidden; pointer-events: none; }
+#mu-wood { z-index: 865; }
+#mu-decks { z-index: 880; }
+/* a picture is off the screen until it has begun (74-music.js): then it is laid on its frame's screen */
+.mu-vp.gone, .mu-vp.prep, .mu-vp.off { position: fixed; left: -10000px; top: 0; }
+.mu-vp:not(.gone):not(.prep):not(.off) { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform;
+  pointer-events: auto; cursor: pointer; animation: pu-reveal .5s ease both; }
+@keyframes pu-reveal { from { opacity: 0; } }
+/* while a piece is carried or the table turned, the pictures let the pointer through */
+#mu-wood.lifting .mu-vp { pointer-events: none !important; }
+.mu-ui.deck { position: absolute; pointer-events: auto; }
+.mu-ui.deck.gone { display: none; }
+
+/* ── the plate ── */
+.mu-ui { position: relative; width: 372px; box-sizing: border-box; color: var(--m-text); font-family: var(--m-f-hand);
+  background: var(--m-marks), linear-gradient(176deg, var(--m-sable-2), var(--m-sable) 62%);
+  box-shadow: var(--m-frame), var(--m-lift); clip-path: var(--m-cut);
+  animation: pu-in .26s var(--pop, cubic-bezier(.2, 1.3, .4, 1)) both; }
+@keyframes pu-in { from { opacity: 0; translate: 0 -10px; } }
+.mu-ui svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.mu-ui button { font-family: inherit; }
+.mu-ui.off .pu-body, .mu-ui.off .pu-rail { opacity: .5; }
+
+/* a player's HUD folds to a pill */
+.mu-ui.folded { width: auto; max-width: 270px; }
+.mu-ui.folded .pu-main { display: none; }
+.mu-ui:not(.folded) .pu-pill { display: none; }
+.pu-pill { display: flex; align-items: center; gap: 11px; height: 38px; padding: 0 10px 0 14px; cursor: pointer;
+  transition: background var(--t-wipe, .2s) ease; }
+.pu-pill:hover { background: var(--m-sable-3); }
+.pu-pt { flex: 1; min-width: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 14px/1 var(--m-f-hand); color: var(--m-argent-hi); }
+.pu-chev { width: 16px; height: 16px; color: var(--m-quiet); }
+
+/* the equaliser: still when it is still, jumping when it plays */
+.pu-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 16px; height: 14px; flex: 0 0 auto; }
+.pu-eq i { flex: 1; height: 28%; background: var(--m-or); transform-origin: bottom; }
+.mu-ui.playing .pu-eq i { animation: pu-eq 1s ease-in-out infinite; }
+.pu-eq i:nth-child(2) { animation-duration: .75s; animation-delay: -.2s; }
+.pu-eq i:nth-child(3) { animation-duration: 1.25s; animation-delay: -.5s; }
+.pu-eq i:nth-child(4) { animation-duration: .9s; animation-delay: -.35s; }
+@keyframes pu-eq { 0%, 100% { height: 22%; } 50% { height: 100%; } }
+
+/* the head: what it is, and the few things that are everybody's */
+.pu-head { display: flex; align-items: center; gap: 10px; padding: 12px 10px 0 18px; }
+.pu-label { flex: 0 0 auto; font: 700 9px/1 var(--m-f-cap); letter-spacing: var(--m-track); text-transform: uppercase; color: var(--m-or); }
+.pu-badge { flex: 0 0 auto; font: 700 8px/1 var(--m-f-cap); letter-spacing: .14em; text-transform: uppercase; padding: 4px 9px;
+  clip-path: var(--m-plaque); background: var(--m-sable-0); color: var(--m-quiet); box-shadow: inset 0 0 0 1px var(--m-line); }
+.pu-badge[data-k="video"] { background: var(--m-or); color: var(--m-sable); }
+.pu-tools { margin-left: auto; display: flex; gap: 2px; }
+.pu-tools button { width: 26px; height: 26px; padding: 5px; border: 0; cursor: pointer; background: transparent; color: var(--m-quiet);
+  transition: color var(--t-wipe, .2s) ease, transform .15s ease; }
+.pu-tools button:hover { color: var(--m-or); transform: scale(1.12); }
+.pu-away { display: none; }
+.mu-ui.host.deck .pu-away { display: block; }
+.mu-ui.host .pu-off { display: none; }
+
+/* what is on: its picture, its name, how it is, and what comes after */
+.pu-body { display: flex; align-items: center; gap: 14px; padding: 12px 18px 2px; }
+.pu-art { position: relative; flex: 0 0 76px; height: 76px; background: var(--m-sable-0); overflow: hidden;
+  box-shadow: 0 0 0 1px var(--m-line-hi), 0 0 0 4px var(--m-sable-0), 0 0 0 5px var(--m-line); }
+.pu-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: pu-fade .6s ease both; }
+@keyframes pu-fade { from { opacity: 0; scale: 1.08; } }
+.pu-art .pu-eq { position: absolute; left: 6px; bottom: 6px; z-index: 1; }
+.pu-art::after { content: ''; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(transparent, rgba(0, 0, 0, .65)); }
+.mu-ui.deck .pu-art { display: none; }
+.pu-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.pu-title { font: 600 19px/1.15 var(--m-f-hand); color: var(--m-argent-hi); display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; }
+.pu-status { font: italic 12px/1 var(--m-f-hand); color: var(--m-quiet); min-height: 12px; }
+.mu-ui.busy .pu-status { color: var(--m-or); animation: pu-breathe 1.4s ease-in-out infinite; }
+@keyframes pu-breathe { 50% { opacity: .45; } }
+.pu-next { display: none; align-items: baseline; gap: 8px; min-width: 0; }
+.mu-ui.hasnext .pu-next, .mu-ui.lastone .pu-next { display: flex; }
+.pu-next em { flex: 0 0 auto; font: 700 8px/1 var(--m-f-cap); letter-spacing: .16em; text-transform: uppercase; font-style: normal; color: var(--m-or); }
+.pu-nt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 13px/1.2 var(--m-f-hand); color: var(--m-quiet); }
+.mu-ui.lastone:not(.hasnext) .pu-next em { display: none; }
+.mu-ui.lastone:not(.hasnext) .pu-nt::after { content: 'Last in the queue'; font-style: italic; }
+.pu-said { margin: 6px 18px 0; font: italic 13px/1.3 var(--m-f-hand); color: var(--m-or-hi); }
+
+/* the rail: the song's length, filling with gilt */
+.pu-rail { display: flex; align-items: center; gap: 10px; padding: 10px 18px 0; font: 14px/1 var(--m-f-tally); color: var(--m-quiet); }
+.pu-rail span { flex: 0 0 auto; min-width: 34px; }
+.pu-t1 { text-align: right; }
+input.pu-seek, input.pu-vr { -webkit-appearance: none; appearance: none; flex: 1 1 0; width: 0; min-width: 0; height: 16px; margin: 0;
+  background: transparent; cursor: pointer; --p: 0%; outline: none; }
+.pu-seek::-webkit-slider-runnable-track, .pu-vr::-webkit-slider-runnable-track { height: 4px;
+  background: linear-gradient(90deg, var(--m-or-hi), var(--m-or) var(--p), rgba(201, 162, 39, .2) var(--p)); }
+.pu-seek::-webkit-slider-runnable-track { box-shadow: 0 0 9px rgba(201, 162, 39, .28); }
+.pu-seek::-webkit-slider-thumb, .pu-vr::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px;
+  background: var(--m-or-hi); clip-path: var(--m-lozenge); transition: transform .12s ease; }
+.pu-seek:hover::-webkit-slider-thumb, .pu-vr:hover::-webkit-slider-thumb { transform: scale(1.25); }
+.pu-seek:disabled { cursor: default; }
+.pu-seek:disabled::-webkit-slider-thumb { background: var(--m-or-lo); transform: none; }
+
+/* the controls: the GM's, then everybody's volume, then the queue */
+.pu-ctl { display: flex; align-items: center; gap: 12px; padding: 8px 18px 14px; }
+.pu-gm { display: none; align-items: center; gap: 5px; flex: 0 0 auto; }
+.mu-ui.host .pu-gm { display: flex; }
+.pu-gm button, .pu-qbtn { display: grid; place-items: center; width: 30px; height: 30px; padding: 7px; border: 0; cursor: pointer; color: var(--m-text);
+  background: var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
+  transition: background-position var(--t-wipe, .22s) var(--settle, ease), color var(--t-wipe, .22s) var(--settle, ease); }
+.pu-gm button:hover, .pu-qbtn:hover { background-position: 0 0; color: var(--m-sable); }
+.mu-ui.looping .pu-loop { background-position: 0 0; color: var(--m-sable); }
+.pu-sealw { display: block; filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .65)); }
+.mu-ui.playing .pu-sealw { animation: pu-glow 2.6s ease-in-out infinite; }
+@keyframes pu-glow { 50% { filter: drop-shadow(0 0 7px rgba(201, 68, 58, .8)); } }
+.pu-gm .pu-seal { width: 46px; height: 46px; padding: 13px; clip-path: var(--m-wax); background: var(--m-wax-melt); color: var(--m-argent-hi);
+  transition: transform .16s var(--pop, cubic-bezier(.2, 1.3, .4, 1)); }
+.pu-gm .pu-seal:hover { background: var(--m-wax-melt); color: #fff; transform: scale(1.07) rotate(-5deg); }
+.pu-vol { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.pu-vi { flex: 0 0 auto; width: 17px; height: 17px; color: var(--m-quiet); }
+.pu-qbtn { width: auto; min-width: 30px; padding: 0 9px 0 7px; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.pu-qbtn svg { width: 16px; height: 16px; }
+.pu-qbtn b { font: 600 14px/1 var(--m-f-tally); }
+.mu-ui.qopen .pu-qbtn { background-position: 0 0; color: var(--m-sable); }
+
+/* the queue: what is on, what is next, what is after */
+.pu-queue { display: none; border-top: 1px solid var(--m-line); }
+.mu-ui.qopen .pu-queue { display: block; }
+.pu-list { list-style: none; margin: 0; padding: 6px 8px; max-height: 236px; overflow-y: auto; }
+.pu-list::-webkit-scrollbar { width: 5px; }
+.pu-list::-webkit-scrollbar-thumb { background: var(--m-line); }
+.pu-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin-bottom: 2px; transition: background var(--t-wipe, .2s) ease; }
+.pu-row:hover { background: var(--m-sable-3); }
+.pu-row.now { background: linear-gradient(90deg, rgba(201, 162, 39, .2), transparent); box-shadow: inset 2px 0 0 var(--m-or); }
+.pu-rmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.mu-ui.host .pu-rmain { cursor: pointer; }
+.pu-th { flex: 0 0 56px; height: 32px; background: #000; overflow: hidden; box-shadow: 0 0 0 1px var(--m-line); }
+.pu-th img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pu-rt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pu-rt b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px/1.1 var(--m-f-hand); color: var(--m-argent); }
+.pu-row.now .pu-rt b { color: var(--m-argent-hi); }
+.pu-rt em { font: 700 8px/1 var(--m-f-cap); letter-spacing: .12em; text-transform: uppercase; font-style: normal; color: var(--m-quiet); }
+.pu-rt em u { text-decoration: none; }
+.pu-row.up .pu-rt em { color: var(--m-or-hi); }
+.pu-row.now .pu-rt em { color: var(--m-or); }
+.pu-rtools { display: none; align-items: center; gap: 1px; flex: 0 0 auto; opacity: .55; transition: opacity .15s ease; }
+.mu-ui.host .pu-rtools { display: flex; }
+.pu-row:hover .pu-rtools { opacity: 1; }
+.pu-rtools button { width: 24px; height: 24px; padding: 5px; border: 0; cursor: pointer; background: transparent; color: var(--m-text); }
+.pu-rtools button:hover:not(:disabled) { color: var(--m-or); background: var(--m-sable-0); }
+.pu-rtools button:disabled { opacity: .25; cursor: default; }
+.pu-add { display: none; gap: 6px; padding: 8px 10px 12px; border-top: 1px solid var(--m-line); }
+.mu-ui.host .pu-add { display: flex; }
+.pu-addin { flex: 1 1 0; min-width: 0; padding: 8px 10px; border: 0; outline: none; background: var(--m-sable-3); color: var(--m-argent);
+  font: 14px/1.2 var(--m-f-hand); box-shadow: inset 0 0 0 1px var(--m-line); }
+.pu-addin:focus { box-shadow: inset 0 0 0 1px var(--m-or); }
+.pu-addgo { width: 34px; padding: 8px; border: 0; cursor: pointer; background: var(--m-or); color: var(--m-sable); transition: filter .15s ease; }
+.pu-addgo:hover { filter: brightness(1.15); }
+
+/* a screen with nothing on it (the GM's): a name and the box to paste a link into */
+.mu-ui.empty .pu-art, .mu-ui.empty .pu-rail, .mu-ui.empty .pu-ctl, .mu-ui.empty .pu-next { display: none; }
+.mu-ui.empty .pu-list { display: none; }
+.mu-ui.empty .pu-queue { display: block; border-top: 0; }
+.mu-ui.empty .pu-body { padding-bottom: 8px; }
+
+/* the Toolbox's Audio tab: which screen a video goes to */
+.au-where { display: flex; align-items: center; gap: 8px; font: 700 9px/1 var(--m-f-cap); letter-spacing: .14em; text-transform: uppercase; color: var(--m-quiet); }
+.au-where select { flex: 1; min-width: 0; padding: 8px 10px; border: 0; outline: none; background: var(--m-sable-3); color: var(--m-argent);
+  font: 14px/1.2 var(--m-f-hand); box-shadow: inset 0 0 0 1px var(--m-line); }
+.au-where select option { background: var(--m-sable-2); color: var(--m-argent); }
+
+@media (prefers-reduced-motion: reduce) { .mu-ui, .mu-ui * { animation: none !important; } }

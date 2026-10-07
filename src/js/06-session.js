@@ -87,7 +87,7 @@ function say(what, extra) {
 const ALPHABET = 'ACDEFGHJKLMNPQRTUVWXY349';
 function makeWord(n) {
   let s = '';
-  for (let i = 0; i < (n || 5); i++)
+  for (let i = 0; i < (n || 6); i++)
     s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
   return s;
 }
@@ -100,7 +100,9 @@ function mine() {
   let me = {};
   try { me = JSON.parse(root.localStorage.getItem('monarchy.me.v1')) || {}; } catch (e) {}
   return {
-    name: String(me.name || '').trim() || 'Someone',
+    /* 40 is what the name box allows; the database refuses a chat line whose `who` is
+       over 60, so a longer name (a restored copy can carry one) must not get that far */
+    name: String(me.name || '').trim().slice(0, 40) || 'Someone',
     arms: me.arms || null,
     /* the full-length likeness that stands at your place (16-menu.js).
        It is a data URI and it is the only big thing any of this writes, so
@@ -133,9 +135,9 @@ function keepWord(id, w) {
 function wordFor(id, opts) {
   if (tidy(opts.word)) return Promise.resolve(tidy(opts.word));
   const was = lastWord(id);
-  if (!was) return Promise.resolve(makeWord(5));
+  if (!was) return Promise.resolve(makeWord(6));
   return Net().get('tables/' + was + '/meta')
-    .then(m => (m && m.host === uid() && m.id === id) ? was : makeWord(5), () => makeWord(5));
+    .then(m => (m && m.host === uid() && m.id === id) ? was : makeWord(6), () => makeWord(6));
 }
 
 function host(id, opts) {
@@ -392,6 +394,61 @@ function listen() {
   offs.push(Net().watch('tables/' + word + '/sheets', s => {
     say('sheets', { sheets: asList(s, 'key') });
   }));
+  /* THE GM'S MUSIC: one small node, written only by the host (the rules give
+     the host the whole table and nobody else a write here) and only when
+     something changes — a track, a pause, a new playlist — never as a stream.
+     Every client plays it itself and keeps time from the stamp (74-music.js).
+     A late arrival is handed the current value at once. */
+  offs.push(Net().watch('tables/' + word + '/music', m => {
+    musicNow = m || null;
+    say('music', { music: musicNow });
+  }));
+  /* AND EACH VIDEO ON THE TABLE HAS ITS OWN, the same kind of note under the id of its screen
+     (tables/{word}/video/{thingId}): there can be several videos at once and each plays by itself,
+     apart from the music and from the others. Held whole, so a late arrival is handed all of them. */
+  offs.push(Net().watch('tables/' + word + '/video', v => {
+    videosNow = v && typeof v === 'object' ? v : null;
+    say('videos', { videos: videosNow });
+  }));
+  /* AND AN EFFECT THE GM FIRES AT THE TABLE — a door, a blade, a spell. One
+     note, overwritten each time; a client plays it only if it is fresh and
+     is not one it has played (75-audio.js), so arriving late replays nothing. */
+  offs.push(Net().watch('tables/' + word + '/fx', f => { if (f) say('fx', { fx: f }); }));
+  /* AND THE SOUNDS THE GM BUILT THEIR BOARD FROM — only the ones that are the GM's own
+     files (a sound that ships with the app needs no sending). Written by the host, held
+     by everyone, so a pad pressed later is already here to play (76-soundboard.js). */
+  if (role !== 'gm') offs.push(Net().watch('tables/' + word + '/pads', p => { padsNow = p || null; say('pads', { pads: padsNow }); }));
+}
+let musicNow = null, videosNow = null, padsNow = null;
+/* `v` is how much of the sound — the pad's own volume, 0 to 1 */
+function sendFx(id, v) {
+  if (!live() || role !== 'gm') return Promise.resolve(false);
+  const note = { id: String(id).slice(0, 24), n: Math.random().toString(36).slice(2, 8), at: Net().now() };
+  if (typeof v === 'number' && isFinite(v)) note.v = Math.round(Math.max(0, Math.min(1, v)) * 100) / 100;
+  return Net().set('tables/' + word + '/fx', note).then(() => true, () => false);
+}
+/* a GM's own sound file, for the table: the host's, and only the host's */
+function setPad(id, val) {
+  if (!live() || role !== 'gm' || !/^[a-z0-9]{4,16}$/.test(String(id))) return Promise.resolve(false);
+  const at = 'tables/' + word + '/pads/' + id;
+  return (val ? Net().set(at, val) : Net().remove(at)).then(() => true, () => false);
+}
+function setPads(all) {
+  if (!live() || role !== 'gm') return Promise.resolve(false);
+  const at = 'tables/' + word + '/pads';
+  return (all && Object.keys(all).length ? Net().set(at, all) : Net().remove(at)).then(() => true, () => false);
+}
+/* the host's, and only the host's */
+function setMusic(m) {
+  if (!live() || role !== 'gm') return Promise.resolve(false);
+  const at = 'tables/' + word + '/music';
+  return (m ? Net().set(at, m) : Net().remove(at)).then(() => true, () => false);
+}
+/* the same, for the video on one screen of the table (a thing's id) */
+function setVideo(id, m) {
+  if (!live() || role !== 'gm' || !/^[A-Za-z0-9]{4,40}$/.test(String(id))) return Promise.resolve(false);
+  const at = 'tables/' + word + '/video/' + id;
+  return (m ? Net().set(at, m) : Net().remove(at)).then(() => true, () => false);
 }
 
 /* ── A BLINK KEEPS ITS CHAIR ──────────────────────────────────
@@ -487,6 +544,10 @@ function leave(why) {
     jobs.push(Net().remove('tables/' + w + '/chat'));
     jobs.push(Net().remove('tables/' + w + '/sheets'));
     jobs.push(Net().remove('tables/' + w + '/seats'));
+    jobs.push(Net().remove('tables/' + w + '/music'));
+    jobs.push(Net().remove('tables/' + w + '/video'));
+    jobs.push(Net().remove('tables/' + w + '/fx'));
+    jobs.push(Net().remove('tables/' + w + '/pads'));
     /* AND THE WOOD ITSELF, which is the heaviest thing on the wire by a
        long way: one thing carrying an uploaded picture is a few hundred
        kilobytes and a night's play is a boardful of them. It was the one
@@ -496,7 +557,7 @@ function leave(why) {
        database entire, for ever. */
     jobs.push(Net().remove('tables/' + w + '/board'));
   }
-  word = null; role = null; members = []; meta = null;
+  word = null; role = null; members = []; meta = null; musicNow = null; videosNow = null; padsNow = null;
   sent = null; resitting = false;
   lingering = {}; root.clearTimeout(lingerT); lingerT = 0;
   /* who we WERE, since role is already gone by now: a player who leaves
@@ -647,7 +708,10 @@ function seating() {
 }
 
 root.Session = { host, join, warm, leave, talk, bring, takeBack, seating, refresh,
-                 makeWord, tidy, diceOf, allow, allowed, point, look,
+                 makeWord, tidy, diceOf, allow, allowed, point, look, setMusic, setVideo, sendFx, setPad, setPads,
+                 get music() { return musicNow; },
+                 get videos() { return videosNow; },
+                 get pads() { return padsNow; },
                  get live() { return live(); },
                  get word() { return word; },
                  get role() { return role; },

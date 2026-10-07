@@ -41,7 +41,11 @@ function list() {
   catch (e) { return []; }
 }
 function save(l) {
-  try { root.localStorage.setItem(KEY, JSON.stringify(l)); } catch (e) {}
+  try { root.localStorage.setItem(KEY, JSON.stringify(l)); }
+  catch (e) {
+    root.dispatchEvent(new CustomEvent('monarchy:savefail', { detail: { message:
+      'Your notes could not be saved — the store is full. Delete a note with a big sketch.' } }));
+  }
   root.dispatchEvent(new CustomEvent('monarchy:pocket'));
 }
 const get = id => list().find(n => n.id === id) || null;
@@ -70,8 +74,12 @@ function sketchSVG(sk, cls) {
 
 /* the card in the pocket: the paper, its first words, and its drawing */
 function card(n) {
+  const lines = String(n.text || '').split('\n');
+  const at = lines.findIndex(s => s.trim());
+  const rest = at < 0 ? '' : lines.slice(at + 1).join('\n').trim();
   return `<span class="pk-card t-${esc(n.tint || 'cream')}" data-pk="${esc(n.id)}">
-      <span class="pk-txt">${esc(String(n.text || '').slice(0, 140))}</span>
+      <span class="pk-ttl">${esc(titleOf(n))}</span>
+      <span class="pk-txt">${esc(rest.slice(0, 110))}</span>
       ${n.sketch && n.sketch.length ? sketchSVG(n.sketch, 'pk-sk') : ''}
     </span>`;
 }
@@ -169,8 +177,11 @@ function pocket(t) {
              or 'closed' (the GM ended it; the table is gone for everyone)
    Returns the things to turn back into pocket notes. */
 function reclaimable(things, me, why) {
-  // TODO(grumkata): which of these come home with you?
-  return [];
+  /* THE NOTES YOU LAID ON THE WOOD — `by` is your seat's uid, stamped when it
+     was put down — come home, whether you got up or the GM closed the table.
+     The GM's own pieces and other players' notes are theirs and stay.
+     (Change this one line to change who takes what home.) */
+  return (things || []).filter(t => t && t.kind === 'note' && me && t.by === me);
 }
 root.addEventListener('monarchy:guest-leaving', e => {
   const d = e.detail || {};
@@ -184,6 +195,18 @@ root.addEventListener('monarchy:guest-leaving', e => {
 
 /* ══ READING ONE, WRITING ON IT, DRAWING ON IT ═══════════════ */
 let ed = null, edId = null, pen = PENS[0], mode = 'write', inkNow = null;
+/* WHAT YOU TYPE IS WRITTEN A MOMENT AFTER YOU STOP. Every keystroke re-read and
+   re-wrote the whole pocket and repainted the kit; now one write per pause —
+   and anything that could lose the pause (closing, another note, a click on
+   the bar, the window going) flushes it first. */
+let wt = 0, wv = null;
+function flushText() {
+  clearTimeout(wt); wt = 0;
+  const w = wv; wv = null;
+  if (w && get(w.id)) update(w.id, { text: w.text });
+}
+root.addEventListener('pagehide', flushText);
+root.addEventListener('beforeunload', flushText);
 function shell() {
   if (ed) return ed;
   ed = doc.createElement('div');
@@ -203,6 +226,7 @@ function shell() {
   return ed;
 }
 function open(id) {
+  flushText();
   const n = get(id); if (!n) return;
   shell(); edId = id; mode = 'write';
   paintEd(n);
@@ -212,6 +236,7 @@ function open(id) {
 }
 function close() {
   if (!ed || ed.hidden) return;
+  flushText();
   ed.hidden = true; edId = null; inkNow = null;
   doc.body.classList.remove('pk-reading');
 }
@@ -219,7 +244,7 @@ const isOpen = () => !!ed && !ed.hidden;
 function paintEd(n) {
   ed.innerHTML =
     `<div class="pk-sheet t-${esc(n.tint || 'cream')}${mode === 'draw' ? ' drawing' : ''}">
-       <textarea spellcheck="false" placeholder="Write on it">${esc(n.text || '')}</textarea>
+       <textarea spellcheck="false" maxlength="4000" placeholder="Write on it">${esc(n.text || '')}</textarea>
        <div class="pk-draw">${sketchSVG(n.sketch, 'pk-sk-big')}</div>
      </div>
      <div class="pk-bar">
@@ -234,7 +259,11 @@ function paintEd(n) {
        <button class="pk-b gilt" data-pk-do="done">Done</button>
      </div>`;
   const ta = ed.querySelector('textarea');
-  ta.addEventListener('input', () => { if (edId) update(edId, { text: ta.value }); });
+  ta.addEventListener('input', () => {
+    if (!edId) return;
+    wv = { id: edId, text: ta.value };
+    clearTimeout(wt); wt = setTimeout(flushText, 300);
+  });
   const pad = ed.querySelector('.pk-draw');
   pad.addEventListener('pointerdown', e => {
     if (mode !== 'draw') return;
@@ -260,6 +289,7 @@ function addPoint(pad, e) {
   const x = Math.round((e.clientX - r.left) / r.width * 1000);
   const y = Math.round((e.clientY - r.top) / r.height * 1000);
   const p = inkNow.p, n = p.length;
+  if (n >= 2400) return;                                  /* 1200 points is a long line */
   if (n && Math.hypot(x - p[n - 2], y - p[n - 1]) < 6) return;
   p.push(Math.max(0, Math.min(1000, x)), Math.max(0, Math.min(1000, y)));
   /* drawn as it goes: the finished strokes, and this one on top */
@@ -273,6 +303,7 @@ function repaintSketch() {
 }
 let tearArmed = 0;
 function onEdClick(e) {
+  flushText();                     /* the bar redraws the sheet from what is stored */
   const n = get(edId); if (!n) return;
   const m = e.target.closest('[data-pk-mode]');
   if (m) { mode = m.dataset.pkMode; return paintEd(get(edId)); }
