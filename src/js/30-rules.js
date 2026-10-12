@@ -616,9 +616,11 @@ function resolve(ability, actor, opts){
                            from:actor.line });
         out.applied.push({ text:'pushed ' + fx.lines + ' line back' });
         break;
-      case 'prone': case 'dismount':
-        out.changes.push({ op:'token', to:who, token:fx.effect === 'prone' ? 'Prone' : 'Dismounted', delta:1 });
+      case 'prone':
+        out.changes.push({ op:'token', to:who, token:'Prone', delta:1 });
         out.applied.push({ text:fx.effect }); break;
+      case 'dismount':          /* where somebody is sitting is not a status: it is the GM's to say */
+        out.forGM.push({ text:describeEffect(fx, ctx).text, why:'being dismounted is a position, not a status' }); break;
       default:
         out.forGM.push({ text:describeEffect(fx, ctx).text,
                          why:'"' + fx.effect + '" has no automatic result yet' });
@@ -998,7 +1000,6 @@ const TOKENS = {
   Debilitated: { sign:'bad', remove:'never', text:'lose your attribute bonus to damage, charge bonus included' },
   Helpless:    { sign:'bad', remove:'turn', text:'no resistance; cannot dodge or parry' },
   Prone:       { sign:'bad', remove:'turn', text:'knocked down' },
-  Dismounted:  { sign:'bad', remove:'never', text:'off your mount' },
 };
 
 const tokensOf = ent => (ent && ent.cond) || [];

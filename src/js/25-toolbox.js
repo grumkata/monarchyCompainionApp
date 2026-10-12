@@ -219,8 +219,6 @@ function open(kindId) {
   if (!T().mayUseBox()) return;
   /* already up: asked for a tab, it turns to it */
   if (open_) { if (kindId && root.Hand && root.Hand.pick) root.Hand.pick(kindId); return; }
-  /* the box and the muster share the dock at your left hand */
-  if (root.Muster && root.Muster.yieldDock) root.Muster.yieldDock();
   open_ = true;
   doc.body.classList.add('box-open');
   if (root.Hand) root.Hand.show(KINDS(), kindId);
@@ -231,7 +229,6 @@ function shut() {
   open_ = false;
   doc.body.classList.remove('box-open');
   if (root.Hand) { root.Hand.drop(); root.Hand.hide(); }
-  if (root.Muster && root.Muster.reopen) root.Muster.reopen();      /* the fight, if it was the box's turn to borrow the dock */
   if (root.GmRail) root.GmRail.paint();
 }
 
@@ -272,7 +269,7 @@ function take(i, x, y, v) {
     const pre = v.preset || i.enc;
     if (pre && root.Encounters) {
       const sc = root.Encounters.toTable(pre, { name: v.name });
-      if (sc) afterScene();
+      if (sc) { afterScene(); shut(); }
       return sc;
     }
     const def = C().SCENES[i.scene] || {};
@@ -285,6 +282,7 @@ function take(i, x, y, v) {
                          w: sz.w, h: sz.h, locked: true });
     T().activate(sc.id);
     afterScene();
+    shut();                         /* a fight is the whole room: the box goes away and the board is framed in what is left */
     return sc;
   }
   /* A record is a PAPER: it opens on your own end, not on the wood. */
@@ -350,13 +348,8 @@ function take(i, x, y, v) {
 /* the camera goes to the scene you just made, so you can see it — two
    frames, because the sheet has to have been laid out to be measured */
 function afterScene() {
-  /* the muster first: it narrows the table's view, and the fight has to be
-     framed in the view that is left (73-encounters.js has the same order) */
-  if (root.Muster) root.Muster.open();
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const el = doc.getElementById('combat-prop');
-    if (el && el.style.display !== 'none' && root.Table3D) root.Table3D.frame(el);
-  }));
+  /* the board is framed for you at the angle a fight is looked at from (81-battle-view.js) */
+  if (root.BattleView) root.BattleView.frameSoon();
 }
 
 const modelName = id => {

@@ -28,7 +28,7 @@
 
    Nothing in here holds state or touches the model. It is asked "what
    does this look like" by 46-figures.js (the toolbox and the wood),
-   32-combat-app.js (the mat), 27-table-gl.js (the 3D standee) and
+   81-battle-view.js (the board), 27-table-gl.js (the 3D standee) and
    37-scene-field.js (the field), so all four agree.
 ══════════════════════════════════════════════════════════════ */
 (function (root) {

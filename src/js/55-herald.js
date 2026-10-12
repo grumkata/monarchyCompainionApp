@@ -524,51 +524,9 @@ function watchDice() {
   }))).observe(cb, { childList: true });
 }
 
-/* the fight: a new round, and whose turn it is.
-   32-combat-app.js writes #round and the .ph classes on every render, so
-   this compares against what it last saw and cries only on a real step
-   forward — a repaint that changes nothing says nothing. */
-const PHASE_TONE = { players: 'house', allies: 'azure', enemies: 'gules' };
-function watchCombat() {
-  const prop = doc.getElementById('combat-prop');
-  const round = doc.getElementById('round');
-  if (!prop || !round || !root.MutationObserver) return;
-  let seen = null;
-  const now = () => {
-    const ph = prop.querySelector('.phases .ph.now');
-    return { r: parseInt(round.textContent, 10) || 0, p: ph ? ph.textContent.trim() : '' };
-  };
-  const live = () => doc.body.classList.contains('at-table') && prop.style.display !== 'none';
-  const check = () => {
-    const n = now();
-    if (!seen || !live()) { seen = n; return; }
-    if (n.r === seen.r && n.p === seen.p) return;
-    const stepped = n.r === seen.r + 1 || (n.r === seen.r && n.p !== seen.p);
-    const was = seen; seen = n;
-    if (!stepped || !n.p) return;
-    const tone = PHASE_TONE[n.p.toLowerCase()] || 'house';
-    if (n.r !== was.r) {
-      proclaim('Round ' + String(n.r).padStart(2, '0'), { sub: n.p.toLowerCase() + ' act first', tone: 'or' });
-    } else {
-      proclaim(n.p + ' Act', { sub: 'round ' + n.r, tone, hold: 700 });
-    }
-  };
-  const mo = new MutationObserver(check);
-  mo.observe(round, { childList: true, characterData: true, subtree: true });
-  const phs = prop.querySelector('.phases');
-  if (phs) mo.observe(phs, { attributes: true, subtree: true, attributeFilter: ['class'] });
-  /* A scene put down or taken away is not a turn: take what the sheet says
-     NOW as the starting point. Not `seen = null` — this observer's callback
-     runs AFTER the one above in the same batch (the scene's first render
-     lands with its display change), so nulling here threw away the state
-     that had just been read, and the first End Turn only re-read it.
-     Only the DISPLAY counts — panning rewrites this element's transform
-     every frame, and resetting on each of those would do the same. */
-  let shown = prop.style.display;
-  new MutationObserver(() => {
-    if (prop.style.display !== shown) { shown = prop.style.display; seen = now(); }
-  }).observe(prop, { attributes: true, attributeFilter: ['style'] });
-}
+/* The fight says nothing aloud. A turn is a number on the strip under the board
+   (82-battle-ui.js): a banner for it was "too embellished", and the fight is
+   not the herald's business. */
 
 /* the hall's cloth drifts against the pointer: --mx/--my, -1..1, set on
    #screen ALONE (a custom property set on the root would restyle the whole
@@ -592,7 +550,7 @@ function watchDrift() {
   }, { passive: true });
 }
 
-function start() { hostUp(); watchDice(); watchCombat(); watchDrift(); }
+function start() { hostUp(); watchDice(); watchDrift(); }
 if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', start);
 else start();
 

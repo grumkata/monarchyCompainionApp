@@ -1560,6 +1560,37 @@ body.peeking .prop.t3-thing.sel > .face::after{ display:none; }
 .cl.note .stxt{ font-family:var(--m-f-hand); font-style:italic; font-size:13px;
   color:var(--m-hush); }
 .cl.said.emote .stxt{ color:var(--m-quiet); }
+
+/* ══ GIFS AND PICTURES IN THE CHAT (78-chat-media.js) ══════════
+   Under the line they belong to, as wide as the dock lets them be. A line is
+   a row (the name, then the words), so one with a picture wraps and the
+   picture takes the row below. */
+/* a long link wraps rather than pushing the dock wider than the dock */
+.cl.said .stxt{ min-width:0; overflow-wrap:anywhere; }
+.chatdock .cb{ overflow-x:hidden; }
+.cl.said.media{ flex-wrap:wrap; }
+.cl.said .cm{
+  flex:0 0 100%; display:block; max-width:100%; max-height:240px; margin-top:5px;
+  object-fit:contain; background:var(--m-sable-0); box-shadow:0 0 0 1px var(--m-line);
+}
+.cl.said img.cm, .cl.said video.cm{ width:auto; height:auto; cursor:zoom-in; }
+.cl.said iframe.cm{ width:100%; height:200px; border:0; }
+/* the paperclip: quiet, beside the words, and gilt when you reach for it — Send stays the plaque */
+.cin button.pic{
+  flex:0 0 auto; width:32px; padding:0; display:grid; place-items:center;
+  background:var(--m-sable-2); color:var(--m-quiet);
+  box-shadow:inset 0 0 0 1px var(--m-line);
+}
+.cin button.pic:hover{ background:var(--m-sable-2); color:var(--m-or); box-shadow:inset 0 0 0 1px var(--m-or); }
+.cin button.pic svg{ width:16px; height:16px; fill:currentColor; }
+/* a picture being carried over the dock */
+.chatdock.dropping .cb{ box-shadow:inset 0 0 0 2px var(--m-or); }
+/* one of them, large: click or Escape to put it away */
+#cm-light{
+  position:fixed; inset:0; z-index:3000; display:grid; place-items:center;
+  background:rgba(8,6,4,.88); cursor:zoom-out;
+}
+#cm-light img{ max-width:92vw; max-height:92vh; box-shadow:0 0 0 1px var(--m-or), 0 12px 40px rgba(0,0,0,.7); }
 .cl.said.emote .stxt b{
   font-style:normal; font-family:var(--m-f-cap); font-size:9px;
   letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or);
@@ -2028,3 +2059,128 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
   border:0; outline:none; padding:5px 8px; color:var(--m-argent, #ded8c8);
   font:italic 13px/1.2 'Crimson Text',serif; box-shadow:inset 0 0 0 1px var(--m-line, rgba(255,255,255,.14)); }
 .kit-find:focus{ box-shadow:inset 0 0 0 1px var(--m-or, #c9a227); }
+
+/* ══ THE GOBLIN IN THE CHEESE (27-goblin.js) ═════════════════
+   What he says, in a speech bubble out of his mouth: the outline and tail
+   are an SVG path redrawn every frame, the words are laid over it. It
+   carries `hidden`, so away from the table (where none of this applies) it
+   is not there at all. */
+#gob-say.on{ position:fixed; inset:0; z-index:1250; display:block; pointer-events:none; }
+#gob-say .gs-in{ position:absolute; inset:0; will-change:transform; }
+#gob-say svg{ position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; }
+#gob-say .gs-body{ fill:url(#gs-paper); stroke:#22170b; stroke-width:3; stroke-linejoin:round; }
+#gob-say .gs-drop{ fill:rgba(8,5,2,.42); transform:translate(4px, 5px); }
+#gob-say .gs-txt{ position:absolute; left:0; top:0; box-sizing:border-box; width:max-content; max-width:372px;
+  padding:13px 26px 17px 19px; pointer-events:auto; cursor:pointer; user-select:none;
+  font:700 22px/1.22 var(--m-f-hand); color:#2a1c0c; letter-spacing:.005em; }
+#gob-say .w{ display:inline-block; white-space:nowrap; }
+/* each letter pops in on its own */
+#gob-say .c{ display:inline-block; opacity:0; transform:translateY(.32em) scale(.35); }
+#gob-say .c.on{ animation:gs-pop .24s var(--pop) forwards; }
+#gob-say .c > span{ display:inline-block; }
+@keyframes gs-pop{ to{ opacity:1; transform:none; } }
+/* the giggle giggles */
+#gob-say .gig{ color:#3a8418; }
+#gob-say .gig .c > span{ animation:gs-gig .46s ease-in-out infinite; animation-delay:calc(var(--i) * -55ms); }
+@keyframes gs-gig{ 0%,100%{ transform:translateY(1px) rotate(-5deg); } 50%{ transform:translateY(-3px) rotate(6deg); } }
+/* and the treasure is slimy */
+#gob-say .goo{ color:#4a9a1b; text-shadow:0 1px 0 #2b5f0d, 0 0 7px rgba(130,210,60,.45); }
+#gob-say .goo .c > span{ transform-origin:50% 100%; animation:gs-goo 1.3s ease-in-out infinite; animation-delay:calc(var(--i) * -90ms); }
+@keyframes gs-goo{ 0%,100%{ transform:scale(1, 1); } 50%{ transform:scale(1.06, .9) translateY(1px); } }
+/* more to come */
+#gob-say .gs-more{ position:absolute; right:10px; bottom:6px; width:0; height:0; opacity:0;
+  border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #2a1c0c;
+  transition:opacity .15s; }
+#gob-say .gs-more.on{ opacity:1; animation:gs-nod .7s ease-in-out infinite; }
+@keyframes gs-nod{ 50%{ transform:translateY(3px); } }
+#vp.gob-hover{ cursor:pointer !important; }
+
+/* ══ THE DOOM CD (27-doom.js) ════════════════════════════════
+   One layer over everything: the pull and the plunge are drawn on .dc-fx,
+   Doom itself on .dc-game at its own 4:3, pixels kept square-edged. */
+#doom-cd{ position:fixed; inset:0; z-index:99996; pointer-events:auto; cursor:default; user-select:none; }
+#doom-cd.dark{ background:#000; }
+#doom-cd canvas{ position:absolute; display:block; }
+#doom-cd .dc-fx{ left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+#doom-cd .dc-game{ visibility:hidden; image-rendering:pixelated; z-index:1; }
+#doom-cd.play{ cursor:crosshair; }
+#doom-cd .dc-leave{ position:absolute; right:16px; top:14px; z-index:3; padding:7px 14px 6px;
+  font:700 11px/1 var(--m-f-cap); letter-spacing:.14em; text-transform:uppercase; color:#f1dfb4;
+  background:rgba(14,9,6,.78); border:1px solid rgba(201,162,39,.7); border-radius:4px; cursor:pointer;
+  opacity:0; pointer-events:none; transition:opacity .25s, background .15s; }
+#doom-cd.play .dc-leave{ opacity:.5; pointer-events:auto; }
+#doom-cd.play .dc-leave:hover{ opacity:1; background:rgba(60,14,6,.9); }
+#doom-cd .dc-keys{ position:absolute; left:50%; top:16px; z-index:3; transform:translateX(-50%); display:flex; gap:16px;
+  padding:7px 14px; border-radius:4px; background:rgba(0,0,0,.6); white-space:nowrap;
+  font:500 13px/1 var(--m-f-tally); letter-spacing:.03em; color:#dccdaa; opacity:0; pointer-events:none; }
+#doom-cd .dc-keys b{ color:#ffb35a; font-weight:700; }
+#doom-cd.play .dc-keys{ animation:dc-keys 8s ease forwards; }
+@keyframes dc-keys{ 0%{ opacity:0; } 6%{ opacity:1; } 82%{ opacity:1; } 100%{ opacity:0; } }
+#doom-cd .dc-note{ position:absolute; left:50%; bottom:12%; z-index:3; transform:translateX(-50%); max-width:70vw; text-align:center;
+  font:italic 19px/1.3 var(--m-f-hand); color:#ffc9a6; text-shadow:0 2px 8px #000; opacity:0; transition:opacity .3s; }
+#doom-cd .dc-note.on{ opacity:1; }
+
+/* ══ THE STAR (27-bob.js) ════════════════════════════════════
+   Bob-omb Battlefield over everything: the course on .bs-gl, the star's
+   light and the star-shaped holes on .bs-fx, the course's name in the
+   chunky gold Mario 64 letters, dropping in one at a time. */
+#bob-star{ position:fixed; inset:0; z-index:99996; pointer-events:auto; user-select:none; cursor:default; }
+#bob-star canvas{ position:absolute; left:0; top:0; display:block; }
+#bob-star .bs-gl{ z-index:1; }
+#bob-star .bs-fx{ z-index:2; width:100%; height:100%; pointer-events:none; }
+#bob-star.play{ cursor:grab; }
+#bob-star .bs-title{ position:absolute; left:0; right:0; top:22%; z-index:3; text-align:center; pointer-events:none;
+  opacity:0; transition:opacity .5s; }
+#bob-star .bs-title.on{ opacity:1; }
+#bob-star .bs-name{ font:900 clamp(34px, 6.2vw, 82px)/1 'Arial Black','Segoe UI Black',Impact,sans-serif; letter-spacing:.02em; }
+#bob-star .bs-name span{ display:inline-block; color:#ffd21a; opacity:0; transform:translateY(-60px) scale(.6);
+  background:linear-gradient(180deg,#fff7b0 0%,#ffd21a 38%,#ff9c1a 70%,#e8590c 100%); -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; -webkit-text-stroke:3px #3a1a06; paint-order:stroke fill;
+  filter:drop-shadow(0 5px 0 rgba(40,16,4,.75)) drop-shadow(0 10px 14px rgba(0,0,0,.35)); }
+#bob-star .bs-title.on .bs-name span{ animation:bs-drop .5s cubic-bezier(.3,1.6,.5,1) forwards; }
+@keyframes bs-drop{ to{ opacity:1; transform:none; } }
+#bob-star .bs-sub{ margin-top:16px; font:800 clamp(14px, 1.8vw, 24px)/1 'Arial Black','Segoe UI Black',sans-serif; letter-spacing:.08em;
+  color:#fff; text-shadow:0 2px 0 #20306a, 0 0 10px rgba(0,0,0,.4); opacity:0; }
+#bob-star .bs-title.on .bs-sub{ animation:bs-fade .5s 1.2s ease forwards; }
+@keyframes bs-fade{ to{ opacity:1; } }
+#bob-star .bs-got{ position:absolute; left:0; right:0; top:30%; z-index:3; text-align:center; pointer-events:none; opacity:0;
+  font:900 clamp(30px, 5.4vw, 70px)/1 'Arial Black','Segoe UI Black',Impact,sans-serif; color:#fff;
+  -webkit-text-stroke:3px #1d2c74; paint-order:stroke fill; text-shadow:0 6px 0 rgba(20,30,90,.7); transform:scale(.4); }
+#bob-star .bs-got.on{ animation:bs-got .55s cubic-bezier(.3,1.6,.5,1) forwards; }
+#bob-star .bs-got.small{ font-size:20px; -webkit-text-stroke:0; color:#3a2a10; text-shadow:none; top:55%; }
+@keyframes bs-got{ to{ opacity:1; transform:none; } }
+#bob-star .bs-keys{ position:absolute; left:50%; bottom:18px; z-index:3; transform:translateX(-50%); display:flex; gap:16px; white-space:nowrap;
+  padding:8px 15px; border-radius:6px; background:rgba(10,20,50,.55); font:600 13px/1 var(--m-f-tally); letter-spacing:.03em; color:#eaf2ff;
+  opacity:0; pointer-events:none; }
+#bob-star .bs-keys b{ color:#ffd21a; }
+#bob-star.play .bs-keys{ animation:bs-keys 9s ease forwards; }
+@keyframes bs-keys{ 0%{ opacity:0; } 6%{ opacity:1; } 85%{ opacity:1; } 100%{ opacity:0; } }
+#bob-star .bs-leave{ position:absolute; right:16px; top:14px; z-index:3; padding:7px 14px 6px; font:700 11px/1 var(--m-f-cap);
+  letter-spacing:.14em; text-transform:uppercase; color:#fff; background:rgba(16,30,80,.6); border:1px solid rgba(255,210,26,.75);
+  border-radius:4px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .25s, background .15s; }
+#bob-star.play .bs-leave{ opacity:.6; pointer-events:auto; }
+#bob-star.play .bs-leave:hover{ opacity:1; background:rgba(30,50,130,.85); }
+
+/* the course's HUD (27-bob-world.js): lives, coins and stars across the top in the game's white-on-black letters, the
+   power meter dropping in when it matters, the game's dark dialog box, and numbers floating off what is got */
+#bob-star .bs-hud{ position:absolute; inset:0; z-index:3; pointer-events:none; opacity:0; transition:opacity .4s; }
+#bob-star.play .bs-hud, #bob-star .bs-hud:has(.bs-say.on){ opacity:1; }
+#bob-star .bs-hud > div:not(.bs-say){ position:absolute; top:18px; display:flex; align-items:center; gap:6px;
+  font:900 30px/1 'Arial Black','Segoe UI Black',Impact,sans-serif; color:#fff; -webkit-text-stroke:2px #101828; paint-order:stroke fill;
+  text-shadow:0 3px 0 rgba(0,0,0,.45); }
+#bob-star .hu-lives{ left:26px; } #bob-star .hu-coins{ left:170px; } #bob-star .hu-stars{ right:26px; top:60px !important; }
+#bob-star .ic-mario{ width:30px; height:30px; border-radius:50%; background:radial-gradient(circle at 50% 70%, #f6c89c 0 46%, transparent 47%), radial-gradient(circle at 50% 30%, #e4281c 0 50%, transparent 51%); box-shadow:0 0 0 2px #101828; }
+#bob-star .ic-coin{ width:26px; height:26px; border-radius:50%; background:radial-gradient(circle at 40% 35%, #fff7a8, #ffcf1a 55%, #c98a00); box-shadow:inset 0 0 0 3px #a86c00, 0 0 0 2px #101828; }
+#bob-star .ic-star{ font-style:normal; color:#ffd21a; font-size:32px; }
+#bob-star .hu-power{ position:absolute; left:50%; top:10px; width:92px; height:92px; transform:translate(-50%, -130px); transition:transform .35s cubic-bezier(.3,1.5,.5,1); }
+#bob-star .hu-power.on{ transform:translate(-50%, 0); }
+#bob-star .bs-say{ position:absolute; left:50%; top:16%; width:min(560px, 80vw); transform:translateX(-50%) scale(.6); opacity:0;
+  padding:18px 26px 22px; border-radius:16px; background:rgba(0,0,0,.62); box-shadow:0 0 0 3px rgba(255,255,255,.12);
+  transition:opacity .15s, transform .2s cubic-bezier(.3,1.5,.5,1); }
+#bob-star .bs-say.on{ opacity:1; transform:translateX(-50%) scale(1); }
+#bob-star .bs-say p{ margin:0; min-height:5.4em; white-space:pre-line; font:700 21px/1.35 'Arial Rounded MT Bold','Segoe UI',Arial,sans-serif; color:#fff; letter-spacing:.01em; }
+#bob-star .bs-say .say-more{ position:absolute; right:18px; bottom:10px; font-style:normal; color:#ff3a2a; opacity:0; }
+#bob-star .bs-say.more .say-more{ opacity:1; animation:gs-nod .6s ease-in-out infinite; }
+#bob-star .bs-pop{ position:absolute; left:0; top:0; z-index:3; pointer-events:none; font:900 34px/1 'Arial Black','Segoe UI Black',Impact,sans-serif;
+  -webkit-text-stroke:2px #101828; paint-order:stroke fill; text-shadow:0 3px 0 rgba(0,0,0,.4); }
+#bob-star .bs-got small{ display:block; margin-top:14px; font-size:.42em; letter-spacing:.06em; -webkit-text-stroke:2px #1d2c74; }

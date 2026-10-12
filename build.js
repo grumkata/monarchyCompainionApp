@@ -65,7 +65,6 @@ const GEO_PACKS = {
   '19-bin-asset.js':     'BIN3D',
   '17-wood-assets.js':   'WOOD',
   '18-bits-assets.js':   'BITS',
-  '33-dice-assets.js':   'DICE_ASSETS',
   '35-kit-assets.js':    'KIT',
   '52-room-assets.js':   'ROOM',
   '53-tavern-assets.js': 'TAVERN',
@@ -128,7 +127,9 @@ const CSS = [
      room (2026-09-25) — last, so it wins over what it replaced */
   ['src/css/14-war.css',     'body.at-table'],
   /* the player: Monarchy's own controls for what the GM plays (74-music.js, 77-player.js) */
-  ['src/css/15-player.css',  'body.at-table']
+  ['src/css/15-player.css',  'body.at-table'],
+  /* the fight: the board's labels, its hit areas and its card (81, 82) */
+  ['src/css/16-battle.css',  'body.at-table']
 ];
 
 const JS = [
@@ -155,7 +156,7 @@ const JS = [
      were what a counter used to be (2026-09-25). The files are still in
      src/js and still bake; put a line back here to have one again. */
   'src/js/17-wood-assets.js',    // WoodStuff (CC0, loafbrr) — the table, and the furniture
-  'src/js/33-dice-assets.js',
+  'src/js/33-dice-forge.js',     // every die and the coin, made in code
   'src/js/35-kit-assets.js',     // Nature MegaKit, baked
   'src/js/36-sprite-assets.js',
   'src/js/52-room-assets.js',    // Medieval Village MegaKit — the tavern shell
@@ -173,9 +174,9 @@ const JS = [
   'src/js/65-token-look.js',     // what a counter looks like; read by the mat, the wood and the field
   'src/js/30-rules.js',          // ── the fight ──
   'src/js/31-content.js',
-  'src/js/32-combat-app.js',     // needs #field in the page: it renders on load
   'src/js/34-gl-pieces.js',      // the moulded counters
   'src/js/37-scene-field.js',    // the immersive field you drop into
+  'src/js/38-field-world.js',    // where the fight happens: the meadow, its sky, its light
   'src/js/39-roll-parse.js',
   'src/js/39-dice.js',
 
@@ -191,17 +192,28 @@ const JS = [
   'src/js/25-toolbox.js',
   'src/js/26-scene-setup.js',
   'src/js/27-table-gl.js',
-  'src/js/44-characters.js',      // the hall's roster, reachable from the table
+  'src/js/27-goblin-loot.js',     // what he gives you: three models, baked by tools/bake_loot.py
+  'src/js/27-goblin.js',          // the cheese on the side table, and who lives in it
+  'src/js/27-doom.js',            // and the Doom CD it leaves you: in through the cover, onto E1M1
+  'src/js/27-bob.js',             // and the Power Star: out through a star, into Bob-omb Battlefield
+  'src/js/27-bob-world.js',       // what lives there: the game's own cast, where the game puts it
+  'src/js/44-characters.js',     // the hall's roster, reachable from the table
   'src/js/43-tokens.js',          // a token has one home
   'src/js/45-papers.js',          // a record opened at the table
   'src/js/50-token-maker.js',     // what a counter is: person, NPC or formation
   'src/js/51-preview.js',        // a preview is the thing, made small
-  'src/js/41-lines-edit.js',
-  'src/js/40-combat-scene.js',   // model <-> battlefield
+  'src/js/79-token-glyph.js',    // what each of the thirty tokens looks like
+  'src/js/80-battle.js',         // the fight, as data: every change one undo step
+  'src/js/81-battle-view.js',    // the board on the table, through the table's own camera
+  'src/js/82-battle-ui.js',      // the strip, the plate, the library, the keys
+  'src/js/83-token-fx.js',       // what each token looks like on the figure that carries it
+  'src/js/84-battle-rail.js',    // the rail of figures under the board, the turn plaque, the mana
+  'src/js/85-battle-drag.js',    // picking a figure up and putting it down
   'src/js/28-table-boot.js',
 
   'src/js/55-herald.js',         // Blazon's motion: the bend, the cry, the gilt
   'src/js/57-chat-net.js',       // the dock, when there are other people in it
+  'src/js/78-chat-media.js',     // Tenor GIFs and pictures in the chat
   'src/js/58-sheets-net.js',     // the sheets somebody pulled onto the wood
   'src/js/59-table-menu.js',     // the table's one menu: Esc, or the mark
   'src/js/60-board-net.js',      // the same wood, for everyone at it
@@ -212,7 +224,6 @@ const JS = [
   'src/js/66-workbench.js',      // everything a thing can be, chosen before it is put down
   'src/js/67-inspector.js',      // the one you have hold of: edit, duplicate, turn, remove
   'src/js/68-gm-rail.js',        // the GM's rail: toolbox, the fight, the music
-  'src/js/72-muster.js',         // the fight run from one place: the roll, the card, the ground
   'src/js/73-encounters.js',     // fights kept and brought back (the war room that made them is gone)
   'src/js/74-music.js',          // the GM's music, played at every seat
   'src/js/75-audio.js',          // plays the GM's own sound-board files (the app has no sounds of its own)
@@ -802,6 +813,20 @@ let fonts = 0;
   if (fs.existsSync(to))
     for (const f of fs.readdirSync(to)) if (!have.includes(f)) fs.unlinkSync(path.join(to, f));
   for (const f of have) { fs.copyFileSync(path.join(FONT_DIR, f), path.join(to, f)); fonts++; }
+}
+
+/* ── AND THE GOBLIN'S TREASURE'S WORLDS ───────────────────────
+   The Doom CD's game (6.8 MB of WebAssembly) and the star's course and
+   Mario: not in the page. 27-doom.js and 27-bob.js load them with a script
+   tag the first time they are wanted. Copied the same way. */
+for (const dir of ['doom', 'bob']) {
+  const from = path.join(__dirname, 'src/assets', dir), to = path.join(__dirname, 'dist/assets', dir);
+  const have = fs.existsSync(from) ? fs.readdirSync(from).filter(f => /\.js$/i.test(f)) : [];
+  if (have.length) fs.mkdirSync(to, { recursive: true });
+  for (const f of have) {
+    const src = path.join(from, f), dst = path.join(to, f);
+    if (!fs.existsSync(dst) || fs.statSync(dst).size !== fs.statSync(src).size) fs.copyFileSync(src, dst);
+  }
 }
 
 /* ══ WHAT AN INSTALLED COPY UPDATES ITSELF TO ═════════════════════

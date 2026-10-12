@@ -1,0 +1,264 @@
+/* ══════════════════════════════════════════════════════════════
+   16-battle.css — THE FIGHT'S OWN STYLES (81-battle-view.js, 82-battle-ui.js).
+
+   Everything is `bt-` and nothing here styles anything else. The board is a
+   canvas (z 865: over the wood, #vp at 860, and under the table's own models,
+   #tgl at 870, and the dice at 900); the labels, the hit areas, the strip under
+   the board and the plate beside a piece are DOM in one fixed layer over it
+   (z 899). The library is docked at the left hand like the toolbox and narrows
+   the table's view the same way.
+   Words and colours are the app's own (--m-*, 20-shell.css).
+══════════════════════════════════════════════════════════════ */
+#bt-cv { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 865; }
+#bt-ov { position: fixed; inset: 0; pointer-events: none; z-index: 899; overflow: hidden;
+         font-family: var(--m-f-hand, 'Crimson Text', Georgia, serif); color: #f0e7d0; user-select: none; }
+#bt-ov * { box-sizing: border-box; }
+/* the empty box on the wood that stands for the scene: a frame to lock onto, nothing to look at */
+#combat-prop { box-shadow: none !important; background: none !important; pointer-events: none; }
+#combat-prop > .face { background: none !important; border: 0 !important; box-shadow: none !important; pointer-events: none; }
+#combat-prop .side { display: none !important; }
+
+/* ── what follows a figure ── */
+#bt-ov .bt-tag, #bt-ov .bt-manav, #bt-ov .bt-manain, #bt-ov .bt-cap, #bt-ov .bt-mor, #bt-ov .bt-ap, #bt-ov .bt-ch, #bt-ov .bt-nm, #bt-ov .bt-hit, #bt-ov .bt-pop, #bt-ov .bt-wear { position: absolute; left: 0; top: 0; }
+.bt-cap { height: 15px; background: #000d; border: 1.5px solid #000; border-radius: 8px; box-shadow: 0 1px 3px #000c; pointer-events: none; }
+.bt-cap i { position: absolute; left: 0; top: 0; height: 100%; }
+.bt-cap .bt-gh { background: #efe7cc; opacity: .6; transition: width .5s ease-out .15s; }
+.bt-cap .bt-fl { transition: width .1s; }
+.bt-cap b { position: relative; display: block; text-align: center; font: 700 13px/12px var(--m-f-tally, 'Barlow Condensed', 'Arial Narrow', sans-serif); color: #fff; -webkit-text-stroke: 2.6px #000; paint-order: stroke fill; }
+.bt-cap .bt-dn { position: absolute; right: -2px; top: -2px; width: 15px; height: 15px; border-radius: 50%; background: #e8c35f; color: #1a1206; font: 700 11px/15px Arial; text-align: center; border: 1px solid #000; text-decoration: none; }
+.bt-cap .bt-nu { position: absolute; left: -2px; top: -2px; width: 15px; height: 15px; border-radius: 50%; background: #1d170f; color: #f0e7d0; font: 700 11px/13px Arial; text-align: center; border: 1.5px solid #f4e9c8; text-decoration: none; }
+.bt-cap .bt-gh, .bt-cap .bt-fl { border-radius: 7px; overflow: hidden; }
+.bt-cap.bt-ghost { opacity: .7; }
+.bt-cap.bt-ghost::after { content: 'hidden'; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 1px; font: italic 600 10px var(--m-f-hand, 'Crimson Text', serif); color: #f6d77a; -webkit-text-stroke: 2.4px #000; paint-order: stroke fill; white-space: nowrap; }
+
+/* the turn's two actions, on the figure: a gold diamond for the full action, a teal dot for the quick one.
+   Lit while it is still there to use; dark and hollow once it is spent */
+.bt-ap { display: flex; align-items: center; gap: 5px; height: 12px; pointer-events: none; transform-origin: top center; }
+.bt-ap u { display: block; width: 10px; height: 10px; background: #e8c35f; border: 1.5px solid #000; box-shadow: 0 1px 3px #000c; text-decoration: none; transition: background .2s, opacity .2s; }
+.bt-ap .bt-af { transform: rotate(45deg) scale(.86); }
+.bt-ap .bt-aq { border-radius: 50%; background: #5ad2c4; }
+.bt-ap.bt-uf .bt-af { background: #1a1510; opacity: .55; }
+.bt-ap.bt-uq .bt-aq { background: #1a1510; opacity: .55; }
+
+/* a formation's morale, there to read from across the table: the number it is at, in a colour that says
+   where it stands on the ladder, with four pips (how many are lit is the level) */
+.bt-mor { display: flex; align-items: center; gap: 3px; height: 18px; padding: 0 8px 0 7px; background: #000d; border: 1.5px solid #000; border-radius: 9px; box-shadow: 0 1px 3px #000c; pointer-events: none; white-space: nowrap; transform-origin: top center; }
+.bt-mor i { font: 600 8px var(--m-f-cap, Cinzel, serif); letter-spacing: .14em; text-transform: uppercase; font-style: normal; color: #cbbf9f; margin-right: 1px; }
+.bt-mor u { width: 6px; height: 7px; border-radius: 2px; background: #3a3126; text-decoration: none; }
+.bt-mor b { margin: 0 4px 0 2px; font: 700 15px/16px var(--m-f-tally, 'Barlow Condensed', sans-serif); color: #fff; }
+.bt-m5 u { background: #7fb4ea; } .bt-m5 b { color: #cfe6ff; }
+.bt-m4 u:nth-of-type(-n+4) { background: #6fbf4a; } .bt-m4 b { color: #c3eaae; }
+.bt-m3 u:nth-of-type(-n+3) { background: #e0cc3a; } .bt-m3 b { color: #f5e68e; }
+.bt-m2 u:nth-of-type(-n+2) { background: #e68a30; } .bt-m2 b { color: #ffc58a; }
+.bt-m1 u:nth-of-type(-n+1) { background: #d63a2a; } .bt-m1 b { color: #ff9c8a; }
+
+.bt-ch { display: flex; flex-direction: column; gap: 3px; transform-origin: left center; pointer-events: none; }
+.bt-tkc { position: relative; display: block; width: 25px; height: 25px; pointer-events: auto; cursor: help; }
+.bt-tkc s { position: absolute; right: -5px; bottom: -5px; background: #0d0a08; border: 1px solid #fff9; border-radius: 6px; min-width: 12px; height: 12px; font: 700 9px/11px Arial; text-decoration: none; text-align: center; color: #fff; }
+.bt-more { display: block; font: 700 10px/12px Arial; font-style: normal; color: #fff; -webkit-text-stroke: 2.5px #000; paint-order: stroke fill; text-align: center; }
+.bt-gl { display: inline-block; flex: none; } .bt-gl svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 1px #000a); }
+.bt-gl-x { border-radius: 50%; background: #444; color: #fff; font: 700 9px/1 Arial; display: inline-flex; align-items: center; justify-content: center; }
+.bt-nm { z-index: 5; white-space: nowrap; font: 700 13px/14px var(--m-f-hand, 'Crimson Text', Georgia, serif); color: #fff6e0; -webkit-text-stroke: 3.2px #000; paint-order: stroke fill; pointer-events: none; }
+.bt-hit { pointer-events: auto; cursor: pointer; border-radius: 40%; }
+body.bt-dragging, body.bt-dragging * { cursor: grabbing !important; }
+body.bt-dragging .bt-tip { display: none !important; }
+.bt-plate, .bt-pp { transition: opacity .12s; }
+body.bt-dragging .bt-plate, body.bt-dragging .bt-pp { opacity: 0; pointer-events: none; }
+.bt-dmark { position: absolute; left: 0; top: 0; z-index: 1900; pointer-events: none; white-space: nowrap; padding: 3px 10px 4px; border-radius: 10px; background: #0d0a07ee; border: 1px solid #8f6f1b; font: 700 17px/1 var(--m-f-tally, 'Barlow Condensed', sans-serif); letter-spacing: .04em; color: #f6d77a; }
+.bt-dmark.bt-bad { color: #ffb4a0; border-color: #c8452c; }
+.bt-pop { z-index: 8; font: 700 26px var(--m-f-tally, 'Barlow Condensed', sans-serif); -webkit-text-stroke: 4px #000; paint-order: stroke fill; pointer-events: none; white-space: nowrap; }
+.bt-pop1 { font-size: 32px; } .bt-pop2 { font-size: 40px; -webkit-text-stroke: 5px #000; } .bt-pop3 { font-size: 50px; -webkit-text-stroke: 6px #2a0000; text-shadow: 0 0 18px #ff3a1a; }
+.bt-cap.bt-hurt { animation: bt-caphurt .46s ease-out; }
+@keyframes bt-caphurt { 0% { margin-left: 0; filter: brightness(2.2) saturate(2.2); } 12% { margin-left: -5px; } 28% { margin-left: 6px; filter: brightness(1.5); } 44% { margin-left: -3px; } 62% { margin-left: 2px; filter: none; } 100% { margin-left: 0; filter: none; } }
+.bt-wear { z-index: 1005; text-align: center; pointer-events: none; white-space: nowrap; }
+.bt-wear b { display: block; font: 700 40px/38px var(--m-f-tally, 'Barlow Condensed', sans-serif); -webkit-text-stroke: 5px #000; paint-order: stroke fill; }
+.bt-wear em { display: block; font: italic 700 14px var(--m-f-hand, 'Crimson Text', serif); color: #ffe9a0; -webkit-text-stroke: 3.5px #000; paint-order: stroke fill; }
+
+/* ── what stands on the wood under the board: the rail of figures, and the dish of mana ── */
+.bt-tag { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; font: 700 11px/12px var(--m-f-hand, 'Crimson Text', Georgia, serif); color: #fff6e0; -webkit-text-stroke: 3px #000; paint-order: stroke fill; pointer-events: none; }
+.bt-mini { border-radius: 30%; cursor: grab; touch-action: none; }
+.bt-mini:hover { box-shadow: 0 0 0 2px #f6d77a66; }
+.bt-dish { border-radius: 50%; }
+.bt-manav { display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform-origin: bottom center; z-index: 1003; }
+.bt-manav b { font: 700 34px/30px var(--m-f-tally, 'Barlow Condensed', sans-serif); color: #e9f6ff; -webkit-text-stroke: 5px #04141f; paint-order: stroke fill; }
+.bt-manav i { font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .2em; text-transform: uppercase; font-style: normal; color: #a9c4f2; -webkit-text-stroke: 3px #04141f; paint-order: stroke fill; }
+.bt-manain { width: 84px; height: 40px; z-index: 1006; text-align: center; background: #07131c; color: #e9f6ff; border: 1px solid #58b8ef; border-radius: 4px; outline: none; pointer-events: auto; font: 700 28px var(--m-f-tally, 'Barlow Condensed', sans-serif); box-shadow: 0 0 0 3px #58b8ef44; }
+.bt-rarr { display: flex; align-items: center; justify-content: center; color: #f6d77a; -webkit-text-stroke: 3px #000; paint-order: stroke fill; cursor: pointer; font-family: Georgia, serif; font-weight: 700; border-radius: 50%; }
+.bt-rarr:hover { color: #fff; }
+.bt-rbtn { border-radius: 40%; } .bt-rbtn:hover { box-shadow: 0 0 0 2px #f6d77a66; }
+
+/* ── a word, when something was refused; and the hover that says what a thing does ── */
+.bt-toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: #0d0a07e8; border: 1px solid #8f6f1b; border-radius: 14px; padding: 5px 16px; font: italic 14px var(--m-f-hand, 'Crimson Text', serif); color: #efe6d2; pointer-events: none; opacity: 0; transition: opacity .2s; white-space: nowrap; z-index: 1004; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; }
+.bt-toast.on { opacity: 1; }
+.bt-tip { position: fixed; left: 0; top: 0; background: #0d0a07f2; border: 1px solid #8f6f1b; border-radius: 3px; padding: 6px 9px; font: italic 13px/1.2 var(--m-f-hand, 'Crimson Text', serif); color: #efe6d2; pointer-events: none; max-width: 260px; box-shadow: 0 4px 14px #000a; z-index: 1700; }
+.bt-tip b { font: 700 11px var(--m-f-cap, Cinzel, serif); font-style: normal; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 2px; }
+.bt-tip em { display: block; margin-top: 3px; font-style: normal; font-weight: 700; color: #f6d77a; }
+
+/* ── the strip: only in the field, where the table is out of sight ── */
+.bt-hud { position: absolute; bottom: 12px; transform: translateX(-50%); display: flex; align-items: stretch; gap: 6px; pointer-events: auto; z-index: 1001; white-space: nowrap; }
+.bt-turn, .bt-hb, .bt-mana { height: 38px; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 0 15px; color: var(--m-argent-hi, #f4efe2);
+  background: linear-gradient(176deg, var(--m-sable-2, #221c16), var(--m-sable, #171310)); box-shadow: inset 0 0 0 1px var(--m-line, #c9a22757), 0 5px 16px #000a; font-family: var(--m-f-cap, Cinzel, serif); }
+.bt-turn { min-width: 118px; justify-content: center; background: linear-gradient(#e0b23a, #b98a1e); color: #1a1206; box-shadow: inset 0 0 0 1px #e8c25a, 0 5px 16px #000a; }
+.bt-turn span { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.bt-turn b { font: 700 24px/1 var(--m-f-tally, 'Barlow Condensed', sans-serif); }
+.bt-turn i { font-style: normal; font-size: 14px; }
+.bt-turn:disabled { cursor: default; background: linear-gradient(176deg, var(--m-sable-2, #221c16), var(--m-sable, #171310)); color: var(--m-argent-hi, #f4efe2); box-shadow: inset 0 0 0 1px var(--m-line, #c9a22757), 0 5px 16px #000a; }
+.bt-turn:not(:disabled):hover { filter: brightness(1.1); }
+.bt-hud .bt-mana { display: none; }
+#bt-ov.bt-infield .bt-hud .bt-mana { display: inline-flex; }
+.bt-mana { cursor: default; padding: 0 10px 0 13px; gap: 9px; }
+.bt-mana span { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #a9c4f2; }
+.bt-mi, .bt-mv { width: 58px; height: 26px; border: 0; background: var(--m-sable-0, #0b0907); box-shadow: inset 0 0 0 1px var(--m-line, #c9a22757); color: #e9f6ff; text-align: center; outline: none;
+  font: 700 19px/26px var(--m-f-tally, 'Barlow Condensed', sans-serif); -moz-appearance: textfield; }
+.bt-mi::-webkit-inner-spin-button { opacity: 0; width: 12px; } .bt-mi:hover::-webkit-inner-spin-button, .bt-mi:focus::-webkit-inner-spin-button { opacity: 1; }
+.bt-mi:focus { box-shadow: inset 0 0 0 1px var(--m-or, #c9a227), 0 0 0 2px #c9a22755; }
+.bt-mv { display: none; background: none; box-shadow: none; }
+.bt-hb { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.bt-hb:hover { box-shadow: inset 0 0 0 1px var(--m-or, #c9a227), 0 5px 16px #000a; }
+.bt-fout { display: none; }
+.bt-hud:not(.bt-gmhud) .bt-mi { display: none; }
+.bt-hud:not(.bt-gmhud) .bt-mv { display: block; }
+.bt-hud:not(.bt-gmhud) .bt-turn { pointer-events: none; }
+
+/* ── the cards that open off the cog, the banner and a monster on the rail ── */
+.bt-pp { position: absolute; left: 0; top: 0; width: 340px; max-height: min(76vh, 640px); overflow-y: auto; pointer-events: auto; z-index: 1003; padding: 12px 14px 8px;
+  background: linear-gradient(#1d170f, #130f0a); border: 1px solid #8f6f1b; border-radius: 5px; box-shadow: 0 10px 28px #000c; color: #efe6d2; }
+.bt-pp::-webkit-scrollbar { width: 5px; } .bt-pp::-webkit-scrollbar-thumb { background: #5a4a2a; }
+.bt-pph { font: 700 11px var(--m-f-cap, Cinzel, serif); letter-spacing: .2em; text-transform: uppercase; color: var(--m-or, #c9a227); padding-bottom: 8px; }
+.bt-pp > label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; font: 600 14px var(--m-f-hand, 'Crimson Text', serif); color: #e3d9bf; }
+.bt-pp > label > span { flex: 1; }
+.bt-pp > label .bt-num, .bt-pp > label .bt-sel { width: 124px; }
+.bt-pp > label .bt-num { width: 64px; text-align: center; }
+.bt-pp .bt-chk { justify-content: flex-start; gap: 9px; cursor: pointer; }
+.bt-pp .bt-chk input { width: 16px; height: 16px; accent-color: #c9a227; }
+.bt-pp .bt-chk span { flex: 1; }
+.bt-pp .bt-stats, .bt-pp .bt-tk, .bt-pp .bt-pal, .bt-pp .bt-row, .bt-pp .bt-lbl, .bt-pp .bt-none { padding-left: 0; padding-right: 0; }
+.bt-pp .bt-ti { padding-left: 2px; padding-right: 2px; }
+
+/* ── the plate beside a picked piece ── */
+.bt-plate { position: absolute; left: 0; top: 0; width: 296px; max-height: min(78vh, 640px); overflow-y: auto; pointer-events: auto; z-index: 1000;
+  background: linear-gradient(#1d170f, #130f0a); border: 1px solid #8f6f1b; border-radius: 5px; box-shadow: 0 8px 24px #000b; color: #efe6d2; padding-bottom: 2px; }
+.bt-plate::-webkit-scrollbar { width: 4px; } .bt-plate::-webkit-scrollbar-thumb { background: #5a4a2a; }
+.bt-hd { display: flex; gap: 11px; padding: 11px 13px 5px; }
+.bt-coin { flex: none; width: 54px; min-height: 54px; display: flex; align-items: center; justify-content: center; }
+.bt-coin > * { flex: none; }
+.bt-id { flex: 1; min-width: 0; }
+.bt-n { font: 700 16px var(--m-f-cap, Cinzel, serif); letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-s { display: flex; align-items: center; gap: 6px; font: 600 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .12em; color: #a8997a; text-transform: uppercase; white-space: nowrap; }
+.bt-hprow { display: flex; align-items: flex-end; gap: 10px; margin-top: 2px; }
+.bt-hpn { font: 700 32px/1 var(--m-f-tally, 'Barlow Condensed', sans-serif); } .bt-hpn small { font-size: 17px; color: #a8997a; }
+.bt-hbar { position: relative; height: 7px; background: #0a0806; border: 1px solid #000; border-radius: 4px; overflow: hidden; flex: 1; margin-bottom: 6px; }
+.bt-hbar i { position: absolute; left: 0; top: 0; height: 100%; }
+.bt-act { display: flex; gap: 7px; align-items: center; padding: 2px 13px 4px; }
+.bt-f { width: 62px; height: 34px; border: 1px solid #d1a52c; background: #0d0a07; border-radius: 3px; font: 700 24px/34px var(--m-f-tally, 'Barlow Condensed', sans-serif); text-align: center; color: #fff; cursor: text; }
+.bt-f.on { box-shadow: 0 0 0 2px #d1a52c55; }
+.bt-b { display: inline-block; font: 600 10px var(--m-f-cap, Cinzel, serif); letter-spacing: .1em; text-transform: uppercase; padding: 8px 11px; border-radius: 3px; border: 1px solid #3a2f20; background: #1e1812; cursor: pointer; color: #efe6d2; user-select: none; }
+.bt-b:hover { border-color: #d1a52c; }
+.bt-b.bt-or { background: linear-gradient(#e0b23a, #b98a1e); color: #1a1206; border-color: #e8c25a; }
+.bt-b.bt-bad { border-color: #c8452c; color: #ffb4a0; }
+.bt-b.bt-off { opacity: .45; pointer-events: none; }
+.bt-turnrow { display: flex; gap: 6px; align-items: center; padding: 4px 13px 6px; }
+.bt-ab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 3px; border: 1px solid #3a2f20; background: #1e1812; cursor: pointer; font: 600 10px var(--m-f-cap, Cinzel, serif); letter-spacing: .1em; text-transform: uppercase; color: #efe6d2; user-select: none; }
+.bt-ab:hover { border-color: #d1a52c; }
+.bt-ab.ro { cursor: default; } .bt-ab.ro:hover { border-color: #3a2f20; }
+.bt-ab i { display: block; width: 10px; height: 10px; border: 1.5px solid #000; }
+.bt-ab i.f { background: #e8c35f; transform: rotate(45deg) scale(.86); }
+.bt-ab i.q { background: #5ad2c4; border-radius: 50%; }
+.bt-ab.used { color: #7d7260; text-decoration: line-through; }
+.bt-ab.used i { background: #1a1510; opacity: .6; }
+.bt-mrow { align-items: flex-end; padding-top: 0; }
+.bt-mrow .bt-b { padding: 7px 10px; }
+.bt-num.bt-m5, .bt-num.bt-m4, .bt-num.bt-m3, .bt-num.bt-m2, .bt-num.bt-m1 { width: 52px; }
+.bt-pvl { padding: 0 13px 6px; font: italic 13px/1.2 var(--m-f-hand, 'Crimson Text', serif); color: #e9d9a8; } .bt-pvl em { font-style: normal; color: #fff; font-weight: 700; }
+.bt-by { display: flex; align-items: center; gap: 8px; padding: 0 13px 6px; }
+.bt-by label { font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .14em; color: #8a7c60; text-transform: uppercase; }
+.bt-by .bt-sel { flex: 1; min-width: 0; }
+.bt-lbl { font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .16em; color: #6f6450; text-transform: uppercase; padding: 5px 13px 2px; }
+.bt-tk { padding: 3px 0; }
+.bt-ti { display: flex; align-items: center; gap: 9px; padding: 3px 13px; cursor: help; }
+.bt-ti:hover { background: #ffffff0a; }
+.bt-tg { flex: none; width: 26px; height: 26px; display: flex; }
+.bt-tt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bt-tt b { font: 700 12px var(--m-f-tally, 'Barlow Condensed', sans-serif); letter-spacing: .06em; text-transform: uppercase; }
+.bt-tt i { font: italic 12px/1.1 var(--m-f-hand, 'Crimson Text', serif); color: #c9ba93; }
+.bt-stp { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; } .bt-stp b { min-width: 14px; text-align: center; font: 700 14px var(--m-f-tally, 'Barlow Condensed', sans-serif); }
+.bt-stp u { width: 20px; height: 20px; border-radius: 50%; background: #2a2118; border: 1px solid #5a4a2a; text-decoration: none; text-align: center; font: 700 13px/18px Arial; cursor: pointer; }
+.bt-stp u:hover { border-color: #d1a52c; }
+.bt-tadd { display: flex; gap: 6px; padding: 5px 13px 2px; align-items: center; }
+.bt-tadd .bt-b { padding: 7px 10px; }
+.bt-tqres { padding: 0 8px; }
+.bt-tqi { display: flex; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 3px; cursor: pointer; }
+.bt-tqi.on, .bt-tqi:hover { background: #2a2118; }
+.bt-tqi b { font: 700 12px var(--m-f-tally, 'Barlow Condensed', sans-serif); letter-spacing: .05em; text-transform: uppercase; flex: none; }
+.bt-tqi span { font: italic 12px/1.1 var(--m-f-hand, 'Crimson Text', serif); color: #a8997a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-none { padding: 8px 13px; font: italic 13px/1.25 var(--m-f-hand, 'Crimson Text', serif); color: #8a7c60; }
+.bt-pal { display: flex; flex-wrap: wrap; gap: 3px; padding: 4px 13px 6px; align-items: center; }
+.bt-pi { cursor: pointer; border-radius: 50%; transition: transform .08s; } .bt-pi:hover { transform: scale(1.22); }
+.bt-gap { width: 8px; }
+.bt-row { display: flex; gap: 6px; padding: 7px 13px 11px; align-items: center; flex-wrap: wrap; }
+.bt-row .bt-b { padding: 7px 9px; }
+.bt-stats { display: flex; flex-wrap: wrap; gap: 5px 9px; padding: 2px 13px 6px; align-items: flex-end; }
+.bt-plate .bt-stats .bt-num { width: 42px; }
+.bt-st { display: inline-flex; flex-direction: column; gap: 1px; font: 700 8px var(--m-f-cap, Cinzel, serif); letter-spacing: .12em; color: #8a7c60; text-transform: uppercase; }
+.bt-st b { font: 700 15px var(--m-f-tally, 'Barlow Condensed', sans-serif); color: #efe6d2; letter-spacing: 0; }
+.bt-num, .bt-txt, .bt-sel { background: #0d0a07; border: 1px solid #5a4a2a; border-radius: 3px; color: #fff; font: 600 14px var(--m-f-tally, 'Barlow Condensed', sans-serif); padding: 3px 5px; width: 46px; outline: none; }
+.bt-txt { flex: 1; min-width: 0; font: 600 15px var(--m-f-hand, 'Crimson Text', serif); width: auto; padding: 5px 8px; border-color: #d1a52c; }
+.bt-sel { width: auto; padding: 4px 5px; font-family: var(--m-f-hand, 'Crimson Text', serif); font-size: 14px; cursor: pointer; }
+.bt-num:focus, .bt-txt:focus, .bt-sel:focus { box-shadow: 0 0 0 2px #d1a52c55; border-color: #d1a52c; }
+.bt-sel.bt-m5 { border-color: #7fb4ea; color: #cfe6ff; } .bt-sel.bt-m4 { border-color: #6fbf4a; color: #c3eaae; } .bt-sel.bt-m3 { border-color: #e0cc3a; color: #f5e68e; }
+.bt-sel.bt-m2 { border-color: #e68a30; color: #ffc58a; } .bt-sel.bt-m1 { border-color: #d63a2a; color: #ff9c8a; }
+.bt-sel option { background: #1d170f; color: #efe6d2; }
+
+/* what kind of piece, said in a colour and a word, everywhere a piece is listed */
+.bt-k { font-style: normal; font: 700 8.5px var(--m-f-cap, Cinzel, serif); letter-spacing: .12em; text-transform: uppercase; padding: 2px 6px; border-radius: 8px; background: #3a3429; color: #d8cfba; white-space: nowrap; }
+.bt-k-large { background: #7a4a1c; color: #ffd98a; box-shadow: inset 0 0 0 1px #e8c35f88; }
+.bt-k-form { background: #1f5a5e; color: #aef0e8; box-shadow: inset 0 0 0 1px #5ad2c488; }
+.bt-sd { font-style: normal; font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .12em; text-transform: uppercase; }
+.bt-sd-en { color: #ff8e7b; } .bt-sd-al { color: #8fb8ff; }
+
+
+/* ── the pieces of the cards: kept fights, the monster being made ── */
+.bt-lbar { display: flex; gap: 8px; padding: 2px 0 8px; align-items: center; }
+.bt-lbar .bt-txt { border-color: var(--m-line, #c9a22757); }
+.bt-eg { flex: none; width: 74px; height: 66px; display: flex; align-items: flex-end; justify-content: center; overflow: visible; pointer-events: none; }
+.bt-en { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+.bt-en b { font: 600 17px/1.1 var(--m-f-hand, 'Crimson Text', serif); color: var(--m-argent-hi, #f4efe2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-en i { display: flex; align-items: center; gap: 7px; font-style: normal; }
+.bt-en small { font: 600 13px var(--m-f-tally, 'Barlow Condensed', sans-serif); color: var(--m-quiet, #ded8c88f); letter-spacing: .04em; }
+.bt-fgt { padding: 9px 10px 9px 12px; margin-bottom: 6px; background: var(--m-sable-0, #0b0907); box-shadow: inset 0 0 0 1px var(--m-line, #c9a22757); }
+.bt-fn { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.bt-fn b { font: 600 17px/1.1 var(--m-f-hand, 'Crimson Text', serif); color: var(--m-argent-hi, #f4efe2); }
+.bt-fn i { font: italic 13px var(--m-f-hand, 'Crimson Text', serif); color: var(--m-quiet, #ded8c88f); }
+.bt-fb { display: flex; gap: 6px; flex-wrap: wrap; }
+.bt-fgt .bt-b { padding: 6px 9px; }
+.bt-fgt .bt-txt { width: 100%; margin-bottom: 8px; }
+.bt-prev { display: flex; align-items: center; gap: 14px; padding: 4px 4px 12px; }
+.bt-prev .bt-eg { width: 92px; height: 82px; }
+.bt-ed { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.bt-ed > label { width: 56px; flex: none; font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .14em; color: var(--m-quiet, #ded8c88f); text-transform: uppercase; }
+.bt-wrap { flex-wrap: wrap; }
+.bt-pics { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.bt-pic { width: 44px; height: 52px; border-radius: 4px; border: 2px solid #3a2f20; background: #2a2118 center 8%/auto 125% no-repeat; cursor: pointer; }
+.bt-pic.on { border-color: #e8c35f; box-shadow: 0 0 0 2px #e8c35f55; } .bt-pic:hover { border-color: #d1a52c; }
+/* ── standing in the field (37-scene-field.js) ──
+   The pieces there are the table's own, so their labels, hit areas, numbers and the plate all stay; only
+   the rail's things (it is not in the field) and the cards that open off them go. */
+#bt-ov.bt-infield .bt-pp, #bt-ov.bt-infield .bt-dmark, #bt-ov.bt-infield .bt-hud,
+#bt-ov.bt-infield .bt-mini, #bt-ov.bt-infield .bt-tag.bt-mn, #bt-ov.bt-infield .bt-rarr, #bt-ov.bt-infield .bt-dish,
+#bt-ov.bt-infield .bt-manav:not(.fld-manav), #bt-ov.bt-infield .bt-rbtn:not(.fld-turn) { display: none !important; }
+#bt-ov .fld-manav { cursor: pointer; }
+#bt-ov .fld-manav b { font-size: 30px; line-height: 27px; }
+#bt-ov .fld-dish { border-radius: 50%; }
+#bt-ov .fld-turn { border-radius: 6px; }
+#bt-ov .fld-turn:hover { box-shadow: none; }
+/* the moment's dark the board-up-close view comes and goes behind */
+.fld-veil { position: fixed; z-index: 1460; pointer-events: none; display: none; opacity: 0;
+  background: radial-gradient(ellipse at 50% 42%, #2a1d12 0%, #160f09 60%, #0b0705 100%); }
+/* the way back to the table: one small pennon in the corner, like the menu's */
+.fld-back { position: fixed; z-index: 1001; display: none; align-items: center; gap: 7px; height: 38px; padding: 0 18px 0 13px; border: 0; cursor: pointer;
+  background: var(--m-marks, none), var(--m-sable, #171310); color: var(--m-or, #c9a227); clip-path: var(--m-pennon, none);
+  box-shadow: inset 0 0 0 1px var(--m-line, #c9a22757), 0 6px 18px #0009;
+  font: 700 10px var(--m-f-cap, Cinzel, serif); letter-spacing: .16em; text-transform: uppercase; }
+.fld-back span { color: var(--m-argent-hi, #f4efe2); }
+.fld-back:hover { box-shadow: inset 0 0 0 1px var(--m-or, #c9a227), 0 6px 18px #0009; }
+body.field-on .fld-back { display: inline-flex; }

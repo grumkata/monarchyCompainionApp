@@ -359,17 +359,14 @@ function piece(i){
 
 /* ═══════════════════════════════════════════════════════════════
    DICE
-   The d4, d6, d8, d20 and the coin are the KayKit BoardGameBits
-   models, baked into the page as plain vertex arrays at build time
-   (see bake_dice.py) — no loader, no fetch, one file.
+   Every die and the coin are made in 33-dice-forge.js, in code: the exact
+   solids with their edges rounded and their numbers painted on their faces.
+   (They were the KayKit BoardGameBits models until grumkata said the dice
+   looked bad.) This file only has to stand them on the wood.
 
-   Their face -> number tables were CALIBRATED, not guessed: each
-   model's triangles were grouped into real faces by normal, each
-   face's UV island was cropped out of the texture, and the numerals
-   were read off a contact sheet. So when the app says a d20 rolled 17,
-   the 17 is the face actually pointing at the ceiling.
-
-   The pack has no d10 or d12, so those two are built here to match.
+   What the forge hands back for each: the thing to draw, `lands[v-1]` — the
+   outward normal of the face that shows v (for a d4, the corner it is read
+   at; the coin is [Heads up, Tails down]) — and the shape, to measure.
 
    The RESULT is rolled first, with Math.random, and the tumble is then
    choreographed to land on it. That order matters: the number is
@@ -377,27 +374,6 @@ function piece(i){
 ═══════════════════════════════════════════════════════════════ */
 
 const UP = new THREE.Vector3(0, Math.sin(TILT), Math.cos(TILT));   // the table's normal
-
-const BODY = '#fab051', INK = '#8c4a10';                           // sampled off the pack
-
-const texCache = {};
-function diceTexture(uri){
-  if (texCache[uri]) return texCache[uri];
-  const t = new THREE.TextureLoader().load(uri, mark);
-  t.encoding = THREE.sRGBEncoding;
-  t.flipY = false;                       // glTF UVs put the origin top-left
-  t.anisotropy = 8;
-  return (texCache[uri] = t);
-}
-
-function geoFrom(m){
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(m.p, 3));
-  g.setAttribute('uv',       new THREE.Float32BufferAttribute(m.u, 2));
-  g.setAttribute('normal',   new THREE.Float32BufferAttribute(m.n, 3));
-  g.setIndex(m.i);
-  return g;
-}
 
 /* Real faces of a convex solid, found by grouping triangles on their normal —
    the same routine the calibration used, so the tables line up. */
@@ -422,78 +398,6 @@ function facesOf(geo){
   }
   out.forEach(f => f.c.divideScalar(f.w));
   return out.sort((x,y) => y.a - x.a);
-}
-
-/* ── the two shapes the pack does not have ──────────────────────
-   Built to sit beside the KayKit dice rather than beside each other:
-   same body colour, same ink, numerals on planes just off each face so
-   they stay crisp instead of stretching over a UV. */
-function trapezohedron(){
-  /* PolyhedronGeometry projects every vertex onto a sphere, which turns a
-     trapezohedron into a blob — so this is built by hand: two apexes and a
-     ten-vertex equator that alternates between two heights, cut into ten kites.
-     The kites are only PLANAR at one proportion (apex height = 9.4721 x the
-     equator's zigzag, for a unit equator); at any other, each "face" is two
-     triangles with different normals and the numbering falls apart. */
-  const R = 0.965, C = 0.106, H = C * 9.4721;
-  const T = [0, H, 0], B = [0, -H, 0], E = [];
-  for (let j = 0; j < 10; j++){
-    const a = j * Math.PI / 5;
-    E.push([Math.cos(a)*R, (j % 2 ? -C : C), Math.sin(a)*R]);
-  }
-  const kites = [];
-  for (let k = 0; k < 5; k++){
-    kites.push([T, E[(2*k)%10],   E[(2*k+1)%10], E[(2*k+2)%10]]);
-    kites.push([B, E[(2*k+1)%10], E[(2*k+2)%10], E[(2*k+3)%10]]);
-  }
-  const pos = [], nor = [];
-  const v = (a,b) => [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
-  kites.forEach(q => {
-    [[0,1,2],[0,2,3]].forEach(t => {
-      let a = q[t[0]], b = q[t[1]], c = q[t[2]];
-      const ab = v(a,b), ac = v(a,c);
-      let n = [ab[1]*ac[2]-ab[2]*ac[1], ab[2]*ac[0]-ab[0]*ac[2], ab[0]*ac[1]-ab[1]*ac[0]];
-      const mid = [(a[0]+b[0]+c[0])/3, (a[1]+b[1]+c[1])/3, (a[2]+b[2]+c[2])/3];
-      if (n[0]*mid[0] + n[1]*mid[1] + n[2]*mid[2] < 0){       // keep the winding outward
-        [b, c] = [c, b];
-        n = n.map(x => -x);
-      }
-      const L = Math.hypot(n[0],n[1],n[2]) || 1;
-      [a,b,c].forEach(p => { pos.push(p[0],p[1],p[2]); nor.push(n[0]/L, n[1]/L, n[2]/L); });
-    });
-  });
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal',   new THREE.Float32BufferAttribute(nor, 3));
-  return g;
-}
-
-const NUMTEX = {};
-function numeralTex(txt){
-  if (NUMTEX[txt]) return NUMTEX[txt];
-  const S = 128, c = document.createElement('canvas'); c.width = c.height = S;
-  const x = c.getContext('2d');
-  x.fillStyle = INK; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.font = '700 ' + (txt.length > 1 ? 62 : 80) + 'px Cinzel, Georgia, serif';
-  x.fillText(txt, S/2, S/2 + 2);
-  if (txt === '6' || txt === '9') x.fillRect(S/2-22, S/2+34, 44, 5);
-  const t = new THREE.CanvasTexture(c);
-  t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
-  return (NUMTEX[txt] = t);
-}
-const markGeo = new THREE.PlaneGeometry(1,1);
-function markMesh(tex, size, at, normal){
-  const m = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial(
-    {map:tex, transparent:true, depthWrite:false}));
-  m.scale.set(size, size, 1);
-  m.position.copy(at).addScaledVector(normal, 0.06);
-  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), normal);
-  const ref = new THREE.Vector3(0,1,0).addScaledVector(normal, -normal.y);
-  if (ref.lengthSq() > 1e-4){
-    ref.normalize().applyQuaternion(m.quaternion.clone().invert());
-    m.rotateZ(-Math.atan2(ref.x, ref.y));
-  }
-  return m;
 }
 
 /* What a die is made of, for standing it on the wood: its corners (as the
@@ -527,72 +431,8 @@ function finishDie(group, lands, geo){
 const DIE = {};
 function buildDie(kind){
   if (DIE[kind]) return DIE[kind];
-  const group = new THREE.Group();
-  let lands = [];
-
-  const asset = DICE_ASSETS[String(kind)];
-  if (asset){
-    const geo = geoFrom(asset);
-    const mat = B3(new THREE.MeshStandardMaterial({
-      map: diceTexture(DICE_TEX[asset.t]),
-      roughness: .38, metalness: kind === 'coin' ? .55 : .04, envMapIntensity: 1.0}),
-      { room:'tavern', steps:5, tint:0.16, rim:0.26 });
-    group.add(new THREE.Mesh(geo, mat));
-
-    if (kind === 'coin'){
-      lands = [new THREE.Vector3(0,1,0), new THREE.Vector3(0,-1,0)];
-    } else if (kind === 4){
-      /* a d4 is read at the APEX, so what lands is a corner. Take the four
-         extreme vertices from the model and match them to the calibration. */
-      const pos = geo.attributes.position, pts = [], v = new THREE.Vector3();
-      for (let i=0;i<pos.count;i++){
-        v.fromBufferAttribute(pos,i);
-        if (v.length() > 0.9 && !pts.some(w => w.distanceTo(v) < 0.4)) pts.push(v.clone());
-      }
-      lands = new Array(4);
-      asset.c.forEach(c => {
-        const want = new THREE.Vector3(c[0],c[1],c[2]).normalize();
-        let best = null, bd = -2;
-        pts.forEach(p => { const d = p.clone().normalize().dot(want); if (d > bd){ bd = d; best = p; } });
-        if (best) lands[c[3]-1] = best.clone().normalize();
-      });
-    } else {
-      const faces = facesOf(geo);
-      lands = new Array(kind);
-      asset.f.forEach(row => {
-        const want = new THREE.Vector3(row[0],row[1],row[2]).normalize();
-        let best = null, bd = -2;
-        faces.forEach(f => { const d = f.n.dot(want); if (d > bd){ bd = d; best = f; } });
-        if (best) lands[row[3]-1] = best.n.clone();
-      });
-    }
-    return (DIE[kind] = finishDie(group, lands, geo));
-  }
-
-  /* ── hand-built d10 and d12 ── */
-  const geo = kind === 10 ? trapezohedron() : new THREE.DodecahedronGeometry(1.0);
-  group.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color:new THREE.Color(BODY).convertSRGBToLinear(),
-    roughness:.38, metalness:.04, envMapIntensity:1.0})));
-  const faces = facesOf(geo);
-  const num = new Array(faces.length).fill(0);
-  let next = 1;
-  faces.forEach((f,i) => {
-    if (num[i]) return;
-    const opp = faces.findIndex(g => g.n.dot(f.n) < -0.985);
-    num[i] = next;
-    if (opp >= 0) num[opp] = kind + 1 - next;
-    next++;
-    while (next <= kind && num.includes(next)) next++;
-  });
-  lands = new Array(kind);
-  faces.forEach((f,i) => {
-    const val = num[i];
-    group.add(markMesh(numeralTex(kind === 10 ? String(val % 10) : String(val)),
-                       kind === 10 ? 0.58 : 0.66, f.c, f.n));
-    lands[val-1] = f.n.clone();
-  });
-  return (DIE[kind] = finishDie(group, lands, geo));
+  const d = window.DiceForge.build(kind);
+  return (DIE[kind] = finishDie(d.group, d.lands, d.geo));
 }
 
 /* ── live dice: THROWN AHEAD OF TIME, THEN PLAYED ──────────────
@@ -659,25 +499,33 @@ function stage(){
    screen-to-table, and if that ray runs over the far rim or off into the room
    (it does, sat in the chair) it is walked down the screen until it lands
    on the wood. The tray's axes are turned against your head, so "up the
-   table" is away from you whichever way you are facing. `s` is table units per
-   unit of the throw, chosen so a die is as big on the screen there as it
-   always was (they were made bigger on purpose: "dice rolls need to be made
-   bigger visually"). Null, and the old screen tray is used, if there is no table
-   camera to ask. */
+   table" is away from you whichever way you are facing.
+
+   A DIE IS THE SAME SIZE ON THE SCREEN WHEREVER YOU ARE. grumkata: "dice
+   shouldnt be scaled based on how far away a person is from the table they
+   should have a consistent scale". `s` is table units per unit of the throw,
+   chosen so a die is exactly as big on the screen at the spot as it always was
+   (they were made bigger on purpose: "dice rolls need to be made bigger
+   visually"). It used to be CAPPED so the whole screen-sized tray fitted on the
+   wood, and that cap made the DICE smaller: at the fit-the-table zoom, where the
+   wood is a few hundred pixels across, a die came out a third smaller than one
+   thrown with the table closer. What a small table cannot hold is the AREA the
+   dice are thrown over, not the dice — so that is what shrinks (`f`, applied in
+   trayHalf()): the same dice, thrown over a smaller patch of wood.
+
+   And the throw is never moved off the screen to make room. It used to jump to the
+   middle of the table when the spot it wanted was too close to the rim, and with
+   the table zoomed in the middle is thousands of pixels away: the dice were
+   thrown, and nobody saw them. Now the spot with the most wood round it, of those
+   on the screen, is used; the middle of the table only if the middle is on the
+   screen; and if there is no wood to be seen at all, null, and the old screen tray
+   is used so that the dice are at least there. */
 let anchor = null;
 function anchorTray(){
   const D = window.Table3D;
   if (!D || !D.camera || !D.camera()) return null;
   const st = stage();
-  let P = null;
-  for (let f = 0.52; f <= 0.97 && !P; f += 0.03){
-    const sy = H * f, w = D.screenToTable(st.sx, sy), back = D.toScreen(w.x, w.y, 0);
-    /* in front of the lens, on the wood, and really where it was asked for: a ray
-       above the horizon meets the plane behind the camera and projects elsewhere */
-    if (back && Math.abs(back.x - st.sx) < 3 && Math.abs(back.y - sy) < 3 && D.onWood(w.x, w.y, 500)) P = w;
-  }
   const mid = { x: D.TW / 2, y: D.TH / 2 };
-  if (!P) P = mid;
   const a = -(D.yaw || 0) * Math.PI / 180;
   /* table units per unit of the throw that make a die as big on the screen at Q
      as it always was; null if Q is behind the lens */
@@ -687,20 +535,31 @@ function anchorTray(){
     const ppu = Math.hypot(B.x - A.x, B.y - A.y) / 100;     /* screen pixels per table unit, across the throw */
     return ppu > 1e-4 ? st.k / ppu : null;
   };
-  /* ...BUT NEVER A THROW BIGGER THAN THE WOOD. Sat in the chair the table is a
-     few hundred pixels across, so a tray as big as the old one was on the screen
-     is wider than the table and spills over the far rim into the room — which is
-     exactly the dice hanging in front of the wall. The tray (and the way in over
-     the near edge, which is half as far again) has to fit on the wood; if it
-     cannot where the screen put it, it goes to the middle of the table, and if it
-     still cannot it is made smaller, which is what a table further away does. */
-  const T = trayHalf(), EXT = Math.hypot(T.x, T.y * 1.5);   /* the throw's own units */
-  const room = Q => (D.TW / 2 - 200 - Math.hypot(Q.x - mid.x, Q.y - mid.y)) / EXT;
-  let s = sizeAt(P);
-  if (s == null) return null;
-  if (s > room(P)){ P = mid; s = sizeAt(P); if (s == null) return null; }
-  s = Math.min(s, room(P));
-  return { x: P.x, y: P.y, a, s };
+  /* How much of the throw's own room the wood has at Q, 0..1. The tray (and the way
+     in over the near edge, which is half as far again) must lie on the wood: if the
+     rim is nearer than that, the tray is made smaller, not the dice. */
+  const T = stageHalf(), EXT = Math.hypot(T.x, T.y * 1.5);   /* the throw's own units */
+  const roomAt = (Q, s) => (D.TW / 2 - 200 - Math.hypot(Q.x - mid.x, Q.y - mid.y)) / (EXT * s);
+  let best = null;
+  /* true when this will do: nothing is to be gained by looking further */
+  const consider = Q => {
+    const s = sizeAt(Q);
+    if (s == null) return false;
+    const f = roomAt(Q, s);
+    if (!best || f > best.f) best = { Q, s, f };
+    return f >= 1;
+  };
+  const onScreen = p => p && p.x > 0 && p.x < W && p.y > 0 && p.y < H;
+  for (let f = 0.52; f <= 0.97; f += 0.03){
+    const sy = H * f, w = D.screenToTable(st.sx, sy), back = D.toScreen(w.x, w.y, 0);
+    /* in front of the lens, on the wood, and really where it was asked for: a ray
+       above the horizon meets the plane behind the camera and projects elsewhere */
+    if (back && Math.abs(back.x - st.sx) < 3 && Math.abs(back.y - sy) < 3 && D.onWood(w.x, w.y, 500) && consider(w)) break;
+  }
+  if (!best && onScreen(D.toScreen(mid.x, mid.y, 0))) consider(mid);
+  if (!best) return null;
+  /* a floor, so a table seen from very far off still gets a throw you can read */
+  return { x: best.Q.x, y: best.Q.y, a, s: best.s, f: Math.max(0.3, Math.min(1, best.f)) };
 }
 
 /* The tray's matrix, every frame: the throw's units -> the table's -> the screen's.
@@ -773,9 +632,14 @@ function setTilt(t){
 }
 
 /* how much room a throw has, in the throw's own units (a unit is k pixels) */
-function trayHalf(){
+function stageHalf(){
   const st = stage();
   return { x: st.w * 0.36 / st.k, y: H * 0.27 / st.k };
+}
+/* ...and how much of that this throw has: all of it, unless the wood is too small for it */
+function trayHalf(){
+  const h = stageHalf(), f = anchor ? anchor.f : 1;
+  return { x: h.x * f, y: h.y * f };
 }
 
 /* a soft dark spot, for under a die */
@@ -809,7 +673,7 @@ function spawnDie(kind, result, i, total){
   /* a fistful shrinks so it still fits the tray; and the pack's models all share one
      unit radius, which makes a d20 look like a pea beside a d6 — each kind is brought
      to the size it is in a hand */
-  const KSCALE = { 4: 1.05, 8: 1.2, 10: 1.2, 12: 1.2, 20: 1.3, coin: 1 };
+  const KSCALE = { 4: 1.05, 8: 1.2, 10: 1.2, 12: 1.2, 20: 1.3, coin: 1.35 };
   const size = Math.min(34, Math.max(14, 34 * Math.sqrt(7 / Math.max(1,total)))) * (KSCALE[kind] || 1);
   const R = trayHalf();
   /* how far apart two of them stand, and how high one stands when it is lying flat:

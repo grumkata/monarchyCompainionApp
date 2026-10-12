@@ -23,7 +23,7 @@
         "chat": {
           "$msg": {
             ".write": "auth != null && !data.exists()",
-            ".validate": "newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 4000 && (newData.child('kind').val() === 'say' || newData.child('kind').val() === 'emote' || newData.child('kind').val() === 'roll') && newData.child('who').isString() && newData.child('who').val().length <= 60 && (newData.child('role').val() !== 'gm' || root.child('tables').child($word).child('meta').child('host').val() === auth.uid)"
+            ".validate": "newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 4000 && (newData.child('kind').val() === 'say' || newData.child('kind').val() === 'emote' || newData.child('kind').val() === 'roll') && newData.child('who').isString() && newData.child('who').val().length <= 60 && (!newData.child('img').exists() || (newData.child('img').isString() && newData.child('img').val().length <= 200000 && newData.child('img').val().matches(/^data:image.(jpeg|png|gif|webp);base64,/))) && (newData.child('role').val() !== 'gm' || root.child('tables').child($word).child('meta').child('host').val() === auth.uid)"
           }
         },
         "board": {

@@ -112,14 +112,13 @@ function boot(tableId) {
     if (cd) doc.body.appendChild(cd);
   });
   tryTo(() => root.TableModel.load(id));
-  tryTo(() => { if (root.CombatScene) root.CombatScene.hookSave(); });
   tryTo(() => root.TableProps.mount());
   tryTo(() => root.Toolbox.mount());
   /* the three that replaced the chest and the bin: the GM's rail, the bar
      that says what you have hold of, and the tracker a fight is run from */
   tryTo(() => { if (root.GmRail) root.GmRail.mount(); });
   tryTo(() => { if (root.Inspector) root.Inspector.mount(); });
-  tryTo(() => { if (root.Muster) root.Muster.mount(); });
+  tryTo(() => { if (root.BattleView) root.BattleView.start(); });
   /* if a session hands out a role later, the box has to notice */
   root.addEventListener('monarchy:role', () => root.Toolbox.gate());
 }

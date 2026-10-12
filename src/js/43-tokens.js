@@ -10,16 +10,15 @@
       way most VTTs do it."
 
    So there is ONE object. `kind:'token'` in the table's model, with
-   a `.ent` on it — the combatant record app.js understands. When a
-   token's home is a combat scene, that same `.ent` object is pushed
-   into the line's `ents` array BY REFERENCE, which means every move
-   app.js makes lands on the token itself. Nothing is copied, so
-   nothing can drift.
+   a `.ent` on it — the combatant record the fight reads. When a token's
+   home is a combat scene (`t.in`, `t.lineKey`), THAT is the piece on the
+   board: 80-battle.js reads it where it stands and changes it through the
+   model, so nothing is copied and nothing can drift.
 
-   Why `.ent` and not the thing itself: app.js reads `e.kind` to
-   size a piece ('unit' one slot, 'large' two, 'form' a tile), and
-   the model reads `t.kind` to know it is a token. One field, two
-   meanings — keeping them apart is a nested object, not a rename.
+   Why `.ent` and not the thing itself: the fight reads `e.kind` to size a
+   piece ('unit' one slot, 'large' two, 'form' a tile), and the model reads
+   `t.kind` to know it is a token. One field, two meanings — keeping them
+   apart is a nested object, not a rename.
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
@@ -80,8 +79,7 @@ function make(spec) {
       max: hp,
       side: spec.side || (source === 'char' ? 'al' : 'en'),
       pc: false,
-      cond: [],
-      q: true, f: true            /* a new unit has both actions; undefined drew it greyed out as already spent */
+      cond: []
     };
   }
   if (spec.side) ent.side = spec.side;
@@ -147,6 +145,10 @@ function formFields(ent, spec) {
   if (spec.def  != null || ent.def  == null) ent.def  = String(spec.def != null ? spec.def : (ent.def || '—')).slice(0, 4) || '—';
   if (spec.lead != null || ent.lead == null)
     ent.lead = LEADS.indexOf(spec.lead) >= 0 ? spec.lead : (ent.lead || 'Stable');
+  if (spec.leadership != null || ent.leadership == null)
+    ent.leadership = ent.lead === 'Unbreakable' ? 100 : n(spec.leadership, ent.leadership != null ? ent.leadership : 60, 0, 100);
+  if (ent.leadFails == null) ent.leadFails = Math.max(0, ['Stable', 'Wavering', 'Crumbling', 'Broken'].indexOf(ent.lead));
+  if (ent.leadStreak == null) ent.leadStreak = 0;
   if (ent.move == null) ent.move = 1;
 }
 
@@ -159,8 +161,7 @@ function edit(id, next) {
   const e = t.ent; if (!e) return false;
   if (next.name != null) { t.name = String(next.name) || t.name;
                            e.name = t.name; e.mono = monoOf(t.name); }
-  if (next.side != null) { e.side = next.side === 'en' ? 'en' : 'al';
-                           if (t.in) t.lineKey = null; }
+  if (next.side != null) e.side = next.side === 'en' ? 'en' : 'al';          /* whose it is; where it stands is its line's, and stays */
   if (next.entKind != null && t.source !== 'char') {
     e.kind = next.entKind;
     if (e.kind === 'form') formFields(e, next);
@@ -202,63 +203,7 @@ function edit(id, next) {
   if (next.art  != null) { t.art = next.art; e.art = t.art; }
   if (next.info != null) t.info = String(next.info);
   T().changed('token-edit');
-  if (typeof render === 'function' && t.in) render();
   return true;
-}
-
-/* ── MANY AT ONCE ─────────────────────────────────────────────
-   A name, how many, which side — that many numbered counters standing in a
-   line of the running fight, in ONE undo. Before this, eight crows was eight
-   trips out of the box and eight drops onto a line, with the same name on
-   all of them. Numbering carries on from what is already on the field, and a
-   line that is full hands the rest to the next one back: a unit on a full
-   line is drawn nowhere at all (firstFree gives it a column past the edge). */
-function addMany(o) {
-  o = o || {};
-  const sc = T().activeScene();
-  const none = { made: [], short: 0 };
-  if (!sc || sc.scene !== 'combat' || !T().mayUseBox() || typeof S === 'undefined' || !S.lines) return none;
-  const side = o.side === 'al' ? 'al' : 'en';
-  const n = Math.max(1, Math.min(20, parseInt(o.n, 10) || 1));
-  const hp = Math.max(1, Math.min(999, parseInt(o.hp, 10) || 10));
-  const base = String(o.name || '').trim().replace(/\s+\d+$/, '').slice(0, 32)
-    || (side === 'al' ? 'Soldier' : 'Enemy');
-  const re = new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?: (\\d+))?$', 'i');
-  let count = 0, top = 0;
-  inScene(sc.id).forEach(t => {
-    const m = re.exec(t.name || ''); if (!m) return;
-    count++; top = Math.max(top, m[1] ? +m[1] : 1);
-  });
-  const numbered = n > 1 || count > 0;
-  let next = top + 1;
-
-  /* front to back: the enemy's frontline is the last of its lines in the
-     array (the Line is between the halves), the allies' is the first */
-  const mine = S.lines.filter(l => l.side === side);
-  const order = side === 'en' ? mine.slice().reverse() : mine;
-  let li = Math.max(0, order.findIndex(l => l.key === o.lineKey));
-  const used = {};
-  order.forEach(l => { used[l.key] = typeof usedIn === 'function' ? usedIn(l) : l.ents.length; });
-  const kind = o.entKind === 'large' ? 'large' : 'unit';
-  const span = kind === 'large' ? 2 : 1;
-  const made = [];
-  T().begin();
-  try {
-    for (let i = 0; i < n; i++) {
-      while (li < order.length && used[order[li].key] + span > S.width) li++;
-      if (li >= order.length) break;
-      const l = order[li];
-      const t = make({ source: 'npc', name: numbered ? base + ' ' + (next++) : base, side,
-                       entKind: kind, hp, max: hp, look: o.look || 'standee', fig: o.fig || '',
-                       x: 0, y: 0 });
-      t.in = sc.id; t.lineKey = l.key;
-      if (t.ent) { t.ent.side = side; t.ent.col = null; }      /* fill() finds it a slot */
-      used[l.key] += span;
-      made.push(t);
-    }
-  } finally { T().end(); }
-  T().changed('encounter');
-  return { made, short: n - made.length };
 }
 
 /* the record behind a token, if it has one */
@@ -285,114 +230,11 @@ function refresh(charId) {
     t.ent.hp = Math.max(0, fresh.max - gone);
     hit = true;
   });
-  if (hit) {
-    T().changed('char');
-    if (typeof render === 'function') render();
-  }
+  if (hit) T().changed('char');
 }
 
 /* every token that lives in this scene, in the order it was put down */
 const inScene = id => T().state.things.filter(t => t.kind === 'token' && t.in === id);
-
-/* ── the board, rebuilt from the tokens ───────────────────────
-   Called whenever the running scene is (re)shown. The ents are the tokens'
-   own `.ent` objects, so this is wiring, not copying. */
-function fill(scene) {
-  if (typeof S === 'undefined' || !S.lines) return;
-  S.lines.forEach(l => { l.ents = []; });
-  const byKey = {};
-  S.lines.forEach(l => { byKey[l.key] = l; });
-
-  inScene(scene.id).forEach(t => {
-    if (!t.ent) return;
-    t.ent.name = t.name;                       /* the thing's name is the name */
-    t.ent.id = t.id;
-    /* and its face is the face — a counter re-dressed on the workbench is
-       re-dressed on the mat and in the field, and a formation saved before
-       formations had numbers gets them on the way past */
-    t.ent.pic = t.src || ''; t.ent.art = t.art || ''; t.ent.fig = t.fig || '';
-    t.ent.look = t.look === 'coin' ? 'coin' : 'standee';
-    if (t.ent.kind === 'form') formFields(t.ent, {});
-    /* a token whose line was renamed away, or which has never been placed,
-       falls in on its own side's frontline rather than vanishing */
-    let l = byKey[t.lineKey];
-    if (!l || l.side !== t.ent.side) {
-      l = S.lines.filter(x => x.side === t.ent.side).slice(-1)[0] ||
-          S.lines.filter(x => x.side === t.ent.side)[0];
-    }
-    if (!l) return;
-    t.lineKey = l.key;
-    l.ents.push(t.ent);
-  });
-
-  /* ONE NEWCOMER DOES NOT RESHUFFLE THE RANK. grumkata: "when the gm adds
-     things it auto goes to the same spot and wont update when the gm moves
-     the token". A unit with no column used to have the WHOLE line re-packed
-     into the middle round it (packLine) — so every piece added landed in the
-     same place, and every arrangement the GM had dressed the line into was
-     thrown away by the next arrival, which read exactly like their moves not
-     sticking. Only the units with no place are given one: the free slot
-     nearest the middle, everybody else stays where they were put. */
-  S.lines.forEach(l => {
-    const lost = l.ents.filter(e => e.col == null);
-    if (lost.length && typeof firstFree === 'function' && typeof slotsOf === 'function') {
-      l.ents = l.ents.filter(e => e.col != null);
-      lost.forEach(e => {
-        const span = slotsOf(e);
-        e.col = firstFree(l, span, Math.max(0, Math.floor((S.width - span) / 2)), e);
-        l.ents.push(e);
-      });
-    } else if (lost.length && typeof packLine === 'function') packLine(l);
-    l.ents.sort((a, b) => (a.col == null ? 99 : a.col) - (b.col == null ? 99 : b.col));
-  });
-}
-
-/* ── and written back ─────────────────────────────────────────
-   app.js moves ents between lines by splicing arrays; which line a token is
-   in is therefore array membership, which has to be recorded on the token or
-   it is lost the moment the page reloads. */
-function harvest(scene) {
-  if (typeof S === 'undefined' || !S.lines || !scene) return;
-  const home = {};
-  S.lines.forEach(l => l.ents.forEach(e => { home[e.id] = l.key; }));
-  inScene(scene.id).forEach(t => {
-    if (home[t.id]) t.lineKey = home[t.id];
-    else { t.in = null; t.lineKey = null; }     /* taken off the board entirely */
-  });
-}
-
-/* ── putting one on the board ─────────────────────────────────
-   Dropped on a line: that line becomes its home, on the side that line
-   belongs to. A token dropped on the enemy half IS an enemy — the board is
-   the statement, not a dropdown somewhere. */
-/* `at` is the column under the pointer, if the drop said (24-table-props.js):
-   it lands THERE, or in the nearest free slot to it, not wherever is left */
-function toLine(tokenId, sceneId, lineKey, at) {
-  const t = T().get(tokenId); if (!t || t.kind !== 'token') return false;
-  const l = (typeof S !== 'undefined' && S.lines || []).find(x => x.key === lineKey);
-  if (!l) return false;
-  t.in = sceneId; t.lineKey = lineKey;
-  if (t.ent) {
-    t.ent.side = l.side; t.ent.col = null;
-    if (at != null && typeof firstFree === 'function' && typeof slotsOf === 'function') {
-      const span = slotsOf(t.ent);
-      const want = (typeof targetCol === 'function') ? targetCol(l, t.ent, at) : Math.round(at);
-      t.ent.col = firstFree(l, span, want, t.ent);
-    }
-  }
-  T().changed('token-placed');
-  return true;
-}
-
-/* off the board and back onto the wood, where it is just standing there */
-function toWood(tokenId, x, y) {
-  const t = T().get(tokenId); if (!t) return false;
-  t.in = null; t.lineKey = null;
-  if (t.ent) t.ent.col = null;
-  if (x != null) { t.x = Math.round(x); t.y = Math.round(y); }
-  T().changed('token-pulled');
-  return true;
-}
 
 function rename(id, name) {
   const t = T().get(id); if (!t) return false;
@@ -403,12 +245,10 @@ function rename(id, name) {
 
 function setSide(id, side) {
   const t = T().get(id); if (!t || !t.ent) return false;
-  t.ent.side = side === 'en' ? 'en' : 'al';
-  if (t.in) { t.lineKey = null; }              /* it has to fall in on its own side */
+  t.ent.side = side === 'en' ? 'en' : 'al';                    /* whose it is; where it stands stays */
   T().changed('side'); return true;
 }
 
-root.Tokens = { make, edit, addMany, fill, harvest, toLine, toWood, rename, setSide, monoOf,
-                inScene, recordOf, refresh, formFields, LEADS };
+root.Tokens = { make, edit, rename, setSide, monoOf, inScene, recordOf, refresh, formFields, LEADS };
 
 })(window, document);

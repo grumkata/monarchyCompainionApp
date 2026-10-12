@@ -88,63 +88,11 @@ const TERRAINS = {
              ground: ['#c3cf5a', '#a6cf4e', '#7fae37', '#4f7c26'], wear: '156,128,84',
              blades: ['#8fc23f', '#7cae32', '#a3d051', '#6f9d2c', '#b6d968', '#88b93a'],
              grass: 1, scatter: 'meadow', clouds: 1 } },
-  forest: {
-    name: 'Forest', blurb: 'A clearing hemmed in by old trees.',
-    mat: { ground: '#4d6a2c', en: 'rgba(163,35,43,.18)', al: 'rgba(39,80,143,.18)', ink: '#f4efe2', edge: '#2c3f16' },
-    field: { sky: ['#4a86b5', '#8dbfd9', '#cfe2e2'], sun: '#ffe9c0', skyLight: '#a9c9dd',
-             bounce: '#6d8a3a', fog: [40, 120], exposure: 0.96,
-             ground: ['#8fa447', '#779a3c', '#5b7f2c', '#3b5c1c'], wear: '120,96,60',
-             blades: ['#6f9d2c', '#5f8f28', '#86b33a', '#4f7c22'],
-             grass: 0.8, scatter: 'forest', clouds: 1 } },
-  blight: {
-    name: 'Blighted waste', blurb: 'Dead wood and grey earth under a low sky.',
-    mat: { ground: '#6d6352', en: 'rgba(163,35,43,.20)', al: 'rgba(39,80,143,.20)', ink: '#f4efe2', edge: '#3a3228' },
-    field: { sky: ['#5d6470', '#8f959c', '#c2c0b8'], sun: '#e8dcc0', skyLight: '#9ea4ac',
-             bounce: '#6b6250', fog: [34, 118], exposure: 0.98,
-             ground: ['#9a8f74', '#877d63', '#6f6651', '#4f473a'], wear: '84,72,56',
-             blades: ['#8a8a5a', '#7a7648', '#6c6a44', '#9a9362'],
-             grass: 0.35, scatter: 'blight', clouds: 1, motes: 'ash' } },
-  desert: {
-    name: 'Desert', blurb: 'Sand and sandstone, and nowhere to hide from the sun.',
-    mat: { ground: '#c9a86a', en: 'rgba(163,35,43,.18)', al: 'rgba(39,80,143,.18)', ink: '#1c140c', edge: '#8a6a3a' },
-    field: { sky: ['#4f8fc8', '#9cc7e0', '#f0e3c4'], sun: '#fff0d0', skyLight: '#d8d0b8',
-             bounce: '#caa26a', fog: [70, 190], exposure: 1.02,
-             ground: ['#e8cf98', '#dcbf84', '#c9a86a', '#a88650'], wear: '150,112,64',
-             blades: ['#b8a45a', '#a8944e'],
-             grass: 0.06, scatter: 'desert', clouds: 0, motes: 'dust' } },
-  snow: {
-    name: 'Snowfield', blurb: 'Deep snow among the pines.',
-    mat: { ground: '#dfe6ea', en: 'rgba(163,35,43,.18)', al: 'rgba(39,80,143,.20)', ink: '#1c140c', edge: '#8c9aa4' },
-    field: { sky: ['#8aa6c0', '#c2d2de', '#eef2f4'], sun: '#f4f6ff', skyLight: '#d4e0ec',
-             bounce: '#e6ecf0', fog: [30, 110], exposure: 0.94,
-             ground: ['#f4f7f9', '#e8eef2', '#d6e0e6', '#b8c6d0'], wear: '150,160,170',
-             blades: ['#b8c4b0', '#a8b8a0'],
-             grass: 0.05, scatter: 'snow', clouds: 1, motes: 'snow' } },
-  marsh: {
-    name: 'Marsh', blurb: 'Black water, twisted trees and a mist that will not lift.',
-    mat: { ground: '#4e5a3a', en: 'rgba(163,35,43,.20)', al: 'rgba(39,80,143,.20)', ink: '#f4efe2', edge: '#283020' },
-    field: { sky: ['#56655e', '#8b9a8e', '#b9c2b2'], sun: '#e6e2c8', skyLight: '#98a89c',
-             bounce: '#4e5a3a', fog: [16, 80], exposure: 0.92,
-             ground: ['#6f7a4c', '#5f6a40', '#4c5634', '#353d26'], wear: '60,62,40',
-             blades: ['#6a7a3a', '#5a6a32', '#7a8a44'],
-             grass: 0.6, scatter: 'marsh', clouds: 1, water: 1, motes: 'flies' } },
-  dungeon: {
-    name: 'Dungeon', blurb: 'Flagstones, pillars and torchlight, far underground.',
-    mat: { ground: '#4a4744', en: 'rgba(163,35,43,.22)', al: 'rgba(39,80,143,.22)', ink: '#f4efe2', edge: '#24211f' },
-    field: { sky: ['#0b0907', '#141110', '#1c1814'], sun: '#ffb070', skyLight: '#5a4a3a',
-             bounce: '#3a3026', fog: [26, 70], exposure: 1.10,
-             ground: ['#6a655e', '#5c5751', '#4c4843', '#383430'], wear: '40,36,32',
-             blades: [], grass: 0, scatter: 'dungeon', clouds: 0, indoor: 1, motes: 'embers' } },
-  courtyard: {
-    name: 'Castle courtyard', blurb: 'Paving stones inside the walls, banners overhead.',
-    mat: { ground: '#8a8276', en: 'rgba(163,35,43,.18)', al: 'rgba(39,80,143,.18)', ink: '#1c140c', edge: '#4a443c' },
-    field: { sky: ['#4a8cc4', '#90c0de', '#dfe9ec'], sun: '#fff0d4', skyLight: '#b8cbd8',
-             bounce: '#9a9080', fog: [60, 170], exposure: 1.02,
-             ground: ['#b4aa98', '#a39a88', '#8f8676', '#6f685c'], wear: '96,90,80',
-             blades: ['#7fa048', '#6f9038'], grass: 0.12, scatter: 'courtyard', clouds: 1 } }
 };
-const TERRAIN_ORDER = ['meadow', 'forest', 'blight', 'desert', 'snow', 'marsh', 'dungeon', 'courtyard'];
-const terrainOf = id => TERRAINS[id] ? id : 'meadow';
+/* grumkata (2026-10-09): "remove the terrain options, make it limited to JUST meadow always". There is one
+   ground; anything saved or sent as another is the meadow. */
+const TERRAIN_ORDER = ['meadow'];
+const terrainOf = () => 'meadow';
 
 /* ══ WHAT STANDS ON THE FIELD ITSELF ══════════════════════════
    grumkata: "i want the capability for field variety". A terrain is the
@@ -191,23 +139,24 @@ const SCENES = {
     name: 'Combat',
     mark: '⚔',
     blurb: 'Ranks and columns. The field.',
-    /* MEASURED, not guessed. .cwin is 1180 wide and the eight lines make it
-       1426 tall; the 720 that used to be here is why a scene "fitted" to the
-       middle of the table still hung off the bottom of it. */
-    size: { w: 1180, h: 1426 },
+    /* The footprint of eight lines and eight slots on the wood: the felt, the
+       frame, and headroom for the figures (80-battle.js geometry() is where it is
+       really worked out, and corrects a scene to it whenever its lines or width
+       change). About 64 cm by 75 cm on a 2.2 m table. */
+    size: { w: 1280, h: 1494 },
     setup: [
-      { key: 'width', label: 'Battlefield width', type: 'number',
+      { key: 'width', label: 'Units per line', type: 'number',
         def: 8, min: 3, max: 14,
-        hint: 'Slots across. Small is about 5, large about 12.' },
-      /* THIS WAS "Immersive battlefield", a choice of one: "Bare field". The
-         seam was right and nothing was ever plugged into it. What the fight
-         stands on is the terrain now, and it has eight answers. */
-      { key: 'terrain', label: 'Terrain', type: 'terrain', def: 'meadow',
-        hint: 'Where the fight happens — the mat, the field and the sky.' }
+        hint: 'How many a line holds. Small is about 5, large about 12. There are always eight lines.' },
+      /* one ground, the meadow, always (grumkata, 2026-10-09). The field stays in the scene's setup so what is
+         saved says so, but nothing offers a choice and any value is the meadow (terrainOf). */
+      { key: 'terrain', label: 'Ground', type: 'terrain', def: 'meadow', hint: 'The meadow.' }
     ],
     /* depth is 8 lines, from the rules — not a choice */
     fixed: { lines: 8 },
-    options: ['fog', 'mana', 'flex', 'npcAuto']
+    /* the fight's own switches (what players see of the enemy's health, the cloth)
+       are kept on the scene by 80-battle.js and set on the board itself */
+    options: ['fog', 'mana']
   },
 
   exploration: {
@@ -242,16 +191,14 @@ const SCENES = {
 };
 
 /* ── THE LINES A NEW FIGHT STARTS WITH ───────────────────────
-   Empty. The demo army in 32-combat-app.js is a fixture for testing
-   the drop rules, not the state a scene begins in — pulling a combat
-   scene out of the box and finding somebody else's Hollow Knight
-   already on it is not a scene, it is a save file.
+   Empty: pulling a combat scene out of the box and finding somebody
+   else's Hollow Knight already on it is not a scene, it is a save file.
 
-   Four lines a side, back to front, and they are DATA: the sheet
-   renders whatever is in this array, so lines can be renamed, added
-   and removed while the fight is running (see 41-lines-edit.js).
-   `depth` is the line's distance from its own backline and is what
-   move speed is counted in.                                        */
+   Four lines a side, back to front. There are ALWAYS these eight and
+   nothing adds or removes one (80-battle.js builds the same eight for any
+   scene, however it was saved); what a fight's setup changes is how many a
+   line holds. `depth` is the line's distance from its own backline and is
+   what move speed is counted in.                                    */
 function blankLines() {
   const side = (s, p) => [
     { key: p + '-back',  side: s, label: 'Backline',  depth: 0, ents: [] },

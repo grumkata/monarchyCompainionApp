@@ -325,7 +325,8 @@ function aimMarks() {
    there, and all of it unreadable — which is exactly what a real table
    looks like from a chair, and exactly what an app must not do.
 
-   So a piece on the wood behaves like a standee. It lies flat while you
+   So a piece on the wood behaved like a standee (a counter still does;
+   paper and screens no longer, see "neither does paper" below). It lay flat while you
    are working over the table, and as you lean back it hinges up off its
    near edge until it is square to your eye — the same trick the
    combatants use, and the same trick a paper figure at a real table uses,
@@ -351,7 +352,21 @@ function aimMarks() {
    scenes it so often is. */
 /* nor does a line drawn on the wood, or a point made at it: both are ON the
    table, not things standing on it (61-ink.js, 63-point.js) */
-const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b|\bt3-art\b|\bt3-ink\b|\bt3-ping\b/;
+/* ── AND NEITHER DOES PAPER, OR A SCREEN ──────────────────
+   grumkata: notes and videos "are still standing in immersive mode because of
+   the weird 2.5d projection" — and that is what the standing was: a note is a
+   piece of paper and a screen is a slab, and on a real table both LIE on it.
+   Hinging them up to face the eye was a trick to keep them readable from the
+   chair, and a trick is what made them look wrong: a cardboard cutout stuck
+   to the wood, and a different cutout again whichever way the head turned.
+
+   They lie flat now, at every angle, and the camera simply looks at them the
+   way it looks at the wood — true perspective, from wherever it is. From the
+   chair that is a slant, which is what a real table is; reading one is a
+   double right-click (peek, below), which brings it square to the eye without
+   pulling anything off the table. Only a counter stands, and the GL layer
+   draws its figure. */
+const STANDS_ALONE = /\bt3-model\b|\btb-box\b|\btb-bin\b|\btmark\b|\bt3-scene\b|\bt3-art\b|\bt3-ink\b|\bt3-ping\b|\bt3-note\b|\bt3-page\b|\bt3-video\b|\btp-paper\b/;
 const flatAlways = p => STANDS_ALONE.test(p.className) || p.id === 'combat-prop';
 /* ── A PIECE THAT HAS JUST LANDED ─────────────────────────
    The squash itself is in 12-combat.css; this only fires it, because CSS
@@ -374,34 +389,12 @@ function settle(p) {
                      { once: true });
 }
 
-/* ── AND IT FACES YOU, WHICHEVER WAY YOU ARE LOOKING ──────────
-   grumkata: notes, sheets, dice and screens "look weird ... they are 2.5
-   projections and not true 3d, so the program continues to project them the
-   same way even when the camera is looking in wholly different ways".
-
-   Exactly that, for these. The hinge below stands a card up about ITS OWN
-   near edge — the edge toward where the card was put, which is the way you
-   were facing when nobody had turned their head. Turn your head (YAW) and
-   the whole table swings about your eye, the card with it, and the card is
-   left leaning toward a seat you are no longer looking from: a note, a
-   sheet or a screen drawn as a squashed parallelogram, a standee that cannot
-   see you.
-
-   So as you sit back the card ALSO swings about its own middle, the short way
-   round, until its foot is toward you — and from then on it is square to the
-   eye at every angle of the head, which is what "stands up to meet the eye"
-   always promised. Counters are left alone: the GL layer turns the figure
-   itself (27-table-gl.js) and measures this box. */
-const FACES_ITSELF = /\bt3-token\b/;
 const turnTo = a => ((a + 540) % 360 + 360) % 360 - 180;        /* the short way round */
 const isPeek = p => !!peeking && (p.dataset.id || p.id) === peeking.key;
+/* how a piece is turned on the wood: as it was laid, or — a peeked one — upright to you */
 function spinOf(p) {
-  const r = +p.dataset.r || 0, u = camU;
-  let s = r;
-  if (u && !flatAlways(p) && !FACES_ITSELF.test(p.className)) s = r + turnTo(-yawNow() - r) * u;
-  /* a peeked piece is turned upright to you, whatever way up it was laid */
-  if (isPeek(p)) s = turnTo(s) * (1 - peekU);
-  return s;
+  const r = +p.dataset.r || 0;
+  return isPeek(p) ? turnTo(r) * (1 - peekU) : r;
 }
 
 function placeProp(p, h) {
@@ -422,13 +415,12 @@ function placeProp(p, h) {
     ` translate3d(0,${(-h / 2).toFixed(1)}px,0)`;
 }
 /* every piece has to be re-placed when the angle changes, which is what
-   makes the standing-up continuous rather than a jump at the threshold —
-   and when the head turns, because that is the other thing they face */
-let propU = 0, propY = 0, propP = 0;
+   makes a counter's standing-up continuous rather than a jump at the
+   threshold — and when a peek turns the piece upright */
+let propU = 0, propP = 0;
 function restandProps() {
-  const y = yawNow();
-  if (Math.abs(camU - propU) < 0.004 && Math.abs(y - propY) < 0.05 && peekU === propP) return;
-  propU = camU; propY = y; propP = peekU;
+  if (Math.abs(camU - propU) < 0.004 && peekU === propP) return;
+  propU = camU; propP = peekU;
   const list = doc.querySelectorAll('#tbl .prop');
   /* read every height, then write every transform: one layout, not one each */
   const hs = [];
@@ -531,31 +523,58 @@ function frame(prop, pad) {
    kept clear along the bottom of the view (a screen's deck goes there). */
 function viewFor(prop, up, reserve) {
   const save = { x: T.x, y: T.y, k: T.k, tilt: TILT, yawK, peekU };
-  const VW = vp.clientWidth, VH = vp.clientHeight - (reserve || 0);
+  /* A BOARD WITH STANDING FIGURES IS LOOKED AT FROM AN ANGLE. The fight asks for
+     one (data-tilt on its prop, 81-battle-view.js): laid flat and squared up, a
+     standee is a card seen edge on. It also keeps a strip clear down the right
+     (data-padr) for a card, and along the bottom (data-padb) for its controls, so the
+     board is fitted to what is left and is never under them. Everything else — a map, a note — is still laid flat. */
+  const tilt = up ? 0 : Math.max(0, Math.min(70, +prop.dataset.tilt || 0));
+  const padR = up ? 0 : Math.max(0, +prop.dataset.padr || 0);
+  const padB = up ? 0 : Math.max(0, +prop.dataset.padb || 0);
+  const VW = vp.clientWidth - padR, VH = vp.clientHeight - (reserve || 0) - padB;
   /* offsetWidth/Height are untransformed table units, so this is measured,
      not predicted — the same trick fitTable() uses, for the same reason. */
-  TILT = 0;
+  TILT = tilt;
   if (up) { yawK = 0; peekU = 1; }
-  T.k = Math.min(VW / (prop.offsetWidth + 80), VH / (prop.offsetHeight + 80));
+  T.k = Math.min(VW / (prop.offsetWidth + 80), VH / (prop.offsetHeight * Math.cos(tilt * Math.PI / 180) + 80));
   T.x = 0; T.y = 0; apply();
-  const r = prop.getBoundingClientRect(), vr = vp.getBoundingClientRect();
-  let ox = T.x + (VW - r.width) / 2 - (r.left - vr.left);
-  let oy = T.y + (VH - r.height) / 2 - (r.top - vr.top);
+  /* tipped back, perspective makes the near edge wider and lower than any sum of
+     cosines says, so a tilted fit is MEASURED — and measured where it will STAND,
+     centred, because the same box is wider at the edge of the screen than in the
+     middle of it. Measure, centre, measure, until the picture fills the room (it
+     may have to grow as well as shrink). */
+  const vr = vp.getBoundingClientRect();
+  const centre = () => {
+    for (let i = 0; i < 4; i++) {
+      const q = prop.getBoundingClientRect();
+      const ex = (VW - q.width) / 2 - (q.left - vr.left);
+      const ey = (VH - q.height) / 2 - (q.top - vr.top);
+      if (Math.abs(ex) < 0.5 && Math.abs(ey) < 0.5) break;
+      T.x += ex; T.y += ey; apply();
+    }
+  };
+  /* How much of the view the tipped box fills is NOT a gentle function of the zoom: the near edge
+     comes toward the lens, and a box that is 1.3 times too big at one zoom is 3.5 times too big at
+     a little more and a third of its size at a little less. A multiplicative correction swings back
+     and forth over that and never settles (a fight board, which is nearly square and tall, does not).
+     So it is searched for: the zoom is bracketed by the flat guess above (a tilt can only make the
+     box bigger) and a sliver, and halved until the box just fits. */
+  if (tilt) {
+    const fill = k => { T.k = k; apply(); centre(); const q = prop.getBoundingClientRect(); return Math.max(q.width / (VW - 36), q.height / (VH - 36)); };
+    let lo = Math.max(0.01, T.k * 0.05), hi = T.k;
+    for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (fill(mid) > 1) hi = mid; else lo = mid; }
+    fill(lo);
+  }
+  /* (the flat view above, and everything else, is measured once and corrected below) */
   /* MEASURE, CORRECT, MEASURE. A piece stands a little proud of the wood, so
      under perspective it moves on the screen by slightly MORE than the table
      is moved — about one per cent, which is nothing for a scene half a table
      away and fifty to two hundred pixels for a note flown in at 340%. The first
-     answer is therefore close and not exact; two more passes make it exact
+     answer is therefore close and not exact; the passes make it exact
      (the same lesson fitTable() and frame() carry). */
-  for (let i = 0; i < 3; i++) {
-    T.x = ox; T.y = oy; apply();
-    const q = prop.getBoundingClientRect();
-    const ex = (VW - q.width) / 2 - (q.left - vr.left);
-    const ey = (VH - q.height) / 2 - (q.top - vr.top);
-    if (Math.abs(ex) < 0.5 && Math.abs(ey) < 0.5) break;
-    ox += ex; oy += ey;
-  }
-  const out = { x: ox, y: oy, k: T.k, tilt: 0 };
+  centre();
+  const ox = T.x, oy = T.y;
+  const out = { x: ox, y: oy, k: T.k, tilt };
   if (up) { out.yawK = 0; out.peekU = 1; }
   T.x = save.x; T.y = save.y; T.k = save.k; TILT = save.tilt;
   yawK = save.yawK; peekU = save.peekU; apply();
@@ -782,6 +801,8 @@ function lockIn(prop) {
   const to = viewFor(prop); lockK = to.k;
   glide(to);
 }
+/* put a locked scene's whole view back as it is framed, without leaving the lock (its size changed, or a new one was set down) */
+function refit() { if (!lock) return false; stopZoom(); glide(viewFor(lock)); return true; }
 function unlock(inPlace) {
   if (!lock) return;
   if (root.__field && root.__field.on()) root.__field.set(false);
@@ -844,17 +865,42 @@ function unpeek(now) {
 
 /* how far past the locked fit you push before you stop looking at the board
    and start standing in it — see proto's note on why this is 3.6 and not 1.5 */
-const FIELD_IN = 3.60, OUT_ZOOM = 0.44;
+/* 3.6 was twelve to fourteen turns of the wheel past the framed board, and on a big screen the
+   floor under the eye came first, so there was no getting there at all. 2.2 is about eight. */
+const FIELD_IN = 2.20, OUT_ZOOM = 0.44;
 function enterField() {
   if (!lock || !root.__field || root.__field.on()) return;
   const c = root.__field.cam;
-  c.zoom = 1; c.pan = 0; c.look = -1.0;   /* arrive facing down the line, every time */
+  c.zoom = 1; c.pan = 0; c.look = 0;      /* arrive with the whole fight in front of you, every time */
   root.__field.set(true);
 }
-function leaveField() {
+/* Out of the field. The field goes back up into the table's own view of the board and hands
+   it back (37-scene-field.js), so the table is put, under it, CLOSE over the middle of the board —
+   all board, the same picture the field ends on — and once the field has gone, the table carries
+   on out to the whole fight framed. The same turn of the wheel does not take you straight back
+   in: that is eight more notches. */
+function leaveField(fit) {
   if (!root.__field || !root.__field.on()) return;
-  root.__field.set(false);
-  T.k = lockK * (FIELD_IN - 0.15); apply();   /* land below the threshold, not on it */
+  if (!lock) { root.__field.set(false); return; }
+  stopZoom(); anim = null;
+  const L = lock, v = viewFor(L);
+  T.x = v.x; T.y = v.y; T.k = v.k; TILT = v.tilt; apply();
+  closeOver(1.9);
+  root.__field.set(false, () => { if (lock === L && !inField()) glide(viewFor(L)); });
+}
+/* the table, f times closer about the middle of the fight's board, if the eye stays clear of the wood */
+function closeOver(f) {
+  const BV = root.BattleView, mid = BV && BV.toTable ? BV.toTable(0, 0, 0) : null;
+  const s = mid ? toScreen(mid[0], mid[1], 0) : null;
+  if (!s || !vp) return;
+  const vr = vp.getBoundingClientRect(), pin = woodPin(s.x, s.y), was = { x: T.x, y: T.y, k: T.k };
+  for (let ff = f; ff > 1.05; ff *= .88) {
+    const px = s.x - vr.left, py = s.y - vr.top, k = was.k * ff;
+    T.x = px - (px - was.x) * ff; T.y = py - (py - was.y) * ff; T.k = k; apply();
+    if (pin) pinTo(pin);
+    if (eyeLocal().z >= EYE_FLOOR_M * U_PER_M * 1.5) return;
+  }
+  T.x = was.x; T.y = was.y; T.k = was.k; apply();
 }
 
 /* ── ARE WE STANDING IN IT ────────────────────────────────────
@@ -916,12 +962,41 @@ function checkBounds() { if (lock && !anim && !inBounds()) unlock(true); }
    is what the eye is actually complaining about and it already carries the
    tilt, the turn and the perspective. */
 const PAN_SLACK = 0.06;      /* how far a small table may sit off-centre */
+/* ── AND IT IS MEASURED, NOT ASKED FOR ────────────────────────
+   The slab's bounding box was the measure, and it lies the moment you are close: lean in
+   far enough and the near rim of the wood passes behind your eye, the browser projects
+   it through the lens to nonsense (a box forty thousand pixels tall), and a box that big
+   "covers the window" wherever the wood really is. That is how the view could drift right
+   off the far edge and leave you staring at the floor. So the rim is projected here, and
+   when part of it is behind you, the rule is the one that matters up close: the middle of
+   the view stays over the wood. */
+function rimBox() {
+  let l = 1e9, t = 1e9, r = -1e9, b = -1e9, behind = false;
+  for (let i = 0; i < 48; i++) {
+    const a = i / 48 * Math.PI * 2;
+    const s = toScreen(CX + Math.cos(a) * RAD, CY + Math.sin(a) * RAD, 0);
+    if (!s) { behind = true; continue; }
+    l = Math.min(l, s.x); r = Math.max(r, s.x); t = Math.min(t, s.y); b = Math.max(b, s.y);
+  }
+  return behind ? null : { left: l, right: r, top: t, bottom: b, width: r - l, height: b - t };
+}
 function holdOnTheTable() {
   if (lock || anim || viewU() > 0.5) return false;
-  const slab = doc.querySelector('#tbl .slab');
-  if (!slab || !vp) return false;
-  const r = slab.getBoundingClientRect(), v = vp.getBoundingClientRect();
-  if (!r.width || !v.width) return false;
+  if (!vp || !tbl) return false;
+  const v = vp.getBoundingClientRect();
+  if (!v.width) return false;
+  const r = rimBox();
+  if (!r) {
+    const mx = v.left + v.width / 2, my = v.top + v.height * 0.5;
+    const q = screenToTable(mx, my);
+    if (!q || onWood(q.x, q.y, 260)) return false;
+    const w = ontoWood(q.x, q.y, 260), s = toScreen(w.x, w.y, 0);
+    if (!s) return false;
+    const pin = { X: w.x, Y: w.y, sx: mx, sy: my };
+    pinTo(pin);
+    return true;
+  }
+  if (!r.width) return false;
   let dx = 0, dy = 0;
   const axis = (lo, hi, vlo, vhi) => {
     const size = hi - lo, vsize = vhi - vlo;
@@ -1065,6 +1140,20 @@ function mount() {
     clearTimeout(rzT);
     rzT = setTimeout(() => { if (!slabVisible()) fitTable(); }, 220);
   });
+  /* A LOCKED SCENE IS FITTED TO THE ROOM IT HAS, AND THE ROOM CHANGES: the toolbox opens
+     and takes the left of the view, the window is made smaller. Whatever is locked is
+     framed again for the room that is left, so a fight never ends up half under a
+     panel — every line of it stays in view. */
+  if (root.ResizeObserver) {
+    let rfT = 0, rfW = vp.clientWidth, rfH = vp.clientHeight;
+    new ResizeObserver(() => {
+      const w = vp.clientWidth, h = vp.clientHeight;
+      if (w === rfW && h === rfH) return;
+      rfW = w; rfH = h;
+      cancelAnimationFrame(rfT);
+      rfT = requestAnimationFrame(() => { if (lock && !peeking && !inField()) { stopZoom(); glide(viewFor(lock)); } });
+    }).observe(vp);
+  }
 }
 
 /* Everything but the lock gesture works with the LEFT button alone, because a
@@ -1133,6 +1222,9 @@ function wire() {
       const dx = e.clientX - fdrag.sx, dy = e.clientY - fdrag.sy;
       fdrag.moved = Math.max(fdrag.moved, Math.hypot(dx, dy));
       const c = root.__field.cam;
+      /* the field says how far a pixel is at the ground in front of you, so dragging holds
+         the ground under the pointer; the stand-in fields of the tests do not */
+      if (root.__field.dragBy) { root.__field.dragBy(fdrag, dx, dy); return; }
       /* sideways walks the line; up and down looks along it. Both are damped
          by the zoom, so leaning in does not make the view skittish. */
       c.pan  = Math.max(-26, Math.min(26, fdrag.pan  - dx * 0.055 / c.zoom));
@@ -1210,10 +1302,7 @@ function wire() {
          select it, which is the same selection the sheet is showing */
       if (fdrag.moved < 5 && root.__field.pick) {
         const id = root.__field.pick(e.clientX, e.clientY);
-        if (typeof S !== 'undefined') {
-          S.sel = id || null;
-          if (typeof render === 'function') render();
-        }
+        if (root.Battle) root.Battle.pick(id || null);
       }
       fdrag = null; vp.classList.remove('grabbing');
       return;
@@ -1258,8 +1347,10 @@ function wire() {
     if (meta && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); if (M) M.redo(); return; }
 
     if (e.key === 'Escape') {
-      /* one step at a time: out of the field, then the lock, then the selection */
-      if (inField()) { leaveField(); return; }
+      /* one step at a time: what is in your hand and the box (47-hand.js takes this
+         key), then out of the field, then the lock, then the selection */
+      if (e.defaultPrevented) return;                 /* somebody nearer the key already used it */
+      if (inField()) { leaveField(true); return; }
       if (lock) { unlock(false); return; }
       if (M && M.state.sel) M.select(null);
       return;
@@ -1361,11 +1452,22 @@ function step(inward, cx, cy, n) {
   if (!vp) return;
   n = n == null ? 1 : n;
   if (inField()) {
-    const c = root.__field.cam;
+    /* the field's own camera takes the wheel; pulled back past the whole board, you are
+       back at the table */
+    const F = root.__field;
+    if (F.zoomAt) { if (F.zoomAt(inward ? n : -n, cx, cy) === 'out') leaveField(true); return; }
+    const c = F.cam;
     c.zoom = Math.min(2.8, Math.max(.40, c.zoom * Math.pow(1.11, inward ? n : -n)));
     if (c.zoom <= .42) { leaveField(); return; }
-    root.__field.place(); return;
+    F.place(); return;
   }
+  /* ── INTO THE FIGHT FROM ANYWHERE ─────────────────────────────
+     grumkata: "you cant even go to immersive mode". The way in was only from a fight
+     already locked in (double-clicked, or framed when it was opened); once it had been let
+     go — Escape, or pulled back past the lock — wheeling in over the board just zoomed the
+     wood until it stopped. Now wheeling in over the fight frames it, and wheeling on goes
+     in: the board is a stop on the way down, the field is the bottom. */
+  if (!lock && inward && !leanAnim && lean <= 0 && intoFight(cx, cy)) return;
   if (!lock) {
     /* ── SITTING BACK IS A MOVE, NOT A PLACE TO STOP ──────────
        grumkata: "when you go to table view you cant stop halfway through
@@ -1393,6 +1495,23 @@ function step(inward, cx, cy, n) {
   const k = Math.min(ceil, Math.max(floor, goalK() * Math.pow(1.10, inward ? n : -n)));
   const vr = vp.getBoundingClientRect();
   zoomTo(k, cx - vr.left, cy - vr.top, inward);
+}
+
+/* the fight's board under the pointer, unlocked: frame it (the zoom it is framed at is the
+   one it would lock to), or, if you are already closer than that, go straight in */
+let fitMemo = null;
+function intoFight(cx, cy) {
+  const BV = root.BattleView, p = doc.getElementById('combat-prop');
+  if (!BV || !BV.isUp || !BV.isUp() || !BV.overBoard || !p || p.style.display === 'none') return false;
+  if (!BV.overBoard(cx, cy) || anim) return false;
+  const key = vp.clientWidth + 'x' + vp.clientHeight + ':' + p.offsetWidth + 'x' + p.offsetHeight;
+  if (!fitMemo || fitMemo.key !== key) fitMemo = { key, k: viewFor(p).k };
+  if (goalK() < fitMemo.k * 0.98) { lockIn(p); return true; }
+  stopZoom();
+  before = { x: T.x, y: T.y, k: T.k, tilt: TILT };
+  lock = p; lockK = fitMemo.k; doc.body.classList.add('locked-in'); p.classList.add('locked');
+  enterField();
+  return true;
 }
 
 /* HOW MANY CLICKS AN EVENT IS WORTH. Every wheel event used to be a whole
@@ -1450,7 +1569,19 @@ function zoomFrame(now) {
    field. */
 function zoomBy(k, px, py, inward) {
   const was = { x: T.x, y: T.y, k: T.k };
+  /* ── ABOUT A POINT ON THE WOOD, NOT A POINT BEHIND IT ─────────
+     grumkata: "if you zoom in too much you phase through the table".
+     Scaling about the pointer's spot on the SCREEN PLANE is not zooming toward the
+     wood under it: the wood tilts up out of that plane, so the spot the zoom closed
+     on lay under the table, and every notch carried the eye along a line that ran
+     past the far edge. At 180% the far edge was below the bottom of the window and
+     all there was to see was the floor beyond it. So the wood under the pointer is
+     taken before the step and put back under the pointer after it: the eye travels
+     straight at what you are pointing at, and what you point at stays the wood. */
+  const vr = vp.getBoundingClientRect();
+  const pin = woodPin(px + vr.left, py + vr.top);
   T.x = px - (px - T.x) * (k / T.k); T.y = py - (py - T.y) * (k / T.k); T.k = k;
+  if (pin) { apply(); pinTo(pin); }
   /* AND NOT INTO THE WOOD. Tried, then measured, then taken back if it
      put the eye under the floor -- rather than solved for, because the
      pan correction two lines up moves T.y in the same breath and the
@@ -1458,17 +1589,49 @@ function zoomBy(k, px, py, inward) {
      account for it. Asking eyeLocal() afterwards is one call and it is
      the same answer the renderer will use. */
   if (inward && eyeLocal().z < EYE_FLOOR_M * U_PER_M) {
-    T.x = was.x; T.y = was.y; T.k = was.k;
+    T.x = was.x; T.y = was.y; T.k = was.k; apply();
+    /* nowhere nearer to go: from a locked fight that is the way in to the field. It used to
+       be only if the zoom had also doubled, and how far the floor is depends on where you
+       point while the fight's framing depends on the size of the window — on a big screen
+       the floor came first and the wheel simply stopped, with no way in at all. */
+    if (lock && fieldable(lock)) { zoom = null; enterField(); }
     return false;
   }
   apply();
   /* zooming out about a corner walks the table off screen just as surely
      as dragging does, so the same rule applies after a wheel */
   if (holdOnTheTable()) apply();
-  if (lock && k >= lockK * FIELD_IN) { zoom = null; enterField(); return false; }
+  if (lock && fieldable(lock) && k >= lockK * FIELD_IN) { zoom = null; enterField(); return false; }
   checkBounds();
   return true;
 }
+
+/* ── WHAT IS UNDER THE POINTER, ON THE WOOD ───────────────────
+   The point of the table under a spot on the screen, and where it is on the screen now.
+   Off the wood (pointing at the room past the rim) it is the nearest point of the wood
+   instead, held where IT is: zooming at the floor still zooms at the table. */
+function woodPin(sx, sy) {
+  const q = screenToTable(sx, sy);
+  if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y)) return null;
+  const on = onWood(q.x, q.y, 40), w = on ? q : ontoWood(q.x, q.y, 40);
+  const s = on ? { x: sx, y: sy } : toScreen(w.x, w.y, 0);
+  return s ? { X: w.x, Y: w.y, sx: s.x, sy: s.y } : null;
+}
+/* move the table in the screen plane until the pinned point is back where it was: a
+   point at depth vz moves P/(P-vz) pixels for each pixel the table does, so one step is
+   exact (twice, for the rounding in the browser's matrix) */
+function pinTo(p) {
+  for (let i = 0; i < 2; i++) {
+    const m = tblMatrix(); if (!m) return;
+    const vz = m[2] * p.X + m[6] * p.Y + m[14], w = PERSP - vz;
+    const s = toScreen(p.X, p.Y, 0); if (!s || !(w > 1)) return;
+    const dx = p.sx - s.x, dy = p.sy - s.y;
+    if (Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3) return;
+    T.x += dx * w / PERSP; T.y += dy * w / PERSP; apply();
+  }
+}
+/* a scene with a field to stand in: the fight (its board says so with data-tilt) */
+const fieldable = p => !!(p && root.__field && p.id === 'combat-prop');
 
 /* ── AND THE CHAIR ────────────────────────────────────────────
    From wherever `lean` is to 0 (over the wood) or 1 (in the chair), at a
@@ -1676,6 +1839,6 @@ root.Table3D = { mount, fit: fitTable, frame, place: placeProp, middle, MM, TABL
                  unpeek, get peeking() { return !!peeking; },
                  get yaw() { return yawNow(); },
                  TW, TH, get tiltDeg() { return TILT; }, get k() { return T.k; },
-                 lockIn, unlock, get locked() { return lock; }, get tilt() { return TILT; } };
+                 lockIn, unlock, refit, leaveField, get locked() { return lock; }, get tilt() { return TILT; } };
 
 })(window, document);

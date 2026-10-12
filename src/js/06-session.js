@@ -604,7 +604,23 @@ function talk(text, kind, extra) {
   /* a roll can carry the dice it threw, as numbers (39-dice.js) */
   const dice = extra && diceOf(extra.dice);
   if (dice) line.dice = dice;
+  /* and a line can carry a picture (78-chat-media.js), already shrunk to fit */
+  const img = extra && imgOf(extra.img);
+  if (img) line.img = img;
   return Net().push('tables/' + word + '/chat', line);
+}
+/* ── A PICTURE IN THE CHAT ────────────────────────────────────
+   Sent inside the line itself, as a data URI, so there is nowhere else for it to
+   live and nothing to clean up: the chat is wiped when the table closes, and the
+   picture goes with it. Only the four kinds a browser draws safely — never SVG,
+   which can carry script — and no larger than IMG_MAX characters, which is what
+   the database's own rule for a chat line allows (firebase.rules.json, 200000).
+   Checked here when it is sent AND on arrival (57-chat-net.js): a line is
+   whatever somebody with a modified app wrote. */
+const IMG_MAX = 190000;
+function imgOf(s) {
+  return typeof s === 'string' && s.length <= IMG_MAX
+    && /^data:image\/(?:jpeg|png|gif|webp);base64,[A-Za-z0-9+\/]+={0,2}$/.test(s) ? s : null;
 }
 /* only what a die is: a kind the tray has and a face it can show. Anything
    else on the wire is dropped here AND on arrival (57-chat-net.js). */
@@ -708,7 +724,7 @@ function seating() {
 }
 
 root.Session = { host, join, warm, leave, talk, bring, takeBack, seating, refresh,
-                 makeWord, tidy, diceOf, allow, allowed, point, look, setMusic, setVideo, sendFx, setPad, setPads,
+                 makeWord, tidy, diceOf, imgOf, IMG_MAX, allow, allowed, point, look, setMusic, setVideo, sendFx, setPad, setPads,
                  get music() { return musicNow; },
                  get videos() { return videosNow; },
                  get pads() { return padsNow; },

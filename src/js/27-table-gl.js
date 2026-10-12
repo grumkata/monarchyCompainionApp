@@ -200,7 +200,7 @@ function buildTable() {
    wall is thousands of pixels behind the camera. That is not a limitation
    to design around; it IS the design — you see the room when you have
    pulled back far enough to be sitting in it. */
-let roomGroup = null, overGroup = null, roomBuilt = false, seatedNow = false;
+let roomGroup = null, overGroup = null, cheese = null, roomBuilt = false, seatedNow = false;
 /* the wood's real size is stated once, by 23-table3d.js, and read here —
    two numbers that must agree and can drift apart is how the camera ended
    up with its chin on the table */
@@ -719,6 +719,8 @@ function buildRoom() {
   uScene.add(roomGroup);
   overGroup = new THREE.Group();
   roomGroup.add(overGroup);
+  cheese = new THREE.Group();
+  roomGroup.add(cheese);
   layRoom();
   fire();
   lightRoom();
@@ -845,6 +847,7 @@ function layRoom() {
       }
       continue;
     }
+    if (row.p === 'T' && row.m === 'Cheese') continue;     /* stands on its own: below */
     const lib  = row.p === 'T' ? T : R;
     const book = row.p === 'T' ? TB : RB;
     if (!lib) continue;
@@ -856,6 +859,16 @@ function layRoom() {
       : put(lib, book, row.m, dress, row.x, FLOOR_Y + (row.y || 0), row.z, ry, row.s);
     if (rec) pivot(row.p + '|' + row.m, rec.mat);
     if (rec && row.over) over.push(BATCH.pop());
+  }
+  /* ...but not the cheese: it is pressed and shaken (27-goblin.js), so it stands on its own, its group where the
+     row says and the model about the group's origin */
+  let cheeseRec = null;
+  for (let i = cheese.children.length - 1; i >= 0; i--) { const c = cheese.children[i]; cheese.remove(c); scrap(c); }
+  cheese.rotation.set(0, 0, 0);
+  const crow = T && plan.find(r => r.p === 'T' && r.m === 'Cheese');
+  if (crow && put(T, TB, crow.m, DRESS[crow.d || 'tavern'] || DRESS.room, 0, 0, 0, (crow.r || 0) * Math.PI / 180, crow.s)) {
+    cheeseRec = BATCH.pop();
+    cheese.position.set(crow.x, FLOOR_Y + (crow.y || 0), crow.z);
   }
   /* whatever the plan says about a chandelier is where its flames go, and
      no chandelier means no flames */
@@ -870,6 +883,7 @@ function layRoom() {
      when you are looking straight down through where they hang */
   for (const rec of over) BATCH.push(rec);
   flushRoom(overGroup, 'over');
+  if (cheeseRec) { BATCH.push(cheeseRec); flushRoom(cheese, 'cheese'); }
 }
 
 /* ══ THE PEOPLE AT THE TABLE ═══════════════════════════════════
@@ -1159,6 +1173,16 @@ function figureLit(mat) {
   mat.needsUpdate = true;
   return mat;
 }
+/* the card a figure stands on in this room (a person's, the goblin's) */
+function cardMat() {
+  return figureLit(B3(figureLight(new THREE.MeshStandardMaterial({ side: THREE.DoubleSide,
+                     transparent: true, alphaTest: 0.02, roughness: 0.94,
+                     metalness: 0, envMapIntensity: 0.3 })),
+                   /* a little more of the room's ramp than before (0.14), so a
+                      figure's colours agree with the room's about what colour
+                      the light is */
+                   { room: 'tavern', rim: 0, tint: 0.24 }));
+}
 let footTex = null;
 function footShade() {
   if (!footTex) {
@@ -1221,13 +1245,7 @@ function buildSeat(seat) {
        without their face being repainted by it. A standee is somebody's
        character art; the room may fall on it, but the room does not get to
        recolour it. Hence the low dye and the near-untouched chroma. */
-    const mat = figureLit(B3(figureLight(new THREE.MeshStandardMaterial({ side: THREE.DoubleSide,
-                     transparent: true, alphaTest: 0.02, roughness: 0.94,
-                     metalness: 0, envMapIntensity: 0.3 })),
-                   /* a little more of the room's ramp than before (0.14), so a
-                      figure's colours agree with the room's about what colour
-                      the light is */
-                   { room: 'tavern', rim: 0, tint: 0.24 }));
+    const mat = cardMat();
     waiting++;
     const card = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 1.62), mat);
     card.visible = false;
@@ -2967,6 +2985,8 @@ function frame(ts) {
          sixty only spent frames — and because it invalidated every one
          of them, the whole layer could never idle. */
       if (t - fireT > 0.083) { fireT = t; tickFire(t); invalidate(2, true); }
+      /* the cheese, and whoever lives in it (27-goblin.js) */
+      if (root.Goblin && root.Goblin.tick(t)) invalidate(2, true);
     }
     drawUnder(t);
   }
@@ -3206,6 +3226,8 @@ root.TableGL = { build, warm, setOpen, sync, thumb, bit, onTextures, invalidate,
   standees: true,
   planRows, planKinds, setPlan, resetPlan, defaultPlan: () => TAVERN_PLAN.map(r => Object.assign({}, r)),
   stats: glStats,
+  /* for 27-goblin.js: the room, the cheese standing on its own in it, the eye, and a figure's card and shadow */
+  egg: () => roomGroup && cheese && camera ? { room: roomGroup, cheese, camera, card: cardMat, foot: footShade } : null,
   get frames() { return drawn; },
   get waiting() { return waiting; },
   get ready() { return !!renderer; } };

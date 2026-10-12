@@ -300,12 +300,9 @@ function rise(node, from, back) {
    While a sheet is up, the docks step back; the fight panel returns with it. */
 function docksAway() {
   if (root.Toolbox && root.Toolbox.isOpen()) root.Toolbox.shut();
-  if (root.Muster && root.Muster.isOpen()) root.Muster.yieldDock();
   if (root.Kit && root.Kit.panel) root.Kit.close();
 }
-function docksBack() {
-  if (root.Muster && root.Muster.reopen) root.Muster.reopen();
-}
+function docksBack() {}
 function read() {
   if (!rec) return;
   docksAway();

@@ -540,6 +540,23 @@ const T = {
     this.changed('edit'); return true;
   },
 
+  /* ── THE DOOR FOR WHAT A FIGHT CHANGES ────────────────────────
+     A wound, a token, a place in a line, the round: every one of them is a
+     change to a piece's `ent` or to the scene's own lines and turn, and `edit`
+     above refuses both on purpose (a workbench slider must never be able to
+     rewrite what a piece IS). The fight needs a door of its own, and it must
+     be an undoable one, or the one thing a GM most often does by mistake — a
+     hit on the wrong piece — would be the one thing Ctrl+Z could not undo.
+
+     The caller hands over a NEW object for anything nested (copy on write):
+     the history keeps the old one as `before`, so mutating it in place would
+     rewrite the past. 80-battle.js is the only caller, and it always copies. */
+  patch(id, fields) {
+    const t = this.get(id); if (!t || !fields) return false;
+    if (!this._set(t, fields)) return true;
+    this.changed('combat'); return true;
+  },
+
   /* ── ANOTHER ONE OF THOSE ─────────────────────────────────────
      A copy lands a little down and to the right of the original so both
      can be seen, with a fresh id and nowhere to live but the bare wood — a

@@ -424,8 +424,9 @@ root.addEventListener('monarchy:session', e => {
    nothing can change the board without this hearing about it. */
 if (M()) M().on((st, why) => { if (why === 'load') loaded(); else push(); });
 
-/* the combat sheet changes the fight without going through the model's
-   change hook (40-combat-scene.js) — it says so here instead */
+/* (the fight used to change its pieces without going through the model's
+   change hook; since 80-battle.js every change is a model patch, so this
+   needs nothing special any more) */
 /* THE BOARD HAS BEEN HEARD: the table's first answer (even "nothing on it")
    has arrived. A join keeps its cover up until then, so a player walks in to
    the table as it stands, not to empty wood that fills in around them. */

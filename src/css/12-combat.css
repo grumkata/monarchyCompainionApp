@@ -786,18 +786,28 @@ body{display:block;padding:0}
 .cl b{display:block;font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
   text-transform:uppercase;color:var(--m-or);margin-bottom:1px}
 .cl.me{color:var(--m-text)}
-.cin{display:flex;gap:6px;padding:11px 12px 12px 26px;border-top:1px solid var(--m-line);
+.cin{display:flex;align-items:flex-end;gap:6px;padding:11px 12px 12px 26px;border-top:1px solid var(--m-line);
   background:var(--m-sable-0)}
-.cin input{flex:1;min-width:0;background:var(--m-sable-2);border:0;color:var(--m-argent-hi);
+.cin input,.cin textarea{flex:1;min-width:0;background:var(--m-sable-2);border:0;color:var(--m-argent-hi);
   font-family:var(--m-f-hand);font-size:14px;padding:7px 10px;outline:none;
   box-shadow:inset 0 0 0 1px var(--m-line),inset 0 2px 4px rgba(0,0,0,.6);
   transition:box-shadow var(--t-hover) var(--settle)}
-.cin input::placeholder{color:var(--m-hush);font-style:italic}
-.cin input:focus{box-shadow:inset 0 0 0 1px var(--m-or),inset 0 2px 4px rgba(0,0,0,.6)}
+/* THE BOX GROWS WITH WHAT IS TYPED. grumkata: "when typing in chat if what you are typing is
+   bigger then the box the box should expand up not hide away the other text". It was one line
+   that scrolled sideways, so a long line ran out of sight. The dock is pinned to the bottom of
+   the window, so a taller box takes its room from the chat above it — up, not down — and the
+   buttons stay on the bottom line beside the last of the words. field-sizing does the growing
+   (the platform's own: no script, and it follows a box that is cleared or filled from code);
+   past eight lines it scrolls instead of eating the chat. */
+.cin textarea{display:block;box-sizing:border-box;flex:1 1 0;resize:none;line-height:18px;
+  min-height:32px;max-height:min(158px,35vh);field-sizing:content;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--m-line) transparent}
+.cin input::placeholder,.cin textarea::placeholder{color:var(--m-hush);font-style:italic}
+.cin input:focus,.cin textarea:focus{box-shadow:inset 0 0 0 1px var(--m-or),inset 0 2px 4px rgba(0,0,0,.6)}
 /* the primary act here: an Or plaque, and the counterchange runs the other
    way — your livery sweeps over the gold */
 .cin button{font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
-  text-transform:uppercase;padding:8px 14px;cursor:pointer;color:var(--m-sable);border:0;
+  text-transform:uppercase;padding:8px 14px;height:32px;cursor:pointer;color:var(--m-sable);border:0;
   background:var(--m-sweep-house) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-or);
   transition:background-position var(--t-wipe) var(--settle),color var(--t-wipe) var(--settle),
     transform var(--t-press) var(--snap)}
@@ -995,113 +1005,6 @@ body.field-on .seldock,body.field-on .hud.tl{display:none}
 body.field-on .hud.br{bottom:auto;top:15px}
 body.field-on #vp{cursor:default}
 
-/* the cloud you pass through on the way in and out. Above both renderers,
-   because the whole point of it is that the swap happens behind it.
-
-   THREE STAGES, NOT ONE TWEEN — and this is the part that took a while to get
-   right. The transition's slow moment is building the field, and building the
-   field blocks the main thread; a keyframe animation cannot advance through a
-   blocked main thread any more than a rAF loop can, because the animation
-   clock is the frame clock. Measured here: thirteen seconds of stall on the
-   first entry, during which a 900ms tween showed exactly nothing.
-   So the cover is a STATE (.hold) with no animation on it at all. It is
-   painted before the work starts and it survives a stall of any length,
-   because nothing has to keep ticking for it to stay on screen. Only the
-   arrival and the departure are animated, and both run while the thread is
-   free. See sweep() in scene.js. */
-/* OVER THE WORLD, NOT OVER THE SCREEN. The chat rail and the toolbar are
-   fixed furniture that does not travel — covering a live conversation in cloud
-   for a second would be a strange thing to do. So the sweep is sized to the
-   viewport's own rect at run time (see sweep()), and sits above the combat HUD
-   so the HUD arrives and leaves behind it too. */
-.fsweep{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:1450;
-  pointer-events:none;display:none;overflow:hidden}
-/* a soft haze under the puffs, so the gaps between them read as weather
-   rather than as holes you can see the cut through */
-.fsweep b{position:absolute;inset:-12%;opacity:0;display:block;
-  background:radial-gradient(120% 90% at 50% 42%,#ffffff 0%,#f6fbff 44%,#d9e7f4 100%);
-  will-change:opacity}
-.fsweep i{position:absolute;left:50%;top:50%;width:96%;aspect-ratio:256/141;opacity:0;
-  background-size:100% 100%;background-repeat:no-repeat;
-  will-change:transform,opacity;filter:blur(1px);
-  transform:translate(-50%,-50%) scale(var(--s))}
-
-/* the covered state: static, unanimated, indefinitely holdable */
-.fsweep.hold b{opacity:.95}
-.fsweep.hold i{opacity:1;transform:translate(-50%,-50%) scale(calc(var(--s) * 1.30))}
-
-/* going IN, the cloud rushes at you from a long way off and swallows the
-   screen; coming OUT again it opens and you fall back through it */
-@keyframes fsIn{
-    0%{opacity:0;transform:translate(-50%,-50%) translate(calc(var(--x) * 7),calc(var(--y) * 6))
-                            scale(calc(var(--s) * 0.42))}
-   55%{opacity:1}
-  100%{opacity:1;transform:translate(-50%,-50%) scale(calc(var(--s) * 1.30))}
-}
-@keyframes fsOut{
-    0%{opacity:1;transform:translate(-50%,-50%) scale(calc(var(--s) * 1.30))}
-   42%{opacity:1}
-  100%{opacity:0;transform:translate(-50%,-50%) scale(calc(var(--s) * 3.60))}
-}
-/* leaving the field is the same passage read backwards */
-@keyframes fsInRev{
-    0%{opacity:0;transform:translate(-50%,-50%) scale(calc(var(--s) * 3.60))}
-   55%{opacity:1}
-  100%{opacity:1;transform:translate(-50%,-50%) scale(calc(var(--s) * 1.30))}
-}
-@keyframes fsOutRev{
-    0%{opacity:1;transform:translate(-50%,-50%) scale(calc(var(--s) * 1.30))}
-   42%{opacity:1}
-  100%{opacity:0;transform:translate(-50%,-50%) translate(calc(var(--x) * 7),calc(var(--y) * 6))
-                            scale(calc(var(--s) * 0.42))}
-}
-@keyframes fhIn { from{opacity:0} 60%{opacity:.95} to{opacity:.95} }
-@keyframes fhOut{ from{opacity:.95} 40%{opacity:.95} to{opacity:0} }
-
-.fsweep.in  i{animation:fsIn  420ms cubic-bezier(.42,0,.55,1) both}
-.fsweep.out i{animation:fsOut 720ms cubic-bezier(.3,0,.35,1) both}
-.fsweep.rev.in  i{animation-name:fsInRev}
-.fsweep.rev.out i{animation-name:fsOutRev}
-.fsweep.in  b{animation:fhIn  420ms linear both}
-.fsweep.out b{animation:fhOut 720ms linear both}
-
-/* ── the names ─────────────────────────────────────────────────
-   Drawn in the DOM and projected onto each figure's head every frame, for the
-   same reason the counters' names are: they have live values in them, and
-   every entity has to be readable without being selected. */
-.fnames{position:fixed;inset:0;z-index:890;pointer-events:none;display:none;
-  transition:opacity .12s linear;
-  font-family:var(--f-disp)}
-body.field-on .fnames{display:block}
-/* ONE LINE, not two. Stacked name-over-number doubled every label's height,
-   and a rank is six of them side by side at the same depth — which is how the
-   board ended up under a wall of boxes you could not read a single name out
-   of. Name and number on one row, and a leader line down to the head so a
-   lifted label still tells you whose it is. */
-.fname{position:absolute;left:0;top:0;display:none;white-space:nowrap;
-  padding:1px 5px 2px;text-align:center;line-height:1;
-  background:rgba(24,36,20,.62);
-  box-shadow:0 1px 4px rgba(20,30,18,.34)}
-.fname::after{content:'';position:absolute;left:50%;top:100%;width:1px;
-  height:var(--lead,0px);background:rgba(253,246,224,.30)}
-.fname b{display:inline-block;vertical-align:middle;font-size:8px;font-weight:700;
-  letter-spacing:.05em;text-transform:uppercase;color:rgba(253,246,224,.92);
-  text-shadow:0 1px 2px rgba(0,0,0,.6)}
-.fname i{display:inline-block;vertical-align:middle;margin-left:5px;
-  font-family:var(--f-num);font-style:normal;font-size:9px;
-  color:rgba(200,226,150,.95);text-shadow:0 1px 2px rgba(0,0,0,.6)}
-/* when a label has nowhere to go, it keeps the name and drops the number —
-   the name is the thing that has to be readable without selecting */
-.fname.crowd i{display:none}
-.fname.crowd{padding:1px 4px 2px;background:rgba(24,36,20,.5)}
-.fname.en i{color:var(--f-sun-l)}
-.fname.done{background:rgba(34,48,31,.55)}
-.fname.done b,.fname.done i{color:rgba(253,246,224,.45)}
-.fname.sel{background:linear-gradient(180deg,var(--f-sun),var(--f-sun-d));
-  box-shadow:0 0 0 2px var(--f-cream),0 4px 12px rgba(20,30,18,.5)}
-.fname.sel b,.fname.sel i{color:var(--f-ink)}
-
-
 /* ══ PRESSES, AT THE TABLE ════════════════════════════════
    The same rule 20-shell.css states for the hall, applied to the table's
    own controls. The selector list is not invented here — it is the one
@@ -1190,9 +1093,6 @@ body.locked-in #vp { cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA
 .act{font-size:10px}
 .role{font-size:10px}
 .sugtxt em{font-size:10px}
-/* the field: a name has to be readable without selecting it */
-.fname b{font-size:11px}
-.fname i{font-size:11.5px}
 
 /* a die edited up to 6 by the skill's points (39-dice.js rollSkill) */
 .rdice i.up::before{content:'\2191';font-size:9px;margin-right:2px;opacity:.7}

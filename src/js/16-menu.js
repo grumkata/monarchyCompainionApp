@@ -704,6 +704,9 @@ const MADE_OF = [
   ['Pieces', 'KayKit — Kay Lousberg', ''],
   ['Trees and ground', 'Nature MegaKit', ''],
   ['The village shell', 'Medieval Village MegaKit', ''],
+  ['A star, a CD case, a shotgun', 'tubers431 (from alec pike), S. Paul Michael (Doom art: id Software), Quaternius', 'CC BY 4.0, CC BY 3.0, CC0'],
+  ['What is on the CD', 'DOOM by id Software; WebAssembly build by Cornelius Diekmann (source: github.com/diekmann/wasm-fizzbuzz)', 'GPL-2.0'],
+  ['Where the star goes', 'Bob-omb Battlefield: Dynamic Light; Mario: adrianandersen (both from Super Mario 64, Nintendo); its collision, cast, paths and words from the decompiled game (github.com/n64decomp/sm64)', 'CC BY 4.0'],
   ['The 3D', 'three.js r128', 'MIT']
 ];
 

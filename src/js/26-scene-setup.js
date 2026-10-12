@@ -283,19 +283,14 @@ function ordersInto(host, sceneId) {
   host.innerHTML =
     `<span class="mu-k">Orders</span>
      <div class="sc-opts-body">
-       <div class="sc-opt wide"><div class="sc-opt-text"><b>Terrain</b>
-         <i>${esc((C().TERRAINS[ter] || {}).blurb || '')}</i></div>
-         <span class="sc-choice">${C().TERRAIN_ORDER.map(k =>
-           `<button type="button" class="sc-pen${k === ter ? ' on' : ''}" data-setup="terrain"
-              data-val="${k}">${esc(C().TERRAINS[k].name)}</button>`).join('')}</span></div>
        <div class="sc-opt"><div class="sc-opt-text"><b>Battlefield width</b><i>Slots across.</i></div>
          ${tally('width', s.setup.width, 3, 14, 'data-setup')}</div>
        ${def.options.map(k => optRow(k, C().OPTIONS[k], s.options[k])).join('')}
      </div>`;
   wireControls(host, (k, v) => {
-    if (k === 'terrain' || k === 'width') T().setSetup(sceneId, k, v);
+    if (k === 'width') T().setSetup(sceneId, k, v);
     else T().setOption(sceneId, k, v);
-  }, k => (k === 'terrain' || k === 'width') ? T().get(sceneId).setup[k] : T().get(sceneId).options[k]);
+  }, k => (k === 'width') ? T().get(sceneId).setup[k] : T().get(sceneId).options[k]);
 }
 
 /* `ask` is true when the GM asked for this panel — made the scene, ran it,
@@ -310,14 +305,13 @@ function showOptions(sceneId, ask) {
   /* ── A FIGHT'S ORDERS ARE IN THE MUSTER ────────────────────────
      The writ floated over the right-hand side of the board, and on a fight
      the right-hand side of the board is where the enemy's flank is. For a
-     combat scene the orders live in the tracker (72-muster.js), which is
-     docked at your left hand with everything else about running the fight;
-     asking for them opens it. The floating writ is for the scenes that have
+     combat scene the orders live in the board's own settings (82-battle-ui.js),
+     in the chat dock, with everything else about running the fight; asking
+     for them opens that. The floating writ is for the scenes that have
      no tracker — a map, a stage. */
-  if (s && s.kind === 'scene' && s.scene === 'combat' && root.Muster) {
+  if (s && s.kind === 'scene' && s.scene === 'combat') {
     const fl = doc.getElementById('sc-float'); if (fl) fl.hidden = true;
-    if (ask && T().mayUseBox()) root.Muster.open();
-    else root.Muster.paint();
+    if (ask && T().mayUseBox() && root.BattleView && root.BattleView.openSetup) root.BattleView.openSetup();
     return;
   }
   const p = panel();

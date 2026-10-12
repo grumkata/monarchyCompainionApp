@@ -1,1990 +1,764 @@
 /* ═══════════════════════════════════════════════════════════════
-   THE FIELD  —  what you see once you lock in
+   37-scene-field.js — GOING INTO THE FIGHT.
 
-   The table view is a table: wood, a playmat, moulded counters seen from
-   above. That is the right thing when you are looking at the whole board.
-   It is the wrong thing when you are playing your character, and it is what
-   made every attempt at an ability UI come out looking like a document.
+   grumkata (2026-10-10): immersive mode is "an optional way to view the same board
+   state, that's why to access it was always to zoom into it ... it should always be
+   available just by zooming in"; and, of what it was: "why does zooming in far
+   enough just bring you to a separate area", "immersive mode is supposed to change
+   the scenery and look", "like something in a real 3D adventure RPG".
 
-   So locking in does not just flatten the table any more. It drops you into
-   the battlefield: a stylized field built out of the Nature MegaKit, the eight
-   lines laid out in front of you receding into the distance, and every unit
-   standing on it as a figure you see from the side. Bright, saturated, hard
-   sun — the same palette the kit is painted in, because the HUD and the world
-   have to look like they were made by the same hand.
+   So there is no cut and no other room. Wheel in on the fight until the board fills
+   the window and keep going: this camera takes over EXACTLY where the table's was
+   (the same lens, the same place, the same figures in the same spots), and comes
+   down among them while the world grows out of the board — the felt sinks into
+   grass, the wood turns to meadow, trees and hills and the sky come up around the
+   fight (38-field-world.js). Wheel out and it goes back up into the table's own
+   view and hands the board back to it, and the table carries on out.
 
-   This owns its OWN canvas and renderer, under the piece layer. Two reasons:
-   the piece layer's camera is welded to the page's CSS perspective so counters
-   land exactly on their DOM boxes, and this camera is a game camera that has
-   nothing to do with the page; and keeping them apart means the table view is
-   untouched and cannot regress while this is being built.
+   The pieces themselves are the table's: 81-battle-view.js hands them over (hostIn)
+   and asks this camera where they are (`proj`), so their blows, falls, tokens,
+   labels, hit areas, typed numbers and the drag all work in here.
 
-   The DOM is still the board. Layout, columns, drag and drop, the cap, the
-   tests — all unchanged. This reads `S.lines` and draws it.
+   The turn is a banner on a pole behind the middle of the fight (the GM touches it);
+   the mana is the table's own orb of light, over the allies.
 ═══════════════════════════════════════════════════════════════ */
-(function(){
-if (typeof THREE === 'undefined' || typeof KIT === 'undefined'
-    || typeof SPRITES === 'undefined') return;
+(function () {
+'use strict';
+if (typeof THREE === 'undefined') return;
 
-/* NOTHING IN HERE IS BUILT UNTIL YOU LOCK IN. A second WebGL context, a
-   thousand-pixel ground texture and thirty trees are not free, and the table
-   view — which is most of the time — never shows any of it. Everything below
-   lives inside `boot`, which runs once, the first time the field is asked for.
-   (This was not premature: eagerly building it slowed page load enough to
-   break two interaction tests, which is the cheap version of the complaint a
-   player would eventually have made.) */
+const CM = 20;                     /* board units in one of the field's: 81 works in the board's, this world in quarter-metres */
+const C = h => new THREE.Color(h).convertSRGBToLinear();
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const mkc = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+const BV = () => window.BattleView;
+const BT = () => window.Battle;
+const hashStr = str => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
 let F = null;
-function boot(){
+function boot() {
 if (F) return F;
 
-/* ── the field's measurements ──────────────────────────────────
-   One unit is one column. Everything else is expressed against that, so the
-   field scales with the battlefield width instead of being pinned to numbers
-   that happen to look right at six. */
-const COL = 2.6;          // column pitch
-const ROW = 3.4;          // line pitch, front to back
-const FIG = 2.05;         // a medium figure's height, feet to crown
-
-const sRGB = h => new THREE.Color(h).convertSRGBToLinear();
-
-/* the kit's palette, sampled off the previews */
-const C = {
-  /* Sunlit, shaded and warm greens rather than one flat lime — the kit's own
-     previews never show a single green anywhere, which is most of why they
-     look like a place and this looked like a golf simulator. */
-  grassSun:'#a6cf4e', grass:'#7fae37', grassShade:'#4f7c26', grassWarm:'#c3cf5a',
-  dirt:    '#c2a672', dirtDk:'#9d8250',
-  skyTop:  '#3f96cf', skyMid:'#84c9ec', skyLow:'#d9edf3',
-  ally:    '#3f7fd0', allyDk:'#27508a', allyLt:'#7fb2ee',
-  enemy:   '#c8452c', enemyDk:'#7d2314', enemyLt:'#e8846c',
-  gold:    '#f2c14e', goldDk:'#c08c1e',
-  sun:     '#fff1cf', skyLight:'#bcdcf5', bounce:'#8aa848',
-};
-
-/* ══ WHERE THE FIGHT IS ═══════════════════════════════════════
-   grumkata: "not every combat will be on a grassy field". Everything in
-   `C` above is the MEADOW — it was the only place a fight could happen.
-   The rest of the field is the terrain's now: 21-table-content.js carries a
-   `field` row per terrain (sky, sun, fog, the ground painter's four colours,
-   how much grass, what is scattered round the edge, what falls from the
-   sky) and `dressFor` below re-dresses sky, light, ground and scenery from
-   it. The meadow's row is exactly the colours above, so a meadow looks
-   exactly as it always did. */
-const TERR = () => window.TableContent && TableContent.TERRAINS;
-const terrainNow = () => (window.TableContent ? TableContent.terrainOf(S.terrain) : 'meadow');
-const fieldOf = id => { const T = TERR(); return (T && T[id] && T[id].field) || (T && T.meadow.field); };
-
-const cv = document.createElement('canvas');
-cv.id = 'gl2';
-/* NOT inset:0. The canvas used to cover the whole window, so the chat's
-   column and a docked muster were both underneath the battlefield — the
-   fight was framed partly behind them, and the chat was painted over (the
-   other half of that is in 28-table-boot.js). It covers #vp now, the part of
-   the screen that is the table's, and follows it when a dock opens. */
-Object.assign(cv.style,{position:'fixed',left:'0',top:'0',zIndex:880,pointerEvents:'none',display:'none'});
+/* ══ THE RENDERER, AND WHAT IS DONE TO THE PICTURE ═════════════
+   Drawn into a buffer of its own (multisampled, half-floats so the sun on a cloud
+   may be brighter than white), then finished: a soft glow off what is bright, a
+   filmic curve, a warm grade, a light vignette. While the world is still coming up
+   out of the table (grow < 1) the finish fades in with it, so the first frame is
+   drawn the way the table draws the board. */
+const cv = mkc(2, 2); cv.id = 'gl2';
+Object.assign(cv.style, { position: 'fixed', left: '0', top: '0', zIndex: 880, pointerEvents: 'none', display: 'none', opacity: '0' });
 document.body.appendChild(cv);
-
-const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
-if (window.Blazon3D && window.Blazon3D.tune) window.Blazon3D.tune(renderer);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.outputEncoding = THREE.sRGBEncoding;
-/* The two settings that do most of the work. Without tone mapping the colours
-   come out raw and plasticky; without shadows nothing is standing ON anything,
-   and a figure that is not standing on the ground reads as a mistake however
-   nice the art is. */
-/* NOT ACES. A filmic curve is built to tame a photographic high-dynamic-range
-   image: it crushes the toe and desaturates the shoulder, which is exactly
-   what you want for a rendered interior and exactly wrong for flat stylized
-   colour. Everything came out muddy olive with grey highlights — the palette
-   was fine, the curve was eating it. Linear keeps the paints the colours they
-   were mixed as; the lights below are balanced to stay under one so nothing
-   clips instead. */
-renderer.toneMapping = THREE.LinearToneMapping;
-renderer.toneMappingExposure = 1.06;
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: false, powerPreference: 'high-performance' });
+const PR = () => Math.min(window.devicePixelRatio || 1, 1.5);
+renderer.setPixelRatio(PR());
+renderer.outputEncoding = THREE.LinearEncoding;
+renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-/* THE SHADOW MAP IS NOT REDRAWN EVERY FRAME. Nineteen thousand trees and
-   tufts do not move — the wind that bends them lives in the vertex shader and
-   is not worth a shadow pass — so the map is rendered when the field is built
-   and when the board changes, and read from cache the rest of the time. That
-   is the difference between this being cheap and being the most expensive
-   thing on screen. */
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false;
-const restamp = () => { renderer.shadowMap.needsUpdate = true; };
+let shadowTick = 0;
+const isGL2 = !!renderer.capabilities.isWebGL2;
+const TYPE = isGL2 && renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType;
+const sceneTarget = () => {
+  const o = { type: TYPE, format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: false };
+  if (isGL2 && THREE.WebGLMultisampleRenderTarget) { const t = new THREE.WebGLMultisampleRenderTarget(4, 4, o); t.samples = 4; return t; }
+  return new THREE.WebGLRenderTarget(4, 4, o);
+};
+const plainTarget = () => new THREE.WebGLRenderTarget(4, 4, { type: TYPE, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false });
+const rt = { scene: sceneTarget(), bA: plainTarget(), bB: plainTarget() };
+const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+const brightMat = new THREE.ShaderMaterial({
+  uniforms: { tIn: { value: null } }, vertexShader: VERT, depthTest: false, depthWrite: false,
+  fragmentShader: `uniform sampler2D tIn; varying vec2 vUv;
+    void main(){ vec3 c = texture2D(tIn, vUv).rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(0.85, 2.2, l), 1.0); }`
+});
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: { tIn: { value: null }, uDir: { value: new THREE.Vector2() } }, vertexShader: VERT, depthTest: false, depthWrite: false,
+  fragmentShader: `uniform sampler2D tIn; uniform vec2 uDir; varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tIn, vUv).rgb * 0.2270270270;
+      c += texture2D(tIn, vUv + uDir * 1.3846153846).rgb * 0.3162162162; c += texture2D(tIn, vUv - uDir * 1.3846153846).rgb * 0.3162162162;
+      c += texture2D(tIn, vUv + uDir * 3.2307692308).rgb * 0.0702702703; c += texture2D(tIn, vUv - uDir * 3.2307692308).rgb * 0.0702702703;
+      gl_FragColor = vec4(c, 1.0);
+    }`
+});
+const finishMat = new THREE.ShaderMaterial({
+  uniforms: { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: .32 }, uExpo: { value: 1.0 }, uVig: { value: .28 }, uLook: { value: 1 }, uAspect: { value: 1.5 }, uSat: { value: 1.0 }, uGrade: { value: new THREE.Vector3(1, 1, 1) } },
+  vertexShader: VERT, depthTest: false, depthWrite: false,
+  fragmentShader: `uniform sampler2D tScene, tBloom; uniform float uBloom, uExpo, uVig, uLook, uAspect, uSat; uniform vec3 uGrade; varying vec2 vUv;
+    vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+    vec3 toSRGB(vec3 c){ return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+    void main(){
+      vec3 s = texture2D(tScene, vUv).rgb;
+      vec3 c = s + texture2D(tBloom, vUv).rgb * uBloom * uLook;
+      vec3 graded = aces(c * uExpo * mix(vec3(1.0), uGrade, uLook));
+      float l = dot(graded, vec3(0.2126, 0.7152, 0.0722));
+      graded = mix(vec3(l), graded, uSat);
+      graded *= mix(vec3(0.95, 0.98, 1.05), vec3(1.04, 1.0, 0.94), smoothstep(0.05, 0.7, l));
+      vec2 q = (vUv - 0.5) * vec2(uAspect, 1.0) / max(uAspect, 1.0);
+      graded *= 1.0 - uVig * smoothstep(0.35, 0.95, length(q) * 1.25);
+      /* at the very start the picture is the table's: no curve, no grade, as 81 draws the board */
+      c = mix(clamp(s, 0.0, 1.0), graded, uLook);
+      gl_FragColor = vec4(toSRGB(clamp(c, 0.0, 1.0)), 1.0);
+    }`
+});
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blurMat); quad.frustumCulled = false;
+const quadScene = new THREE.Scene(); quadScene.add(quad);
+const pass = (mat, target) => { quad.material = mat; renderer.setRenderTarget(target); renderer.render(quadScene, quadCam); };
+
 const scene = new THREE.Scene();
-/* aerial perspective: the far treeline has to haze into the sky or the
-   horizon reads as a cardboard cut-out standing behind the field */
-/* haze from WELL BEYOND the treeline, so the far edge of the world dissolves
-   into the sky instead of ending in a dark wall of pines. Pulled back after it
-   started bleaching the trees themselves — the camera stands thirty-six units
-   off and the pines are ninety-odd away, so a near plane of forty was putting
-   two thirds sky colour over the one thing framing the shot. */
-scene.fog = new THREE.Fog(sRGB(C.skyLow), 62, 165);
+scene.background = C('#140d08');
+const W = window.FieldWorld.make({ scene, renderer });
 
-/* ── sky ───────────────────────────────────────────────────────
-   Painted, not photographic: three stops and a couple of soft cloud bands,
-   which is exactly what the kit's own skybox is. Painted per terrain: an
-   overcast waste has low grey streaks, a crypt has no sky at all. */
-function paintSky(f){
-  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
-  const x = c.getContext('2d');
-  const g = x.createLinearGradient(0,0,0,256);
-  g.addColorStop(0, f.sky[0]); g.addColorStop(.52, f.sky[1]); g.addColorStop(1, f.sky[2]);
-  x.fillStyle = g; x.fillRect(0,0,512,256);
-  /* wispy streaks, thin and near the top, the way the kit's own previews are */
-  let sd = 4242; const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff)/0x7fffffff;
-  x.globalCompositeOperation = 'lighter';
-  const streaks = f.indoor ? 0 : 70;
-  for (let i = 0; i < streaks; i++){
-    const cx = rnd()*512, cy = rnd()*rnd()*150, w = 40 + rnd()*190, h = 3 + rnd()*13;
-    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, w);
-    const a = .05 + rnd()*.13;
-    rg.addColorStop(0, 'rgba(255,255,255,' + a.toFixed(3) + ')');
-    rg.addColorStop(1, 'rgba(255,255,255,0)');
-    x.save(); x.translate(cx, cy); x.rotate((rnd()-.5)*0.5); x.scale(1, h/w);
-    x.fillStyle = rg; x.beginPath(); x.arc(0,0,w,0,7); x.fill(); x.restore();
+/* the table's own lights, which the board and the figures are lit by at the moment this camera takes over from the
+   table's; they go out as the sun comes up (81-battle-view.js lights its board with these, fixed to the view) */
+const tableKey = new THREE.DirectionalLight(C('#fff0d6'), 1.25); scene.add(tableKey, tableKey.target);
+const tableFill = new THREE.DirectionalLight(C('#9ab4e0'), .4); scene.add(tableFill, tableFill.target);
+const tableHemi = new THREE.HemisphereLight(C('#ffe9c8'), C('#33303c'), 1); scene.add(tableHemi);
+const orbLight = new THREE.PointLight(C('#9cc6ff'), 0, 40, 2); scene.add(orbLight);
+
+/* the fight's own group: in the board's units (81-battle-view.js puts its pieces in it as they are), one of this world's
+   to every twenty of them; the middle of the felt is the middle of the world, x across, z toward you */
+const stage = new THREE.Group(); stage.scale.setScalar(1 / CM); scene.add(stage);
+
+/* ══ THE BANNER: THE TURN ═════════════════════════════════════
+   A tall standard behind the middle of the fight, between the two sides, its cloth
+   moving in the wind: TURN and the number. The GM touches it for the next turn. */
+const BAN = { canvas: mkc(512, 768), said: null, shown: null, flip: 0, hot: 0, glow: 0, w: 6.4, h: 8.6 };
+BAN.tex = new THREE.CanvasTexture(BAN.canvas); BAN.tex.encoding = THREE.sRGBEncoding; BAN.tex.anisotropy = 8;
+function drawBanner(text) {
+  const c = BAN.canvas, x = c.getContext('2d'), Wc = c.width, Hc = c.height;
+  x.clearRect(0, 0, Wc, Hc);
+  /* the cloth: swallow-tailed at the foot */
+  const tail = Hc * .86;
+  const shape = () => { x.beginPath(); x.moveTo(0, 0); x.lineTo(Wc, 0); x.lineTo(Wc, Hc); x.lineTo(Wc / 2, tail); x.lineTo(0, Hc); x.closePath(); };
+  shape();
+  const g = x.createLinearGradient(0, 0, Wc, 0); g.addColorStop(0, '#16213d'); g.addColorStop(.5, '#22325a'); g.addColorStop(1, '#16213d');
+  x.fillStyle = g; x.fill();
+  /* the weave */
+  x.save(); shape(); x.clip();
+  for (let i = 0; i < 2600; i++) { x.fillStyle = 'rgba(' + (Math.random() < .5 ? '255,255,255' : '0,0,0') + ',' + (Math.random() * .05).toFixed(3) + ')'; x.fillRect(Math.random() * Wc, Math.random() * Hc, 2, 1); }
+  x.restore();
+  /* the gold border */
+  x.save(); shape(); x.lineWidth = 34; x.strokeStyle = '#c9a43c'; x.stroke(); x.lineWidth = 6; x.strokeStyle = '#7d5f1c'; x.stroke(); x.restore();
+  x.save(); x.beginPath(); x.moveTo(40, 40); x.lineTo(Wc - 40, 40); x.lineTo(Wc - 40, Hc - 70); x.lineTo(Wc / 2, tail - 50); x.lineTo(40, Hc - 70); x.closePath();
+  x.lineWidth = 4; x.strokeStyle = 'rgba(214,180,90,.75)'; x.stroke(); x.restore();
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const engrave = (t, font, cy, fill) => { x.font = font; x.fillStyle = 'rgba(0,0,0,.55)'; x.fillText(t, Wc / 2 + 3, cy + 4); x.fillStyle = fill; x.fillText(t, Wc / 2, cy); };
+  const m = /^TURN (\d+)$/.exec(text || '');
+  if (m) {
+    engrave('TURN', '700 72px Cinzel, Georgia, serif', 170, '#e8c86a');
+    engrave(m[1], '700 ' + (m[1].length > 2 ? 210 : 270) + 'px Cinzel, Georgia, serif', 390, '#f6dc8a');
+  } else if (text) engrave(text, '700 92px Cinzel, Georgia, serif', 300, '#f6dc8a');
+  else {
+    /* a crown, for those who are only waiting */
+    x.fillStyle = '#d8b452'; x.beginPath();
+    const cx = Wc / 2, cy = 300; x.moveTo(cx - 120, cy + 60); x.lineTo(cx - 140, cy - 60); x.lineTo(cx - 70, cy); x.lineTo(cx, cy - 90); x.lineTo(cx + 70, cy); x.lineTo(cx + 140, cy - 60); x.lineTo(cx + 120, cy + 60); x.closePath(); x.fill();
   }
-  x.globalCompositeOperation = 'source-over';
-  const t = new THREE.CanvasTexture(c);
-  t.encoding = THREE.sRGBEncoding;
-  if (scene.background && scene.background.dispose) scene.background.dispose();
-  scene.background = t;
+  BAN.tex.needsUpdate = true;
 }
-paintSky(fieldOf('meadow'));
-
-/* ── light: hard sun, warm bounce, sky fill ── */
-/* a strong sky fill, because with no filmic toe lifting them the shadowed
-   sides go to near-black otherwise — and a figure whose shadow side is black
-   is a silhouette, not a figure */
-const hemi = new THREE.HemisphereLight(sRGB(C.skyLight), sRGB(C.bounce), 0.86);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(sRGB(C.sun), 1.12);
-sun.position.set(-32, 27, 22);   // raking, so the shadows have length
-sun.castShadow = true;
-sun.shadow.mapSize.set(1536, 1536);
-/* a tight orthographic box around the board — a shadow camera that covers the
-   whole world wastes its whole resolution on the empty half of it */
-/* The first box was 24 across, which did not reach the treeline — every tree
-   on the field was standing in its own light with no shadow under it. */
-const SD = 46;
-Object.assign(sun.shadow.camera, { left:-SD, right:SD, top:SD, bottom:-SD, near:1, far:130 });
-sun.shadow.camera.updateProjectionMatrix();
-sun.target.position.set(0, 0, 0); scene.add(sun.target);
-sun.shadow.bias = -0.0012;
-sun.shadow.normalBias = 0.03;
-scene.add(sun);
-const rim = new THREE.DirectionalLight(sRGB('#ffd08a'), 0.26);
-rim.position.set(20, 10, -26); scene.add(rim);
-
-/* ── going through the cloud ───────────────────────────────────
-   The camera does not cut from the board to the field; it climbs, and there is
-   weather in between. Six painted puffs rush the screen, close over it, and
-   blow past — the swap happens while they are covering, so what you see is
-   never a cut, only cloud parting on a battlefield.
-
-   Drawn in the DOM rather than in the scene deliberately: it has to cover BOTH
-   renderers, and the moment it matters is the moment neither of them is what
-   you are looking at. */
-let sweepEl = null, sweepTimer = 0, sweepTok = 0;
-
-/* how long the cloud takes to close over the screen. After this it HOLDS,
-   for as long as the work behind it takes. */
-const IN_MS = 420, OUT_MS = 760;
-
-function buildSweep(){
-  sweepEl = document.createElement('div');
-  sweepEl.className = 'fsweep';
-  sweepEl.appendChild(document.createElement('b'));      // the haze
-  const tex = cloudTexture().image.toDataURL();
-  /* each puff gets its own offset and a small lag, so the screen fills
-     raggedly rather than closing like a shutter — but every lag is short
-     enough that all seven are up before the hold begins */
-  const seeds = [[-30,18,1.00,0],[26,-12,1.25,55],[-8,-28,0.90,80],
-                 [40,26,1.15,35],[-46,-6,1.05,90],[10,34,1.30,65],[0,-4,1.60,15]];
-  seeds.forEach(([x, y, sc, lag]) => {
-    const d = document.createElement('i');
-    d.style.backgroundImage = 'url(' + tex + ')';
-    d.style.setProperty('--x', x + 'px');
-    d.style.setProperty('--y', y + 'px');
-    d.style.setProperty('--s', sc);
-    d.style.animationDelay = lag + 'ms';
-    sweepEl.appendChild(d);
-  });
-  document.body.appendChild(sweepEl);
-}
-
-/* Run the cloud, and hand `behind` the screen once it is white.
-   `behind(release)` does whatever must not be seen, and calls release() when
-   there is something worth uncovering to — for the field, that is its FIRST
-   RENDERED FRAME, not merely its construction. Uncovering to a canvas that
-   has been sized but never drawn is the same black flash the cloud was
-   introduced to hide. */
-function sweep(dirIn, behind){
-  if (!sweepEl) buildSweep();
-  const el = sweepEl, tok = ++sweepTok;
-  clearTimeout(sweepTimer);
-  /* match the world's box, whatever the layout has made it this session */
-  const r = (document.getElementById('vp') || document.body).getBoundingClientRect();
-  el.style.left = r.left + 'px';  el.style.top    = r.top + 'px';
-  el.style.width = r.width + 'px'; el.style.height = r.height + 'px';
-  el.style.display = 'block';
-  el.className = 'fsweep' + (dirIn ? '' : ' rev');
-  void el.offsetWidth;                               // restart from the top
-  el.classList.add('in');
-
-  sweepTimer = setTimeout(() => {
-    if (tok !== sweepTok) return;
-    el.classList.remove('in');
-    el.classList.add('hold');                        // static cover, no clock
-    void el.offsetWidth;
-    /* TWO frames, not one. One rAF only guarantees the style was computed;
-       the second guarantees the frame carrying it was actually presented. Only
-       then is it safe to stall the thread. */
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (tok !== sweepTok) return;
-      let spent = false;
-      const release = () => {
-        if (spent || tok !== sweepTok) return;
-        spent = true;
-        el.classList.remove('hold');
-        el.classList.add('out');
-        clearTimeout(sweepTimer);
-        sweepTimer = setTimeout(() => {
-          if (tok !== sweepTok) return;
-          el.className = 'fsweep';
-          el.style.display = 'none';
-        }, OUT_MS + 120);
-      };
-      if (behind) behind(release); else release();
-    }));
-  }, IN_MS);
-}
-
-/* ── clouds ────────────────────────────────────────────────────
-   Painted puffs on billboards, a long way out and high up, drifting across
-   and wrapping round. They are the only thing in the scene that moves without
-   being asked to, which is most of why a still field starts to feel like
-   weather rather than a diagram. */
-function cloudTexture(){
-  const S = 256, c = document.createElement('canvas');
-  c.width = S; c.height = Math.round(S * 0.55);
-  const x = c.getContext('2d');
-  let sd = 20260827;
-  const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  const puff = (cx, cy, r, a) => {
-    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0,   'rgba(255,255,255,' + a.toFixed(3) + ')');
-    g.addColorStop(.45, 'rgba(252,253,255,' + (a*0.82).toFixed(3) + ')');
-    g.addColorStop(.78, 'rgba(226,238,250,' + (a*0.34).toFixed(3) + ')');
-    g.addColorStop(1,   'rgba(226,238,250,0)');
-    x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
-  };
-  const H = c.height;
-  for (let i = 0; i < 26; i++){
-    const t = i / 25;
-    puff(S*0.12 + t*S*0.76 + (rnd()-.5)*24,
-         H*0.62 - Math.sin(t*Math.PI)*H*0.26 + (rnd()-.5)*12,
-         14 + Math.sin(t*Math.PI)*30 + rnd()*14, .55 + rnd()*.35);
-  }
-  const t2 = new THREE.CanvasTexture(c);
-  t2.encoding = THREE.sRGBEncoding;
-  return t2;
-}
-const clouds = new THREE.Group(); scene.add(clouds);
-const CLOUD_SPAN = 340;
-function makeClouds(){
-  clouds.clear();
-  const tex = cloudTexture();
-  const mat = new THREE.MeshBasicMaterial({ map:tex, transparent:true,
-    opacity:0.85, depthWrite:false, fog:false });
-  const geo = new THREE.PlaneGeometry(1, 0.55);
-  let sd = 777;
-  const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  for (let i = 0; i < 22; i++){
-    const m = new THREE.Mesh(geo, mat);
-    const w = 46 + rnd()*110;
-    m.scale.set(w, w * (0.7 + rnd()*0.5), 1);
-    m.position.set((rnd()-0.5) * CLOUD_SPAN,
-                   26 + rnd()*44,
-                   -70 - rnd()*180);
-    m.renderOrder = -10;
-    m.userData.drift = 0.35 + rnd()*0.9;
-    clouds.add(m);
-  }
-}
-function driftClouds(dt){
-  for (const m of clouds.children){
-    m.position.x += m.userData.drift * dt;
-    if (m.position.x > CLOUD_SPAN/2) m.position.x -= CLOUD_SPAN;
-    m.lookAt(camera.position.x, m.position.y, camera.position.z);
-  }
-}
-
-/* ── the kit ───────────────────────────────────────────────────
-   Baked to plain arrays by bake_kit.py, so there is no loader and no fetch —
-   the same trade the dice already make. */
-const texCache = {};
-function kitTex(uri, book){
-  const src = (book || KIT_TEX)[uri];
-  if (!src) return null;
-  if (texCache[src]) return texCache[src];
-  const t = new THREE.TextureLoader().load(src);
-  t.encoding = THREE.sRGBEncoding;
-  t.flipY = false;                       // glTF UVs, not canvas UVs
-  return (texCache[src] = t);
-}
-/* ── WHICH PACK A PIECE COMES FROM ─────────────────────────────
-   A bare name is the Nature kit, as it always was. `terra:` is the rest of
-   the MegaKit (dead and twisted trees, sandstone) and `dun:` is KayKit's
-   Dungeon — both baked by tools/bake_terrain.py in the kit's own shape.
-   The kit and TERRA are one unit on their longest side, so the scatter
-   scales them by the height it wants; the dungeon is at its own size in
-   metres, which is why a plan entry for it carries `s` instead. */
-const PACKS = {
-  kit:   () => (typeof KIT !== 'undefined' ? [KIT, KIT_TEX] : null),
-  terra: () => (typeof TERRA !== 'undefined' ? [TERRA, TERRA_TEX] : null),
-  dun:   () => (typeof DUNGEON !== 'undefined' ? [DUNGEON, DUNGEON_TEX] : null)
-};
-function packOf(name){
-  const i = name.indexOf(':');
-  const pk = i < 0 ? 'kit' : name.slice(0, i), key = i < 0 ? name : name.slice(i + 1);
-  const p = PACKS[pk] && PACKS[pk]();
-  return p && p[0][key] ? { src: p[0][key], book: p[1], key } : null;
-}
-const hasProp = name => !!packOf(name);
-/* Geometry and material per primitive, built once and shared — the scatter
-   draws thousands of these and a cloned Group per shrub would be thousands of
-   draw calls for a field of grass. */
-const propCache = {};
-function propParts(name){
-  if (propCache[name]) return propCache[name];
-  const got = packOf(name);
-  if (!got) return (propCache[name] = { parts: [], r: 0 });
-  const wind = WIND[got.key] || WIND[name] || 0;
-  const src = got.src, parts = [];
-  for (const pr of src.prims){
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pr.p, 3));
-    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(pr.n, 3));
-    if (pr.u) geo.setAttribute('uv', new THREE.Float32BufferAttribute(pr.u, 2));
-    /* THE BAKED OCCLUSION. Stored as one grey channel and expanded here. This
-       is what puts shadow in the crook of a branch and under the lip of a
-       rock — without it every surface is lit identically and the whole kit
-       reads as moulded plastic, which is exactly how it read. */
-    if (pr.ao){
-      const c = new Float32Array(pr.ao.length * 3);
-      for (let i = 0; i < pr.ao.length; i++){
-        c[i*3] = c[i*3+1] = c[i*3+2] = pr.ao[i];
-      }
-      geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
-    }
-    if (pr.i) geo.setIndex(pr.i);
-    geo.computeBoundingSphere();
-    /* Foliage is a flat card and its SHAPE is in the texture's alpha. An
-       alpha test rather than blending, so a thousand leaves need no depth
-       sort, and double-sided because a leaf card has a back. */
-    const mat = new THREE.MeshLambertMaterial({
-      map: pr.t ? kitTex(pr.t, got.book) : null, vertexColors: !!pr.ao,
-      transparent: false, alphaTest: pr.cut ? 0.5 : 0,
-      side: pr.cut ? THREE.DoubleSide : THREE.FrontSide });
-    if (pr.c) mat.color.setRGB(pr.c[0], pr.c[1], pr.c[2]);
-    if (wind) windy(mat, wind);
-    parts.push({ geo, mat, cut: !!pr.cut });
-  }
-  return (propCache[name] = { parts, r: src.r });
-}
-
-/* ── the ground ────────────────────────────────────────────────
-   Painted in a canvas rather than tiled from a photo: a green field, a churned
-   band of dirt where the two armies meet, and the eight lines marked as faint
-   bands so the BOARD is still legible inside the scenery. A player has to be
-   able to count lines at a glance — that is the whole game. */
-
-/* THE DETAIL TILE. A 2048px texture stretched over a hundred and twenty world
-   units is twenty-three pixels per unit — enough for patches and mud, nowhere
-   near enough for anything you could call grass. Everything read as painted
-   card because the ground had NO high-frequency detail at all, at any
-   distance. This is a small seamless tile of blade strokes and speckle,
-   repeated sixty times across and multiplied into the base, so the surface has
-   texture at the scale a boot would. It wraps by drawing every stroke a second
-   time offset by a full tile whenever it crosses an edge. */
-function detailTexture(){
-  const S = 512, c = document.createElement('canvas');
-  c.width = c.height = S;
-  const x = c.getContext('2d');
-  x.fillStyle = '#808080'; x.fillRect(0, 0, S, S);          // neutral = unchanged
-  let sd = 987651;
-  const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  x.lineCap = 'round';
-  const stroke = (px, py, ang, len, w, col) => {
-    for (const ox of [0, -S, S]) for (const oy of [0, -S, S]){
-      if ((ox && Math.abs(px) > S*0.12 && Math.abs(px - S) > S*0.12) ||
-          (oy && Math.abs(py) > S*0.12 && Math.abs(py - S) > S*0.12)) continue;
-      x.strokeStyle = col; x.lineWidth = w;
-      x.beginPath(); x.moveTo(px+ox, py+oy);
-      x.quadraticCurveTo(px+ox + Math.cos(ang)*len*0.5 + (rnd()-.5)*2,
-                         py+oy + Math.sin(ang)*len*0.5,
-                         px+ox + Math.cos(ang)*len, py+oy + Math.sin(ang)*len);
-      x.stroke();
-    }
-  };
-  /* blades: mostly upright, leaning both ways, light and dark in equal
-     measure so the tile averages back to neutral and does not tint the map.
-     BIG ENOUGH TO SURVIVE A MIPMAP — the first cut had them five pixels long
-     repeated fifty-eight times across the field, which put every blade under
-     one screen pixel and left the trilinear filter to average the whole thing
-     back to flat grey. Detail you cannot resolve is not detail. */
-  for (let i = 0; i < 1700; i++){
-    const px = rnd()*S, py = rnd()*S;
-    /* ANY DIRECTION. Every stroke leaning within eighty degrees of the same
-       way turned the whole field into a brushed diagonal smear — grass looked
-       at from above has no grain, it splays. */
-    const ang = rnd() * Math.PI * 2;
-    const up = rnd() > .5;
-    stroke(px, py, ang, 14 + rnd()*30, 1.4 + rnd()*2.4,
-           up ? 'rgba(200,212,152,'+(.20+rnd()*.32).toFixed(2)+')'
-              : 'rgba(56,72,32,'  +(.18+rnd()*.30).toFixed(2)+')');
-  }
-  /* speckle: seed heads, grit, small stones */
-  for (let i = 0; i < 1100; i++){
-    const px = rnd()*S, py = rnd()*S, r = 1.4 + rnd()*3.4;
-    x.fillStyle = rnd() > .45 ? 'rgba(226,232,182,'+(.13+rnd()*.24).toFixed(2)+')'
-                              : 'rgba(46,58,28,'  +(.11+rnd()*.22).toFixed(2)+')';
-    x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(21, 19);        // ~5.7 world units a tile
-  t.anisotropy = 8;
-  return t;
-}
-
-/* the terrain's colours as numbers the painters can mix */
-const rgbOf = hex => { const c = new THREE.Color(hex); return [c.r*255|0, c.g*255|0, c.b*255|0]; };
-const rgba = (rgb, a) => 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a.toFixed(3) + ')';
-
-/* ── THE GROUND, PAINTED FOR WHERE THE FIGHT IS ───────────────
-   One painter per kind of ground, all reading the terrain's own four
-   colours (21-table-content.js: warm, sunlit, base, shade) and its wear:
-
-     OPEN GROUND  the meadow's painter, unchanged in what it does — soft
-                  patches, a churned middle, trampled wear on the board —
-                  just no longer green by definition: the same strokes make
-                  a blighted waste grey-brown and a marsh black-green
-     SAND         the open-ground painter, then long wind ripples across it
-     SNOW         the same, then blue drift-shadows and nothing trampled in
-     STONE        a dungeon's and a courtyard's floor: laid flagstones,
-                  mortar lines, worn in the middle where the fight stands
-
-   The layout of the board is the same for all of them, so a slot on the
-   mat is a slot on the ground whatever the ground is. */
-function groundTexture(bw, bd, f){
-  f = f || fieldOf('meadow');
-  const S = 2048, c = document.createElement('canvas');
-  c.width = c.height = S;
-  const x = c.getContext('2d');
-  let seed = 12345;
-  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  const G = f.ground.map(rgbOf);          /* warm, sun, base, shade */
-  const W = f.wear.split(',').map(Number);
-  const stone = f.scatter === 'dungeon' || f.scatter === 'courtyard';
-
-  /* a base that already varies front to back, so even bare ground has a
-     direction to it */
-  const g = x.createLinearGradient(0, 0, 0, S);
-  g.addColorStop(0, f.ground[0]); g.addColorStop(.45, f.ground[1]);
-  g.addColorStop(1, f.ground[2]);
-  x.fillStyle = g; x.fillRect(0, 0, S, S);
-
-  /* big soft patches, light and dark, laid down in two passes so the field
-     reads as ground rather than as noise */
-  const blob = (rgb, n, rMin, rMax, aMin, aMax) => {
-    for (let i = 0; i < n; i++){
-      const cx = rnd()*S, cy = rnd()*S, r = rMin + rnd()*(rMax-rMin);
-      const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
-      const a = aMin + rnd()*(aMax-aMin);
-      rg.addColorStop(0, rgba(rgb, a));
-      rg.addColorStop(1, rgba(rgb, 0));
-      x.fillStyle = rg; x.fillRect(cx-r, cy-r, r*2, r*2);
-    }
-  };
-  blob(G[3],  90, 90, 340, .10, .28);   // shade
-  blob(G[1],  70, 70, 260, .10, .24);   // sun
-  blob(G[2], 120, 30, 110, .06, .16);   // texture
-
-  if (stone) flagstones(x, S, f, G, rnd);
-  if (f.scatter === 'desert') ripples(x, S, G, rnd);
-  if (f.scatter === 'snow') drifts(x, S, rnd);
-  if (f.water) pools(x, S, rnd, bw, bd);
-
-  /* THE CHURNED MIDDLE, where the two front lines meet. Built from overlapping
-     ellipses rather than a straight gradient band — a battle line is not a
-     ruler, and a hard-edged stripe across the field was the single most
-     obviously computer-generated thing on it. Kept FAINT: it is a change in
-     the ground, not a road. */
-  const churn = [Math.min(255, W[0] + 60), Math.min(255, W[1] + 52), Math.min(255, W[2] + 44)];
-  for (let i = 0; i < 60; i++){
-    const cx = rnd()*S, cy = S*0.5 + (rnd()-.5)*S*0.13;
-    const rx = 60 + rnd()*180, ry = 22 + rnd()*70;
-    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
-    const a = (.08 + rnd()*.16) * (stone ? .5 : 1);
-    rg.addColorStop(0, rgba(churn, a));
-    rg.addColorStop(.6, rgba(churn, a*.5));
-    rg.addColorStop(1, rgba(churn, 0));
-    x.save(); x.translate(cx, cy); x.scale(rx/Math.max(rx,ry), ry/Math.max(rx,ry));
-    x.fillStyle = rg; x.beginPath(); x.arc(0, 0, Math.max(rx,ry), 0, 7); x.fill(); x.restore();
-  }
-
-  /* THE BATTLEFIELD ITSELF. It has to be bare — nothing grows where the units
-     stand — and bare clean ground is both boring and a lie. Two armies have
-     been standing on this. Wear reads as wear when there is still something to
-     have worn away: broad thin scuffing, hard little boot-churn where feet
-     actually land, ruts, and tufts that survived. */
-  if (bw){
-    const cx = S/2, cz = S/2;
-    const px = bw / FIELD_W * S, pz = bd / FIELD_D * S;
-    const wear = (ex, ez) => {
-      const u = Math.abs(ex - cx) / px, v = Math.abs(ez - cz) / pz;
-      return Math.max(0, 1 - Math.max(u, v) * 0.82);
-    };
-    const scuff = [W[0] + 30, W[1] + 24, W[2] + 20].map(v => Math.min(255, v));
-    const deep  = W.map(v => Math.max(0, v - 20));
-    const soft = f.scatter === 'snow' ? .45 : stone ? .35 : 1;
-    for (let i = 0; i < 120; i++){
-      const ex = cx + (rnd()*2-1)*px*1.06, ez = cz + (rnd()*2-1)*pz*1.06;
-      const w = wear(ex, ez); if (w <= 0.02) continue;
-      const r = 50 + rnd()*130;
-      const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
-      const a = (.09 + rnd()*.22) * w * soft;
-      const col = rnd() > .5 ? scuff : W;
-      rg.addColorStop(0, rgba(col, a));
-      rg.addColorStop(1, rgba(col, 0));
-      x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
-    }
-    for (let i = 0; i < 420; i++){
-      const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
-      const w = wear(ex, ez); if (rnd() > w * 0.9) continue;
-      const r = 6 + rnd()*22;
-      const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
-      const a = (.22 + rnd()*.42) * soft;
-      const col = rnd() > .55 ? W : deep;
-      rg.addColorStop(0, rgba(col, a));
-      rg.addColorStop(.6, rgba(col, a*.5));
-      rg.addColorStop(1, rgba(col, 0));
-      x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
-    }
-    if (!stone){
-      x.lineCap = 'round';
-      for (let i = 0; i < 110; i++){
-        const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
-        const w = wear(ex, ez); if (w <= 0.1) continue;
-        const len = 40 + rnd()*160, ang = (rnd()-.5)*0.6 + (rnd() > .62 ? Math.PI/2 : 0);
-        x.strokeStyle = rgba(deep, (.13 + rnd()*.22) * w * soft);
-        x.lineWidth = 1.5 + rnd()*7;
-        x.beginPath(); x.moveTo(ex, ez);
-        x.lineTo(ex + Math.cos(ang)*len, ez + Math.sin(ang)*len*0.45); x.stroke();
-      }
-      /* and what survived it, so the wear has something to be wear ON */
-      const tuft = f.blades && f.blades.length ? rgbOf(f.blades[0]) : G[1];
-      for (let i = 0; i < 900; i++){
-        const ex = cx + (rnd()*2-1)*px, ez = cz + (rnd()*2-1)*pz;
-        const w = wear(ex, ez); if (rnd() < w * 0.75) continue;
-        const r = 5 + rnd()*20;
-        const rg = x.createRadialGradient(ex, ez, 0, ex, ez, r);
-        const a = .10 + rnd()*.22;
-        rg.addColorStop(0, rgba(rnd() > .5 ? tuft : G[1], a));
-        rg.addColorStop(1, rgba(tuft, 0));
-        x.fillStyle = rg; x.beginPath(); x.arc(ex, ez, r, 0, 7); x.fill();
-      }
-    }
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.encoding = THREE.sRGBEncoding;
-  t.anisotropy = 8;
-  return t;
-}
-
-/* STONE: flagstones in courses, each its own shade, with mortar between and
-   the odd one cracked. Big enough that a column of the board is about two
-   stones across. */
-function flagstones(x, S, f, G, rnd){
-  const rows = 64, h = S / rows;
-  const mortar = rgba(G[3].map(v => Math.max(0, v - 40)), .9);
-  for (let r = 0; r < rows; r++){
-    let cx = -rnd() * h;
-    while (cx < S){
-      const w = h * (1.1 + rnd() * 1.1);
-      const shade = G[(rnd() * 3) | 0].map(v => Math.max(0, Math.min(255, v + (rnd() - .5) * 26)));
-      x.fillStyle = rgba(shade, .92);
-      x.fillRect(cx + 2, r * h + 2, w - 4, h - 4);
-      /* a bevel of light along the top and dark along the bottom */
-      x.fillStyle = 'rgba(255,255,255,.07)'; x.fillRect(cx + 2, r * h + 2, w - 4, 3);
-      x.fillStyle = 'rgba(0,0,0,.14)'; x.fillRect(cx + 2, r * h + h - 5, w - 4, 3);
-      if (rnd() < .06){
-        x.strokeStyle = mortar; x.lineWidth = 2;
-        x.beginPath(); x.moveTo(cx + rnd()*w, r*h + 3);
-        x.lineTo(cx + rnd()*w, r*h + h*.5); x.lineTo(cx + rnd()*w, r*h + h - 3); x.stroke();
-      }
-      cx += w;
-    }
-    x.fillStyle = mortar; x.fillRect(0, r * h - 1, S, 3);
-  }
-}
-/* SAND: long, soft wind ripples */
-function ripples(x, S, G, rnd){
-  x.lineCap = 'round';
-  for (let i = 0; i < 520; i++){
-    const y0 = rnd() * S, x0 = rnd() * S, len = 80 + rnd() * 260, amp = 4 + rnd() * 8;
-    x.strokeStyle = rnd() > .5 ? rgba(G[0], .22 + rnd() * .2) : rgba(G[3], .16 + rnd() * .16);
-    x.lineWidth = 2 + rnd() * 3;
-    x.beginPath();
-    for (let t = 0; t <= 1.0001; t += .1) {
-      const px = x0 + t * len, py = y0 + Math.sin(t * 6 + y0) * amp;
-      if (t === 0) x.moveTo(px, py); else x.lineTo(px, py);
-    }
-    x.stroke();
-  }
-}
-/* SNOW: the cold blue of shadowed drifts, and a little grit */
-function drifts(x, S, rnd){
-  for (let i = 0; i < 90; i++){
-    const cx = rnd()*S, cy = rnd()*S, r = 60 + rnd()*260;
-    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
-    rg.addColorStop(0, 'rgba(150,176,206,' + (.10 + rnd()*.16).toFixed(3) + ')');
-    rg.addColorStop(1, 'rgba(150,176,206,0)');
-    x.fillStyle = rg; x.fillRect(cx-r, cy-r, r*2, r*2);
-  }
-  for (let i = 0; i < 700; i++){
-    x.fillStyle = 'rgba(70,74,80,' + (.10 + rnd()*.2).toFixed(2) + ')';
-    x.beginPath(); x.arc(rnd()*S, rnd()*S, .8 + rnd()*2, 0, 7); x.fill();
-  }
-}
-/* MARSH: black standing water between the tussocks, off the board */
-function pools(x, S, rnd, bw, bd){
-  const cx = S/2, cz = S/2;
-  const px = (bw || 20) / FIELD_W * S, pz = (bd || 16) / FIELD_D * S;
-  for (let i = 0; i < 70; i++){
-    const ex = rnd()*S, ez = rnd()*S;
-    if (Math.abs(ex - cx) < px * 1.1 && Math.abs(ez - cz) < pz * 1.1) continue;
-    const rx = 40 + rnd()*160, ry = 20 + rnd()*90;
-    x.save(); x.translate(ex, ez); x.rotate(rnd() * 3);
-    const rg = x.createRadialGradient(0, 0, 0, 0, 0, rx);
-    rg.addColorStop(0, 'rgba(22,34,30,.92)'); rg.addColorStop(.75, 'rgba(34,48,40,.8)');
-    rg.addColorStop(1, 'rgba(34,48,40,0)');
-    x.scale(1, ry / rx); x.fillStyle = rg; x.beginPath(); x.arc(0, 0, rx, 0, 7); x.fill();
-    x.restore();
-  }
-}
-
-/* a soft contact shadow, so a figure sits in the grass instead of on top of it */
-function blobShadow(){
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, 'rgba(24,40,14,.50)');
-  g.addColorStop(.55,'rgba(24,40,14,.24)');
-  g.addColorStop(1, 'rgba(24,40,14,0)');
-  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
-  return t;
-}
-let SHADOW_TEX = null;
-
-const FIELD_W = 120, FIELD_D = 110;
-
-/* THE GROUND IS NOT A SHEET. A dead-flat plane is the other half of why this
-   looked computer-generated: real ground rolls, and the roll is what gives the
-   horizon a shape. It stays perfectly flat over the board, because units stand
-   in lines and a line on a hill is a bug — the relief fades in outside it. */
-const BOARD_R = 26;
-/* a crypt's floor and a courtyard's paving do not roll, and the snow and the
-   sand roll more gently than a meadow — the terrain says how much */
-let RELIEF_K = 1;
-function relief(x, z){
-  if (!RELIEF_K) return 0;
-  const d = Math.hypot(x * 0.72, z);
-  const k = Math.max(0, Math.min(1, (d - BOARD_R) / 26));   // 0 on the board
-  const ease = k * k * (3 - 2 * k);
-  return RELIEF_K * ease * (Math.sin(x * 0.055) * 1.5 + Math.cos(z * 0.043) * 1.7
-               + Math.sin((x + z) * 0.021) * 2.6);
-}
-
-const groundGeo = new THREE.PlaneGeometry(FIELD_W, FIELD_D, 90, 84);
-function shapeGround(){
-  const pos = groundGeo.attributes.position;
-  for (let i = 0; i < pos.count; i++)
-    pos.setZ(i, relief(pos.getX(i), -pos.getY(i)));         // pre-rotation axes
-  pos.needsUpdate = true;
-  groundGeo.computeVertexNormals();
-}
-shapeGround();
-const groundMat = new THREE.MeshLambertMaterial({ map:groundTexture(
-    (S.width*COL/2 + COL*1.6), (S.lines.length*ROW/2 + ROW*1.1), fieldOf('meadow')) });
-/* the detail tile multiplied in, and FADED OUT WITH DISTANCE. Left on all the
-   way to the horizon it turns into a shimmering moire the moment the camera
-   moves, which is worse than having no detail at all — so it is strongest
-   underfoot and gone by the treeline, which is also how ground actually
-   reads. */
-(function(){
-  const det = detailTexture();
-  groundMat.onBeforeCompile = sh => {
-    sh.uniforms.uDetail = { value: det };
-    sh.uniforms.uDetRep = { value: det.repeat.clone() };
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPosD;')
-      .replace('#include <begin_vertex>',
-               '#include <begin_vertex>\nvWPosD = (modelMatrix * vec4(transformed,1.0)).xyz;');
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>',
-               '#include <common>\nuniform sampler2D uDetail;\nuniform vec2 uDetRep;\nvarying vec3 vWPosD;')
-      .replace('#include <map_fragment>',
-               `#include <map_fragment>
-                float dFade = 1.0 - smoothstep(14.0, 62.0, length(vWPosD.xz - cameraPosition.xz));
-                vec3 det = texture2D(uDetail, vMapUv * uDetRep).rgb;
-                diffuseColor.rgb *= mix(vec3(1.0), det * 2.0, dFade * 0.85);`);
-  };
-  /* r128 still calls it vUv, not vMapUv */
-  const patch = groundMat.onBeforeCompile;
-  groundMat.onBeforeCompile = sh => { patch(sh);
-    sh.fragmentShader = sh.fragmentShader.replace('vMapUv * uDetRep', 'vUv * uDetRep'); };
-})();
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI/2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-/* the field sits on a wider apron so the horizon is grass, not a hard edge */
-const apron = new THREE.Mesh(
-  new THREE.PlaneGeometry(420, 420),
-  new THREE.MeshLambertMaterial({ color:sRGB(C.grass) }));
-apron.rotation.x = -Math.PI/2; apron.position.y = -1.2;
-scene.add(apron);
-
-/* ── the lines, marked on the ground ───────────────────────────
-   Faint chalked bands with a worn socket at every column. This is the part
-   that keeps it a WARGAME and not a diorama: you can still see the grid. */
-const marks = new THREE.Group(); scene.add(marks);
-function layMarks(lines, width){
-  marks.clear();
-  const ringGeo = new THREE.RingGeometry(0.62, 0.78, 28);
-  lines.forEach((l, i) => {
-    const z = (i - (lines.length-1)/2) * ROW;
-    const side = l.side === 'al';
-    const bandM = new THREE.MeshBasicMaterial({
-      color:sRGB(side ? C.ally : C.enemy), transparent:true, opacity:.055,
-      depthWrite:false });
-    const band = new THREE.Mesh(new THREE.PlaneGeometry(width*COL + COL*0.7, ROW*0.86), bandM);
-    band.rotation.x = -Math.PI/2; band.position.set(0, 0.012, z);
-    marks.add(band);
-    for (let col = 0; col < width; col++){
-      const r = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
-        color:sRGB(side ? C.allyDk : C.enemyDk), transparent:true, opacity:.10,
-        depthWrite:false }));
-      r.rotation.x = -Math.PI/2;
-      r.position.set((col - (width-1)/2) * COL, 0.02, z);
-      marks.add(r);
-    }
-  });
-}
-
-/* ── scenery ───────────────────────────────────────────────────
-   The single biggest thing wrong with the first field was DENSITY. The kit's
-   own previews are thick with ground cover — grass, clover, ferns, flowers,
-   pebbles, mushrooms, all layered — and trees standing in copses. Twenty trees
-   sprinkled evenly over bare green is not a sparser version of that; it is a
-   different and much worse picture.
-
-   So: thousands of instances, and CLUSTERED. Real ground is patchy. Things
-   grow near other things. An even random scatter has a texture of its own and
-   the eye reads it instantly as a computer filling space.
-
-   All of it drawn as InstancedMesh — one draw call per prop per material,
-   whatever the count.  */
-const scenery = new THREE.Group(); scene.add(scenery);
-
-/* Per-instance leaf colour, kept NEAR the texture's own green. The first
-   attempt tinted toward orange for autumn and got brown, because tinting is a
-   multiply and multiplying a dark green leaf by orange lands in the mud. Small
-   shifts around the natural colour are what a treeline actually looks like. */
-const WHITE = new THREE.Color(1,1,1);
-const LEAF = ['#ffffff','#e8f0c8','#d8e8b0','#fff0c0','#f0e0a8','#ffe8b8','#e0eebb'];
-
-/* ── GRASS, MADE OF TRIANGLES ──────────────────────────────────
-   A texture cannot do this. Painted grass is flat by definition: it has no
-   silhouette against the sky, it does not catch the sun on one side and shade
-   on the other, and — the thing you actually notice — it does not MOVE. Every
-   attempt to fix the ground by painting it harder was fixing the wrong layer.
-
-   So the grass is geometry: one tapered blade, five vertices and three
-   triangles, instanced thirty thousand times, bent in the vertex shader by the
-   same wind that moves the trees. Cheap enough because the blade is three
-   triangles and the bend costs one sine; convincing because every one of them
-   is a real object with a real edge and a real shadow falling across it.
-   (method after antaeus-ar, "making grass with triangles in glsl") */
-function bladeGeometry(){
-  /* A TUFT, NOT A HAIR. One blade per instance was thirty thousand strokes two
-     pixels wide in almost exactly the ground's own green — present in the
-     scene, invisible on the screen. Grass reads as grass because blades stand
-     in clumps and shade each other; so each instance is three blades at
-     different heights and angles, which triples the density on screen for the
-     same number of instance matrices.
-
-     SIX of them, not three, and spread wider. A test pass with the blades
-     tinted red showed the truth the green ones were hiding: they were the
-     right size all along and there were nowhere near enough of them — roughly
-     one clump per square metre, which is a lawn that has been dead for a
-     while. Blades per instance is the cheap axis: one matrix, six blades. */
-  const BLADES = 6;
-  const g = new THREE.BufferGeometry();
-  const pos = [], nor = [], col = [], idx = [];
-  let sd = 4242;
-  const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-
-  for (let k = 0; k < BLADES; k++){
-    const base = idx.length ? pos.length / 3 : 0;
-    const ang = (k / BLADES) * Math.PI * 2 + rnd() * 0.9;
-    const ca = Math.cos(ang), sa = Math.sin(ang);
-    const off = k === 0 ? 0 : 0.30 + rnd() * 0.78;         // spread from the crown
-    const ox = Math.cos(ang * 2.1) * off, oz = Math.sin(ang * 2.1) * off;
-    const tall = 0.72 + rnd() * 0.5;                       // uneven, like a real clump
-    const lean = (rnd() - 0.5) * 0.34;
-    /* half-widths up the blade, tapering to a point */
-    const lv = [[0, 0.50], [0.55, 0.30], [1.0, 0.0]];
-    lv.forEach(([y, w]) => {
-      const shade = 0.50 + y * 0.68;      // dark at the root, bright at the tip
-      const yy = y * tall, bend = lean * y * y;
-      const put = (lx) => {
-        pos.push(ox + (lx + bend) * ca, yy, oz + (lx + bend) * sa);
-        nor.push(Math.sign(lx || 1) * 0.42 * ca, 0.91, Math.sign(lx || 1) * 0.42 * sa);
-        col.push(shade, shade, shade);
-      };
-      if (w > 0){ put(-w); put(w); } else put(0);
-    });
-    idx.push(base+0, base+2, base+1,  base+1, base+2, base+3,  base+2, base+4, base+3);
-  }
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal',   new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('color',    new THREE.Float32BufferAttribute(col, 3));
-  g.setIndex(idx);
-  return g;
-}
-
-const BLADE_GREENS = ['#8fc23f','#7cae32','#a3d051','#6f9d2c','#b6d968','#88b93a'];
-
-function sowGrass(halfW, halfD, rnd, f){
-  /* HOW MUCH GROWS HERE, AND WHAT COLOUR. A meadow is the full sowing; a
-     desert a few dry wisps; a crypt none at all. */
-  const amount = f && f.grass != null ? f.grass : 1;
-  const greens = f && f.blades && f.blades.length ? f.blades : BLADE_GREENS;
-  if (amount <= 0.001) return null;
-  /* WHERE, not just how many. Sown evenly over a thirty-four unit disc, a
-     hundred and forty thousand blades come out at a blade a square foot —
-     technically grass, visually a bald patch with hairs in it. Almost all of
-     them are wasted out where a blade is one pixel.
-
-     So it is sown in three bands. Most of it hugs the edge of the trampled
-     ground, which is the strip you actually look at and the one that has to
-     say "the army stopped here"; a thinner scatter runs out towards the trees
-     so it does not end in a ring; and stubble inside the lines keeps the board
-     from reading as a hole cut in the world. */
-  const BAND = Math.round(20000 * amount), OUT = Math.round(7000 * amount),
-        IN = Math.round(5000 * amount), N = BAND + OUT + IN;
-  const geo = bladeGeometry();
-  const mat = windy(new THREE.MeshLambertMaterial({
-    vertexColors: true, side: THREE.DoubleSide }), 0.62);
-  const im = new THREE.InstancedMesh(geo, mat, N);
-  im.receiveShadow = true;            // unit and tree shadows fall across it
-  im.castShadow = false;              // a hundred thousand blades in the shadow map is not worth it
-  im.frustumCulled = false;
-
-  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(),
-        E = new THREE.Euler(), Vp = new THREE.Vector3(), Vs = new THREE.Vector3();
-  const tint = new THREE.Color();
-  let n = 0;
-
-  const sow = (x, z, edge, inside) => {
-    /* shorter where the armies have been walking over it, taller out towards
-       the trees where nothing has */
-    const trod = inside ? 0.20 : Math.min(1, 0.40 + edge / 5.5);
-    /* ankle-to-shin, never a hedge. It grew to head height at the near edge
-       on the first pass, which turns the frame's foreground into a wall you
-       are looking over rather than a field the army is standing in. */
-    const h = (0.34 + rnd() * 0.40) * trod;
-    const w = (inside ? 0.10 : 0.17) + rnd() * (inside ? 0.06 : 0.15);
-    E.set((rnd() - 0.5) * 0.26, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.30);
-    Q.setFromEuler(E);
-    Vp.set(x, relief(x, z) - 0.02, z);
-    Vs.set(w, h, w);
-    im.setMatrixAt(n, M.compose(Vp, Q, Vs));
-    tint.copy(sRGB(greens[(rnd() * greens.length) | 0]))
-        .multiplyScalar(0.80 + rnd() * 0.36);
-    im.setColorAt(n, tint);
-    n++;
-  };
-
-  /* the band: a point on the board's edge, pushed outward, biased hard towards
-     the edge itself so the mat is thickest where the grass meets the mud */
-  for (let i = 0; i < BAND; i++){
-    const out = Math.pow(rnd(), 1.9) * 15;
-    let x, z;
-    if (rnd() < halfW / (halfW + halfD)){          // top or bottom edge
-      x = (rnd() * 2 - 1) * (halfW + out);
-      z = (rnd() < 0.5 ? -1 : 1) * (halfD + out);
-    } else {                                       // left or right edge
-      x = (rnd() < 0.5 ? -1 : 1) * (halfW + out);
-      z = (rnd() * 2 - 1) * (halfD + out);
-    }
-    sow(x, z, out, false);
-  }
-  /* thinning out towards the treeline */
-  for (let i = 0; i < OUT; i++){
-    const a = rnd() * Math.PI * 2, r = 12 + Math.sqrt(rnd()) * 44;
-    const x = Math.cos(a) * r * 1.32, z = Math.sin(a) * r;
-    const ox = Math.max(0, Math.abs(x) - halfW), oz = Math.max(0, Math.abs(z) - halfD);
-    if (ox === 0 && oz === 0) continue;
-    sow(x, z, Math.hypot(ox, oz), false);
-  }
-  /* stubble on the board itself: a fifth the height, well below the base
-     rings, nothing you could lose a figure behind */
-  for (let i = 0; i < IN; i++){
-    sow((rnd() * 2 - 1) * halfW, (rnd() * 2 - 1) * halfD, 0, true);
-  }
-
-  im.count = n;
-  im.instanceMatrix.needsUpdate = true;
-  if (im.instanceColor) im.instanceColor.needsUpdate = true;
-  return im;
-}
-
-/* ══ WHAT STANDS ROUND THE FIELD, BY TERRAIN ═══════════════════
-   The meadow's list below is the list that was here, unchanged; the rest
-   are the same two moves — COVER (ground cover sown everywhere off the
-   board) and CLUMPS (trees in copses, rocks in outcrops) — out of whichever
-   pieces make that place. A name with no prefix is the Nature kit; `terra:`
-   is the rest of the MegaKit; `dun:` is the dungeon, and is placed by
-   `build` rather than scattered, because a wall is laid, not sown.
-
-   cover:  [name, count, hMin, hMax, radius]
-   clumps: [[names], groups, per, hMin, hMax, rMin(+halfW), rMax, spread, tinted]  */
-const PLANS = {
-  meadow: {
-    cover: [['grassS',1700,.30,.66,62], ['wispyS',1200,.34,.76,60], ['clover',2200,.15,.30,52],
-            ['grass',1900,.52,1.05,60], ['wispy',1500,.58,1.15,60], ['plant',900,.38,.82,54],
-            ['fern',620,.42,.88,56], ['flower',760,.28,.54,52], ['flower2',640,.32,.60,52],
-            ['pebble',700,.13,.34,54], ['pebble2',520,.12,.30,54], ['mushroom',260,.15,.30,50]],
-    clumps: [[['tree','tree2'],58,6,4.5,9.5,8,84,7.0,true], [['pine'],34,5,5.5,11.0,12,90,7.5,false],
-             [['bush','bushfl'],150,4,0.7,2.0,2,66,3.4,false], [['rock','rock2'],70,5,0.4,1.4,1,60,2.6,false],
-             [['boulder'],26,3,1.3,3.4,5,66,3.2,false]] },
-  /* a clearing: the trees come right up to the edge of the fight */
-  forest: {
-    cover: [['fern',1500,.45,1.0,58], ['grassS',1200,.30,.60,58], ['plant',1200,.40,.90,56],
-            ['mushroom',600,.15,.34,52], ['terra:fungus',160,.14,.28,50], ['clover',1200,.15,.30,50],
-            ['terra:plantB',300,.5,.9,56], ['pebble2',400,.12,.28,52]],
-    clumps: [[['tree','tree2'],110,7,5.5,11.0,3,70,6.0,true], [['pine','terra:pine2'],80,6,6.0,12.0,4,80,6.5,false],
-             [['bush','bushfl'],180,4,0.8,2.2,1,60,3.0,false], [['boulder'],30,3,1.2,3.0,3,60,3.0,false]] },
-  /* nothing alive for a mile: dead wood, twisted trunks and stones */
-  blight: {
-    cover: [['pebble',900,.14,.40,58], ['pebble2',700,.12,.32,58], ['terra:pebS5',500,.2,.5,56],
-            ['grassS',700,.22,.46,58], ['wispyS',500,.24,.5,56], ['terra:fungus',140,.14,.28,50]],
-    clumps: [[['terra:dead1','terra:dead3'],60,4,4.5,10.0,5,84,7.5,false], [['terra:twist2'],22,2,5.0,9.0,8,80,6.0,false],
-             [['rock','rock2'],70,5,0.5,1.6,1,62,2.8,false], [['boulder'],30,3,1.3,3.6,4,66,3.2,false]] },
-  /* sand and sandstone, a dead tree or two, and a great deal of sky */
-  desert: {
-    cover: [['terra:pebR3',700,.2,.5,62], ['terra:pebS5',500,.2,.55,62], ['pebble',600,.14,.36,60]],
-    clumps: [[['terra:drock1','terra:drock2'],70,4,0.8,2.6,2,80,4.5,false], [['terra:drock3'],34,2,2.8,6.5,8,90,6.0,false],
-             [['terra:dead1'],10,1,3.5,6.5,10,80,5.0,false]] },
-  /* pines, stone, and snow over everything */
-  snow: {
-    cover: [['pebble',300,.14,.30,58], ['grassS',260,.20,.36,56]],
-    clumps: [[['pine','terra:pine1','terra:pine2'],110,6,5.0,12.0,6,88,6.5,false],
-             [['boulder'],36,3,1.2,3.4,3,70,3.4,false], [['rock','rock2'],60,4,0.5,1.4,1,64,2.6,false],
-             [['terra:dead3'],12,1,4.0,8.0,10,80,5.0,false]] },
-  /* twisted trees standing in black water, fungus on everything */
-  marsh: {
-    cover: [['grass',1500,.55,1.2,60], ['wispy',1300,.6,1.25,60], ['fern',700,.45,.9,56],
-            ['terra:plantB',400,.5,1.0,56], ['mushroom',400,.15,.34,52], ['terra:fungus',200,.14,.3,54],
-            ['clover',800,.15,.28,50]],
-    clumps: [[['terra:twist2'],60,4,4.5,9.0,4,80,6.5,false], [['terra:dead1','terra:dead3'],30,2,4.0,8.0,6,80,6.0,false],
-             [['bush'],120,4,0.8,2.0,1,60,3.0,false]] },
-  /* a crypt: laid, not sown (see build below) */
-  dungeon: { cover: [], clumps: [] },
-  /* inside the walls: flagstones, barrels, a tree or two in the corners */
-  courtyard: {
-    cover: [['grassS',260,.2,.4,40], ['pebble',260,.12,.26,40]],
-    clumps: [[['tree','tree2'],8,2,4.0,7.0,6,26,3.0,true]] }
-};
-
-/* ── A PLACE THAT IS BUILT ─────────────────────────────────────
-   Walls on three sides — the near one left out, the way a diorama is cut
-   away, because the camera stands off the near edge and a wall there is a
-   wall in front of the fight. Pillars down the long sides; torches on the
-   walls, each with a light of its own (a crypt is lit by what is in it);
-   and the clutter a fight happens among, kept off the board. KayKit is in
-   metres; DS makes a metre the field's metre (a figure is two units tall). */
-const DS = 1.14;
-let lamps = [];
-function build(put, halfW, halfD, f, rnd){
-  lamps = [];
-  const inside = f.scatter === 'dungeon';
-  const gapX = halfW + (inside ? 5.5 : 9), gapZ = halfD + (inside ? 4.5 : 8);
-  const wallLen = 4 * DS;
-  /* the far wall, and the two long ones */
-  for (let x = -gapX; x <= gapX + 0.01; x += wallLen) {
-    const k = Math.abs(x) < wallLen ? 'dun:wall_arched' : (rnd() < .18 ? 'dun:wall_broken' : 'dun:wall');
-    put(k, x, -gapZ, DS, null, 0);
-  }
-  for (let z = -gapZ + wallLen / 2; z <= gapZ; z += wallLen) {
-    const kind = inside && rnd() < .3 ? 'dun:wall_pillar' : (rnd() < .15 ? 'dun:wall_broken' : 'dun:wall');
-    put(kind, -gapX - 0.5, z, DS, null, Math.PI / 2);
-    put(kind, gapX + 0.5, z, DS, null, -Math.PI / 2);
-  }
-  /* pillars down the long sides, inside the walls */
-  const pillar = inside ? 'dun:pillar_decorated' : 'dun:pillar';
-  for (let z = -gapZ + 5; z < gapZ - 2; z += 7.5) {
-    put(pillar, -gapX + 2.4, z, DS, null, 0);
-    put(pillar, gapX - 2.4, z, DS, null, 0);
-  }
-  /* torches on the walls, facing in; each is a light in a crypt */
-  for (let z = -gapZ + 3; z < gapZ; z += 9) {
-    put('dun:torch_mounted', -gapX + 0.3, z, DS, null, Math.PI / 2);
-    put('dun:torch_mounted', gapX - 0.3, z, DS, null, -Math.PI / 2);
-    if (inside) lamps.push([-gapX + 0.9, 3.4, z], [gapX - 0.9, 3.4, z]);
-  }
-  for (let x = -gapX + 6; x < gapX - 3; x += 10) {
-    put('dun:torch_mounted', x, -gapZ + 0.3, DS, null, 0);
-    if (inside) lamps.push([x, 3.4, -gapZ + 0.9]);
-  }
-  /* banners in the courtyard, hung on the far wall */
-  if (!inside) for (let x = -gapX + 4; x < gapX - 2; x += 8)
-    put(rnd() < .5 ? 'dun:banner_patternA_red' : 'dun:banner_patternB_blue', x, -gapZ + 0.7, DS, null, 0);
-  /* the clutter: barrels, crates, rubble — in the corners and along the walls */
-  const junk = inside
-    ? ['dun:barrel_large', 'dun:barrel_small_stack', 'dun:crates_stacked', 'dun:rubble_half',
-       'dun:rubble_large', 'dun:chest', 'dun:table_long_broken', 'dun:candle_triple', 'dun:trunk_large_A',
-       'dun:sword_shield', 'dun:column', 'dun:shelf_small_candles']
-    : ['dun:barrel_large', 'dun:barrel_small_stack', 'dun:crates_stacked', 'dun:barrier', 'dun:trunk_large_A'];
-  for (let i = 0; i < (inside ? 34 : 18); i++) {
-    const side = rnd() < .5 ? -1 : 1;
-    const along = rnd() < .35;
-    const x = along ? (rnd() * 2 - 1) * (gapX - 3) : side * (halfW + 1.5 + rnd() * (gapX - halfW - 3.2));
-    const z = along ? -gapZ + 1.5 + rnd() * 2.5 : (rnd() * 2 - 1) * (gapZ - 2);
-    if (Math.abs(x) < halfW && Math.abs(z) < halfD) continue;
-    if (z > halfD - 1 && Math.abs(x) < halfW + 4) continue;          /* not in front of the camera */
-    put(junk[(rnd() * junk.length) | 0], x, z, DS * (0.85 + rnd() * 0.3), null, rnd() * Math.PI * 2);
-  }
-}
-
-function scatter(width, depth, f){
-  f = f || fieldOf('meadow');
-  scenery.clear();
-  let seed = 987654321;
-  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  const gauss = () => (rnd() + rnd() + rnd() - 1.5) * 0.9;
-
-  /* THE BATTLEFIELD IS BARE. Scenery lives outside it and nowhere else — a
-     tuft of grass under a unit is a thing between you and reading the board,
-     and the board is the entire point of the view. The margin is generous so
-     nothing crowds the outer lines either. */
-  const halfW = width*COL/2 + COL*1.6, halfD = depth*ROW/2 + ROW*1.1;
-  const onBoard = (x, z) => Math.abs(x) < halfW && Math.abs(z) < halfD;
-  /* AND NOTHING BETWEEN YOU AND THE FIGHT. The camera stands off the near
-     edge, so anything tall in that corridor is a tree planted in front of the
-     screen. Ground cover is fine there; anything with a trunk is not. */
-  const inTheWay = (x, z, tall) => tall && z > halfD - 2 && Math.abs(x) < 44;
-
-  /* a plan of where each prop goes, gathered first so every instance of one
-     prop can be handed to a single InstancedMesh */
-  const plan = {};
-  const put = (name, x, z, h, tint, rot) => {
-    if (!hasProp(name)) return;
-    (plan[name] || (plan[name] = [])).push({ x, z, h,
-      rot: rot == null ? rnd()*Math.PI*2 : rot, tint: tint || null });
-  };
-
-  /* GROUND COVER — everywhere off the board */
-  const cover = (name, n, hMin, hMax, R) => {
-    for (let i = 0; i < n; i++){
-      const a = rnd()*Math.PI*2, r = Math.sqrt(rnd()) * R;
-      const x = Math.cos(a)*r*1.3, z = Math.sin(a)*r;
-      if (onBoard(x, z)) continue;
-      put(name, x, z, hMin + rnd()*(hMax-hMin));
-    }
-  };
-  /* CLUMPS — trees in copses, rocks in outcrops. A cluster centre, then a
-     handful of things falling around it. */
-  const clump = (names, groups, per, hMin, hMax, rMin, rMax, spread, tinted) => {
-    for (let g = 0; g < groups; g++){
-      let cx, cz, tries = 0;
-      do {
-        const a = rnd()*Math.PI*2, r = rMin + rnd()*(rMax-rMin);
-        cx = Math.cos(a)*r*1.2; cz = Math.sin(a)*r;
-      } while ((onBoard(cx, cz) || inTheWay(cx, cz, hMax > 2.2)) && ++tries < 40);
-      if (onBoard(cx, cz) || inTheWay(cx, cz, hMax > 2.2)) continue;
-      const n = 1 + Math.floor(rnd()*per);
-      for (let i = 0; i < n; i++){
-        const x = cx + gauss()*spread, z = cz + gauss()*spread;
-        if (onBoard(x, z) || inTheWay(x, z, hMax > 2.2)) continue;
-        put(names[Math.floor(rnd()*names.length)], x, z, hMin + rnd()*(hMax-hMin),
-            tinted ? LEAF[Math.floor(rnd()*LEAF.length)] : null);
-      }
-    }
-  };
-  const P = PLANS[f.scatter] || PLANS.meadow;
-  P.cover.forEach(c => cover.apply(null, c));
-  P.clumps.forEach(c => clump(c[0], c[1], c[2], c[3], c[4], halfW + c[5], c[6], c[7], c[8]));
-  if (f.scatter === 'dungeon' || f.scatter === 'courtyard') build(put, halfW, halfD, f, rnd);
-
-  const blades = sowGrass(halfW, halfD, rnd, f);
-  if (blades) scenery.add(blades);
-
-  /* build one InstancedMesh per prop primitive */
-  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(),
-        Vp = new THREE.Vector3(), Vs = new THREE.Vector3(), up = new THREE.Vector3(0,1,0);
-  let total = 0;
-  for (const name of Object.keys(plan)){
-    const list = plan[name], { parts } = propParts(name);
-    const casts = CASTS.has(name) || /^(dun|terra):/.test(name);
-    for (const part of parts){
-      const im = new THREE.InstancedMesh(part.geo, part.mat, list.length);
-      /* ankle-high ground cover does not earn a shadow-map slot, and there are
-         thousands of it */
-      im.castShadow = casts; im.receiveShadow = true;
-      list.forEach((it, i) => {
-        Q.setFromAxisAngle(up, it.rot);
-        Vp.set(it.x, relief(it.x, it.z) - 0.02, it.z);
-        Vs.setScalar(it.h);
-        im.setMatrixAt(i, M.compose(Vp, Q, Vs));
-        /* instanceColor is per-mesh: once one instance sets a tint every other
-           one must set white, or they come out black */
-        if (list.some(x => x.tint)) im.setColorAt(i, it.tint ? sRGB(it.tint) : WHITE);
-      });
-      im.instanceMatrix.needsUpdate = true;
-      if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.frustumCulled = false;          // one mesh spans the whole field
-      scenery.add(im);
-    }
-    total += list.length;
-  }
-  lightLamps();
-  return total;
-}
-
-/* ── A CRYPT IS LIT BY WHAT IS IN IT ───────────────────────────
-   Each wall torch gets a warm point light, flickering on its own phase
-   (frame() below). Capped: every light is a cost in every material on the
-   field, and eight torches light a crypt as well as twenty. */
-const lampGroup = new THREE.Group(); scene.add(lampGroup);
-function lightLamps(){
-  lampGroup.clear();
-  lamps.slice(0, 8).forEach((p, i) => {
-    const L = new THREE.PointLight(sRGB('#ffae5a'), 1.8, 34, 1.4);
-    L.position.set(p[0], p[1], p[2]);
-    L.userData.phase = i * 1.7;
-    lampGroup.add(L);
-  });
-}
-const flat = hex => new THREE.MeshLambertMaterial({ color:sRGB(hex) });
-
-/* ── figures ───────────────────────────────────────────────────
-   grumkata's character art, as BILLBOARDS. Not models — cutouts standing on
-   the field, turning to face the camera around Y only so they stay upright and
-   never foreshorten into a smear when you pan.
-
-   Three details that are the difference between this working and looking wrong:
-
-     · THE QUAD'S ORIGIN IS AT THE FEET, not its middle. Everything below scales
-       the sprite, and a sprite scaled about its centre sinks into the ground
-       and rises off it as it breathes.
-     · `alphaTest` rather than blended transparency. Thirty cutouts with soft
-       alpha need a per-frame depth sort to layer correctly; an alpha cutout
-       needs none, and the art has hard edges anyway.
-     · The two armies MIRROR, so they face each other instead of both looking
-       the same way down the field.
-
-   They sway, and they breathe — a squash and stretch that holds volume, so it
-   reads as a chest rising rather than a balloon. Phase comes off the entity's
-   own id, so a rank of Grave Serjeants is not a chorus line.  */
-/* ── wind ──────────────────────────────────────────────────────
-   Everything that grows bends. It is done in the VERTEX SHADER rather than by
-   moving objects on the CPU, because there are fifteen thousand of them and
-   they are drawn in a handful of instanced batches — moving them from
-   JavaScript would mean rebuilding those batches every frame.
-
-   The displacement is weighted by height SQUARED, so the base of a tuft stays
-   planted in the ground and only the tips travel, and the phase comes from the
-   instance's own world position, so a gust reads as a wave crossing the field
-   rather than every blade twitching in unison. */
-const uTime = { value: 0 };
-function windy(mat, strength){
+const banner = new THREE.Group();
+(function () {
+  const wood = new THREE.MeshStandardMaterial({ color: C('#5a3b22'), roughness: .8 });
+  const gold = new THREE.MeshStandardMaterial({ color: C('#d4a63e'), roughness: .35, metalness: .9 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.16, .22, 15.5, 10), wood); pole.position.y = 7.75; banner.add(pole);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, BAN.w + .9, 8), wood); bar.rotation.z = Math.PI / 2; bar.position.y = 14.2; banner.add(bar);
+  [-1, 1].forEach(s => { const k = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), gold); k.position.set(s * (BAN.w / 2 + .45), 14.2, 0); banner.add(k); });
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(.24, .9, 10), gold); tip.position.y = 15.9; banner.add(tip);
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(.28, 12, 10), gold); boss.position.y = 15.4; banner.add(boss);
+  const g = new THREE.PlaneGeometry(BAN.w, BAN.h, 14, 20); g.translate(0, -BAN.h / 2, 0);
+  const mat = new THREE.MeshLambertMaterial({ map: BAN.tex, emissiveMap: BAN.tex, transparent: true, alphaTest: .4, side: THREE.DoubleSide, emissive: new THREE.Color(.42, .42, .42) });
   mat.onBeforeCompile = sh => {
-    sh.uniforms.uTime = uTime;
-    sh.uniforms.uWind = { value: strength };
-    sh.vertexShader = 'uniform float uTime;\nuniform float uWind;\n' + sh.vertexShader;
-    sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `
-      #include <begin_vertex>
-      #ifdef USE_INSTANCING
-        vec3 iOrigin = instanceMatrix[3].xyz;
-      #else
-        vec3 iOrigin = vec3(0.0);
-      #endif
-      float wH = max(transformed.y, 0.0);
-      float wPh = iOrigin.x * 0.55 + iOrigin.z * 0.42;
-      float wS = sin(uTime * 1.35 + wPh) + 0.45 * sin(uTime * 2.7 + wPh * 1.9);
-      transformed.x += wS * uWind * wH * wH;
-      transformed.z += wS * 0.42 * uWind * wH * wH;
-    `);
+    sh.uniforms.uT = W.uniforms.uT; sh.uniforms.uWind = W.uniforms.uWind;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uT; uniform float uWind;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float hang = clamp(-position.y / ${BAN.h.toFixed(2)}, 0.0, 1.0);
+        transformed.z += (sin(uT * 2.1 + position.x * 0.7 - position.y * 0.45) * 0.32 + sin(uT * 3.3 + position.x * 1.3) * 0.12) * hang * uWind;
+        transformed.x += sin(uT * 1.4 - position.y * 0.3) * 0.22 * hang * hang * uWind;`);
   };
-  mat.customProgramCacheKey = () => 'wind' + strength;
-  return mat;
-}
-/* how hard each thing bends, and whether it is worth a shadow map slot */
-const WIND = { grass:0.16, grassS:0.16, wispy:0.19, wispyS:0.19, clover:0.10,
-               fern:0.11, plant:0.13, flower:0.14, flower2:0.14,
-               bush:0.045, bushfl:0.045, tree:0.030, tree2:0.030, pine:0.022 };
-const CASTS = new Set(['tree','tree2','pine','bushfl','bush','boulder']);
-
-const spriteCache = {};
-function spriteMat(name){
-  if (spriteCache[name]) return spriteCache[name];
-  const t = new THREE.TextureLoader().load(SPRITES[name].src);
-  t.encoding = THREE.sRGBEncoding;
-  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
-  /* Unlit on purpose — the art carries its own shading, and lighting a
-     billboard makes it flicker as the quad turns to follow the camera. A warm
-     multiply is enough to sit it in the same sun as everything else. */
-  return (spriteCache[name] = new THREE.MeshBasicMaterial({
-    map:t, transparent:true, alphaTest:0.35, side:THREE.DoubleSide,
-    color:sRGB('#fffaf0'), fog:true }));
-}
-/* one unit quad, origin at the bottom edge */
-const QUAD = (() => {
-  const g = new THREE.PlaneGeometry(1, 1);
-  g.translate(0, 0.5, 0);
-  return g;
+  mat.customProgramCacheKey = () => 'fw-banner';
+  const cloth = new THREE.Mesh(g, mat); cloth.position.set(0, 14.05, .05); banner.add(cloth);
+  BAN.cloth = cloth; BAN.mat = mat;
+  const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: BAN.tex, alphaTest: .4 }); cloth.customDepthMaterial = dm;
+  banner.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
 })();
+scene.add(banner);
+const bannerText = () => { const A = BV().A, gm = BT().isGM(); return !A ? '' : A.fight.cover ? (gm ? 'BEGIN' : '') : 'TURN ' + A.fight.round; };
 
-/* Who looks like what. Content decides — an entity may name its own `sprite`,
-   and this is only the fallback so a board full of placeholders still reads. */
-const SPRITE_FOR = {
-  'Bone Levy':'skeleton', 'Ravener':'skeleton',
-  'Pyre-Adept':'lich', 'Ash Cantor':'lich', 'Hollow Knight':'lich',
-  'Longbowman':'archer', 'Crow Archer':'archer',
-  'Thane Bryn':'axeman', 'Vashka':'axeman',
-};
-/* THE COUNTER'S OWN FIGURE FIRST. A unit dressed on the workbench as an
-   archer is an archer here too (65-token-look.js), and one wearing a
-   portrait stands as that portrait, printed on a card. The name table below
-   is only for the demo army, whose units were never dressed at all. */
-const spriteOf = e => {
-  if (e.sprite && SPRITES[e.sprite]) return e.sprite;
-  if (e.fig && SPRITES[e.fig]) return e.fig;
-  const L = window.TokenLook;
-  if (L && (e.pic || e.art)) {
-    const k = L.figOf({ src: e.pic, art: e.art, fig: e.fig, side: e.side, entKind: e.kind });
-    if (k && SPRITES[k]) return k;
-  }
-  return SPRITE_FOR[e.name] || (e.side === 'en' ? (e.kind === 'large' ? 'lich' : 'skeleton')
-                                                : (e.kind === 'large' ? 'axeman' : 'spearman'));
-};
-const portraitOf = e => {
-  if (!e.pic) return '';
-  const L = window.TokenLook, p = L && L.pic({ src: e.pic, art: e.art });
-  return p && !p.cut ? p.src : '';
-};
-/* a portrait, printed on a card: cropped to the card's shape, a Sable
-   border and a gilt hairline, so a photograph stands on the field as a
-   standee does on the table rather than as a floating rectangle */
-const picCache = {};
-const CARD_W = 0.78;
-function picMat(src){
-  if (picCache[src]) return picCache[src];
-  const c = document.createElement('canvas'); c.width = 256; c.height = 328;
-  const x = c.getContext('2d');
-  x.fillStyle = '#171310'; x.fillRect(0, 0, 256, 328);
-  const t = new THREE.CanvasTexture(c);
-  t.encoding = THREE.sRGBEncoding;
-  const im = new Image();
-  im.onload = () => {
-    const bw = 232, bh = 304, k = Math.max(bw / im.width, bh / im.height);
-    const w = im.width * k, h = im.height * k;
-    x.save(); x.beginPath(); x.rect(12, 12, bw, bh); x.clip();
-    x.drawImage(im, 12 + (bw - w) / 2, 12 + (bh - h) / 2, w, h); x.restore();
-    x.strokeStyle = '#c9a227'; x.lineWidth = 2; x.strokeRect(13, 13, bw - 2, bh - 2);
-    t.needsUpdate = true; restamp();
-  };
-  im.src = src;
-  return (picCache[src] = new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide,
-    color: sRGB('#fffaf0'), fog: true }));
-}
+/* ══ THE MANA: THE TABLE'S OWN ORB, OVER THE ALLIES ═══════════ */
+let orb = null, orbMana = -1;
 
-const GEO = {
-  /* a thin ring on the ground, not a poker chip. The fat coloured discs were
-     doing more damage to this than anything else on screen: five saturated
-     dinner plates per line, all exactly alike, sitting on flat green. */
-  ring:   new THREE.RingGeometry(0.46, 0.56, 26),
-  plinth: new THREE.RingGeometry(0.56, 0.72, 30),
-  shadow: new THREE.PlaneGeometry(1.6, 1.6),
-};
-
-const span = e => e.kind === 'unit' ? 1 : e.kind === 'large' ? 2 : (e.wide ? 3 : 2);
-function figure(e){
-  const g = new THREE.Group();
-  const en = e.side === 'en';
-  const dark = en ? C.enemyDk : C.allyDk;
-  const big = e.kind === 'large', form = e.kind === 'form';
-  const s = big ? 1.45 : 1;
-  const card = portraitOf(e);
-  const art = card ? { w: CARD_W } : SPRITES[spriteOf(e)];
-  if (!SHADOW_TEX) SHADOW_TEX = blobShadow();
-
-  /* the ground contact, soft-edged. A hard circle under a soft-edged figure is
-     a sticker, not a shadow. */
-  /* the ring and the contact shadow belong to the STAND, not to the men, so
-     they are sized in world units and divided back out of the group scale */
-  const stand = new THREE.Group();  g.add(stand);
-  const sh = new THREE.Mesh(GEO.shadow, new THREE.MeshBasicMaterial({
-    map:SHADOW_TEX, transparent:true, depthWrite:false }));
-  sh.rotation.x = -Math.PI/2; sh.position.y = 0.02;
-  sh.scale.set(s * (form ? span(e) * 1.5 : 1), s * (form ? 1.9 : 1), 1);
-  stand.add(sh);
-
-  /* Allegiance is not in the art, so a thin ring carries it — read at a
-     glance, and gone the moment you stop looking for it. */
-  const ring = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({
-    color:sRGB(dark), transparent:true, opacity:.55, side:THREE.DoubleSide, depthWrite:false }));
-  ring.rotation.x = -Math.PI/2; ring.position.y = 0.035;
-  ring.scale.set(s * (form ? span(e) * 1.35 : 1), s * (form ? 1.5 : 1), 1);
-  stand.add(ring);
-  if (e.pc){
-    const pl = new THREE.Mesh(GEO.plinth, new THREE.MeshBasicMaterial({
-      color:sRGB(C.gold), transparent:true, opacity:.85, side:THREE.DoubleSide, depthWrite:false }));
-    pl.rotation.x = -Math.PI/2; pl.position.y = 0.045; pl.scale.setScalar(s);
-    stand.add(pl);
-  }
-
-  /* A FORMATION IS AS MANY FIGURES AS IT HAS UNITS. Ten men in the Iron
-     Phalanx is ten men, packed into the footprint its slots give it — three
-     stand-ins was me not listening, and it also threw away the one thing a
-     formation is FOR: you can see how many of them are left. */
-  let men = [[0, 0]], G = FIG * (big ? 1.34 : 1);
-  if (form){
-    const n = Math.max(1, e.alive != null ? e.alive : (e.total || 1));
-    const Wf = span(e) * COL * 0.90, Df = ROW * 0.74;
-    let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * Wf / Df))));
-    const rows = Math.ceil(n / cols);
-    const dx = Wf / cols, dz = Df / rows;
-    /* a grunt is never taller than a hero, and never wider than his own file */
-    G = Math.min(FIG * 0.86, dx * 0.98 / art.w);
-    men = [];
-    for (let i = 0; i < n; i++){
-      const c = i % cols, r = Math.floor(i / cols);
-      men.push([ (c - (cols-1)/2) * dx / G, (r - (rows-1)/2) * dz / G ]);
-    }
-  }
-
-  const bill = [];
-  const mat = card ? picMat(card) : spriteMat(spriteOf(e));
-  let hh = 0; for (let j = 0; j < e.id.length; j++) hh = (hh * 31 + e.id.charCodeAt(j)) & 255;
-  men.forEach(([ox, oz], i) => {
-    const m = new THREE.Mesh(QUAD, mat);
-    /* a few percent of size variance, so a block of men stops reading as one
-       model pasted ten times */
-    const vary = 0.94 + (((hh + i * 61) % 100) / 100) * 0.12;
-    m.scale.set(art.w * vary, vary, 1);
-    m.position.set(ox * (form ? 1 : s), 0, oz * (form ? 1 : s));
-    m.renderOrder = -oz;                      // the back rank draws behind
-    if (en) m.scale.x *= -1;                  // the two armies look at each other
-    m.castShadow = true;
-    /* the shadow has to be cut out by the same alpha the sprite is, or every
-       figure throws a rectangle */
-    m.customDepthMaterial = new THREE.MeshDepthMaterial({
-      depthPacking: THREE.RGBADepthPacking, map: card ? null : mat.map, alphaTest: card ? 0 : 0.4 });
-    m.userData = { phase: i * 1.37, w: art.w * vary, h: vary };
-    bill.push(m);
-    g.add(m);
+/* the lines light under a figure being carried, as the felt does on the table */
+const glows = new THREE.Group(); scene.add(glows);
+function layGlows(g) {
+  glows.children.slice().forEach(o => { glows.remove(o); o.geometry.dispose(); o.material.dispose(); });
+  g.lines.forEach((l, i) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(BT().G.LW / CM - .3, g.bh / CM + .6), new THREE.MeshBasicMaterial({ color: C('#ffd25a'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(BT().lineX(g, i) / CM, .12, 0); m.renderOrder = 5; glows.add(m);
   });
-  g.userData.bill = bill;
-  g.scale.setScalar(G);
-  stand.scale.setScalar(1 / G);   // the stand is measured in world units
-  return g;
 }
-
-const AIM_GOLD = sRGB('#ffe066'), SEL_GOLD = sRGB(C.gold);
-/* ── the selection ring ── */
-const ringGeo = new THREE.RingGeometry(0.86, 1.06, 32);
-function selRing(hex, op){
-  const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
-    color:sRGB(hex), transparent:true, opacity:op, side:THREE.DoubleSide }));
-  m.rotation.x = -Math.PI/2; m.position.y = 0.06;
-  return m;
-}
-
-/* ── the army on the field ─────────────────────────────────────
-   Rebuilt from S.lines whenever the board changes. Figures are cheap and the
-   board is small; rebuilding is simpler than diffing and cannot drift. */
-const army = new THREE.Group(); scene.add(army);
-const pegs = [];            // {id, group, ring, phase, ent}
-let builtSig = '';
-
-function boardSig(){
-  return S.lines.map(l => l.key + ':' + l.ents.map(e =>
-    e.id + (e.col||0) + (e.hp||e.alive||0) + (e.acted?'x':'') + (e.fig||'') + (e.pic ? e.pic.length : 0)
-    ).join(',')).join('|')
-    + '#' + S.sel + '#' + S.width;
-}
-
-function buildArmy(){
-  army.clear(); pegs.length = 0;
-  const width = S.width, n = S.lines.length;
-  S.lines.forEach((l, i) => {
-    const z = (i - (n-1)/2) * ROW;
-    for (const e of l.ents){
-      const span = e.kind === 'unit' ? 1 : e.kind === 'large' ? 2 : (e.wide ? 3 : 2);
-      const col = (e.col == null ? 0 : e.col) + (span - 1) / 2;
-      const g = figure(e);
-      g.position.set((col - (width-1)/2) * COL, 0, z);   // the board is flat by construction
-      const ring = selRing(C.gold, 0);
-      ring.visible = false;
-      g.add(ring);
-      army.add(g);
-      let h = 0; for (let k=0;k<e.id.length;k++) h = (h*31 + e.id.charCodeAt(k)) & 1023;
-      pegs.push({ id:e.id, group:g, ring, phase:h/1023*6.283, ent:e });
-    }
+function stepGlows() {
+  const lanes = BV().laneMeshes ? BV().laneMeshes() : [];
+  glows.children.forEach((m, i) => {
+    const L = lanes[i], hex = L && L.material && L.material.emissive ? L.material.emissive.getHex() : 0;
+    m.material.opacity += ((hex ? .22 : 0) - m.material.opacity) * .3;
+    if (hex) m.material.color.copy(C(((hex >> 16) & 255) > 64 ? '#ff5a3c' : '#ffd25a'));
   });
 }
 
-/* ── the camera ────────────────────────────────────────────────
-   A game camera: behind and above your own back line, looking down the field
-   at the enemy. Low enough that you see your soldiers from the SIDE, which is
-   the entire point of dropping into this view. */
-/* a longer lens: 38 degrees is a phone camera and it was splaying the near
-   rank out toward the corners */
-const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 400);
-/* Framed so the WHOLE board is on screen at zoom 1 — eight lines is 27 units
-   of depth and the near rank was falling off the bottom edge, which is the one
-   thing a battle line view cannot do. */
-/* LOWER AND CLOSER than a diagram wants to be. The whole point of this view
-   is seeing the units as units from the side, and at nineteen units up the
-   figures were forty pixels tall and you were mostly looking at ground. This
-   is a shallower angle: ranks overlap each other a little, which is exactly
-   what a line of troops looks like from the field. */
-const CAM = { dist: 36, height: 14.2, look: -1.0, pan: 0, zoom: 1 };
-function placeCamera(k){
-  /* `k` is the arrival push: the field starts a fifth further out and settles
-     in as it fades up, which is what makes it read as arriving somewhere
-     rather than as a slide changing */
-  const z = CAM.zoom * (k == null ? 1 : k);
-  /* A NARROW VIEW STANDS FURTHER BACK. The framing was tuned for the whole
-     window; with the chat and a docked muster either side the field can be
-     half as wide as it is tall, and a battle line twelve wide ran off both
-     edges of it. Step back until the width fits again. */
-  const fit = Math.pow(Math.max(1, 1.6 / Math.max(0.45, camera.aspect || 1.6)), 0.72);
-  const d = CAM.dist * fit / z, h = CAM.height * Math.sqrt(fit) / Math.pow(z, 0.55);
-  /* and the haze moves back with it: a crypt's fog is short, and a camera
-     stood further off would otherwise be looking at nothing but fog */
-  if (scene.fog && fogBase) { const off = Math.max(0, d - CAM.dist);
-    scene.fog.near = fogBase[0] + off; scene.fog.far = fogBase[1] + off; }
-  camera.position.set(CAM.pan, h, d);
-  camera.lookAt(CAM.pan * 0.55, 1.1, CAM.look);
+/* ══ WHERE THE BOARD BECOMES THE MEADOW ═══════════════════════
+   As the felt goes into the grass (and comes back out of it on the way up), a drift of small warm lights rises off
+   where the lanes were: the change is something that happens, not a cut. A hundred points, moved on the CPU. */
+const SPK = (() => {
+  const n = 110, g = new THREE.BufferGeometry(), pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const c = mkc(64, 64), x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.3, 'rgba(255,240,200,.6)'); gr.addColorStop(1, 'rgba(255,230,180,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  const map = new THREE.CanvasTexture(c); map.encoding = THREE.sRGBEncoding;
+  const mat = new THREE.PointsMaterial({ map, size: 1.5, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.visible = false; pts.renderOrder = 60;
+  const p = []; for (let i = 0; i < n; i++) p.push({ x: 0, z: 0, d: 0, l: 1, v: 1, w: 0, k: 1 });
+  return { pts, p, t0: 0, on: false, fired: '' };
+})();
+scene.add(SPK.pts);
+function sparkFire(now, way) {
+  if (!GEO || (BV().ui && BV().ui.reduced && BV().ui.reduced())) return;
+  const hw = GEO.bw / CM / 2, hd = GEO.bh / CM / 2;
+  SPK.p.forEach(q => { q.x = (Math.random() * 2 - 1) * hw; q.z = (Math.random() * 2 - 1) * hd; q.d = Math.random() * .55; q.l = .9 + Math.random() * .9; q.v = 2.2 + Math.random() * 3.5; q.w = Math.random() * 6.28; q.k = .55 + Math.random() * .45; });
+  SPK.t0 = now; SPK.on = true; SPK.pts.visible = true; SPK.fired = way;
+}
+function sparkStep(now) {
+  if (!SPK.on) return;
+  const t = (now - SPK.t0) / 1000, P = SPK.pts.geometry.attributes.position, Cc = SPK.pts.geometry.attributes.color, warm = [2.6, 2.1, 1.2];   /* brighter than white: the glow takes them */
+  let live = false;
+  SPK.p.forEach((q, i) => {
+    const u = (t - q.d) / q.l;
+    if (u < 0 || u > 1) { P.setXYZ(i, 0, -999, 0); Cc.setXYZ(i, 0, 0, 0); if (u < 0) live = true; return; }
+    live = true;
+    const a = Math.sin(u * Math.PI) * q.k;
+    P.setXYZ(i, q.x + Math.sin(t * 2 + q.w) * .5 * u, .4 + q.v * (1 - Math.pow(1 - u, 2)), q.z + Math.cos(t * 1.7 + q.w) * .5 * u);
+    Cc.setXYZ(i, warm[0] * a, warm[1] * a, warm[2] * a);
+  });
+  P.needsUpdate = true; Cc.needsUpdate = true;
+  if (!live) { SPK.on = false; SPK.pts.visible = false; }
 }
 
-/* the part of the screen that is the table's — #vp, which stops at the chat
-   and starts after a docked panel — and where it is, for picking and names */
+/* ══ THE CAMERA ═══════════════════════════════════════════════
+   A pose is where the eye is, which way it looks, and its lens: f, the focal
+   length in pixels, and where on the view the middle of the lens falls. The table's
+   view of the board is one of these (it is a perspective too: CSS's), so the two can
+   be blended — that is the way in and out.
+
+   Standing in the field: the whole fight from a little above, the land and the sky
+   behind it; wheel in and you come down lower and closer, toward what you point at.
+   Drag and the ground goes with the pointer. Out past the whole fight, you rise back
+   into the table. The camera breathes a little, side to side, as a battle camera does. */
+const camera = new THREE.PerspectiveCamera(38, 1.5, .3, 9000);
+const CAM = { zoom: 1, pan: 0, look: 0 };
+const ZMAX = 4.2, ZOUT = .78, FOV = 50, PITCH0 = 17 * Math.PI / 180, PITCH1 = 6 * Math.PI / 180;
 const view = { x: 0, y: 0, w: 1, h: 1 };
-function size(){
-  const vp = document.getElementById('vp');
-  const r = vp && vp.getBoundingClientRect();
-  const ok = r && r.width > 10 && r.height > 10;
-  const W = ok ? Math.round(r.width) : innerWidth, H = ok ? Math.round(r.height) : innerHeight;
-  view.x = ok ? Math.round(r.left) : 0; view.y = ok ? Math.round(r.top) : 0; view.w = W; view.h = H;
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.setSize(W, H, false);
-  cv.style.left = view.x+'px'; cv.style.top = view.y+'px';
-  cv.style.width = W+'px'; cv.style.height = H+'px';
-  camera.aspect = W/H; camera.updateProjectionMatrix();
-}
-addEventListener('resize', size);
-size();
-
-/* ── names ─────────────────────────────────────────────────────
-   Text is never drawn in WebGL here for the same reason it is not drawn in the
-   piece layer: it has live values in it. Every figure gets a DOM label,
-   projected to its head each frame. Legible without selecting anything, which
-   has been the rule since the first day. */
-let nameLayer = null;
-function labels(){
-  if (nameLayer) return nameLayer;
-  nameLayer = document.createElement('div');
-  nameLayer.className = 'fnames';
-  document.body.appendChild(nameLayer);
-  return nameLayer;
-}
-const V = new THREE.Vector3();
-/* THE LABELS DE-OVERLAP, and this is not cosmetic. Every entity's name has to
-   be readable WITHOUT selecting it — that is a rule of this app — and six
-   units in a rank stand at the same depth, so their labels land on the same
-   screen row and pile into an unreadable wall. So: place them nearest-first
-   (depth order is the only honest tiebreak), and lift each one above whatever
-   is already there, dropping the number and finally the whole label if there
-   is genuinely nowhere left. A leader line runs back down to the head, so a
-   label that has been lifted three rows still points at its owner. */
-const LBL_H = 13, LBL_STEP = 14, LBL_LIFTS = 6;
-function drawLabels(){
-  const layer = labels();
-  while (layer.children.length > pegs.length) layer.lastChild.remove();
-  while (layer.children.length < pegs.length){
-    const d = document.createElement('div');
-    d.className = 'fname';
-    d.innerHTML = '<b></b><i></i>';
-    layer.appendChild(d);
-  }
-  const W = view.w, H = view.h;
-
-  /* project everything first, then place in depth order */
-  const want = [];
-  pegs.forEach((p, i) => {
-    const el = layer.children[i], e = p.ent;
-    V.set(0, e.kind === 'large' ? 2.5 : 2.1, 0).applyMatrix4(p.group.matrixWorld).project(camera);
-    const x = view.x + (V.x * 0.5 + 0.5) * W, y = view.y + (-V.y * 0.5 + 0.5) * H;
-    if (!(V.z < 1 && x > view.x - 80 && x < view.x + W + 80 && y > view.y - 40 && y < view.y + H + 40)){
-      el.style.display = 'none'; return;
-    }
-    want.push({ el, e, x, y, z: V.z });
-  });
-  want.sort((m, n) => m.z - n.z);                       // nearest gets its spot
-
-  const taken = [];
-  const hits = (x0, x1, y0) => taken.some(t =>
-    x1 > t.x0 - 3 && x0 < t.x1 + 3 && y0 > t.y0 - LBL_H && y0 < t.y1 + LBL_H);
-
-  for (const w of want){
-    const e = w.e, sel = e.id === S.sel, legal = aimSet && aimSet.has(e.id);
-    const hp = e.kind === 'form' ? e.alive + '/' + e.total : (e.hp|0) + '/' + (e.max|0);
-    const full = e.name.length * 5.1 + hp.length * 5.4 + 20;
-    const bare = e.name.length * 5.1 + 12;
-
-    /* the selected piece and anything currently a legal target always get a
-       place; they are what you are looking at */
-    let wide = full, crowd = false, lift = 0, ok = false;
-    for (let pass = 0; pass < 2 && !ok; pass++){
-      wide = pass ? bare : full; crowd = !!pass;
-      for (lift = 0; lift < LBL_LIFTS; lift++){
-        const y0 = w.y - lift * LBL_STEP;
-        if (!hits(w.x - wide/2, w.x + wide/2, y0)){ ok = true; break; }
-      }
-    }
-    if (!ok && !(sel || legal)){ w.el.style.display = 'none'; continue; }
-    if (!ok){ lift = 0; crowd = true; wide = bare; }     // the important ones barge in
-
-    const y0 = w.y - lift * LBL_STEP;
-    taken.push({ x0: w.x - wide/2, x1: w.x + wide/2, y0: y0 - LBL_H, y1: y0 });
-
-    const el = w.el;
-    el.style.display = 'block';
-    el.style.setProperty('--lead', (lift * LBL_STEP) + 'px');
-    el.style.transform = 'translate(' + Math.round(w.x) + 'px,' + Math.round(y0)
-                       + 'px) translate(-50%,-100%)';
-    el.style.zIndex = String(1000 - Math.round(w.z * 900));
-    el.className = 'fname ' + (e.side === 'en' ? 'en' : 'al')
-      + (sel ? ' sel' : '') + (e.acted ? ' done' : '') + (crowd ? ' crowd' : '')
-      + (aimSet ? (legal ? ' legal' : ' dim') : '');
-    if (el.firstChild.textContent !== e.name) el.firstChild.textContent = e.name;
-    if (el.lastChild.textContent !== hp) el.lastChild.textContent = hp;
-  }
-}
-
-
-/* ── picking ───────────────────────────────────────────────────
-   The figures ARE the board here, so hit testing is a raycast rather than a
-   DOM lookup. Everything else — what a click MEANS — is still app.js's. */
-const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
-function pick(cx, cy){
-  ptr.set(((cx - view.x)/view.w)*2 - 1, -((cy - view.y)/view.h)*2 + 1);
-  ray.setFromCamera(ptr, camera);
-  const hit = ray.intersectObjects(army.children, true)[0];
-  if (!hit) return null;
-  let o = hit.object;
-  while (o && o.parent !== army) o = o.parent;
-  const p = pegs.find(x => x.group === o);
-  return p ? p.id : null;
-}
-
-/* ── the loop ──────────────────────────────────────────────────
-   Only while the field is up. The table view has its own layer and its own
-   loop and neither knows about the other. */
-/* ── aiming ────────────────────────────────────────────────────
-   The HUD hands over the set of pieces a chosen ability may legally land on;
-   the field lights those and stands the rest down. Which target is legal is
-   the engine's answer, not this layer's — all it does is paint it. */
-let aimSet = null;
-function setAim(ids){ aimSet = ids ? new Set(ids) : null; }
-
-/* ══ DRESSING THE FIELD FOR WHERE THE FIGHT IS ═════════════════
-   Sky, fog, the three lights, how much the ground rolls, what it is painted
-   as, what stands round it and what falls from the sky — all from the
-   terrain's row. Done behind the cloud (setOn), once per terrain and board
-   shape, because a scatter is thousands of instances and the field is a
-   place: it does not change while you stand in it. */
-let fogBase = null;
-function dressFor(id, width, depth){
-  const f = fieldOf(id);
-  paintSky(f);
-  scene.fog.color.copy(sRGB(f.sky[2]));
-  fogBase = f.fog.slice();
-  scene.fog.near = f.fog[0]; scene.fog.far = f.fog[1];
-  hemi.color.copy(sRGB(f.skyLight)); hemi.groundColor.copy(sRGB(f.bounce));
-  /* a crypt is lit from within — a cold light from high up so the fight can
-     be read at all, and the torches (lightLamps) doing the rest */
-  hemi.intensity = f.indoor ? 0.62 : 0.86;
-  sun.color.copy(sRGB(f.sun)); sun.intensity = f.indoor ? 0.55 : 1.12;
-  rim.intensity = f.indoor ? 0.14 : 0.26;
-  renderer.toneMappingExposure = f.exposure || 1.06;
-  RELIEF_K = (f.indoor || f.scatter === 'courtyard') ? 0
-           : (f.scatter === 'desert' || f.scatter === 'snow') ? 0.7 : 1;
-  shapeGround();
-  const bw = width*COL/2 + COL*1.6, bd = depth*ROW/2 + ROW*1.1;
-  if (groundMat.map) groundMat.map.dispose();
-  groundMat.map = groundTexture(bw, bd, f);
-  groundMat.needsUpdate = true;
-  apron.material.color.copy(sRGB(f.ground[2]));
-  apron.visible = !f.indoor;
-  scatter(width, depth, f);
-  layMarks(S.lines, width);
-  if (f.clouds && !clouds.children.length) makeClouds();
-  clouds.visible = !!f.clouds;
-  setMotes(f.motes || null);
-  featSig = '';
-}
-
-/* ── WHAT FALLS FROM THE SKY ───────────────────────────────────
-   Snow on the snowfield, ash drifting over the waste, dust in the desert
-   wind, embers rising in a crypt, midges over the marsh. One cloud of
-   points, a soft dot each, moved on the CPU — there are a few hundred of
-   them, not a few hundred thousand. */
-const MOTES = {
-  snow:   { n: 900, size: 0.22, color: '#ffffff', add: false, fall: 1.6,  drift: 0.5, op: .85 },
-  ash:    { n: 420, size: 0.16, color: '#b8b0a4', add: false, fall: 0.35, drift: 0.8, op: .6 },
-  dust:   { n: 380, size: 0.12, color: '#e8d2a0', add: false, fall: 0.05, drift: 2.4, op: .5 },
-  embers: { n: 160, size: 0.14, color: '#ffae4a', add: true,  fall: -0.8, drift: 0.4, op: .9 },
-  flies:  { n: 120, size: 0.10, color: '#d8f080', add: true,  fall: 0,    drift: 0.6, op: .8 }
+const FIT = { dist: 100, fz: 0 };
+let LAY = null, GEO = null, idleT = 0;
+const camState = () => {
+  const z = clamp(CAM.zoom, .6, ZMAX), u = clamp(Math.log(Math.max(1, z)) / Math.log(ZMAX), 0, 1), e = smooth(u);
+  return { z, u, e, pitch: lerp(PITCH0, PITCH1, e), dist: FIT.dist / z, lift: lerp(2.6, 3.6, e), shift: lerp(.16, .04, e) };
 };
-let moteKind = null, motes = null;
-function dotTexture(){
-  const c = document.createElement('canvas'); c.width = c.height = 32;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(16, 16, 0, 16, 16, 16);
-  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.7)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = g; x.fillRect(0, 0, 32, 32);
-  return new THREE.CanvasTexture(c);
+const fOf = () => (view.h / 2) / Math.tan(FOV * Math.PI / 360);
+const Q = () => ({ pos: new THREE.Vector3(), quat: new THREE.Quaternion(), f: 1, px: 0, py: 0 });
+const LOOK = new THREE.Matrix4(), UPV = new THREE.Vector3(0, 1, 0), TGT = new THREE.Vector3();
+/* the pose standing in the field, from CAM (and the camera's breathing) */
+function battlePose(out, breathe) {
+  const s = camState();
+  const fx = CAM.pan, fz = FIT.fz + CAM.look, fy = s.lift;
+  const yaw = breathe ? Math.sin(idleT * .21) * .035 + Math.sin(idleT * .13 + 1) * .015 : 0;
+  const pitch = s.pitch + (breathe ? Math.sin(idleT * .17) * .006 : 0);
+  let ex = fx + Math.sin(yaw) * Math.cos(pitch) * s.dist, ez = fz + Math.cos(yaw) * Math.cos(pitch) * s.dist, ey = fy + Math.sin(pitch) * s.dist;
+  /* never into anything: the eye keeps above the ground */
+  ey = Math.max(ey, W.heightAt(ex, ez) + 1.6);
+  out.pos.set(ex, ey, ez);
+  LOOK.lookAt(out.pos, TGT.set(fx, fy, fz), UPV); out.quat.setFromRotationMatrix(LOOK);
+  out.f = fOf(); out.px = view.w / 2; out.py = view.h * (.5 + s.shift);
+  return out;
 }
-function setMotes(kind){
-  if (motes) { scene.remove(motes); motes.geometry.dispose(); motes = null; }
-  moteKind = kind && MOTES[kind] ? kind : null;
-  if (!moteKind) return;
-  const M = MOTES[moteKind];
-  const pos = new Float32Array(M.n * 3), vel = new Float32Array(M.n * 3);
-  let sd = 5150;
-  const rnd = () => (sd = (sd*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  for (let i = 0; i < M.n; i++){
-    pos[i*3] = (rnd() - .5) * 80; pos[i*3+1] = rnd() * 18; pos[i*3+2] = (rnd() - .5) * 70;
-    vel[i*3] = (rnd() - .5) * M.drift; vel[i*3+1] = -M.fall * (.6 + rnd() * .8); vel[i*3+2] = (rnd() - .5) * M.drift;
+/* the table's view of the board, in this world: 81 says how the table's camera sees the board (board units to its own
+   space, in window pixels); scaled out, that is a camera here. Null if the table is not showing it. */
+const M4 = new THREE.Matrix4(), S4 = new THREE.Matrix4(), M3 = new THREE.Matrix3(), SC = new THREE.Vector3();
+function tablePose(out) {
+  const tv = BV().tableView && BV().tableView(); if (!tv) return null;
+  M4.copy(tv.m).multiply(S4.makeScale(CM, CM, CM));
+  const det = M3.setFromMatrix4(M4).determinant(), s = Math.cbrt(Math.abs(det));
+  if (!(s > 0)) return null;
+  const e = M4.elements; for (let i = 0; i < 15; i++) if (i % 4 !== 3) e[i] /= s;
+  M4.invert().decompose(out.pos, out.quat, SC);
+  out.f = tv.f; out.px = tv.px - view.x; out.py = tv.py - view.y;
+  out.tilt = tv.tilt; out.yaw = tv.yaw;
+  return out;
+}
+/* between two poses: round the ground point each is looking at, so the fight stays in the picture all the way */
+const A1 = new THREE.Vector3(), A2 = new THREE.Vector3(), FW = new THREE.Vector3(), OF1 = new THREE.Vector3(), OF2 = new THREE.Vector3();
+function aimOf(p, out) {
+  FW.set(0, 0, -1).applyQuaternion(p.quat);
+  const d = FW.y < -.05 ? clamp(-p.pos.y / FW.y, 1, 400) : 80;
+  return out.copy(p.pos).addScaledVector(FW, d);
+}
+function blendPose(a, b, u, out) {
+  aimOf(a, A1); aimOf(b, A2);
+  OF1.copy(a.pos).sub(A1); OF2.copy(b.pos).sub(A2);
+  const d1 = OF1.length(), d2 = OF2.length();
+  const p1 = Math.asin(clamp(OF1.y / d1, -1, 1)), p2 = Math.asin(clamp(OF2.y / d2, -1, 1));
+  const y1 = Math.atan2(OF1.x, OF1.z); let y2 = Math.atan2(OF2.x, OF2.z);
+  if (y2 - y1 > Math.PI) y2 -= Math.PI * 2; if (y1 - y2 > Math.PI) y2 += Math.PI * 2;
+  const d = Math.exp(lerp(Math.log(d1), Math.log(d2), u)), pit = lerp(p1, p2, u), yw = lerp(y1, y2, u);
+  A1.lerp(A2, u);
+  out.pos.set(A1.x + Math.sin(yw) * Math.cos(pit) * d, A1.y + Math.sin(pit) * d, A1.z + Math.cos(yw) * Math.cos(pit) * d);
+  out.quat.copy(a.quat).slerp(b.quat, u);
+  out.f = Math.exp(lerp(Math.log(a.f), Math.log(b.f), u)); out.px = lerp(a.px, b.px, u); out.py = lerp(a.py, b.py, u);
+  return out;
+}
+/* put a pose on the camera: its place, and a lens with its middle wherever the pose says */
+function usePose(p) {
+  camera.position.copy(p.pos); camera.quaternion.copy(p.quat); camera.updateMatrixWorld(true);
+  const n = camera.near, fa = camera.far, w = view.w, h = view.h;
+  camera.projectionMatrix.set(2 * p.f / w, 0, 1 - 2 * p.px / w, 0, 0, 2 * p.f / h, 2 * p.py / h - 1, 0, 0, 0, -(fa + n) / (fa - n), -2 * fa * n / (fa - n), 0, 0, -1, 0);
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+}
+function fitCamera() {
+  if (!GEO) return;
+  const hw = GEO.bw / CM / 2 + 2, hd = GEO.bh / CM / 2;
+  const pts = [[-hw, 0, hd + 3], [hw, 0, hd + 3], [-hw, 9, -hd - 1], [hw, 9, -hd - 1], [0, 17, -hd - 5], [-hw, 0, -hd], [hw, 0, -hd]];
+  const V = new THREE.Vector3(), mx = .92, ylo = -.9, yhi = .42, p = Q();
+  const save = { zoom: CAM.zoom, pan: CAM.pan, look: CAM.look };
+  CAM.zoom = 1; CAM.pan = 0; CAM.look = 0;
+  const over = () => { usePose(battlePose(p, false)); let o = 0, lo = 9, hi = -9; pts.forEach(q => { V.set(q[0], q[1], q[2]).project(camera); o = Math.max(o, Math.abs(V.x) / mx, V.y > yhi ? V.y / yhi : 0, V.y < ylo ? V.y / ylo : 0); lo = Math.min(lo, V.y); hi = Math.max(hi, V.y); }); return { o, mid: (lo + hi) / 2 - (ylo + yhi) / 2 }; };
+  for (let k = 0; k < 4; k++) {
+    let lo = 20, hi = 900;
+    for (let i = 0; i < 30; i++) { FIT.dist = (lo + hi) / 2; if (over().o > 1) lo = FIT.dist; else hi = FIT.dist; }
+    FIT.dist = hi;
+    FIT.fz -= over().mid * FIT.dist * .3;
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  motes = new THREE.Points(geo, new THREE.PointsMaterial({
-    size: M.size, map: dotTexture(), color: sRGB(M.color), transparent: true, opacity: M.op,
-    depthWrite: false, sizeAttenuation: true,
-    blending: M.add ? THREE.AdditiveBlending : THREE.NormalBlending }));
-  motes.userData.vel = vel;
-  motes.frustumCulled = false;
-  scene.add(motes);
+  CAM.zoom = save.zoom; CAM.pan = save.pan; CAM.look = save.look;
 }
-function stepMotes(dt, t){
-  if (!motes) return;
-  const p = motes.geometry.attributes.position.array, v = motes.userData.vel;
-  const wob = moteKind === 'flies' ? 1.6 : moteKind === 'snow' ? 0.6 : 0.3;
-  for (let i = 0; i < p.length; i += 3){
-    p[i]   += (v[i]   + Math.sin(t * 1.3 + i) * wob) * dt;
-    p[i+1] += (v[i+1] + (moteKind === 'flies' ? Math.sin(t * 2 + i * .7) * .8 : 0)) * dt;
-    p[i+2] += (v[i+2] + Math.cos(t * 1.1 + i) * wob * .5) * dt;
-    if (p[i+1] < 0) p[i+1] += 18; else if (p[i+1] > 18) p[i+1] -= 18;
-    if (p[i] > 40) p[i] -= 80; else if (p[i] < -40) p[i] += 80;
-    if (p[i+2] > 35) p[i+2] -= 70; else if (p[i+2] < -35) p[i+2] += 70;
+function clampCam() {
+  CAM.zoom = clamp(CAM.zoom, ZOUT - .02, ZMAX);
+  if (!GEO) return;
+  const free = Math.max(0, 1 - 1 / Math.max(1, CAM.zoom)), hw = GEO.bw / CM / 2, hd = GEO.bh / CM / 2;
+  CAM.pan = clamp(CAM.pan, -(hw + 6) * free, (hw + 6) * free); CAM.look = clamp(CAM.look, -(hd + 8) * free, hd * free);
+}
+const RAY = new THREE.Raycaster(), NDC = new THREE.Vector2(), PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), HIT = new THREE.Vector3();
+function groundAt(sx, sy) {
+  NDC.set((sx - view.x) / view.w * 2 - 1, -((sy - view.y) / view.h) * 2 + 1);
+  RAY.setFromCamera(NDC, camera);
+  return RAY.ray.intersectPlane(PLANE, HIT) ? { x: HIT.x, z: HIT.z } : null;
+}
+const POSE = Q(), TMPP = Q(), FROM = Q(), TBL = Q();
+let mode = 'off', modeT0 = 0, grow = 1, lean = 0, growFrom = 0, hold = null, over = null;
+const DIVE = 1450, RISE = 1150;
+function zoomAt(n, sx, sy) {
+  if (mode === 'rise') { if (n > 0) setOn(true); return 'ok'; }
+  const want = CAM.zoom * Math.pow(1.12, n);
+  if (n < 0 && want < ZOUT && mode === 'in') return 'out';
+  const a = sx != null && mode === 'in' ? groundAt(sx, sy) : null;
+  CAM.zoom = clamp(want, ZOUT, ZMAX); clampCam();
+  if (a) { usePose(battlePose(TMPP, true)); const b = groundAt(sx, sy); if (b) { CAM.pan += a.x - b.x; CAM.look += a.z - b.z; clampCam(); } }
+  return 'ok';
+}
+function dragBy(st, dx, dy) {
+  if (mode !== 'in') return;
+  const s = camState(), wpp = s.dist / fOf();
+  CAM.pan = st.pan - dx * wpp; CAM.look = st.look - dy * wpp / Math.max(.3, Math.sin(s.pitch));
+  clampCam();
+}
+const PV = new THREE.Vector3();
+const proj = {
+  toScreen(x, y, z) {
+    PV.set(x / CM, y / CM, z / CM).applyMatrix4(camera.matrixWorldInverse);
+    if (PV.z > -camera.near) return null;
+    PV.applyMatrix4(camera.projectionMatrix);
+    return { x: view.x + (PV.x * .5 + .5) * view.w, y: view.y + (-PV.y * .5 + .5) * view.h };
+  },
+  boardAt(sx, sy) { const p = groundAt(sx, sy); return p ? { x: p.x * CM, z: p.z * CM } : null; },
+  eye() { return { x: camera.position.x * CM, y: camera.position.y * CM, z: camera.position.z * CM }; },
+  /* how far the figures still stand as they do on the table (tipped back to its camera): 1 at the handover, 0 in the field */
+  lean: () => lean
+};
+const PW = new THREE.Vector3();
+function onScreen(x, y, z) {
+  PW.set(x, y, z).applyMatrix4(camera.matrixWorldInverse); if (PW.z > -camera.near) return null;
+  PW.applyMatrix4(camera.projectionMatrix);
+  return { x: view.x + (PW.x * .5 + .5) * view.w, y: view.y + (-PW.y * .5 + .5) * view.h };
+}
+
+/* ══ HOW MUCH IT DRAWS ════════════════════════════════════════
+   As a game does: full quality to begin with, and if the machine cannot keep up, a little less smoothing of the
+   edges first, then a little less resolution, until it moves smoothly. Measured over a second and a half at a
+   time; it climbs back only when there is plenty of room, and never back to a level that has already failed. */
+const QL = [{ samples: 4, scale: 1 }, { samples: 4, scale: .9 }, { samples: 4, scale: .82 }, { samples: 2, scale: .8 }];
+const QUAL = { level: 0, floor: 0, t0: 0, n: 0, ms: 0, good: 0 };
+function qualityTick(now, dtMs) {
+  if (mode !== 'in' || dtMs > 250) { QUAL.t0 = 0; return; }
+  if (!QUAL.t0) { QUAL.t0 = now; QUAL.n = 0; QUAL.ms = 0; return; }
+  QUAL.n++; QUAL.ms += dtMs;
+  if (now - QUAL.t0 < 1500) return;
+  const avg = QUAL.ms / QUAL.n; QUAL.t0 = now; QUAL.n = 0; QUAL.ms = 0;
+  if (avg > 1000 / 36 && QUAL.level < QL.length - 1) { QUAL.floor = Math.max(QUAL.floor, QUAL.level + 1); QUAL.level++; QUAL.good = 0; size(); }
+  else if (avg < 1000 / 57 && QUAL.level > 0) { if (++QUAL.good >= 3 && QUAL.level - 1 >= QUAL.floor - 0) { QUAL.level--; QUAL.good = 0; size(); } }
+  else QUAL.good = 0;
+}
+
+/* ══ SIZE ═════════════════════════════════════════════════════ */
+function size() {
+  const vp = document.getElementById('vp'), rr = vp && vp.getBoundingClientRect(), ok = rr && rr.width > 10 && rr.height > 10;
+  view.x = ok ? Math.round(rr.left) : 0; view.y = ok ? Math.round(rr.top) : 0;
+  view.w = ok ? Math.round(rr.width) : window.innerWidth; view.h = ok ? Math.round(rr.height) : window.innerHeight;
+  const pr = PR(); renderer.setPixelRatio(pr); renderer.setSize(view.w, view.h, false);
+  Object.assign(cv.style, { left: view.x + 'px', top: view.y + 'px', width: view.w + 'px', height: view.h + 'px' });
+  const q = QL[QUAL.level], sc = q.scale;
+  const Wd = Math.max(4, Math.round(view.w * pr * sc)), Hd = Math.max(4, Math.round(view.h * pr * sc));
+  if (rt.scene.samples != null && rt.scene.samples !== q.samples) { rt.scene.samples = q.samples; rt.scene.dispose(); }
+  rt.scene.setSize(Wd, Hd); rt.bA.setSize(Wd >> 2, Hd >> 2); rt.bB.setSize(Wd >> 2, Hd >> 2);
+  camera.aspect = view.w / view.h;
+  finishMat.uniforms.uAspect.value = camera.aspect;
+  if (GEO) fitCamera();
+}
+window.addEventListener('resize', () => { if (mode !== 'off') size(); });
+if (window.ResizeObserver) { const vp = document.getElementById('vp'); if (vp) new ResizeObserver(() => { if (mode !== 'off') size(); }).observe(vp); }
+
+/* ══ MAKING THE PLACE FOR THIS FIGHT ══════════════════════════ */
+let dressed = '';
+/* dressGen builds the meadow a piece at a time (yielding between pieces); dress() runs it straight through. Only the
+   newest build counts: one started while another was half done makes the old one give up. */
+let buildTok = 0;
+function dress() { const it = dressGen(); let r; do { r = it.next(); } while (!r.done); return r.value; }
+function* dressGen() {
+  const s = BV().scene && BV().scene(), g = BV().geo && BV().geo();
+  if (!s || !g) return false;
+  const key = (forced != null ? forced : s.id) + ':' + g.bw + 'x' + g.bh;
+  GEO = g;
+  if (key === dressed) return true;
+  const tok = ++buildTok, it = W.buildGen(hashStr(String(forced != null ? forced : s.id || 'fight')), g.bw / CM, g.bh / CM);
+  let r;
+  while (!(r = it.next()).done) { yield; if (tok !== buildTok) return false; }
+  LAY = r.value; dressed = key; warmed = '';
+  /* the banner stands at the Line, behind the last of the fight */
+  const nEn = g.lines.filter(l => l.side === 'en').length, lx = (-g.bw / 2 + (g.n - nEn) * BT().G.LW) / CM;
+  banner.position.set(lx, W.heightAt(lx, -g.bh / CM / 2 - 4.5), -g.bh / CM / 2 - 4.5);
+  layGlows(g);
+  if (!orb && BV().rail && BV().rail.newOrb) { orb = BV().rail.newOrb(); orb.g.scale.setScalar(.75); stage.add(orb.g); }
+  fitCamera();
+  return true;
+}
+
+/* ══ GETTING READY BEFORE ANYONE ASKS ═══════════════════════
+   grumkata: "it's really laggy on load". Going in the first time used to build the whole meadow (three seconds, then
+   six tenths once the path was made quick) and then make every surface's shader on the card (another second) — in
+   the middle of the zoom. So as soon as a fight is on the table it is got ready while nobody is looking, a little at a
+   time in the moments the table is idle: the meadow built a piece at a time, every surface's shader made a few at a
+   time, then one picture drawn out of sight with the figures standing in it (their pictures, the shadows and the
+   finishing passes all sent to the card). Going in after that is only the zoom. */
+let warmed = '';
+function* prepare() {
+  if (mode !== 'off') return;
+  const d = dressGen(); let r;
+  while (!(r = d.next()).done) { yield; if (mode !== 'off') return; }
+  if (!r.value || warmed === dressed) return;
+  const key = dressed;
+  yield;
+  if (mode !== 'off' || key !== dressed) return;
+  size();
+  battlePose(POSE, false); usePose(POSE);
+  W.frame(0, 0, camera);
+  /* the meadow's surfaces, a few at a time: the rest are set aside for a moment, in the same breath */
+  const live = W.live, kids = live.children.slice();
+  for (let i = 0; i < kids.length; i += 3) {
+    if (mode !== 'off' || key !== dressed) { live.children = kids; return; }
+    live.children = kids.slice(i, i + 3);
+    try { renderer.compile(scene, camera); } finally { live.children = kids; }
+    yield;
   }
-  motes.geometry.attributes.position.needsUpdate = true;
+  if (mode !== 'off' || key !== dressed) return;
+  /* last, with the figures and the board standing in it: their surfaces made, then one picture drawn out of sight */
+  BV().warmIn(stage, () => { W.setGrow(1); renderer.compile(scene, camera); });
+  yield;
+  if (mode !== 'off' || key !== dressed) return;
+  BV().warmIn(stage, () => { W.setGrow(1); renderer.shadowMap.needsUpdate = true; render(1); });
+  warmed = key;
+}
+const idle = fn => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1200 }) : setTimeout(fn, 50));
+let prepIt = null;
+function preload() {
+  if (prepIt || mode !== 'off') return;
+  prepIt = prepare();
+  const step = () => {
+    if (!prepIt) return;
+    let r; try { r = prepIt.next(); } catch (e) { console.warn('[monarchy] getting the field ready:', e); r = { done: true }; }
+    if (r.done) { prepIt = null; return; }
+    idle(step);
+  };
+  idle(step);
 }
 
-/* ══ THE GROUND UNDER THE FIGHT ════════════════════════════════
-   The scene's features (21-table-content.js), stood up on their slots out
-   of the same packs the scenery is: a low wall or a row of stones for
-   cover, a boulder or a pillar that nobody stands in, rubble for rough
-   ground, a fire for a hazard, black water. Rebuilt when the features, the
-   width or the terrain change — not every frame. */
-const featGroup = new THREE.Group(); scene.add(featGroup);
-let featSig = '', fires = [];
-const featSigNow = () => (S.features || []).map(f => f.line + '@' + f.col + ':' + f.kind).join('|')
-  + '#' + S.width + '#' + terrainNow() + '#' + S.lines.map(l => l.key).join(',');
-
-function flameTexture(){
-  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(32, 96, 2, 32, 80, 60);
-  g.addColorStop(0, 'rgba(255,248,210,1)'); g.addColorStop(.25, 'rgba(255,200,90,.95)');
-  g.addColorStop(.55, 'rgba(240,110,30,.6)'); g.addColorStop(1, 'rgba(160,40,10,0)');
-  x.fillStyle = g;
-  x.beginPath(); x.moveTo(32, 6); x.quadraticCurveTo(62, 70, 50, 118); x.lineTo(14, 118);
-  x.quadraticCurveTo(2, 70, 32, 6); x.fill();
-  return new THREE.CanvasTexture(c);
+/* ══ WHAT IS DOM: THE WAY BACK, THE BANNER'S AND THE ORB'S HANDLES ══ */
+const veil = document.createElement('div'); veil.className = 'fld-veil'; document.body.appendChild(veil);
+const back = document.createElement('button'); back.className = 'fld-back'; back.type = 'button';
+back.title = 'Back to the table (Esc, or wheel out)';
+back.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back to the table</span>';
+back.addEventListener('click', () => { if (window.Table3D && window.Table3D.leaveField) window.Table3D.leaveField(true); else setOn(false); });
+document.body.appendChild(back);
+let turnHit = null, manaLbl = null, manaHit = null;
+function handles() {
+  if (turnHit) return;
+  const ov = BV().overlay();
+  turnHit = document.createElement('div'); turnHit.className = 'bt-hit bt-rbtn fld-turn';
+  turnHit.dataset.tip = 'The turn|Click for the next turn (Space).';
+  turnHit.addEventListener('click', () => BV().ui && BV().ui.turn && BV().ui.turn());
+  turnHit.addEventListener('pointerenter', () => { BAN.hot = 1; }); turnHit.addEventListener('pointerleave', () => { BAN.hot = 0; });
+  turnHit.addEventListener('wheel', ev => BV().wheelThrough(ev), { passive: false });
+  manaLbl = document.createElement('div'); manaLbl.className = 'bt-manav fld-manav'; manaLbl.innerHTML = '<b>0</b><i>Mana</i>';
+  manaLbl.addEventListener('click', () => BV().ui && BV().ui.editMana && BV().ui.editMana());
+  manaLbl.addEventListener('wheel', ev => BV().wheelThrough(ev), { passive: false });
+  manaHit = document.createElement('div'); manaHit.className = 'bt-hit fld-dish';
+  manaHit.dataset.tip = 'Mana in the air|Click, and type how much.';
+  manaHit.addEventListener('click', () => BV().ui && BV().ui.editMana && BV().ui.editMana());
+  manaHit.addEventListener('wheel', ev => BV().wheelThrough(ev), { passive: false });
+  [manaHit, manaLbl, turnHit].forEach(e => { e.style.display = 'none'; ov.appendChild(e); });
 }
-let FLAME = null;
+const box = (el, x, y, w, h, z) => { el.style.display = ''; el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)'; el.style.width = Math.round(w) + 'px'; el.style.height = Math.round(h) + 'px'; if (z != null) el.style.zIndex = z; };
+const hideHandles = () => [turnHit, manaHit, manaLbl].forEach(e => { if (e) e.style.display = 'none'; });
 
-function standProp(name, x, z, s, rot){
-  const { parts } = propParts(name);
-  parts.forEach(pt => {
-    const m = new THREE.Mesh(pt.geo, pt.mat);
-    m.position.set(x, 0, z); m.scale.setScalar(s); m.rotation.y = rot || 0;
-    m.castShadow = true; m.receiveShadow = true;
-    featGroup.add(m);
-  });
-  return parts.length > 0;
-}
-
-function buildFeatures(){
-  featGroup.clear(); fires = [];
-  const F = window.TableContent && TableContent.FEATURES;
-  if (!F || !S.features || !S.features.length) return;
-  const f = fieldOf(terrainNow());
-  const stone = f.indoor || f.scatter === 'courtyard';
-  const n = S.lines.length, width = S.width;
-  S.features.forEach(ft => {
-    const i = S.lines.findIndex(l => l.key === ft.line); if (i < 0) return;
-    const line = S.lines[i];
-    const x = (ft.col - (width - 1) / 2) * COL, z = (i - (n - 1) / 2) * ROW;
-    /* in front of the slot is toward the other side of the Line */
-    const front = line.side === 'en' ? 1 : -1;
-    if (ft.kind === 'cover'){
-      if (stone || f.scatter === 'forest') standProp('dun:barrier', x, z + front * 1.0, DS * 0.55, 0);
-      else if (f.scatter === 'desert') standProp('terra:drock2', x, z + front * 1.0, 1.4, 0.3);
-      else [-0.8, 0, 0.8].forEach((d, k) => standProp(k === 1 ? 'rock2' : 'rock', x + d, z + front * 1.0, 0.8 + (k % 2) * .25, k));
-    } else if (ft.kind === 'obstacle'){
-      if (f.indoor) standProp('dun:pillar', x, z, DS * 0.62, 0);
-      else if (f.scatter === 'courtyard') standProp('dun:pillar', x, z, DS * 0.5, 0);
-      else if (f.scatter === 'desert') standProp('terra:drock3', x, z, 2.6, 0.7);
-      else standProp('boulder', x, z, 2.4, 0.4);
-    } else if (ft.kind === 'rough'){
-      if (stone) standProp('dun:rubble_half', x, z, DS * 0.42, 0.5);
-      else {
-        const bits = f.scatter === 'desert' ? ['terra:pebR3', 'terra:pebS5'] : ['pebble', 'pebble2', 'rock'];
-        for (let k = 0; k < 6; k++) standProp(bits[k % bits.length], x + Math.cos(k * 2.1) * 0.9, z + Math.sin(k * 2.1) * 0.9, .35 + (k % 3) * .15, k);
-        if (f.scatter !== 'desert' && f.scatter !== 'snow') standProp('bush', x + .3, z - .4, 0.7, 0);
-      }
-    } else if (ft.kind === 'hazard'){
-      for (let k = 0; k < 7; k++) standProp('pebble', x + Math.cos(k * .9) * 0.7, z + Math.sin(k * .9) * 0.7, .32, k);
-      if (!FLAME) FLAME = flameTexture();
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FLAME, transparent: true,
-        depthWrite: false, blending: THREE.AdditiveBlending, fog: true }));
-      sp.position.set(x, 0.75, z); sp.scale.set(1.1, 1.7, 1);
-      featGroup.add(sp);
-      const L = new THREE.PointLight(sRGB('#ff9a40'), 1.2, 9, 1.8);
-      L.position.set(x, 1.2, z); featGroup.add(L);
-      fires.push({ sp, L, ph: fires.length * 2.3 });
-    } else if (ft.kind === 'water'){
-      const m = new THREE.Mesh(new THREE.CircleGeometry(1.25, 28),
-        new THREE.MeshPhongMaterial({ color: sRGB(f.indoor ? '#1f3a48' : '#2c5a7c'), shininess: 90,
-          specular: sRGB('#a8c8e0'), transparent: true, opacity: .86 }));
-      m.rotation.x = -Math.PI / 2; m.position.set(x, 0.035, z); m.scale.set(1, 0.8, 1);
-      m.receiveShadow = true;
-      featGroup.add(m);
-    }
-  });
-}
-function stepFires(t){
-  lampGroup.children.forEach(L => {
-    L.intensity = 1.8 + Math.sin(t * 9 + L.userData.phase) * .16 + Math.sin(t * 23 + L.userData.phase * 2) * .10;
-  });
-  fires.forEach(fr => {
-    const k = 1 + Math.sin(t * 11 + fr.ph) * .08 + Math.sin(t * 27 + fr.ph) * .05;
-    fr.sp.scale.set(1.1 * (2 - k), 1.7 * k, 1);
-    fr.L.intensity = 1.1 + (k - 1) * 3;
-  });
-}
-
-let on = false, t0 = 0, lastTs = 0, alive = false, fade = 0, scatterSig = '';
-/* Rendering the field costs a real frame. While the cloud is closing over it,
-   that frame is being taken from the one thing that has to stay smooth — so
-   the field stops drawing the instant a transition is asked for, not when the
-   cloud finally has the screen. Nobody can tell a frozen field from a live one
-   through a cloud; everybody can tell a stuttering cloud from a smooth one. */
-let paused = false;
-/* `on` is what the app asked for, and it flips the instant it is asked. The
-   renderer only follows once the cloud has the screen — otherwise the field
-   would come and go in plain sight and the cloud would arrive to cover
-   nothing. `drawnPing` is how the loop tells the cloud it may clear. */
-let drawnPing = null;
-
-/* ── coming and going ──────────────────────────────────────────
-   Snapping between the flat board and the field was jarring for a plain
-   reason: they are two different cameras looking at two different things, and
-   a hard cut between two cameras always reads as a glitch.
-
-   So it CROSS-FADES, and the field pushes in slightly as it arrives — the
-   board stays visible underneath until the field is solid enough to cover it,
-   and on the way out it reappears through the fade. The table is only actually
-   hidden once nothing of it can be seen, which also means the piece layer
-   keeps drawing for exactly as long as it is worth drawing. */
-function setOn(v){
-  if (v === on) return;
-  on = v;
-
-  /* THE CLOUD GOES FIRST AND THE SWAP HAPPENS INSIDE IT. Not for polish — for
-     honesty about what the machine is doing. Everything in here is expensive
-     enough to stall a frame, and a stalled frame during a cut is exactly what
-     a cut looks like. Behind full cover there is nothing to cross-fade and
-     nothing to get wrong: it is a hard cut, and a hard cut you cannot see is
-     the cleanest transition there is. */
-  paused = true;
-  sweep(v, release => {
-    if (on !== v){ release(); return; }
-    document.body.classList.toggle('field-on', v);
-    /* THE HUD FOLLOWS THE FIELD, and now it follows it LATE — the class it
-       gates on flips behind the cloud rather than the moment the field is
-       asked for, so nothing repaints it unless we say so. Left out, the combat
-       bar stayed on screen over the flat board after leaving. */
-    if (window.__hudRender) window.__hudRender();
-
-    if (!v){
-      alive = false; fade = 0;
-      cv.style.display = 'none';
-      if (nameLayer) nameLayer.style.display = 'none';
-      document.body.classList.remove('field-solid');
-      release();
-      return;
-    }
-
-    fade = 0; t0 = 0; lastTs = 0;
-    cv.style.display = 'block';
-    cv.style.opacity = '1';
-    builtSig = '';
-    /* THE FIELD IS A PLACE AND IT DOES NOT MOVE. Scattering nineteen thousand
-       instances was being redone on every single transition, for a landscape
-       that is identical every time. Built once, kept. */
-    /* the terrain is part of the layout: a fight moved from the meadow to
-       the crypt is a different place, dressed again behind the cloud */
-    size();
-    const layout = S.width + 'x' + S.lines.length + ':' + terrainNow();
-    if (layout !== scatterSig){ scatterSig = layout;
-      dressFor(terrainNow(), S.width, S.lines.length); }
-    placeCamera();
-    restamp();
-    if (nameLayer){ nameLayer.style.display = 'block'; nameLayer.style.opacity = '0'; }
-
-    /* clear the cloud on the first frame that actually has the field in it */
-    drawnPing = release;
-    paused = false;
-    if (!alive){ alive = true; requestAnimationFrame(frame); }
-    /* and clear it anyway if that frame never comes, rather than leaving
-       someone staring at a white screen because of a lost context */
-    setTimeout(() => { if (drawnPing === release){ drawnPing = null; release(); } }, 8000);
-  });
-}
-
-function frame(ts){
+/* ══ ONE FRAME ════════════════════════════════════════════════ */
+let alive = false, t0 = 0, lastTs = 0, solid = false;
+const WP = new THREE.Vector3(), KEYDIR = new THREE.Vector3(), FILLDIR = new THREE.Vector3(), FEET = [];
+function frame() {
   if (!alive) return;
   requestAnimationFrame(frame);
-  if (paused){ lastTs = 0; return; }
-  if (!t0) t0 = ts;
-  const t = (ts - t0) / 1000;
-  /* TIME-BASED, not per-frame. A fade measured in frames takes a quarter of a
-     second on a fast machine and four seconds on a slow one, which is the
-     wrong way round: the slower the machine, the longer you stare at a
-     half-faded screen. */
-  const dt = Math.min(0.25, lastTs ? (ts - lastTs) / 1000 : 0.016);
-  lastTs = ts;
+  const now = performance.now();
+  if (!t0) t0 = now;
+  const rawMs = lastTs ? now - lastTs : 16;
+  const t = (now - t0) / 1000, dt = Math.min(.1, lastTs ? (now - lastTs) / 1000 : .016); lastTs = now;
+  if (!hostOK) return;
+  dress();
+  qualityTick(now, rawMs);
+  const V = BV(), A = V.A, gm = BT().isGM();
+  idleT += dt * (V.drag && V.drag.active ? 0 : 1);
+  /* where the camera is: going in, standing in it, or going back up into the table */
+  let u = mode === 'dive' ? clamp((now - modeT0) / DIVE, 0, 1) : mode === 'rise' ? clamp((now - modeT0) / RISE, 0, 1) : 1;
+  if (hold != null && (mode === 'dive' || mode === 'rise')) u = Math.min(hold, .999);
+  battlePose(POSE, true);
+  if (mode === 'dive') {
+    const e = 1 - Math.pow(1 - u, 2.2);
+    blendPose(FROM, POSE, e, TMPP); usePose(TMPP);
+    grow = Math.max(growFrom, smooth(clamp(u / .78, 0, 1)));
+    lean = Math.min(lean, 1 - smooth(clamp(u / .42, 0, 1)));
+    if (u >= 1) { mode = 'in'; grow = 1; lean = 0; }
+  } else if (mode === 'rise') {
+    const tp = tablePose(TBL) ? TBL : FROM, e = 1 - Math.pow(1 - u, 2.2);
+    blendPose(FROM, tp, e, TMPP); usePose(TMPP);
+    grow = Math.min(growFrom, 1 - smooth(clamp(u / .9, 0, 1)));
+    lean = smooth(clamp((u - .45) / .55, 0, 1));
+  } else if (over) {
+    /* the harness's free camera: an eye and a point to look at */
+    POSE.pos.set(over[0], over[1], over[2]); LOOK.lookAt(POSE.pos, TGT.set(over[3], over[4], over[5]), UPV); POSE.quat.setFromRotationMatrix(LOOK); POSE.py = view.h / 2;
+    usePose(POSE);
+  } else {
+    const sk = (V.shakeNow || 0) / CM * 1.2;
+    if (sk) { POSE.pos.x += sk * (Math.random() - .5); POSE.pos.y += sk * (Math.random() - .5); }
+    usePose(POSE);
+  }
+  W.setGrow(grow);
+  const lit = smooth(clamp(grow * 1.4, 0, 1));
+  finishMat.uniforms.uLook.value = lit;
+  if (LAY && LAY.tod && LAY.tod.grade) finishMat.uniforms.uGrade.value.fromArray(LAY.tod.grade);
+  /* the table's light, fixed to the view as 81 fixes it, going out as the day comes up */
+  KEYDIR.set(-500, 900, 800).normalize().applyQuaternion(camera.quaternion); tableKey.position.copy(camera.position).addScaledVector(KEYDIR, 100); tableKey.target.position.copy(camera.position);
+  FILLDIR.set(700, 300, 400).normalize().applyQuaternion(camera.quaternion); tableFill.position.copy(camera.position).addScaledVector(FILLDIR, 100); tableFill.target.position.copy(camera.position);
+  tableHemi.position.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  tableKey.intensity = 1.25 * (1 - lit); tableFill.intensity = .4 * (1 - lit); tableHemi.intensity = 1 - lit;
 
-  /* NOT a cross-fade any more — the cut happened behind the cloud. This is
-     the settle: the camera easing the last of the way in and the names
-     arriving, over the moment the cloud is blowing past. */
-  /* against the CLOCK, not accumulated per-frame deltas. A frame-accumulated
-     settle is clamped by the same dt guard that stops a stalled tab from
-     jumping, so on a slow machine it stretches to several seconds — the wrong
-     way round, since the slow machine is the one you want it over with on. */
-  fade = Math.min(1, t / 0.85);
-  if (nameLayer) nameLayer.style.opacity = Math.max(0, (fade - 0.25) / 0.75).toFixed(3);
-  document.body.classList.toggle('field-solid', fade > 0.45);
-
-  const sig = boardSig();
-  if (sig !== builtSig){ builtSig = sig; buildArmy(); restamp(); }
-  const fsig = featSigNow();
-  if (fsig !== featSig){ featSig = fsig; buildFeatures(); restamp(); }
-  /* the GM changed the ground, or the width, while everyone is standing in
-     it: dress it again, here, rather than making them leave and come back */
-  const lay = S.width + 'x' + S.lines.length + ':' + terrainNow();
-  if (lay !== scatterSig){ scatterSig = lay; dressFor(terrainNow(), S.width, S.lines.length); restamp(); }
-
-  uTime.value = t;
-  driftClouds(dt);
-  stepMotes(dt, t);
-  stepFires(t);
-  const camAng = Math.atan2(camera.position.x, camera.position.z);
-  for (const p of pegs){
-    for (const m of (p.group.userData.bill || [])){
-      const w = t * 0.9 + p.phase + m.userData.phase;
-      m.rotation.y = camAng;
-      m.rotation.z = Math.sin(w) * 0.028;                  // sway
-      const br = Math.sin(w * 1.6) * 0.028;                // breathe, volume held
-      const sx = m.userData.w * (1 - br), sy = m.userData.h * (1 + br);
-      m.scale.set(m.scale.x < 0 ? -sx : sx, sy, 1);
-    }
-    const sel = p.id === S.sel;
-    const legal = aimSet && aimSet.has(p.id);
-    p.ring.visible = sel || !!legal;
-    if (legal){
-      p.ring.material.color.copy(AIM_GOLD);
-      p.ring.material.opacity = 0.55 + 0.35*Math.sin(t*4.2 + p.phase);
-      p.group.position.y = Math.abs(Math.sin(t*2.6 + p.phase)) * 0.10;
-    } else {
-      p.group.position.y = 0;
-      if (sel){ p.ring.material.color.copy(SEL_GOLD);
-                p.ring.material.opacity = 0.55 + 0.25*Math.sin(t*3.1); }
+  /* the board the table was showing, sinking into the grass as the meadow comes up round it */
+  const sink = smooth(clamp((grow - .12) / .35, 0, 1));
+  if (V.boardShow) V.boardShow(sink);
+  if (mode === 'dive' && sink > .03 && SPK.fired !== 'in') sparkFire(now, 'in');
+  if (mode === 'rise' && sink < .85 && SPK.fired !== 'out') sparkFire(now, 'out');
+  sparkStep(now);
+  /* the grass is pressed down where the figures stand */
+  if (W.setFeet && V.pcs) {
+    FEET.length = 0;
+    V.pcs.forEach(pv => { if (!pv.g || !pv.g.visible || pv.dragX != null) return; const rx = (pv.form ? pv.hw : pv.R) / CM * 1.05, rz = (pv.form ? Math.max(pv.hd, pv.R * .6) : pv.R) / CM * 1.05; FEET.push([pv.x / CM, pv.z / CM, Math.max(.8, rx), Math.max(.8, rz)]); });
+    W.setFeet(FEET);
+  }
+  V.fieldTick(now);
+  W.frame(t, dt, camera);
+  /* the turn */
+  const said = bannerText();
+  if (said !== BAN.said) { const first = BAN.said == null; BAN.said = said; if (first) { drawBanner(said); BAN.shown = said; } else BAN.flip = now; }
+  if (BAN.flip) {
+    const fu = (now - BAN.flip) / 700;
+    if (fu >= .5 && BAN.shown !== BAN.said) { drawBanner(BAN.said); BAN.shown = BAN.said; }
+    BAN.cloth.rotation.y = Math.sin(clamp(fu, 0, 1) * Math.PI) * Math.PI * (fu < .5 ? .5 : -.5) * (fu < .5 ? fu * 2 : (1 - fu) * 2);
+    if (fu >= 1) { BAN.flip = 0; BAN.cloth.rotation.y = 0; }
+  }
+  BAN.glow = lerp(BAN.glow, BAN.hot && gm ? 1 : 0, .2);
+  BAN.mat.emissive.setRGB(.42 + .45 * BAN.glow, .42 + .38 * BAN.glow, .42 + .1 * BAN.glow);
+  banner.scale.setScalar(Math.max(.001, smooth(clamp((grow - .25) / .5, 0, 1))));
+  /* the orb, over the allies' back */
+  const mana = A ? A.options.mana : 0;
+  if (orb && GEO) {
+    if (mana !== orbMana) { if (orbMana >= 0) orb.popAt = now; orbMana = mana; }
+    const G = BT().G, ox = -GEO.bw / 2 + G.LW * .5, oy = 240 + Math.sin(t * 1.1) * 8, oz = -GEO.bh / 2 - 40;
+    orb.g.position.set(ox, oy, oz); orb.g.visible = grow > .5;
+    const lv = orb.frame(now, mana);
+    orbLight.position.set(ox / CM, oy / CM, oz / CM); orbLight.intensity = (.2 + 1.6 * lv) * grow; orbLight.color.copy(orb.core.material.color);
+  }
+  stepGlows();
+  handles();
+  if (A && GEO && mode === 'in') {
+    BAN.cloth.updateMatrixWorld();
+    const corner = (cu, cvv) => { WP.set(cu * BAN.w / 2, -BAN.h * (cvv + 1) / 2, 0); BAN.cloth.localToWorld(WP); return onScreen(WP.x, WP.y, WP.z); };
+    const cs4 = [corner(-1, -1), corner(1, -1), corner(-1, .9), corner(1, .9)];
+    if (gm && cs4.every(Boolean)) { const xs = cs4.map(p => p.x), ys = cs4.map(p => p.y); box(turnHit, Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 6); }
+    else turnHit.style.display = 'none';
+    const o = orb ? onScreen(orb.g.position.x / CM, orb.g.position.y / CM, orb.g.position.z / CM) : null;
+    const o2 = orb ? onScreen(orb.g.position.x / CM + 3, orb.g.position.y / CM, orb.g.position.z / CM) : null;
+    if (o && o2) {
+      const w = clamp(Math.abs(o2.x - o.x) * 1.6, 40, 140);
+      if (gm) box(manaHit, o.x - w / 2, o.y - w / 2, w, w, 7); else manaHit.style.display = 'none';
+      const editing = V.rail && V.rail.input;
+      manaLbl.style.display = editing ? 'none' : '';
+      manaLbl.style.pointerEvents = gm ? '' : 'none';
+      if (manaLbl.firstChild.textContent !== String(mana)) manaLbl.firstChild.textContent = mana;
+      manaLbl.style.transform = 'translate(' + Math.round(o.x) + 'px,' + Math.round(o.y) + 'px) translate(-50%,-56%) scale(' + clamp(w / 90, .8, 1.4).toFixed(2) + ')';
+      manaLbl.style.zIndex = 8;
+      if (editing) editing.style.transform = 'translate(' + Math.round(o.x) + 'px,' + Math.round(o.y) + 'px) translate(-50%,-50%)';
+    } else { manaHit.style.display = 'none'; manaLbl.style.display = 'none'; }
+  } else hideHandles();
+  back.style.left = (view.x + 16) + 'px'; back.style.top = (view.y + view.h - 54) + 'px'; back.style.opacity = smooth(clamp((grow - .4) / .5, 0, 1)).toFixed(2);
+  /* the light's own camera follows where you look, so the shadows near you are sharp */
+  render(lit);
+  /* first frame drawn: let it show (the table's last picture of the board is still under it, the same picture) */
+  if (mode === 'dive' && cv.style.opacity !== '1') { cv.style.transition = 'opacity 160ms linear'; cv.style.opacity = '1'; }
+  if (mode === 'dive' && !solid && now - modeT0 > 220) { solid = true; document.body.classList.add('field-solid'); }
+  if (mode === 'rise' && u >= 1) handBack();
+}
+function render(lit) {
+  if ((shadowTick++ & 1) === 0 || mode !== 'in') renderer.shadowMap.needsUpdate = true;
+  renderer.setRenderTarget(rt.scene); renderer.clear(); renderer.render(scene, camera);
+  if (lit > .01) {
+    brightMat.uniforms.tIn.value = rt.scene.texture; pass(brightMat, rt.bA);
+    for (let i = 0; i < 2; i++) {
+      blurMat.uniforms.tIn.value = rt.bA.texture; blurMat.uniforms.uDir.value.set((1 + i) / rt.bA.width, 0); pass(blurMat, rt.bB);
+      blurMat.uniforms.tIn.value = rt.bB.texture; blurMat.uniforms.uDir.value.set(0, (1 + i) / rt.bA.height); pass(blurMat, rt.bA);
     }
   }
-  placeCamera(0.88 + 0.12 * fade);
-  renderer.render(scene, camera);
-  drawLabels();
-  /* the field is now genuinely on screen; the cloud may clear */
-  if (drawnPing){ const go = drawnPing; drawnPing = null; go(); }
+  const U = finishMat.uniforms;
+  U.tScene.value = rt.scene.texture; U.tBloom.value = rt.bA.texture;
+  pass(finishMat, null);
 }
 
-/* a window into the built scene, for the screenshot harnesses — they cannot
-   read pixels back out of a WebGL canvas, so counting what is actually in
-   there is the only way to tell "it did not render" from "it was never
-   built" */
-window.__peek = () => {
-  const out = [];
-  scene.traverse(o => { if (o.isInstancedMesh)
-    out.push({ n: o.count, tri: o.geometry.index ? o.geometry.index.count/3 : 0,
-               vis: o.visible, mat: o.material.type,
-               y: +(o.instanceMatrix.array[13] || 0).toFixed(2) }); });
-  return { inst: out.length, grass: out.filter(o => o.tri === 18),
-           total: out.reduce((a, o) => a + o.n, 0) };
-};
-return (F = { on: () => on, set: setOn, pick, aim: setAim, cam: CAM, place: placeCamera,
-  /* the two things that move on their own, exposed so a test can watch them
-     without trying to read pixels back out of a WebGL canvas */
-  clock: () => ({ wind: uTime.value, cloud: clouds.children.length
-                    ? clouds.children[0].position.x : 0, fade }) });
+/* ══ GOING IN, AND COMING BACK OUT ════════════════════════════ */
+let hostOK = false, fadeT = 0;
+const reduced = () => !!(BV() && BV().ui && BV().ui.reduced && BV().ui.reduced());
+function setOn(v) {
+  v = !!v;
+  if (v) {
+    if (mode === 'dive' || mode === 'in') return;
+    if (!(BV() && BV().isUp && BV().isUp())) return;
+    enter();
+  } else {
+    if (mode === 'off' || mode === 'rise') return;
+    rise();
+  }
 }
+function enter() {
+  clearTimeout(fadeT);
+  size();
+  const was = mode;
+  if (was === 'off') {
+    /* where you were pointing on the board is where you come down */
+    const vr = view, aim = BV().boardAt(lastPtr ? lastPtr.x : vr.x + vr.w / 2, lastPtr ? lastPtr.y : vr.y + vr.h / 2);
+    if (!dress()) return;
+    const from = tablePose(FROM);
+    hostOK = BV().hostIn(stage);
+    if (!hostOK) return;
+    CAM.zoom = 1.2; CAM.pan = 0; CAM.look = 0;
+    if (aim) { const hw = GEO.bw / CM / 2, hd = GEO.bh / CM / 2; CAM.pan = clamp(aim.x / CM, -hw, hw) * .4; CAM.look = clamp(aim.z / CM, -hd, hd) * .3; }
+    clampCam();
+    if (!from) { battlePose(FROM, false); FROM.pos.y += 40; }
+    grow = 0; growFrom = 0; lean = 1;
+    cv.style.transition = 'none'; cv.style.opacity = '0'; cv.style.display = 'block';
+  } else {
+    /* turned round on the way back up: go back down from wherever the camera is */
+    FROM.pos.copy(camera.position); FROM.quat.copy(camera.quaternion); FROM.f = TMPP.f; FROM.px = TMPP.px; FROM.py = TMPP.py;
+    growFrom = grow;
+  }
+  mode = reduced() ? 'in' : 'dive'; modeT0 = performance.now(); QUAL.floor = 0;
+  if (mode === 'in') { grow = 1; lean = 0; cv.style.opacity = '1'; }
+  solid = mode === 'in';
+  document.body.classList.add('field-on'); if (solid) document.body.classList.add('field-solid');
+  if (window.__hudRender) window.__hudRender();
+  t0 = t0 || 0; lastTs = 0;
+  if (!alive) { alive = true; requestAnimationFrame(frame); }
+}
+function rise() {
+  /* from wherever the camera is now, up into the table's view (23-table3d.js has put the table there, close over the
+     board, under this canvas) */
+  FROM.pos.copy(camera.position); FROM.quat.copy(camera.quaternion);
+  const cur = mode === 'dive' ? TMPP : POSE; FROM.f = cur.f; FROM.px = cur.px; FROM.py = cur.py;
+  growFrom = grow;
+  mode = 'rise'; modeT0 = performance.now();
+  hideHandles(); BAN.hot = 0;
+  document.body.classList.remove('field-solid'); solid = false;
+  if (reduced()) handBack();
+}
+/* the board goes back to the table: the last picture stays up over it for a moment, fading, and it is the same picture */
+function handBack() {
+  mode = 'off'; alive = false;
+  BV().hostOut(); hostOK = false;
+  document.body.classList.remove('field-on', 'field-solid');
+  if (window.__hudRender) window.__hudRender();
+  hideHandles();
+  cv.style.transition = 'opacity 220ms linear'; cv.style.opacity = '0';
+  fadeT = setTimeout(() => { if (mode === 'off') cv.style.display = 'none'; }, 260);
+  if (onOut) { const f = onOut; onOut = null; f(); }
+}
+let onOut = null, lastPtr = null;
+window.addEventListener('wheel', e => { lastPtr = { x: e.clientX, y: e.clientY }; }, { passive: true, capture: true });
 
-/* the handle the rest of the app holds. Asking whether the field is up, or
-   putting it away, must never be the thing that builds it. */
+return (F = { on: () => mode === 'dive' || mode === 'in' || mode === 'rise', set: (v, done) => { if (!v && done) onOut = done; setOn(v); }, preload, ready: () => !!warmed && warmed === dressed,
+  cam: CAM, place: () => { clampCam(); }, zoomAt, dragBy, proj,
+  live: () => hostOK,
+  clock: () => ({ t: W.uniforms.uT.value, fade: hostOK ? 1 : 0 }),
+  /* for the harness: what this fight's meadow is, and what the camera sees */
+  peek: () => ({ mode, grow, lean, quality: QUAL.level, zoom: CAM.zoom, pan: CAM.pan, look: CAM.look, fit: FIT.dist, eye: camera.position.toArray().map(v => +v.toFixed(2)),
+                 tod: LAY && LAY.tod && LAY.tod.el, ruin: LAY && LAY.ruinSide, ruinAt: LAY && LAY.ruin, crag: LAY && LAY.crag, fence: LAY && LAY.fence, bridge: LAY && LAY.bridge, sign: LAY && LAY.sign, log: LAY && LAY.log && { x: LAY.log.x, z: LAY.log.z }, grass: LAY && LAY.grassN, far: LAY && LAY.farN, lite: LAY && LAY.liteN, gl2: isGL2, half: TYPE === THREE.HalfFloatType }),
+  knobs: { scene, world: W, finish: finishMat.uniforms, camera, CAM, banner, renderer, rt, render, cv, SPK, fire: () => sparkFire(performance.now(), 'x'), stage, usePose, battlePose, POSE, hold: v => { hold = v; }, quality: l => { if (l == null) return QUAL.level; QUAL.level = l; QUAL.floor = 99; size(); }, over: v => { over = v || null; }, redress: id => { dressed = ''; if (id != null) forced = id; } } });
+}
+let forced = null;
+
+/* the handle the rest of the app holds. Asking whether the field is up, or putting it away, never builds it. */
+/* a fight on the table: get its field ready, a moment after the table has settled (not under an automated browser —
+   the test runs draw in software, where this is seconds of work nobody asked for; the harness calls it with force) */
+let preT = 0;
 window.__field = {
-  on:    () => !!F && F.on(),
-  set:   v => { if (!v && !F) return; boot().set(v); },
-  pick:  (x, y) => (F ? F.pick(x, y) : null),
-  aim:   ids => { if (F) F.aim(ids); },
+  preload: force => {
+    if (!force && navigator.webdriver) return;
+    clearTimeout(preT); preT = setTimeout(() => boot().preload(), force ? 0 : 1500);
+  },
+  ready: () => !!F && F.ready(),
+  on: () => !!F && F.on(),
+  set: (v, done) => { if (!v && !F) { if (done) done(); return; } boot().set(v, done); },
+  pick: () => null,                               /* the figures are picked by their own hit areas, as on the table */
+  aim: () => {},
   place: () => { if (F) F.place(); },
+  zoomAt: (n, x, y) => (F ? F.zoomAt(n, x, y) : 'ok'),
+  dragBy: (st, dx, dy) => { if (F) F.dragBy(st, dx, dy); },
   clock: () => (F ? F.clock() : null),
-  get cam(){ return boot().cam; },
+  peek: () => (F ? F.peek() : null),
+  knobs: () => (F ? F.knobs : null),
+  get proj() { return F && F.live() ? F.proj : null; },
+  get cam() { return boot().cam; }
 };
 })();

@@ -312,7 +312,7 @@ const NATURAL = {
      landscape box because the drawing was a little picture of a battlefield;
      it is the battlefield sheet now, and that is tall. Squeezing a 1180x1426
      sheet into a 160x120 box is how you get a preview that is cut off. */
-  'scene:combat': [PVBOX, Math.round(PVBOX * 1426 / 1180)],
+  'scene:combat': [PVBOX, Math.round(PVBOX * 1494 / 1280)],
   'scene:exploration': [PVBOX, Math.round(PVBOX * 800 / 1180)],
   'scene:stage': [PVBOX, Math.round(PVBOX * 740 / 1180)]
 };

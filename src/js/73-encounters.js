@@ -10,7 +10,7 @@
    setting up while everybody waits — and a prepared ambush is prepared
    because it should arrive all at once.
 
-   So a fight on the table can be KEPT (the muster's Save as prepared) and
+   So a fight on the table can be KEPT (the tray's Fights tab, +) and
    brought back in one move — out of the toolbox's Scenes, where every
    prepared fight is a tile — landing already dressed and already manned,
    so a good one can be run again another night. (There used to be a WAR
@@ -23,7 +23,6 @@
      { id, name, width, terrain,
        lines:    the scene's own lines, empty         (21-table-content.js)
        units:    [{ line, col, ...a counter's spec }] (43-tokens.js make)
-       features: [{ line, col, kind }]
        notes }
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
@@ -54,7 +53,7 @@ function blank(name) {
   return { id: uid(), name: name || 'A new fight', width: 8, terrain: 'meadow',
            lines: C().blankLines().map(l => ({ key: l.key, side: l.side, label: l.label,
                                                 depth: l.depth, front: !!l.front })),
-           units: [], features: [], notes: '', made: Date.now(), changed: Date.now() };
+           units: [], notes: '', made: Date.now(), changed: Date.now() };
 }
 /* cleaned on the way in: a hand-edited or older copy still opens */
 function clean(e) {
@@ -64,7 +63,7 @@ function clean(e) {
   out.terrain = C().terrainOf(out.terrain);
   if (!Array.isArray(out.lines) || !out.lines.length) out.lines = b.lines;
   out.units = (Array.isArray(out.units) ? out.units : []).filter(u => u && out.lines.some(l => l.key === u.line));
-  out.features = C().coerceFeatures(out.features, out.lines);
+  delete out.features;                    /* the ground's marks are gone (cover, water...): older copies still open */
   return out;
 }
 function save(e) {
@@ -75,6 +74,13 @@ function save(e) {
   persist();
   if (root.Hand) root.Hand.refresh();
   return c;
+}
+function rename(id, name) {
+  const e = get(id), n = String(name || '').trim().slice(0, 40);
+  if (!e || !n) return false;
+  e.name = n; e.changed = Date.now(); persist();
+  if (root.Hand) root.Hand.refresh();
+  return true;
 }
 function remove(id) {
   const i = all().findIndex(x => x.id === id);
@@ -109,22 +115,22 @@ function keepInPreset(t) {
 }
 function unitOf(t, line, col) {
   const e = t.ent || {};
-  return { line, col, name: t.name, side: e.side, entKind: e.kind || 'unit',
+  const u = { line, col, name: t.name, side: e.side, entKind: e.kind || 'unit',
            hpMax: e.max, bodies: e.total, hpea: e.hpea, dmg: e.dmg, skl: e.skl,
-           def: e.def, lead: e.lead, look: t.look || 'standee',
+           def: e.def, lead: e.lead, leadership: e.leadership, look: t.look || 'standee',
            fig: t.fig || '', src: t.src || '', art: t.art || '', info: t.info || '' };
+  ['sta', 'str', 'av', 'move'].forEach(k => { if (e[k] != null) u[k] = e[k]; });
+  if ((e.cond || []).length) u.cond = e.cond.map(c => ({ n: c.n, c: c.c }));
+  return u;
 }
-function fromScene(s) {
+function fromScene(s, name) {
   if (!s || s.kind !== 'scene' || s.scene !== 'combat') return null;
-  const e = blank(s.name && s.name !== 'Combat' ? s.name : 'A fight kept ' + new Date().toLocaleDateString());
+  const e = blank(name || (s.name && s.name !== 'Combat' ? s.name : 'A fight kept ' + new Date().toLocaleDateString()));
   e.width = s.setup.width; e.terrain = s.setup.terrain;
-  e.lines = (s.lines || C().blankLines()).map(l => ({ key: l.key, side: l.side, label: l.label,
-                                                      depth: l.depth, front: !!l.front }));
-  e.features = (s.features || []).map(f => Object.assign({}, f));
-  (s.lines || []).forEach(l => (l.ents || []).forEach(en => {
-    const t = T().get(en.id);
-    if (t && keepInPreset(t)) e.units.push(unitOf(t, l.key, en.col == null ? 0 : en.col));
-  }));
+  const A = root.Battle.arrange(s);
+  e.lines = A.g.lines.map(l => ({ key: l.key, side: l.side, label: l.label, depth: l.depth, front: !!l.front }));
+  /* who stands where, in the order they stand (the place in the line is its index) */
+  A.rows.forEach(row => row.pieces.forEach((t, i) => { if (keepInPreset(t)) e.units.push(unitOf(t, row.line.key, i)); }));
   return save(e);
 }
 
@@ -147,17 +153,22 @@ function toTable(id, opts) {
                    name: (opts.name || e.name || 'Combat').slice(0, 40),
                    x: Math.round((T().TW - sz.w) / 2), y: Math.round((T().TH - sz.h) / 2),
                    w: sz.w, h: sz.h, locked: true });
-    sc.lines = e.lines.map(l => Object.assign({}, l, { ents: [] }));
-    sc.features = C().coerceFeatures(e.features, sc.lines);
+    sc.lines = e.lines.map(l => Object.assign({}, l));
     (e.units || []).forEach(u => {
       if (!root.Tokens) return;
       const t = root.Tokens.make({
         source: u.entKind === 'form' ? 'form' : 'npc', name: u.name, side: u.side,
         entKind: u.entKind, hp: u.hpMax, max: u.hpMax, bodies: u.bodies, hpea: u.hpea,
-        dmg: u.dmg, skl: u.skl, def: u.def, lead: u.lead, look: u.look, fig: u.fig,
-        src: u.src, art: u.art, info: u.info, x: 0, y: 0 });
+        dmg: u.dmg, skl: u.skl, def: u.def, lead: u.lead, leadership: u.leadership, look: u.look, fig: u.fig,
+        src: u.src, art: u.art, info: u.info, sta: u.sta, str: u.str, av: u.av, move: u.move, x: 0, y: 0 });
       t.in = sc.id; t.lineKey = u.line;
-      if (t.ent) { t.ent.col = u.col; const l = sc.lines.find(x => x.key === u.line); if (l) t.ent.side = l.side; }
+      if (t.ent) {
+        const l = sc.lines.find(x => x.key === u.line);
+        const ent = Object.assign({}, t.ent); delete ent.q; delete ent.f; delete ent.col;
+        ent.ord = u.col == null ? 0 : u.col; ent.done = false; if (u.side) ent.side = u.side === 'en' ? 'en' : 'al';
+        if (Array.isArray(u.cond) && u.cond.length) ent.cond = u.cond.map(c => ({ n: c.n, c: c.c }));
+        t.ent = ent;
+      }
     });
     T().activate(sc.id);
   } finally { T().end(); }
@@ -169,17 +180,11 @@ function toTable(id, opts) {
 
 function say(t) { if (root.Inspector) root.Inspector.said(t); }
 
-/* THE MUSTER FIRST, THEN THE CAMERA. Opening the muster narrows the table's
-   view (14-war.css), so framing the fight before it opened framed it for a
-   view that no longer existed — small, and off to one side. */
+/* the camera goes to the board, at the angle a fight is looked at from */
 function frameFight() {
-  if (root.Muster) root.Muster.open();
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const el = doc.getElementById('combat-prop');
-    if (el && el.style.display !== 'none' && root.Table3D) root.Table3D.frame(el);
-  }));
+  if (root.BattleView) root.BattleView.frameSoon();
 }
 
-root.Encounters = { list, get, save, remove, blank, fromScene, toTable, keepInPreset, KEY };
+root.Encounters = { list, get, save, remove, rename, blank, fromScene, toTable, keepInPreset, KEY };
 
 })(window, document);

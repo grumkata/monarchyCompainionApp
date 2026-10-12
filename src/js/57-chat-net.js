@@ -78,6 +78,8 @@ function draw(list) {
         d.className = 'cl said' + (m.role === 'gm' ? ' gm' : '');
         d.innerHTML = '<b>' + esc(m.who) + '</b><span class="stxt">'
                     + esc(m.text) + '</span>';
+        /* a Tenor link in the words, or a picture on the line (78-chat-media.js) */
+        if (root.ChatMedia) root.ChatMedia.decorate(d, m.text, m.img);
       }
       cb.appendChild(d);
       /* AN EVENING IS THOUSANDS OF LINES and the dock kept every one, each a

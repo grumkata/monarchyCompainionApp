@@ -138,7 +138,7 @@ function resilience(r){
   return best && best.v ? best.v : 0;
 }
 function derived(r){
-  const F = +r.attr.for||0, W = +r.attr.wil||0;
+  const at = r.attr || {}, F = +at.for||0, W = +at.wil||0;
   return { hp: Math.ceil(F * av(r) + resilience(r)),
            st: Math.ceil((F + W) / 2) + 4,
            str: W * 2, av: av(r), res: resilience(r) };

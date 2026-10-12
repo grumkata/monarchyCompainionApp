@@ -159,6 +159,8 @@ function talk(text){
   d.innerHTML = emote
     ? `<span class="stxt"><b>${esc(speaker())}</b> ${esc(body)}</span>`
     : `<b>${esc(speaker())}</b><span class="stxt">${esc(body)}</span>`;
+  /* a Tenor link in the words shows its GIF (78-chat-media.js) */
+  if (!emote && window.ChatMedia) window.ChatMedia.decorate(d, body);
   cb.appendChild(d); cb.scrollTop = cb.scrollHeight;
   return true;
 }
@@ -224,7 +226,7 @@ function hookChat(){
   const inp = document.getElementById('chat-in');
   const go  = document.getElementById('chat-go');
   if (!inp) return;
-  inp.placeholder = 'Say something, or roll  ·  /r 3 4d6';
+  inp.placeholder = 'Talk, or /r 3 4d6';              /* one line: this is a box that grows, and a placeholder that wraps would open it */
   inp.maxLength = 400;                                   /* a line, not a document */
   let last = 0;
   const send = () => {
@@ -257,10 +259,17 @@ function hookChat(){
     inp.value = '';
     return false;
   };
+  /* THE BOX IS A TEXTAREA NOW, so that it can grow (12-combat.css). Enter still sends and
+     is never a new line — a chat line is one line, however many it wraps over — and what
+     is pasted in over several lines goes in as one. */
   inp.addEventListener('keydown', ev => {
-    if (ev.key !== 'Enter') return;
-    if (!send()){ ev.stopPropagation(); ev.preventDefault(); }
+    if (ev.key !== 'Enter' || ev.isComposing) return;
+    ev.preventDefault();
+    if (!send()) ev.stopPropagation();
   }, true);
+  inp.addEventListener('input', () => {
+    if (/[\r\n]/.test(inp.value)) inp.value = inp.value.replace(/\s*[\r\n]+\s*/g, ' ');
+  });
   go.addEventListener('click', ev => {
     if (!send()){ ev.stopPropagation(); ev.preventDefault(); }
   }, true);

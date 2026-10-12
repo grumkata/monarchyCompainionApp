@@ -102,7 +102,6 @@ function fieldsFor(o, v, locked) {
   ];
   if (k === 'scene:combat') return [
     { f: 'name', type: 'text', label: 'Name', max: 40, ph: 'Combat' },
-    { f: 'terrain', type: 'terrain', label: 'Terrain' },
     { f: 'width', type: 'number', label: 'Battlefield width', min: 3, max: 14,
       hint: 'Slots across. A skirmish is about 5, a pitched battle 12.' }
   ];

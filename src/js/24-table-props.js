@@ -52,7 +52,7 @@ function mount() {
    for them detached the very element the pointer was pressing on — `raise`
    fires on pointerdown, so grabbing anything threw InvalidStateError from
    setPointerCapture and no prop could be dragged at all. */
-const CHEAP = { raise: 1, move: 1, scale: 1, select: 1 };
+const CHEAP = { raise: 1, move: 1, scale: 1, select: 1, combat: 1 };   /* combat: a wound, a token, the round (80-battle.js) */
 
 function paint(state, why) {
   /* whatever changed, the models drawn over these props have to follow */
@@ -115,8 +115,8 @@ function repaint() {
      because exploration and stage have no interior yet and saying so plainly
      beats drawing a convincing-looking box that does nothing. */
   const live = T().activeScene();
-  if (live && live.scene === 'combat' && root.CombatScene) root.CombatScene.show(live);
-  else if (root.CombatScene) root.CombatScene.hide();
+  if (live && live.scene === 'combat' && root.BattleView) root.BattleView.show(live);
+  else if (root.BattleView) root.BattleView.hide();
 
   st.things.slice().sort((a, b) => a.z - b.z).forEach(t => {
     if (t.id === (live && live.id) && t.scene === 'combat') return;
@@ -473,32 +473,19 @@ function dropped(el, ev) {
      Checked before the generic scene test — a line is inside a scene, so the
      coarser answer would win and the token would land nowhere in particular. */
   if (t.kind === 'token') {
-    const line = lineUnder(ev);
     const live = T().activeScene();
-    if (line && live && live.scene === 'combat' && root.Tokens) {
-      /* and WHERE along it: the column under the pointer, the same way the
-         sheet's own drag reads it (32-combat-app.js dropCol) */
-      const lineEl = doc.querySelector(`#field .line[data-line="${line}"]`);
-      const at = (lineEl && typeof dropCol === 'function') ? dropCol(lineEl, ev.clientX) : null;
-      root.Tokens.toLine(id, live.id, line, at);
-      return;
+    if (live && live.scene === 'combat' && root.Battle && root.BattleView && root.BattleView.isUp()) {
+      /* and WHERE along it: the line and the place in it that the pointer is over */
+      const at = root.BattleView.dropAt(ev.clientX, ev.clientY);
+      if (at && root.Battle.bring(id, at.line, at.index).ok) return;
     }
-    if (t.in && root.Tokens) root.Tokens.toWood(id, x, y);
+    if (t.in && root.Battle) root.Battle.release(id, x, y);
   }
 
   if (t.kind !== 'scene') {
     const over = sceneUnder(ev, id);
     T().homeTo(id, over ? over.id : null);
   }
-}
-
-/* which rank the pointer is over, if any */
-function lineUnder(ev) {
-  for (const el of doc.elementsFromPoint(ev.clientX, ev.clientY)) {
-    const l = el.closest && el.closest('#field .line');
-    if (l && l.dataset.line) return l.dataset.line;
-  }
-  return null;
 }
 
 function overBox(ev) {
