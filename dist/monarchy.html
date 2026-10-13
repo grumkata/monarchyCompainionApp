@@ -4193,7 +4193,15 @@ to{opacity:1;transform:translateZ(10px) scale(1)}
   font: 14px/1.2 var(--m-f-hand); box-shadow: inset 0 0 0 1px var(--m-line); }body.at-table .pu-addin:focus{ box-shadow: inset 0 0 0 1px var(--m-or); }body.at-table .pu-addgo{ width: 34px; padding: 8px; border: 0; cursor: pointer; background: var(--m-or); color: var(--m-sable); transition: filter .15s ease; }body.at-table .pu-addgo:hover{ filter: brightness(1.15); }/* a screen with nothing on it (the GM's): a name and the box to paste a link into */body.at-table .mu-ui.empty .pu-art, body.at-table .mu-ui.empty .pu-rail, body.at-table .mu-ui.empty .pu-ctl, body.at-table .mu-ui.empty .pu-next{ display: none; }body.at-table .mu-ui.empty .pu-list{ display: none; }body.at-table .mu-ui.empty .pu-queue{ display: block; border-top: 0; }body.at-table .mu-ui.empty .pu-body{ padding-bottom: 8px; }/* the Toolbox's Audio tab: which screen a video goes to */body.at-table .au-where{ display: flex; align-items: center; gap: 8px; font: 700 9px/1 var(--m-f-cap); letter-spacing: .14em; text-transform: uppercase; color: var(--m-quiet); }body.at-table .au-where select{ flex: 1; min-width: 0; padding: 8px 10px; border: 0; outline: none; background: var(--m-sable-3); color: var(--m-argent);
   font: 14px/1.2 var(--m-f-hand); box-shadow: inset 0 0 0 1px var(--m-line); }body.at-table .au-where select option{ background: var(--m-sable-2); color: var(--m-argent); }
 
-@media (prefers-reduced-motion: reduce) {body.at-table .mu-ui, body.at-table .mu-ui *{ animation: none !important; } }
+@media (prefers-reduced-motion: reduce) {body.at-table .mu-ui, body.at-table .mu-ui *{ animation: none !important; } }/* ══ THE PLATE, AS A BANNER ══════════════════════════════════════
+   Its corners were cut on the bend like every panel used to be; it hangs
+   now, like every banner at the table — a forked foot, a gilt thread round
+   it — and folded, it is a forked ribbon rather than a pill. */body.at-table .mu-ui{ --pu-tail: 16px; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - var(--pu-tail)), 0 100%);
+  padding-bottom: var(--pu-tail); box-shadow: none; isolation: isolate; }body.at-table .mu-ui::after{ content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, var(--m-or), var(--m-or-lo)); opacity: .7;
+  clip-path: polygon(evenodd,
+    4px 4px, calc(100% - 4px) 4px, calc(100% - 4px) calc(100% - 6px), 50% calc(100% - var(--pu-tail) - 5px), 4px calc(100% - 6px), 4px 4px,
+    5.5px 5.5px, 5.5px calc(100% - 8.4px), 50% calc(100% - var(--pu-tail) - 6.6px), calc(100% - 5.5px) calc(100% - 8.4px), calc(100% - 5.5px) 5.5px, 5.5px 5.5px); }body.at-table .mu-ui.folded{ --pu-tail: 0px; clip-path: var(--m-band); padding: 0 8px; }body.at-table .mu-ui.folded::after{ display: none; }
 
 </style>
 <style>

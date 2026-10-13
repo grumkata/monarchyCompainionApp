@@ -182,3 +182,17 @@ input.pu-seek, input.pu-vr { -webkit-appearance: none; appearance: none; flex: 1
 .au-where select option { background: var(--m-sable-2); color: var(--m-argent); }
 
 @media (prefers-reduced-motion: reduce) { .mu-ui, .mu-ui * { animation: none !important; } }
+
+/* ══ THE PLATE, AS A BANNER ══════════════════════════════════════
+   Its corners were cut on the bend like every panel used to be; it hangs
+   now, like every banner at the table — a forked foot, a gilt thread round
+   it — and folded, it is a forked ribbon rather than a pill. */
+.mu-ui { --pu-tail: 16px; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - var(--pu-tail)), 0 100%);
+  padding-bottom: var(--pu-tail); box-shadow: none; isolation: isolate; }
+.mu-ui::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, var(--m-or), var(--m-or-lo)); opacity: .7;
+  clip-path: polygon(evenodd,
+    4px 4px, calc(100% - 4px) 4px, calc(100% - 4px) calc(100% - 6px), 50% calc(100% - var(--pu-tail) - 5px), 4px calc(100% - 6px), 4px 4px,
+    5.5px 5.5px, 5.5px calc(100% - 8.4px), 50% calc(100% - var(--pu-tail) - 6.6px), calc(100% - 5.5px) calc(100% - 8.4px), calc(100% - 5.5px) 5.5px, 5.5px 5.5px); }
+.mu-ui.folded { --pu-tail: 0px; clip-path: var(--m-band); padding: 0 8px; }
+.mu-ui.folded::after { display: none; }
