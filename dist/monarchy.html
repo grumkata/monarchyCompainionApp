@@ -4107,7 +4107,48 @@ to{opacity:1;transform:translateZ(10px) scale(1)}
   background: radial-gradient(ellipse at 50% 42%, #2a1d12 0%, #160f09 60%, #0b0705 100%); }/* the way back to the table: one small pennon in the corner, like the menu's */body.at-table .fld-back{ position: fixed; z-index: 1001; display: none; align-items: center; gap: 7px; height: 38px; padding: 0 18px 0 13px; border: 0; cursor: pointer;
   background: var(--m-marks, none), var(--m-sable, #171310); color: var(--m-or, #c9a227); clip-path: var(--m-pennon, none);
   box-shadow: inset 0 0 0 1px var(--m-line, #c9a22757), 0 6px 18px #0009;
-  font: 700 10px var(--m-f-cap, Cinzel, serif); letter-spacing: .16em; text-transform: uppercase; }body.at-table .fld-back span{ color: var(--m-argent-hi, #f4efe2); }body.at-table .fld-back:hover{ box-shadow: inset 0 0 0 1px var(--m-or, #c9a227), 0 6px 18px #0009; }body.at-table.field-on .fld-back{ display: inline-flex; }
+  font: 700 10px var(--m-f-cap, Cinzel, serif); letter-spacing: .16em; text-transform: uppercase; }body.at-table .fld-back span{ color: var(--m-argent-hi, #f4efe2); }body.at-table .fld-back:hover{ box-shadow: inset 0 0 0 1px var(--m-or, #c9a227), 0 6px 18px #0009; }body.at-table.field-on .fld-back{ display: inline-flex; }/* ══ THE FIGHT, IN MONARCHY'S SHAPES ════════════════════════════
+   Everything above was written in a dialect of its own — rounded boxes with
+   a one-pixel gold border, pill-shaped tags, a bordered button, a browser's
+   checkbox — which made the fight the one place at the table you could have
+   mistaken for any other web app. It speaks the table's language now
+   (20-shell.css, THE SILHOUETTES):
+     · a CARD is cloth: a gilt thread round it and a forked foot, its name on
+       an argent scroll
+     · a BUTTON is a forked ribbon, the one that commits in Or, the one that
+       destroys in Gules; a lesser act is a pennon; a step is a lozenge
+     · a NUMBER or a WORD is written on a line
+     · a YES/NO is a wax seal — hatched and open, or poured and set
+     · a TAG is a pennon, a PORTRAIT a shield
+     · the bars over the pieces are BATONS, pointed at both ends */body.at-table .bt-pp, body.at-table .bt-plate{ border:0; border-radius:0; box-shadow:none; isolation:isolate; --m-tail:22px;
+  padding-bottom:calc(var(--m-tail) + 10px) !important;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% calc(100% - var(--m-tail)),0 100%);
+  background:
+    repeating-linear-gradient(90deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
+    linear-gradient(90deg,rgba(0,0,0,.32),transparent 10%,transparent 90%,rgba(0,0,0,.32)),
+    linear-gradient(180deg,var(--m-sable-2,#221c16),var(--m-sable,#171310) 70%,#120e0b);
+ }/* NO UNFURL HERE: the board re-places its cards every frame and toggles them
+   in and out of display as it does, which restarts any entrance on every
+   frame — the card was held at the first instant of its own animation */body.at-table .bt-pp::after, body.at-table .bt-plate::after{ content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background:linear-gradient(180deg,var(--m-or,#c9a227),var(--m-or-lo,#86621c)); opacity:.7;
+  clip-path:polygon(evenodd,
+    4px 4px,calc(100% - 4px) 4px,calc(100% - 4px) calc(100% - 6px),50% calc(100% - var(--m-tail) - 5px),4px calc(100% - 6px),4px 4px,
+    5.5px 5.5px,5.5px calc(100% - 8.4px),50% calc(100% - var(--m-tail) - 6.6px),calc(100% - 5.5px) calc(100% - 8.4px),calc(100% - 5.5px) 5.5px,5.5px 5.5px); }/* the card's name on a scroll */body.at-table .bt-pph{ display:table; margin:2px auto 10px; padding:4px 22px 5px; color:var(--m-sable,#171310); text-shadow:0 1px 0 rgba(255,255,255,.35);
+  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%,9px 50%);
+  background:linear-gradient(180deg,rgba(255,255,255,.55),transparent 22%,transparent 70%,rgba(60,40,20,.28)), var(--m-argent,#ded8c8); }/* buttons */body.at-table .bt-b, body.at-table .bt-ab{ border:0; border-radius:0; clip-path:polygon(0 0,100% 0,calc(100% - 7px) 50%,100% 100%,0 100%,7px 50%);
+  padding:8px 16px; color:var(--m-text,#ded8c8);
+  background:linear-gradient(115deg,var(--m-or,#c9a227) 0 50%,transparent calc(50% + .5px)) 102% 0 / 260% 100% no-repeat, var(--m-sable-3,#30271e);
+  transition:background-position var(--t-wipe,.22s) var(--settle), color var(--t-wipe,.22s) var(--settle); }body.at-table .bt-b:hover, body.at-table .bt-ab:not(.ro):hover{ background-position:0 0; color:var(--m-sable,#171310); }body.at-table .bt-b.bt-or{ color:var(--m-sable,#171310); background:linear-gradient(115deg,var(--m-house,#a3232b) 0 50%,transparent calc(50% + .5px)) 102% 0 / 260% 100% no-repeat, var(--m-or,#c9a227); }body.at-table .bt-b.bt-or:hover{ color:var(--m-house-ink,#ded8c8); }body.at-table .bt-b.bt-bad{ color:var(--m-gules-hi,#c9443a); background:linear-gradient(115deg,var(--m-gules,#a3232b) 0 50%,transparent calc(50% + .5px)) 102% 0 / 260% 100% no-repeat, var(--m-sable-3,#30271e); }body.at-table .bt-b.bt-bad:hover{ color:var(--m-argent-hi,#f4efe2); background-position:0 0; }body.at-table .bt-row .bt-b, body.at-table .bt-tadd .bt-b, body.at-table .bt-mrow .bt-b, body.at-table .bt-fgt .bt-b{ padding:7px 15px; }body.at-table .bt-ab{ clip-path:polygon(0 0,100% 0,calc(100% - 8px) 50%,100% 100%,0 100%); padding:7px 16px 7px 9px; }body.at-table .bt-stp u{ border:0; border-radius:0; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); width:22px; height:22px;
+  background:var(--m-or,#c9a227); color:var(--m-sable,#171310); line-height:22px; }body.at-table .bt-stp u:hover{ background:var(--m-or-hi,#ecd27a); }/* written on a line */body.at-table .bt-num, body.at-table .bt-txt, body.at-table .bt-sel, body.at-table .bt-f, body.at-table .bt-manain{ border:0; border-radius:0; box-shadow:none;
+  background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; padding-bottom:7px; }body.at-table .bt-num:focus, body.at-table .bt-txt:focus, body.at-table .bt-sel:focus, body.at-table .bt-f.on, body.at-table .bt-manain:focus{ box-shadow:none; filter:brightness(1.35); }body.at-table .bt-f{ height:38px; line-height:30px; }body.at-table .bt-manain{ color:#e9f6ff; }/* a yes or a no is a seal */body.at-table .bt-pp .bt-chk input{ -webkit-appearance:none; appearance:none; flex:none; width:24px; height:24px; margin:0; cursor:pointer;
+  clip-path:var(--m-wax);
+  background:repeating-linear-gradient(135deg,rgba(201,162,39,.45) 0 1.5px,transparent 1.5px 4px), var(--m-sable-0,#0b0907);
+  transition:transform var(--t-hover,.16s) var(--pop); }body.at-table .bt-pp .bt-chk input:checked{ background:radial-gradient(circle at 50% 50%, transparent 0 40%, rgba(0,0,0,.25) 41% 47%, transparent 48%), var(--m-wax-melt);
+  transform:rotate(-12deg); }body.at-table .bt-pp .bt-chk:hover input{ transform:rotate(-12deg) scale(1.1); }/* tags and portraits */body.at-table .bt-k{ border-radius:0; padding:2px 10px 2px 6px; clip-path:polygon(0 0,100% 0,calc(100% - 5px) 50%,100% 100%,0 100%); }body.at-table .bt-pic{ border:0; border-radius:0; clip-path:var(--m-shield); filter:brightness(.85); }body.at-table .bt-pic.on{ box-shadow:none; filter:none; outline:2px solid var(--m-or-hi,#ecd27a); outline-offset:-4px; }body.at-table .bt-pic:hover{ filter:none; }/* the bars over the pieces: batons */body.at-table .bt-cap, body.at-table .bt-mor{ border:0; border-radius:0; box-shadow:none;
+  clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 50%,calc(100% - 7px) 100%,7px 100%,0 50%); background:#000d; }body.at-table .bt-cap .bt-gh, body.at-table .bt-cap .bt-fl, body.at-table .bt-hbar, body.at-table .bt-hbar i{ border-radius:0; }body.at-table .bt-hbar{ border:0; clip-path:polygon(4px 0,calc(100% - 4px) 0,100% 50%,calc(100% - 4px) 100%,4px 100%,0 50%); }/* what the board says to you: dark scrolls, not boxes */body.at-table .bt-tip, body.at-table .bt-dmark, body.at-table .bt-toast{ border:0; border-radius:0; padding:6px 22px 7px;
+  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%,9px 50%);
+  background:linear-gradient(180deg,var(--m-sable-3,#30271e),var(--m-sable-0,#0b0907));
+  box-shadow:none; }body.at-table .bt-tip b{ color:var(--m-or,#c9a227); }body.at-table .bt-tqi, body.at-table .bt-ti:hover{ border-radius:0; }body.at-table .bt-fgt{ background:none; box-shadow:none; background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; padding-bottom:14px; }
 
 </style>
 </head>
