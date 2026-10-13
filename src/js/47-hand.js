@@ -95,6 +95,7 @@ function build() {
   /* the dock is a control, never the table: nothing pressed on it pans, and
      the wheel over it scrolls it rather than zooming the wood beneath */
   dock.addEventListener('pointerdown', e => e.stopPropagation());
+  dock.addEventListener('dblclick', lateDouble);
   dock.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
 
   pill = doc.createElement('div');
@@ -125,6 +126,7 @@ function show(list, openId) {
 
 function hide() {
   if (!dock) return;
+  tipOff();                         /* the tile it named is gone from under the pointer, and never said leave */
   closeBench();
   if (root.Music && root.Music.panel) root.Music.panel(null);       /* the audio panel stops painting while it is shut */
   dock.hidden = true;
@@ -308,11 +310,25 @@ function wireTile(b, o) {
   b.addEventListener('pointerup', () => { down = null; });
   b.addEventListener('click', e => {
     if (e.detail > 1) return;               /* the second of a double click */
+    twice = { o, t: performance.now() };
     choose(o);
   });
-  b.addEventListener('dblclick', () => quick(o));
+  b.addEventListener('dblclick', e => { e.stopPropagation(); twice = null; quick(o); });
   b.addEventListener('pointerenter', () => tipOn(b, o.name));
   b.addEventListener('pointerleave', tipOff);
+}
+
+/* ── AND A DOUBLE CLICK STILL MEANS "AS IT IS" ──────────────────
+   The foot has always promised it, and it could never happen: the first
+   click opens the bench, the bench takes the grid's place, and the second
+   click lands on the bench — so the tile never heard a double click at all.
+   The dock remembers which tile the first click was on, and a double click
+   anywhere in it a moment later takes that thing as it is. */
+let twice = null;
+function lateDouble() {
+  if (!twice || performance.now() - twice.t > 650) { twice = null; return; }
+  const o = twice.o; twice = null;
+  quick(o);
 }
 
 /* ONE CLICK OPENS THE BENCH. Everything the thing can be, decided while
@@ -349,6 +365,7 @@ function quick(o) {
 
 /* ══ THE BENCH ═════════════════════════════════════════════════ */
 function openBench(o) {
+  tipOff();
   if (!root.Workbench) { grab(o); return; }
   build();
   grid.hidden = true; shelf.hidden = true;

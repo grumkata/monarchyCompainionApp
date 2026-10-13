@@ -74,39 +74,98 @@ const GLYPH = {
     x.closePath(); x.fill(); x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(0, 0, 14, 0, 7); x.fill();
   }
 };
-function brassTex(glyph) {
-  const c = mkc(128, 128), x = c.getContext('2d');
-  const g = x.createRadialGradient(46, 42, 6, 64, 64, 70); g.addColorStop(0, '#f4dc8a'); g.addColorStop(.5, '#d9ad3c'); g.addColorStop(1, '#8f6616');
-  x.fillStyle = g; x.beginPath(); x.arc(64, 64, 62, 0, 7); x.fill();
-  x.strokeStyle = 'rgba(60,36,6,.55)'; x.lineWidth = 3; x.beginPath(); x.arc(64, 64, 54, 0, 7); x.stroke();
-  const gl = mkc(128, 128), gx = gl.getContext('2d'); gx.fillStyle = '#3a2509'; GLYPH[glyph](gx);
-  x.save(); x.translate(1.5, 1.5); x.globalAlpha = .5; x.drawImage(gl, 0, 0); x.restore();           /* a little highlight below the cut */
-  x.drawImage(gl, 0, 0);
-  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t;
+/* ══ THE BRASS IS CUT TO A SHIELD ══════════════════════════════
+   The plates at the rail's end and the cog in the frame were round brass
+   coins — a button's outline, the one in every game's toolbar. They are cut
+   to the heater shield every other control at the table is (20-shell.css
+   --m-shield, the same seventeen points), so the board's own furniture and
+   the chrome round it are visibly one family: a plate is a shield of brass
+   with its device cut into it. */
+const SHIELD = [[0,0],[100,0],[100,38],[99,50],[96.5,61],[92,71],[85.5,80],[77,87.5],[66,94],[50,100],
+                [34,94],[23,87.5],[14.5,80],[8,71],[3.5,61],[1,50],[0,38]];
+const PW = 56, PH = 64;                         /* a plate, in board units: about the old coin's span */
+function shieldPath(x, w, h, ox, oy) {
+  x.beginPath();
+  SHIELD.forEach(([u, v], i) => { const px = ox + u / 100 * w, py = oy + v / 100 * h;
+    if (i) x.lineTo(px, py); else x.moveTo(px, py); });
+  x.closePath();
 }
+function brassTex(glyph) {
+  const W = 112, H = 128, c = mkc(W, H), x = c.getContext('2d');
+  const g = x.createRadialGradient(40, 34, 6, 56, 56, 84); g.addColorStop(0, '#f4dc8a'); g.addColorStop(.5, '#d9ad3c'); g.addColorStop(1, '#8f6616');
+  x.fillStyle = g; shieldPath(x, W, H, 0, 0); x.fill();
+  x.strokeStyle = 'rgba(60,36,6,.55)'; x.lineWidth = 3; shieldPath(x, W - 16, H - 18, 8, 7); x.stroke();
+  /* the device, drawn in its own 128 square and set on the shield's fess point */
+  const gl = mkc(128, 128), gx = gl.getContext('2d'); gx.fillStyle = '#3a2509'; GLYPH[glyph](gx);
+  const k = .62, gw = 128 * k, ox = (W - gw) / 2, oy = H * .42 - gw / 2;
+  x.save(); x.globalAlpha = .5; x.drawImage(gl, ox + 1.5, oy + 1.5, gw, gw); x.restore();     /* a little highlight below the cut */
+  x.drawImage(gl, ox, oy, gw, gw);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+  /* the cap's UVs are its outline's own coordinates: map them onto the picture */
+  t.repeat.set(1 / PW, 1 / PH); t.offset.set(.5, .5);
+  return t;
+}
+let plateGeo = null;
 function brassPlate(glyph) {
   const g = new THREE.Group();
+  if (!plateGeo) {
+    const sh = new THREE.Shape();
+    SHIELD.forEach(([u, v], i) => { const px = (u / 100 - .5) * PW, py = (.5 - v / 100) * PH;
+      if (i) sh.lineTo(px, py); else sh.moveTo(px, py); });
+    plateGeo = new THREE.ExtrudeGeometry(sh, { depth: 5, bevelEnabled: true, bevelThickness: 1.2,
+                                               bevelSize: 1.4, bevelSegments: 2, curveSegments: 4 });
+    plateGeo.rotateX(-Math.PI / 2);              /* lying on the wood, chief to the far side */
+  }
   const side = K.M('#9a7424', .35, .5), top = new THREE.MeshStandardMaterial({ map: brassTex(glyph), roughness: .4, metalness: .35, transparent: false });
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(28, 30, 7, 36), [side, top, side]);
-  cyl.position.y = 3.5; g.add(cyl);
+  const m = new THREE.Mesh(plateGeo, [top, side]);
+  m.position.y = 1.2; g.add(m);
   return g;
 }
 
-/* the plaque: a brass rim, dark wood, and what it says painted on it */
-const PLQ = { w: 640, h: 160, text: null, flip: 0 };
+/* ══ THE TURN IS WRITTEN ON A SCROLL ═════════════════════════════
+   It was a box of dark wood in a brass rim — a sign. What says the turn now
+   is the motto scroll every heading at the table rides (20-shell.css .m-band):
+   argent, forked at both ends, its tails folded back under it, lying on the
+   board's far frame over The Line. TURN in Sable capitals, the number in
+   Gules, the way a rubricated book marks what you must not miss. */
+const PLQ = { w: 640, h: 200, text: null, flip: 0 };
 function drawPlaque(text) {
   const c = PLQ.canvas || (PLQ.canvas = mkc(PLQ.w, PLQ.h)), x = c.getContext('2d');
-  const g = x.createLinearGradient(0, 0, 0, PLQ.h); g.addColorStop(0, '#34200f'); g.addColorStop(1, '#22150a');
-  x.fillStyle = g; x.fillRect(0, 0, PLQ.w, PLQ.h);
-  for (let i = 0; i < 90; i++) { x.strokeStyle = 'rgba(' + (Math.random() < .5 ? '10,5,0' : '255,210,150') + ',' + (Math.random() * .07) + ')'; x.lineWidth = 1 + Math.random() * 2; const y = Math.random() * PLQ.h; x.beginPath(); x.moveTo(0, y); x.bezierCurveTo(200, y + (Math.random() - .5) * 8, 440, y + (Math.random() - .5) * 8, PLQ.w, y); x.stroke(); }
-  x.strokeStyle = 'rgba(232,195,95,.75)'; x.lineWidth = 5; x.strokeRect(14, 14, PLQ.w - 28, PLQ.h - 28);
+  const W = PLQ.w, H = PLQ.h, top = 34, bot = 150, tail = 96, notch = 30, drop = 26;
+  x.clearRect(0, 0, W, H);
+  /* the tails, folded back and lower */
+  const tailG = x.createLinearGradient(0, top + drop, 0, bot + drop);
+  tailG.addColorStop(0, '#8a816f'); tailG.addColorStop(1, '#4b4437');
+  x.fillStyle = tailG;
+  [[0, 1], [W, -1]].forEach(([ex, d]) => {
+    x.beginPath();
+    x.moveTo(ex, top + drop); x.lineTo(ex + d * (tail + 22), top + drop); x.lineTo(ex + d * (tail + 22), bot + drop);
+    x.lineTo(ex, bot + drop); x.lineTo(ex + d * notch, (top + bot) / 2 + drop); x.closePath(); x.fill();
+  });
+  /* the fold: a shadow where the band turns under */
+  x.fillStyle = 'rgba(20,14,8,.55)';
+  [[tail, 1], [W - tail, -1]].forEach(([ex, d]) => {
+    x.beginPath(); x.moveTo(ex, bot); x.lineTo(ex - d * 22, bot + drop); x.lineTo(ex - d * 22, top + drop);
+    x.lineTo(ex, top); x.closePath(); x.fill();
+  });
+  /* the band itself, argent, forked */
+  const bandG = x.createLinearGradient(0, top, 0, bot);
+  bandG.addColorStop(0, '#f6f1e4'); bandG.addColorStop(.25, '#e6dfcc'); bandG.addColorStop(.8, '#cfc6b0'); bandG.addColorStop(1, '#a89f8a');
+  x.fillStyle = bandG;
+  x.beginPath();
+  x.moveTo(tail - 22, top); x.lineTo(W - tail + 22, top); x.lineTo(W - tail + 22 - notch * .6, (top + bot) / 2);
+  x.lineTo(W - tail + 22, bot); x.lineTo(tail - 22, bot); x.lineTo(tail - 22 + notch * .6, (top + bot) / 2); x.closePath(); x.fill();
+  x.strokeStyle = 'rgba(70,52,30,.45)'; x.lineWidth = 2;
+  x.beginPath(); x.moveTo(tail - 10, top + 9); x.lineTo(W - tail + 10, top + 9);
+  x.moveTo(tail - 10, bot - 9); x.lineTo(W - tail + 10, bot - 9); x.stroke();
   x.textBaseline = 'middle'; x.textAlign = 'center';
+  const mid = (top + bot) / 2 + 3;
   const m = /^TURN (\d+)$/.exec(text || '');
   if (m) {
-    x.font = '700 70px Cinzel, "Palatino Linotype", Georgia, serif'; x.fillStyle = '#e8c35f'; x.fillText('TURN', 200, 84);
-    x.font = '700 134px "Barlow Condensed", "Bahnschrift", "Arial Narrow", sans-serif'; x.lineWidth = 8; x.strokeStyle = '#150d05'; x.strokeText(m[1], 470, 88); x.fillStyle = '#f4efe2'; x.fillText(m[1], 470, 88);
+    x.font = '700 64px Cinzel, "Palatino Linotype", Georgia, serif'; x.fillStyle = '#171310'; x.fillText('TURN', 262, mid);
+    x.font = '700 118px "Barlow Condensed", "Bahnschrift", "Arial Narrow", sans-serif'; x.fillStyle = '#a3232b'; x.fillText(m[1], 446, mid + 2);
   } else if (text) {
-    x.font = '700 76px Cinzel, "Palatino Linotype", Georgia, serif'; x.lineWidth = 8; x.strokeStyle = '#150d05'; x.strokeText(text, PLQ.w / 2, 84); x.fillStyle = '#e8c35f'; x.fillText(text, PLQ.w / 2, 84);
+    x.font = '700 70px Cinzel, "Palatino Linotype", Georgia, serif'; x.fillStyle = '#a3232b'; x.fillText(text, W / 2, mid);
   }
   if (PLQ.tex) PLQ.tex.needsUpdate = true;
 }
@@ -149,12 +208,12 @@ function ensure() {
   S.cogHit.addEventListener('click', () => V.ui && V.ui.cogClick && V.ui.cogClick(S.cogHit));
   S.cogHit.addEventListener('wheel', K.wheelThrough, { passive: false });
   S.plaque = new THREE.Group(); S.frameG.add(S.plaque);
-  S.plaque.add(K.mesh(new THREE.BoxGeometry(252, 6, 74), K.M('#b28a2c', .35, .55), 0, 9, 0));
-  S.plaque.add(K.mesh(new THREE.BoxGeometry(236, 7, 60), K.M('#22150a', .8), 0, 10.5, 0));
   PLQ.tex = new THREE.CanvasTexture(mkc(1, 1)); drawPlaque(null);
   PLQ.tex = new THREE.CanvasTexture(PLQ.canvas); PLQ.tex.encoding = THREE.sRGBEncoding; PLQ.tex.anisotropy = 8;
-  S.face = new THREE.Mesh(new THREE.PlaneGeometry(216, 54), new THREE.MeshStandardMaterial({ map: PLQ.tex, roughness: .6, metalness: .1 }));
-  S.face.rotation.x = -Math.PI / 2; S.face.position.y = 14.3; S.plaque.add(S.face);
+  /* no box under it any more: the scroll lies on the frame, cut out of its own picture */
+  S.face = new THREE.Mesh(new THREE.PlaneGeometry(272, 85), new THREE.MeshStandardMaterial({ map: PLQ.tex, roughness: .7, metalness: 0,
+    transparent: true, alphaTest: .5 }));
+  S.face.rotation.x = -Math.PI / 2; S.face.position.y = 7.6; S.plaque.add(S.face);
   S.plaqueHit = K.el('bt-hit bt-rbtn'); S.plaqueHit.dataset.tip = 'The turn|Click for the next turn (Space).';
   S.plaqueHit.addEventListener('click', () => V.ui && V.ui.turn && V.ui.turn());
   S.plaqueHit.addEventListener('wheel', K.wheelThrough, { passive: false });
@@ -346,11 +405,11 @@ S.frame = function (now, dt, tilt, yaw, gm) {
   S.cog.position.set(d.xCog, 8, d.zTop); S.cog.visible = gm;
   if (PLQ.flip) {
     const u = (now - PLQ.flip) / 320;
-    if (u >= 1) { PLQ.flip = 0; S.face.scale.y = 1; S.face.position.y = 14.3; }
+    if (u >= 1) { PLQ.flip = 0; S.face.scale.y = 1; S.face.position.y = 7.6; }
     else {
       if (u >= .45 && PLQ.text !== PLQ.shown) { drawPlaque(PLQ.text); PLQ.shown = PLQ.text; }
       const s = u < .45 ? 1 - u / .45 : (u - .45) / .55;
-      S.face.scale.y = Math.max(.02, s); S.face.position.y = 14.3 + (1 - s) * 5;
+      S.face.scale.y = Math.max(.02, s); S.face.position.y = 7.6 + (1 - s) * 5;
     }
   } else if (PLQ.shown !== PLQ.text) { drawPlaque(PLQ.text); PLQ.shown = PLQ.text; }
   /* the figures along the rail, from where it is scrolled to */

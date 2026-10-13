@@ -82,6 +82,10 @@ body.bt-dragging .bt-plate, body.bt-dragging .bt-pp { opacity: 0; pointer-events
 .bt-manav { display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform-origin: bottom center; z-index: 1003; }
 .bt-manav b { font: 700 34px/30px var(--m-f-tally, 'Barlow Condensed', sans-serif); color: #e9f6ff; -webkit-text-stroke: 5px #04141f; paint-order: stroke fill; }
 .bt-manav i { font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .2em; text-transform: uppercase; font-style: normal; color: #a9c4f2; -webkit-text-stroke: 3px #04141f; paint-order: stroke fill; }
+/* the word under the number rides a motto scroll, like every name at the table */
+.bt-manav i { margin-top: 3px; padding: 3px 12px 3px; color: #171310; -webkit-text-stroke: 0; font-size: 8px;
+  clip-path: polygon(0 0,100% 0,calc(100% - 6px) 50%,100% 100%,0 100%,6px 50%);
+  background: linear-gradient(180deg,#f6f1e4,#d8d0bb 70%,#a89f8a); text-shadow: none; }
 .bt-manain { width: 84px; height: 40px; z-index: 1006; text-align: center; background: #07131c; color: #e9f6ff; border: 1px solid #58b8ef; border-radius: 4px; outline: none; pointer-events: auto; font: 700 28px var(--m-f-tally, 'Barlow Condensed', sans-serif); box-shadow: 0 0 0 3px #58b8ef44; }
 .bt-rarr { display: flex; align-items: center; justify-content: center; color: #f6d77a; -webkit-text-stroke: 3px #000; paint-order: stroke fill; cursor: pointer; font-family: Georgia, serif; font-weight: 700; border-radius: 50%; }
 .bt-rarr:hover { color: #fff; }

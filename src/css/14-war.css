@@ -1041,6 +1041,46 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
 .au-add { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--m-line); }
 .au-picked { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: italic 12px/1.2 var(--m-f-hand); color: var(--m-quiet); }
 
+/* ── AUDIO, IN MONARCHY'S SHAPES ──────────────────────────────
+   The tab was two boxed wells of form controls. A section is divided from
+   the next by a line of partition, not a frame; you write a link on a line;
+   to commit is a forked Or ribbon, to do anything else a pennon; a small
+   act is a lozenge; and the sound board is what the toolbox is — a roll of
+   shields, each one a sound, pressed to sound it at every seat. */
+.au{ gap:16px; }
+.au-sec{ background:none; box-shadow:none; padding:4px 6px 12px;
+  background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; }
+.au-sec:last-child{ background:none; }
+.au-sec h4{ font-size:10.5px; letter-spacing:var(--m-track); }
+.au-play input, .au-add input:not([type=range]):not([type=file]), .au-add select, .au-pname{
+  background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; box-shadow:none; padding:6px 2px 9px;
+  color:var(--m-argent-hi); }
+.au-play input:focus, .au-add input:focus, .au-add select:focus, .au-pname:focus{ box-shadow:none; filter:brightness(1.35); }
+.au-play input::placeholder, .au-pname::placeholder{ font-style:italic; color:var(--m-hush); }
+.au-go{ clip-path:var(--m-band); padding:10px 20px; }
+.au-go:hover{ filter:none; background:var(--m-or-hi); }
+.au-ghost, .au-hbtns button, .au-seg button{ clip-path:var(--m-pennon); box-shadow:none; padding:7px 14px 7px 8px;
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle); }
+.au-ghost:hover, .au-hbtns button:hover, .au-hbtns button.on, .au-seg button:hover, .au-seg button.on{
+  background-position:0 0; color:var(--m-sable); }
+.au-seg{ gap:4px; }
+.au-prow button{ clip-path:var(--m-lozenge); box-shadow:none; background:var(--m-sable-3); flex-basis:28px; height:28px; }
+.au-prow button:hover{ background:var(--m-or); }
+.au-add{ border-top:0; padding-top:14px; background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
+.au-pgrid{ grid-template-columns:repeat(3,1fr); gap:8px 6px; }
+.au-pad{ position:relative; isolation:isolate; min-height:0; aspect-ratio:.86; padding:0 10px 22%; box-shadow:none;
+  display:grid; place-items:center; text-align:center; clip-path:var(--m-shield); white-space:normal;
+  background:linear-gradient(160deg,var(--m-or),var(--m-or-lo) 55%,#4a3510); color:var(--m-argent-hi);
+  font:600 12px/1.15 var(--m-f-cap); text-shadow:0 1px 2px rgba(0,0,0,.7);
+  transition:transform var(--t-hover) var(--settle), background var(--t-hover) var(--settle); }
+.au-pad::before{ content:''; position:absolute; inset:2px 2px 3px; z-index:-1; clip-path:var(--m-shield);
+  background:radial-gradient(ellipse 70% 55% at 50% 34%, rgba(255,226,170,.15), transparent 70%),
+    color-mix(in srgb, var(--m-bleu) 34%, #0a0806); transition:background var(--t-wipe) var(--settle); }
+.au-pad:hover{ background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 50%,var(--m-or-lo)); color:var(--m-sable); text-shadow:none; }
+.au-pad:hover::before{ background:var(--m-or); }
+.au-pad:active{ transform:scale(.94); }
+
 /* ══ THE KEYBOARD CAN SEE WHERE IT IS ══════════════════════════
    20-shell.css rings whatever has the keys, two pixels OUTSIDE it — and
    nearly every control at the table is cut to a pennon, a plaque or a
