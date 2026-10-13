@@ -168,7 +168,7 @@ function buildTable() {
      across it — at the room's own settings the steps turned that shadow
      into a torn silhouette. More bands, softer mix: the wood is stylised
      without the shadow on it becoming a shape. */
-  body.add(mesh(WOOD.Table_Round_A.prims, WOOD_TEX, DRESS.timber,
+  body.add(mesh(WOOD.Table_Round_A.prims.map(pr => roundTop(pr, 128)), WOOD_TEX, DRESS.timber,
                 { room: 'tavern', steps: 9, tint: 0.20, hard: 0.26, rim: 0.10 }));
   /* TOP SURFACE AT THE ORIGIN, not the model's middle: the plane the pieces
      live on IS the table top, so that is the part that has to line up. */
@@ -180,6 +180,148 @@ function buildTable() {
   if (inl) tableObj.add(inl);
   uScene.add(tableObj);
   buildRoom();
+}
+
+/* ══ THE TOP IS TURNED, NOT CUT ════════════════════════════════
+   The model's top is a 32-sided polygon. At the size it is drawn — the wood
+   filling most of the screen — every one of those straight sides showed on
+   the rim: a facet ninety pixels long, the plainest "low-poly asset" tell in
+   the room. So the top slab is rebuilt at 128 sides, and the rest of the
+   model (apron, legs) is kept exactly as it was.
+
+   The new slab is painted EXACTLY as the old one was. The model's UVs on the
+   top and the underside are an affine map of position, mirrored across a
+   diagonal; on the edge band they run linearly with the angle, mirrored at
+   the same two angles. 128 is a multiple of 32, so every old vertex angle is
+   also a new one and no new triangle straddles an old seam: a new point on a
+   face takes its UV from the old triangle it lies in, carried out to the
+   circle; a new point on the edge is interpolated by angle between the old
+   points either side of it. Anything about the model that is not what this
+   expects, and the model is left alone. */
+function roundTop(prim, segs) {
+  const P = prim.p, N = prim.n, U = prim.u, I = prim.i;
+  if (!P || !N || !U || !I) return prim;
+  const nv = P.length / 3, Y = a => P[a * 3 + 1], NY = a => N[a * 3 + 1];
+  let ymax = -Infinity;
+  for (let a = 0; a < nv; a++) ymax = Math.max(ymax, Y(a));
+  /* the slab: every triangle wholly within its thickness (the apron under
+     it starts a good deal lower) */
+  const floor = ymax - 0.05, keep = [], slab = [];
+  for (let t = 0; t < I.length; t += 3) {
+    const tri = [I[t], I[t + 1], I[t + 2]];
+    (tri.every(a => Y(a) >= floor) ? slab : keep).push(tri);
+  }
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const tri of slab) for (const a of tri) if (NY(a) > 0.9) {
+    x0 = Math.min(x0, P[a * 3]); x1 = Math.max(x1, P[a * 3]);
+    z0 = Math.min(z0, P[a * 3 + 2]); z1 = Math.max(z1, P[a * 3 + 2]);
+  }
+  if (!slab.length || !isFinite(x0)) return prim;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const ang = a => Math.atan2(P[a * 3 + 2] - cz, P[a * 3] - cx);
+  const rad = a => Math.hypot(P[a * 3] - cx, P[a * 3 + 2] - cz);
+  const wrap = d => d > Math.PI ? d - 2 * Math.PI : d < -Math.PI ? d + 2 * Math.PI : d;
+
+  /* the faces, as fans: each old triangle with its angular sector and the
+     affine map from (x, z) to its UVs */
+  const fans = { up: [], down: [] };
+  for (const tri of slab) {
+    const side = tri.every(a => NY(a) > 0.9) ? 'up' : tri.every(a => NY(a) < -0.9) ? 'down' : null;
+    if (!side) continue;
+    const rim = tri.filter(a => rad(a) > 1e-4);
+    if (rim.length !== 2) return prim;
+    let lo = ang(rim[0]), hi = lo + wrap(ang(rim[1]) - lo);
+    if (hi < lo) { const t = lo; lo = hi; hi = t; }
+    const [a, b, c] = tri, X = k => P[k * 3], Z = k => P[k * 3 + 2];
+    const det = (X(b) - X(a)) * (Z(c) - Z(a)) - (X(c) - X(a)) * (Z(b) - Z(a));
+    if (Math.abs(det) < 1e-12) continue;
+    const map = (x, z) => {
+      const s = ((x - X(a)) * (Z(c) - Z(a)) - (X(c) - X(a)) * (z - Z(a))) / det;
+      const t = ((X(b) - X(a)) * (z - Z(a)) - (x - X(a)) * (Z(b) - Z(a))) / det;
+      return [U[a * 2] + s * (U[b * 2] - U[a * 2]) + t * (U[c * 2] - U[a * 2]),
+              U[a * 2 + 1] + s * (U[b * 2 + 1] - U[a * 2 + 1]) + t * (U[c * 2 + 1] - U[a * 2 + 1])];
+    };
+    fans[side].push({ lo, hi, map, y: Y(a) });
+  }
+  const onFan = (fan, th) => {
+    for (const f of fan) for (const t of [th, th + 2 * Math.PI, th - 2 * Math.PI])
+      if (t >= f.lo - 1e-6 && t <= f.hi + 1e-6) return f;
+    return null;
+  };
+
+  /* the edge, as rings: the slab's sloped and upright vertices, grouped by
+     height and by which way they face — two rings to a strip */
+  const rings = {};
+  for (const tri of slab) for (const a of tri) {
+    const ny = NY(a);
+    if (Math.abs(ny) > 0.9) continue;
+    const cls = ny > 0.3 ? 'up' : ny < -0.3 ? 'down' : 'flat', key = cls + Y(a).toFixed(4);
+    const r = rings[key] || (rings[key] = { cls, y: Y(a), pts: new Map(), r: 0, nr: 0, ny: 0, n: 0 });
+    const th = +ang(a).toFixed(5);
+    if (!r.pts.has(th)) r.pts.set(th, [U[a * 2], U[a * 2 + 1]]);
+    r.r += rad(a); r.nr += Math.hypot(N[a * 3], N[a * 3 + 2]); r.ny += ny; r.n++;
+  }
+  const strips = ['up', 'flat', 'down'].map(cls => Object.values(rings)
+    .filter(r => r.cls === cls).sort((p, q) => q.y - p.y));
+  if (strips.some(st => st.length !== 2) || !fans.up.length || !fans.down.length) return prim;
+  for (const st of strips) for (const r of st) {
+    r.r /= r.n; r.nr /= r.n; r.ny /= r.n;
+    r.list = [...r.pts.entries()].sort((p, q) => p[0] - q[0]);
+    if (r.list.length < 3) return prim;
+  }
+  const along = (r, th) => {
+    const L = r.list;
+    for (let k = 0; k < L.length; k++) {
+      const [ta, ua] = L[k], [tb0, ub] = L[(k + 1) % L.length];
+      const tb = k + 1 < L.length ? tb0 : tb0 + 2 * Math.PI;
+      for (const t of [th, th + 2 * Math.PI]) if (t >= ta - 1e-6 && t <= tb + 1e-6) {
+        const f = tb > ta ? (t - ta) / (tb - ta) : 0;
+        return [ua[0] + f * (ub[0] - ua[0]), ua[1] + f * (ub[1] - ua[1])];
+      }
+    }
+    return L[0][1];
+  };
+
+  const p = Array.from(P), n = Array.from(N), u = Array.from(U), idx = [];   /* the pack may hand typed arrays */
+  for (const tri of keep) idx.push(tri[0], tri[1], tri[2]);
+  const put = (x, y, z, nx, ny, nz, uv) => {
+    p.push(x, y, z); n.push(nx, ny, nz); u.push(uv[0], uv[1]); return p.length / 3 - 1;
+  };
+  const TH = k => -Math.PI + 2 * Math.PI * (k % segs) / segs;
+  /* the two faces */
+  for (const side of ['up', 'down']) {
+    const fan = fans[side], y = fan[0].y, R = side === 'up' ? strips[0][0].r : strips[2][1].r;
+    const sy = side === 'up' ? 1 : -1;
+    const mid = put(cx, y, cz, 0, sy, 0, fan[0].map(cx, cz));
+    const rim = [];
+    for (let k = 0; k < segs; k++) {
+      const th = TH(k), x = cx + R * Math.cos(th), z = cz + R * Math.sin(th);
+      const f = onFan(fan, th + 1e-7) || onFan(fan, th);
+      if (!f) return prim;
+      rim.push(put(x, y, z, 0, sy, 0, f.map(x, z)));
+    }
+    for (let k = 0; k < segs; k++) {
+      const a = rim[k], b = rim[(k + 1) % segs];
+      if (side === 'up') idx.push(mid, b, a); else idx.push(mid, a, b);
+    }
+  }
+  /* the edge: a bevel, the upright band, a bevel */
+  for (const [hi, lo] of strips) {
+    const ring = r => {
+      const out = [], l = Math.hypot(r.nr, r.ny) || 1;
+      for (let k = 0; k < segs; k++) {
+        const th = TH(k), c = Math.cos(th), s = Math.sin(th);
+        out.push(put(cx + r.r * c, r.y, cz + r.r * s, r.nr * c / l, r.ny / l, r.nr * s / l, along(r, th)));
+      }
+      return out;
+    };
+    const A = ring(hi), B = ring(lo);
+    for (let k = 0; k < segs; k++) {
+      const k1 = (k + 1) % segs;
+      idx.push(A[k], A[k1], B[k], A[k1], B[k1], B[k]);
+    }
+  }
+  return Object.assign({}, prim, { p, n, u, i: idx });
 }
 
 /* ══ THE ROUND TABLE ═══════════════════════════════════════════
