@@ -2171,8 +2171,8 @@ input[type=range]:not(.pu-seek):not(.pu-vr):focus-visible { outline: none; }
    theme — it never borrows --gold/--ink, which flip with the Theme button ── *//* the corner names THIS table (42-shell.js writes it), in the mark's hand */body.at-table .hud.tl{bottom:13px;left:17px;color:var(--m-argent-hi);max-width:46vw;
   font-family:var(--m-f-mark);font-size:30px;font-weight:400;letter-spacing:.01em;
   text-transform:none;line-height:1;text-shadow:0 2px 0 rgba(0,0,0,.8),0 0 18px rgba(0,0,0,.9)}body.at-table .hud.tl em{display:block;font-family:var(--m-f-hand);font-style:italic;font-size:12.5px;letter-spacing:0;
-  text-transform:none;color:var(--m-quiet);margin-top:6px;padding-top:5px;font-weight:400;
-  border-top:1px solid var(--m-line);max-width:640px}body.at-table .hud.tl em b{color:var(--m-or);font-style:normal;font-family:var(--m-f-cap);font-size:10px;letter-spacing:.08em}body.at-table .hud.br{bottom:15px;right:17px;display:flex;gap:6px;align-items:center}body.at-table .hud button{font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
+  text-transform:none;color:var(--m-quiet);margin-top:6px;padding-top:8px;font-weight:400;
+  background:var(--m-rule-indented) 0 0 / auto 6px repeat-x;max-width:640px}body.at-table .hud.tl em b{color:var(--m-or);font-style:normal;font-family:var(--m-f-cap);font-size:10px;letter-spacing:.08em}body.at-table .hud.br{bottom:15px;right:17px;display:flex;gap:6px;align-items:center}body.at-table .hud button{font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
   text-transform:uppercase;padding:10px 18px;cursor:pointer;color:var(--m-text);border:0;
   clip-path:var(--m-plaque);
   background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable);
@@ -4841,7 +4841,7 @@ to{opacity:1;transform:translateZ(10px) scale(1)}
 <aside class="chatdock">
   <div class="plaque m-band">Chat</div>
   <div class="cb" id="chat-body"></div>
-  <div class="cin"><textarea id="chat-in" rows="1" placeholder="Talk, or /r 3 4d6"></textarea><button id="chat-img" class="pic" type="button" title="Send a picture (or paste one, or drop one here)" aria-label="Send a picture"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg></button><button id="chat-go">Send</button><input type="file" id="chat-file" accept="image/*" hidden></div>
+  <div class="cin"><textarea id="chat-in" rows="1" placeholder="Talk, or /r 3 4d6"></textarea><button id="chat-img" class="pic" type="button" title="Send a picture (or paste one, or drop one here)" aria-label="Send a picture"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M4 2.5h16V11c0 5.2-3.6 8.8-8 10.5C7.6 19.8 4 16.2 4 11z M6 4.5h12V11c0 4-2.7 6.8-6 8.2-3.3-1.4-6-4.2-6-8.2z M6.4 13.9l3.5-3.7 2.7 2.7 1.8-1.9 3.2 3.4c-.9 2-2.6 3.4-5.6 4.6-2.8-1.2-4.6-2.9-5.6-5.1z M16.4 7.6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0z"/></svg></button><button id="chat-go">Send</button><input type="file" id="chat-file" accept="image/*" hidden></div>
 </aside>
 <!-- ITS OWN ID. It was id="toast" too — and so is the hall's, which comes
      first in the one document, so every table notice (the inspector's, the
