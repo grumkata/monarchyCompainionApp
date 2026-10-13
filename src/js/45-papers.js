@@ -333,7 +333,8 @@ function pick() {
   doc.body.classList.add('reading');
   openId = null; rec = null;
   p.innerHTML =
-    `<div class="tp-head"><span class="plaque">Papers</span>
+    `<span class="m-pole" aria-hidden="true"></span>
+     <div class="tp-head"><span class="plaque">Papers</span>
        <button class="tp-x" data-tp-close>&#10005;</button></div>
      <div class="tp-pickers">${list.map(c => {
         const d = root.Sheet.derived(root.Sheet.fill(c));
@@ -367,14 +368,18 @@ root.addEventListener('monarchy:sheets', () => {
 
 function paint() {
   const p = el(); if (!p || !rec) return;
+  /* it hangs from a rod and is sealed at its foot (20-shell.css, CHARTER) */
+  const nm = root.Characters.nameOf(rec), initial = (String(nm || '').trim().match(/[A-Za-z0-9]/) || ['\u2720'])[0].toUpperCase();
   p.innerHTML =
-    `<div class="tp-head">
-       <span class="plaque">${esc(root.Characters.nameOf(rec))}</span>
+    `<span class="m-pole" aria-hidden="true"></span>
+     <div class="tp-head">
+       <span class="plaque">${esc(nm)}</span>
        ${readOnly(rec) ? '<span class="tp-ro-note">Reading only &mdash; this is ' + esc(rec.__byName || 'another player') + '&rsquo;s sheet</span>' : ''}
        <button class="tp-x" data-tp-away title="Take it off the table">&#8615;</button>
        <button class="tp-x" data-tp-close title="Put it back down (Esc)">&#10005;</button>
      </div>
-     <div class="tp-leaf" id="tp-leaf">${root.Sheet.render(rec)}</div>`;
+     <div class="tp-leaf" id="tp-leaf">${root.Sheet.render(rec)}</div>
+     <span class="tp-seal" aria-hidden="true"><b>${esc(initial)}</b></span>`;
   const ro = readOnly(rec);
   p.classList.toggle('tp-ro', ro);
   if (ro) {

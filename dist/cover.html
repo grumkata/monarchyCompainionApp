@@ -983,6 +983,60 @@ body.at-table #pickmenu { z-index: 960; }
   transform: rotate(-14deg) scale(1.1); }
 #tp .tp-head .tp-x:first-of-type { right: 38px; }
 
+/* ══ THE RECORD HANGS AS A CHARTER ══════════════════════════════
+   It was a window: vellum in a sable border with two gilt rings inside it
+   and a mark in each corner, under a sable title bar — a panel with a gold
+   border, which is the one thing a surface here may not be. It is a
+   document, so it hangs like one: from a gilt rod with a fleur at each end,
+   no border and no rings, its sides and foot a little ragged where the
+   skin was trimmed, and from its foot, on two ribbons, a wax seal struck
+   with the first letter of whoever it is. The vellum is drawn by ::after
+   (so the rod and the seal can stand outside its edges); its shadow is
+   ::before. */
+#tp { background: none; border: 0; box-shadow: none; isolation: isolate; padding-top: 12px; }
+#tp:not(.picking) { bottom: 64px; }
+#tp::before, #tp::after { content: ''; position: absolute; left: 0; right: 0; top: 10px; bottom: 0;
+  pointer-events: none; clip-path: var(--m-deckle); }
+#tp::after { z-index: -1;
+  background:
+    repeating-linear-gradient(45deg, rgba(28,20,12,.04) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, rgba(28,20,12,.04) 0 2px, transparent 2px 7px),
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(255,250,235,.35), transparent 60%),
+    linear-gradient(90deg, rgba(90,62,24,.22), transparent 4%, transparent 96%, rgba(90,62,24,.22)),
+    linear-gradient(176deg, var(--m-vellum-2) 0%, var(--m-vellum-3) 100%); }
+/* NOT A BLURRED COPY OF THE OUTLINE. That was the first try, and a filter
+   that size is re-rendered every frame the sheet rises from the wood — the
+   rise stalled. The ragged edge moves by two pixels at most, so the shadow
+   of a plain rectangle under it is the same shadow, at the cost the window
+   always paid. */
+#tp::before { z-index: -2; clip-path: none; box-shadow: 0 26px 70px rgba(0,0,0,.6); }
+#tp { --m-deckle: polygon(0 0,100% 0,calc(100% - 0.0px) 3.57%,calc(100% - 2.0px) 7.14%,calc(100% - 0.6px) 10.71%,calc(100% - 0.5px) 14.29%,calc(100% - 1.6px) 17.86%,calc(100% - 1.2px) 21.43%,calc(100% - 0.7px) 25.00%,calc(100% - 1.7px) 28.57%,calc(100% - 1.7px) 32.14%,calc(100% - 1.2px) 35.71%,calc(100% - 1.5px) 39.29%,calc(100% - 1.4px) 42.86%,calc(100% - 1.8px) 46.43%,calc(100% - 0.5px) 50.00%,calc(100% - 0.8px) 53.57%,calc(100% - 1.6px) 57.14%,calc(100% - 1.5px) 60.71%,calc(100% - 0.1px) 64.29%,calc(100% - 1.5px) 67.86%,calc(100% - 1.0px) 71.43%,calc(100% - 2.0px) 75.00%,calc(100% - 1.8px) 78.57%,calc(100% - 0.3px) 82.14%,calc(100% - 1.1px) 85.71%,calc(100% - 2.0px) 89.29%,calc(100% - 1.5px) 92.86%,calc(100% - 1.4px) 96.43%,calc(100% - 1.3px) calc(100% - 2.0px),96.43% calc(100% - 2.0px),92.86% calc(100% - 0.8px),89.29% calc(100% - 0.7px),85.71% calc(100% - 1.8px),82.14% calc(100% - 0.7px),78.57% calc(100% - 0.3px),75.00% calc(100% - 0.7px),71.43% calc(100% - 0.9px),67.86% calc(100% - 0.6px),64.29% calc(100% - 2.1px),60.71% calc(100% - 1.2px),57.14% calc(100% - 1.6px),53.57% calc(100% - 1.9px),50.00% calc(100% - 0.1px),46.43% calc(100% - 0.6px),42.86% calc(100% - 1.2px),39.29% calc(100% - 1.1px),35.71% calc(100% - 0.9px),32.14% calc(100% - 0.4px),28.57% calc(100% - 2.0px),25.00% calc(100% - 0.1px),21.43% calc(100% - 0.8px),17.86% calc(100% - 0.8px),14.29% calc(100% - 1.5px),10.71% calc(100% - 2.0px),7.14% calc(100% - 1.1px),3.57% calc(100% - 0.4px),0.9px calc(100% - 0.6px),0.8px 96.43%,0.9px 92.86%,0.7px 89.29%,1.2px 85.71%,1.4px 82.14%,0.5px 78.57%,2.0px 75.00%,1.0px 71.43%,1.9px 67.86%,1.4px 64.29%,1.4px 60.71%,1.1px 57.14%,1.1px 53.57%,1.5px 50.00%,2.1px 46.43%,0.9px 42.86%,1.6px 39.29%,0.6px 35.71%,1.3px 32.14%,0.8px 28.57%,0.7px 25.00%,0.9px 21.43%,1.7px 17.86%,1.9px 14.29%,0.2px 10.71%,1.8px 7.14%,0.2px 3.57%); }
+#tp > .m-pole { top: 4px; left: 8px; right: 8px; }   /* the fleurs stay clear of the chat */
+#tp .tp-head { background: none; border: 0; box-shadow: none; height: 32px; margin: 0 0 2px; }
+/* the record runs on below the foot of what you can see: it fades into the
+   skin there rather than being sliced off at the edge */
+#tp:not(.picking) .tp-leaf { -webkit-mask: linear-gradient(180deg, #000 calc(100% - 28px), transparent);
+  mask: linear-gradient(180deg, #000 calc(100% - 28px), transparent); }
+#tp .tp-head .plaque { top: 6px; }
+#tp .tp-x { top: 4px; }
+/* the seal at its foot, on two ribbons, struck with an initial. The seal
+   makes no stacking context of its own, so its ribbons (z -2) pass UNDER the
+   vellum's foot and come out from behind it, and the wax (z 1) and the
+   letter on it (z 2) lie over it. */
+#tp .tp-seal { position: absolute; left: 50%; bottom: -58px; width: 48px; height: 46px; margin-left: -24px;
+  display: grid; place-items: center; pointer-events: none; }
+#tp .tp-seal b { position: relative; z-index: 2; font: 400 22px/1 var(--m-f-mark); color: rgba(255,214,200,.92);
+  text-shadow: 0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,170,150,.3); }
+#tp .tp-seal::after { content: ''; position: absolute; inset: 0; z-index: 1; clip-path: var(--m-wax);
+  background: radial-gradient(circle at 50% 50%, transparent 0 36%, rgba(0,0,0,.24) 37% 42%, transparent 43%),
+    var(--m-wax-melt); }
+#tp .tp-seal::before { content: ''; position: absolute; z-index: -2; left: 9px; right: 9px; top: -34px; height: 52px;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.35), transparent 30%, transparent 70%, rgba(0,0,0,.35)) 0 0 / 50% 100% repeat-x,
+    var(--m-house, var(--m-gules));
+  clip-path: polygon(18% 0, 40% 0, 38% 100%, 10% 100%, 18% 0, 60% 0, 82% 0, 90% 100%, 62% 100%, 60% 0); }
+#tp.picking .tp-seal { display: none; }
+
 /* ══ THE HERALD'S WHISPER (42-shell.js) ═════════════════════════
    What the system's grey tooltip box used to say, on a dark forked scroll:
    a name in engraved capitals, a sentence in the book's hand, and the key
