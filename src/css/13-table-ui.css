@@ -2026,6 +2026,72 @@ body.pk-dragging, body.pk-dragging *{ cursor:grabbing !important; }
 .pk-tint.t-red{ background:#e0b8a8; }
 .pk-tint.on{ outline:2px solid var(--m-or); outline-offset:2px; }
 
+/* ── THE NOTE'S TOOLS ARE A RIBBON, AND DONE IS A SEAL ──────────
+   The bar under a note was a framed box of framed buttons, two rows of
+   them — a toolbar. Now it is a sable ribbon cut in a swallow's notch at
+   each end, the words lettered on it with nothing round them; the inks
+   are lozenges and the papers little shields, and the one in use is
+   ringed in gilt in its own shape rather than turned into a square. You
+   finish a note the way you finish a charter: Done is a wax seal pressed
+   over the ribbon's end. And the note itself is pinned under a seal at
+   its head, so it reads as a letter you are holding, not a text box. */
+#pk-ed .pk-sheet::before{ content:''; position:absolute; z-index:2; left:50%; top:-15px; width:36px; height:34px;
+  margin-left:-18px; pointer-events:none; clip-path:var(--m-wax);
+  background:radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(0,0,0,.22) 35% 41%, transparent 42%),
+    var(--m-wax-melt);
+  filter:drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
+#pk-ed .pk-bar{ position:relative; isolation:isolate; flex-wrap:nowrap; gap:2px; max-width:none;
+  padding:9px 74px 9px 30px !important; background:none; box-shadow:none;
+  filter:drop-shadow(0 8px 14px rgba(0,0,0,.55)); }
+#pk-ed .pk-bar::before{ content:''; position:absolute; z-index:-1; left:0; right:26px; top:0; bottom:0;
+  pointer-events:none;
+  background:
+    repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px),
+    linear-gradient(180deg,var(--m-sable-2),var(--m-sable) 70%,#120e0b);
+  clip-path:polygon(0 0,100% 0,calc(100% - 14px) 50%,100% 100%,0 100%,14px 50%); }
+#pk-ed .pk-bar::after{ content:''; position:absolute; z-index:-1; left:18px; right:44px; top:4px; bottom:4px;
+  pointer-events:none; opacity:.55;
+  background:linear-gradient(90deg,var(--m-or),var(--m-or-lo)) 0 0/100% 1px no-repeat,
+             linear-gradient(90deg,var(--m-or),var(--m-or-lo)) 0 100%/100% 1px no-repeat; }
+#pk-ed .pk-b{ padding:6px 9px !important; background:none; box-shadow:none; color:var(--m-quiet);
+  transition:color var(--t-hover) var(--settle); }
+#pk-ed .pk-b:hover, #pk-ed .pk-b:focus-visible{ color:var(--m-argent-hi); box-shadow:none; outline:none; }
+#pk-ed .pk-b.on{ color:var(--m-or-hi); background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; }
+#pk-ed .pk-b.bad{ color:#d98679; }
+#pk-ed .pk-b.bad:hover, #pk-ed .pk-b.bad:focus-visible{ color:#ffb3a6; background:none; }
+#pk-ed .pk-b.gilt{ position:absolute; right:0; top:50%; width:58px; height:54px; margin-top:-27px;
+  padding:0 !important; color:var(--m-argent-hi); font-size:9px; letter-spacing:.12em;
+  text-shadow:0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,170,150,.25);
+  clip-path:var(--m-wax);
+  background:radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(0,0,0,.22) 39% 43%, transparent 44%),
+    var(--m-wax-melt);
+  transition:transform var(--t-hover) var(--pop), filter var(--t-hover) var(--settle); }
+#pk-ed .pk-b.gilt:hover{ color:var(--m-argent-hi); filter:brightness(1.12); transform:rotate(-8deg) scale(1.05); }
+#pk-ed .pk-b.gilt:focus-visible{ filter:brightness(1.3); transform:rotate(-10deg) scale(1.08); }
+#pk-ed .pk-b.gilt:active{ transform:scale(.9); }
+#pk-ed .pk-pens, #pk-ed .pk-tints{ gap:3px; padding:0 8px !important; }
+/* an ink or a paper is drawn by its ::before; the ring it wears when it is
+   the one in use is its ::after, the same shape a size larger, behind it */
+#pk-ed .pk-pen, #pk-ed .pk-tint{ position:relative; isolation:isolate; width:24px; height:26px;
+  background:none !important; box-shadow:none; clip-path:none; outline:none; }
+#pk-ed .pk-pen::before, #pk-ed .pk-tint::before,
+#pk-ed .pk-pen::after, #pk-ed .pk-tint::after{ content:''; position:absolute; pointer-events:none; }
+#pk-ed .pk-pen::before{ inset:3px; background:var(--pen); clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
+#pk-ed .pk-tint::before{ inset:4px 5px 3px; clip-path:var(--m-shield);
+  background:linear-gradient(180deg,rgba(255,255,255,.35),transparent 60%),var(--paper,#eadbb5); }
+#pk-ed .pk-tint.t-cream{ --paper:#eadbb5; }
+#pk-ed .pk-tint.t-blue{ --paper:#c4d5e3; }
+#pk-ed .pk-tint.t-red{ --paper:#e0b8a8; }
+/* every ink has a faint argent edge, or the black one is a hole in the ribbon */
+#pk-ed .pk-pen::after{ z-index:-1; inset:0; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  background:rgba(244,232,204,.26); }
+#pk-ed .pk-tint::after{ z-index:-1; inset:1px 2px 0; clip-path:var(--m-shield); }
+#pk-ed .pk-pen.on::after, #pk-ed .pk-tint.on::after{ background:var(--m-or); }
+#pk-ed .pk-pen:hover::after, #pk-ed .pk-tint:hover::after,
+#pk-ed .pk-pen:focus-visible::after, #pk-ed .pk-tint:focus-visible::after{ background:var(--m-or-lo); }
+#pk-ed .pk-pen.on, #pk-ed .pk-tint.on{ outline:none; }
+
 /* ── A LINE ON THE WOOD (61-ink.js) ───────────────────────────
    No card, no edges, no shadow of its own box: it is ink. The line takes
    no presses unless you are rubbing out, so drawing over a piece never
