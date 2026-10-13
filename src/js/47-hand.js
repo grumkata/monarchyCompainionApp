@@ -113,6 +113,13 @@ function show(list, openId) {
   const n = openId ? Math.max(0, kinds.findIndex(k => k.id === openId)) : sel;
   pickKind(kinds[Math.min(n, kinds.length - 1)] || kinds[0]);
   paintFoot();
+  /* the keys come with it, onto the kind it opened on (walk, below) — unless
+     they are in the middle of something, a word half-typed in the chat */
+  const a = doc.activeElement;
+  if (!a || a === doc.body || !a.matches('input,textarea,select,[contenteditable="true"]')) {
+    const on = kindsEl.querySelector('.tbx-kind.on');
+    if (on) on.focus({ preventScroll: true });
+  }
 }
 
 function hide() {
@@ -134,7 +141,20 @@ function docked(on) {
 const isUp = () => !!dock && !dock.hidden;
 
 /* ── the kinds ── */
-function paintKinds() {
+/* A REPAINT KEEPS THE KEYS. The kinds are redrawn when a model's textures
+   land and the grid whenever what is in it changes, and both are innerHTML —
+   so whatever had focus was thrown away with the old button, mid-walk. The
+   same button on the new row takes it back. */
+function keepFocus(box, attr, paint) {
+  const a = doc.activeElement;
+  const had = a && box.contains(a) ? a.getAttribute(attr) : null;
+  paint();
+  if (had == null) return;
+  const to = [...box.querySelectorAll('[' + attr + ']')].find(x => x.getAttribute(attr) === had);
+  if (to) to.focus({ preventScroll: true });
+}
+function paintKinds() { keepFocus(kindsEl, 'data-n', paintKinds_); }
+function paintKinds_() {
   kindsEl.innerHTML = kinds.map((k, n) =>
     `<button class="tbx-kind" data-n="${n}" title="${esc(k.name)}  (${n + 1})">
        <span class="tbx-kfig${k.icon ? ' tbx-kico' : ''}">${k.icon || F().html(k.fig, k.figv || {}, 40)}</span>
@@ -209,7 +229,8 @@ function shown() {
   });
 }
 
-function paintGrid() {
+function paintGrid() { keepFocus(grid, 'data-id', paintGrid_); }
+function paintGrid_() {
   if (openKind && openKind.id === 'audio') return;
   const gs = groupsOf(opts);
   const big = opts.length > SHELF_AT;
@@ -613,6 +634,9 @@ function mount() {
       else if (root.Toolbox) root.Toolbox.shut();
       return;
     }
+    if (/^Arrow/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && walk(e.key)) {
+      e.preventDefault(); return;
+    }
     if (e.key >= '1' && e.key <= '9' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const n = +e.key - 1;
       if (n < kinds.length) { e.preventDefault(); sel = n; pickKind(kinds[n]); }
@@ -623,6 +647,47 @@ function mount() {
   });
 
   root.addEventListener('resize', () => { if (held) at(last.x, last.y); });
+}
+
+/* ══ THE ARROWS, INSIDE THE BOX ════════════════════════════════
+   A hundred and forty-eight models are a hundred and forty-eight Tab
+   presses. With the keys in the dock, the arrows walk it the way a game's
+   inventory is walked: left and right along the kinds (turning to each),
+   down off them into the grid, round the grid by its own columns, and up
+   off its top row back to the kinds. Enter on a tile is a click — the
+   bench — because it is a button. Only while the keys are IN the dock: an
+   arrow anywhere else still looks round the table (23-table3d.js). */
+function walk(key) {
+  const a = doc.activeElement;
+  if (!dock || !a || !dock.contains(a)) return false;
+  const kb = [...kindsEl.querySelectorAll('.tbx-kind')];
+  const tiles = grid.hidden ? [] : [...grid.querySelectorAll('.tbx-tile')];
+  const k = kb.indexOf(a);
+  if (k >= 0) {
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      const n = (k + (key === 'ArrowRight' ? 1 : -1) + kb.length) % kb.length;
+      sel = n; pickKind(kinds[n]);
+      const to = kindsEl.querySelectorAll('.tbx-kind')[n];
+      if (to) to.focus({ preventScroll: true });
+      return true;
+    }
+    if (key === 'ArrowDown' && tiles.length) { tiles[0].focus(); return true; }
+    return key === 'ArrowUp';                    /* nowhere above the kinds; just do not zoom */
+  }
+  const t = tiles.indexOf(a);
+  if (t < 0) return false;
+  const cols = Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(' ').length);
+  let n = t;
+  if (key === 'ArrowRight') n = Math.min(tiles.length - 1, t + 1);
+  if (key === 'ArrowLeft')  n = Math.max(0, t - 1);
+  if (key === 'ArrowDown')  n = Math.min(tiles.length - 1, t + cols);
+  if (key === 'ArrowUp') {
+    if (t < cols) { const on = kindsEl.querySelector('.tbx-kind.on'); if (on) on.focus(); return true; }
+    n = t - cols;
+  }
+  tiles[n].focus();
+  tiles[n].scrollIntoView({ block: 'nearest' });
+  return true;
 }
 
 /* the table pans and zooms without telling anyone; re-place each frame —

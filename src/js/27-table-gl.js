@@ -628,7 +628,7 @@ const TAVERN_PLAN = [
   { p:'R', m:'Prop_Support', x:2.9, y:0.2, z:2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
   /* ── the hearth, dead ahead ─────────────────────────────── */
   { p:'T', m:'Fireplace', x:0, y:0, z:-2.62, r:0 },
-  { p:'T', m:'Cauldron', x:0, y:0.02, z:-2.24, r:0, s:0.45 },
+  { p:'T', m:'Cauldron', x:0, y:0.235, z:-2.24, r:0, s:0.45 },   /* ON the hearth stone, whose top is 0.234 */
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.7, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.58, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.46, r:90, s:1 },
@@ -870,6 +870,9 @@ function layRoom() {
     cheeseRec = BATCH.pop();
     cheese.position.set(crow.x, FLOOR_Y + (crow.y || 0), crow.z);
   }
+  /* the hearth's back and its logs belong to the fireplace, wherever the
+     plan has put it */
+  for (const row of plan) if (row.p === 'T' && row.m === 'Fireplace') dressHearth(row, T, TB);
   /* whatever the plan says about a chandelier is where its flames go, and
      no chandelier means no flames */
   aimChandelier(plan);
@@ -884,6 +887,92 @@ function layRoom() {
   for (const rec of over) BATCH.push(rec);
   flushRoom(overGroup, 'over');
   if (cheeseRec) { BATCH.push(cheeseRec); flushRoom(cheese, 'cheese'); }
+}
+
+/* ══ A FIREPLACE HAS A BACK, AND ITS LOGS LIE ON THE HEARTH ═════
+   Looking across the table from your chair, the hearth was a stone arch
+   with the WALL showing through it — plaster and the timber cross-brace of
+   the frame, as if the fireplace were a doorway. The model does have a
+   fireback, sloping, 0.62m in from its own front; it is simply set so far
+   into the far wall that the back lands inside the wall's slab, and the
+   wall's face (2.90m out) is drawn over it.
+
+   And the three logs in it were buried. The hearth stone's top is 0.234m
+   up; the logs were laid at 0.05, so a 9cm log topped out at 0.19 — inside
+   the stone, every one of them. The grate looked swept because, as far as
+   anybody could see, it was.
+
+   So both are dressed from the plan's own Fireplace row, in its own frame:
+   a soot-black firebrick back stood a hand's depth inside the opening, in
+   front of where any wall can be, and the logs laid on the stone across the
+   grate, charred. Move the fireplace in the room editor and its back and its
+   logs go with it — a fireplace's insides are not coordinates in the room.
+
+   NOT A FIRE. grumkata asked for the light out of the hearth, and the glow
+   that was standing in for flames went with it; this puts back nothing that
+   shines. The brick is Lambert, lit by the same sky term as every wall, and
+   reads as a cold hearth with the night's fire burned down. */
+const HEARTH = { top: 0.234, back: -0.26, w: 0.96, lintel: 1.22 };
+const HEARTH_LOGS = [            /* fireplace-local x, z, how high, turn */
+  [-0.08, -0.15, 0, 98], [0.07, -0.03, 0, 79], [0.0, -0.09, 0.068, 93]];
+let sootTex = null;
+function firebrick() {
+  if (sootTex) return sootTex;
+  const c = doc.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#120c08'; x.fillRect(0, 0, 256, 256);
+  /* firebrick in running bond, every brick its own burnt shade — from a
+     fixed seed, so the room is the same room every time it is laid */
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const BW = 64, BH = 22;
+  for (let row = 0, y = 0; y < 256; row++, y += BH) {
+    for (let bx = (row % 2) ? -BW / 2 : 0; bx < 256; bx += BW) {
+      const v = 22 + rnd() * 16, r = v * (1.25 + rnd() * 0.2);
+      x.fillStyle = `rgb(${r | 0},${(v * 0.82) | 0},${(v * 0.62) | 0})`;
+      x.fillRect(bx + 2, y + 2, BW - 4, BH - 4);
+    }
+  }
+  /* soot: black where the smoke went up the middle, heaviest at the top */
+  const g = x.createRadialGradient(128, 30, 10, 128, 60, 220);
+  g.addColorStop(0, 'rgba(0,0,0,.88)'); g.addColorStop(0.55, 'rgba(0,0,0,.55)');
+  g.addColorStop(1, 'rgba(0,0,0,.18)');
+  x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  /* and a grey of old ash along the foot, where the fire sat */
+  const a = x.createLinearGradient(0, 256, 0, 196);
+  a.addColorStop(0, 'rgba(92,84,76,.35)'); a.addColorStop(1, 'rgba(92,84,76,0)');
+  x.fillStyle = a; x.fillRect(0, 196, 256, 60);
+  sootTex = new THREE.CanvasTexture(c);
+  sootTex.encoding = THREE.sRGBEncoding;
+  return sootTex;
+}
+function dressHearth(row, T, TB) {
+  const s = row.s == null ? 1 : row.s;
+  const ry = (row.r || 0) * Math.PI / 180, C = Math.cos(ry), S = Math.sin(ry);
+  const base = FLOOR_Y + (row.y || 0);
+  /* fireplace-local to room, the same turn put() gives a row */
+  const at = (lx, lz) => [row.x + s * (lx * C + lz * S), row.z + s * (-lx * S + lz * C)];
+
+  const h = HEARTH.lintel - HEARTH.top;
+  const geo = new THREE.PlaneGeometry(HEARTH.w, h);
+  geo.translate(0, HEARTH.top + h / 2, HEARTH.back);
+  const back = new THREE.Mesh(geo, B3(new THREE.MeshLambertMaterial({ map: firebrick() }),
+    { room: 'tavern', rim: 0, steps: 6, tint: 0.30, hard: 0.5 }));
+  back.position.set(row.x, base, row.z);
+  back.rotation.y = ry;
+  back.scale.setScalar(s);
+  back.castShadow = back.receiveShadow = false;
+  back.userData.plan = 1;
+  roomGroup.add(back);
+
+  if (!T || !T.FireLog) return;
+  for (const [lx, lz, up, turn] of HEARTH_LOGS) {
+    const [wx, wz] = at(lx, lz);
+    /* 0.031 is half a log's own depth at this scale: it lies ON the stone */
+    put(T, TB, 'FireLog', DRESS.char, wx, base + s * (HEARTH.top + 0.031 + up), wz,
+        ry + turn * Math.PI / 180, 0.85 * s);
+  }
 }
 
 /* ══ THE PEOPLE AT THE TABLE ═══════════════════════════════════
@@ -1493,41 +1582,10 @@ function glow(colour, size) {
 function fire() {
   const T = (typeof TAVERN !== 'undefined') ? TAVERN : null;
 
-  /* the embers in the hearth: real geometry, really glowing */
-  if (T && T.FireLog) {
-    for (const p of [[-0.16, 0, 0.1], [0.15, 0.02, -0.05], [0, 0.09, 0.06]]) {
-      const g = mesh(T.FireLog.prims, TAVERN_TEX, DRESS.tavern);
-      g.traverse(o => {
-        if (!o.isMesh) return;
-        o.castShadow = o.receiveShadow = false;
-        /* ── A COAL IS NOT LIT, IT IS THE LIGHT ───────────
-           These were Standard with an emissive on top, sitting twenty
-           centimetres from a point light of intensity 3.4 with inverse
-           square falloff — so their diffuse term alone came out around
-           eighty, the emissive added three more, and every channel
-           clipped. The fire had a flat WHITE CARD lying in it.
-
-           Basic takes no light at all, which is the honest description
-           of a coal: its brightness is its own and tickFire sets it
-           directly, so it glows and breathes and never clips. */
-        /* -- AND NOW A COAL IS JUST A LOG -----------------------
-           It was Basic and unlit precisely so it could be brighter than
-           the room and breathe on tickFire's clock. That is a light, in
-           every way that matters to somebody looking at the screen, so it
-           goes with the rest of them: an ordinary lit material, taking
-           the sky term like every other piece of timber in the room.
-
-           Not pushed to emberMats either, so tickFire has nothing left to
-           animate even if something ever calls it again. */
-        o.material = new THREE.MeshLambertMaterial({
-          map: o.material.map, color: 0x6b5a4c });
-      });
-      g.position.set(p[0], FLOOR_Y + 0.05 + p[1], -RZ + 0.62 + p[2]);
-      g.rotation.y = Math.random() * 3;
-      g.scale.setScalar(0.85);
-      roomGroup.add(g);
-    }
-  }
+  /* THE EMBERS ARE NOT HERE ANY MORE. They were three logs placed by
+     coordinate, once, at a height that put them inside the hearth stone —
+     and as plain lit timber they were no longer embers anyway. The hearth's
+     logs are laid by dressHearth() now, from the plan, on the stone. */
   /* THE HALO IS GONE TOO. Two additive sprites over the hearth, and they
      were the single brightest thing in the picture -- the thing you would
      point at if somebody asked you to point at the light from the
@@ -2005,6 +2063,10 @@ const DRESS = {
            wood:  { mul: [0.09, 0.075, 0.06], rough: 0.97, metalness: 0.0 } },
   tavern:{ metal: { mul: [0.28, 0.25, 0.21], rough: 0.58, metalness: 0.60 },
            wood:  { mul: [0.34, 0.29, 0.23], rough: 0.74, metalness: 0.0 } },
+  /* the logs on the hearth (dressHearth): the same timber, burnt — about
+     half the albedo of the log pile beside it and pulled toward black */
+  char:  { metal: { mul: [0.10, 0.09, 0.08], rough: 0.95, metalness: 0.0 },
+           wood:  { mul: [0.15, 0.115, 0.095], rough: 0.95, metalness: 0.0 } },
   /* A LAMP HAS TO LOOK LIT. There are five lanterns on the walls and every
      one of them was a dark lump of tin, because a wall lamp in this room is
      a MODEL and the light in the room comes from somewhere else entirely.

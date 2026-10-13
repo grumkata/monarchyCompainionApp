@@ -1540,15 +1540,34 @@ body.peeking .prop.t3-thing.sel > .face::after{ display:none; }
    notation fell through to a handler that did not exist, and the
    words vanished. Speech sits in the same dock as the rolls,
    quieter than them, because most of a session is talking.     */
+/* THE NAME OVER THE WORDS, the way a roll already had it. Speech used to be a
+   row — name, then words beside it — and a roll a column, so the dock read
+   in two shapes, and every line of speech was indented by however long the
+   speaker's name happened to be. One shape now: the name on its own line,
+   what was said or thrown under it, all of it on one left edge. */
 .cl.said{
-  display:flex; gap:9px; align-items:baseline;
-  padding:5px 11px; line-height:1.45;
+  display:block; padding:5px 11px; line-height:1.45;
 }
 .cl.said > b{
-  flex:0 0 auto; font-family:var(--m-f-cap); font-size:9px; font-weight:700;
-  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); padding-top:3px;
+  display:block; font-family:var(--m-f-cap); font-size:9px; font-weight:700;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); margin-bottom:1px;
 }
 .cl.said .stxt{ color:var(--m-text); font-size:14px; }
+.cl.roll{ padding:5px 11px; }
+/* A RUN BY ONE SPEAKER is signed once (57-chat-net.js thread): the lines after
+   the first drop the name and close up under it */
+.cl.cont{ margin-top:-10px; padding-top:0; }
+.cl.cont > b:first-child{ display:none; }
+/* THE DOCK BEFORE ANYBODY HAS SPOKEN. It was an empty dark column, which on
+   the first evening says nothing about what it is for. A line in the dock's
+   own quiet hand, gone the moment the first line arrives. */
+.chatdock .cb:empty::before{
+  content:'The table is quiet.\A Say something, or roll \2014  /r 2d6';
+  white-space:pre-line; display:block; margin:18px 11px 0; padding-top:12px;
+  border-top:1px solid var(--m-line);
+  font-family:var(--m-f-hand); font-style:italic; font-size:14px; line-height:1.6;
+  color:var(--m-hush);
+}
 .cl.said.emote{ font-style:italic; }
 /* THE GM IS NOT LOUDER, THEY ARE MARKED. Same size, same weight — a gilt
    rule down the edge, the way a marginal hand marks a passage. At a table

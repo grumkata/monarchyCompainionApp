@@ -327,6 +327,13 @@ function natural(k, v) {
        tray, in your hand and on the wood. */
     const form = v && v.entKind === 'form';
     if (v && v.plate) return form ? [150, 140] : [116, 140];
+    /* A STANDEE IS TALLER THAN A COIN. It is drawn 100 wide and 136 high
+       (14-war.css .tl-stand), and boxed as a 104-high coin it spilled 27px
+       out of the bottom of every toolbox tile, straight over the name under
+       it — "A new person" read as an A and an n either side of a plinth.
+       Only the unnamed counter changes: the named one stands on the wood,
+       where standing proud of its box is the point. */
+    if (!(v && v.look === 'coin')) return form ? [124, 136] : [100, 136];
     return form ? [124, 104] : n;
   }
   return n;

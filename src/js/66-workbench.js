@@ -306,6 +306,20 @@ function field(fd) {
                min="${fd.min}" max="${fd.max}" ${fd.locked ? 'readonly' : ''}>
         <button type="button" class="wb-step" data-f="${fd.f}" data-step="1" ${fd.locked ? 'disabled' : ''}>+</button>
       </span>`;
+  } else if (fd.type === 'choice' && fd.choices === TURNS8) {
+    /* EIGHT WAYS TO FACE ARE A COMPASS, not a row of pennons. As pennons
+       they ran one past the width of the dock, so "315°" sat on a line of
+       its own under the other seven, and a row of numbers is the least
+       legible way there is to say which way something is looking. The same
+       buttons, stood round a rose with a needle at the one that is chosen. */
+    const a = +val || 0;
+    control = `<span class="wb-rose" style="--a:${a}deg">
+        <i class="wb-needle"></i>
+        ${fd.choices.map(c => `<button type="button" class="wb-pen wb-pt${String(c[0]) === String(val) ? ' on' : ''}"
+           data-f="${fd.f}" data-val="${esc(c[0])}" style="--p:${c[0]}deg" title="${esc(c[1])}"
+           aria-label="Face ${esc(c[1])}" ${fd.locked ? 'disabled' : ''}></button>`).join('')}
+        <b class="wb-rose-v">${a}&deg;</b>
+      </span>`;
   } else if (fd.type === 'choice') {
     control = `<span class="wb-pens">${fd.choices.map(c =>
       `<button type="button" class="wb-pen${String(c[0]) === String(val) ? ' on' : ''}"
@@ -428,6 +442,17 @@ function wire() {
     set(f, val, whole);
     if (!whole) el.querySelectorAll(`.wb-pen[data-f="${f}"], .wb-ter[data-f="${f}"]`).forEach(x =>
       x.classList.toggle('on', x.dataset.val === b.dataset.val));
+    /* the rose's needle swings round to the point that was pressed */
+    const rose = b.closest('.wb-rose');
+    if (rose) {
+      /* the short way round: 315 to 0 is a step clockwise, not a lap back */
+      const was = parseFloat(rose.dataset.a || rose.style.getPropertyValue('--a')) || 0;
+      const turn = (((+b.dataset.val || 0) - was) % 360 + 540) % 360 - 180;
+      rose.dataset.a = String(was + turn);
+      rose.style.setProperty('--a', (was + turn) + 'deg');
+      const say = rose.querySelector('.wb-rose-v');
+      if (say) say.textContent = (+b.dataset.val || 0) + '°';
+    }
   }));
   el.querySelectorAll('.wb-face').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.face === 'own') {

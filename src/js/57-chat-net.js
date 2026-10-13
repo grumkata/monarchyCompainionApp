@@ -193,6 +193,47 @@ root.addEventListener('monarchy:session', e => {
     note(d.what === 'closed' ? 'The GM has closed the table' : 'You have left the table');
   }
 });
+/* ══ ONE NAME OVER A RUN OF LINES ═════════════════════════════
+   Four things said in a row by one person put their name in the dock four
+   times, in gilt capitals, and the conversation read as a list of who rather
+   than what. A line that follows its own speaker's last line is a
+   continuation: it keeps its words and drops the name (13-table-ui.css
+   .cl.cont), the way a letter is signed once at the end and not after every
+   sentence.
+
+   Watched rather than wired in, because lines come from three files (39-dice
+   writes your own and your notices, this file what arrives, 78-chat-media
+   pictures) and all three only ever append to the one body. A pause of two
+   minutes starts a new run, so a name comes back when the talk picks up. */
+const RUN = 120000;
+const speakerOf = d => {
+  if (!d || !d.classList || d.classList.contains('emote') || d.classList.contains('sys') ||
+      d.classList.contains('note')) return '';
+  const b = d.firstElementChild;
+  return (b && b.tagName === 'B') ? b.textContent.trim() : '';
+};
+function thread(d) {
+  if (!d || !d.classList || !d.classList.contains('cl')) return;
+  d.dataset.t = d.dataset.t || String(Date.now());
+  const p = d.previousElementSibling;
+  const who = speakerOf(d);
+  d.classList.toggle('cont', !!who && !!p && speakerOf(p) === who &&
+                             (+d.dataset.t - (+p.dataset.t || 0)) < RUN);
+}
+function watchRuns() {
+  const cb = body();
+  if (!cb || !root.MutationObserver) return;
+  [...cb.children].forEach(thread);
+  new root.MutationObserver(list => list.forEach(m => {
+    m.addedNodes.forEach(thread);
+    /* the oldest line falling off the top (draw's cap of 300) leaves the new
+       first line as a continuation of nothing */
+    if (m.removedNodes.length && cb.firstElementChild) cb.firstElementChild.classList.remove('cont');
+  })).observe(cb, { childList: true });
+}
+if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', watchRuns);
+else watchRuns();
+
 root.ChatNet = { scrub, draw };
 
 })(window, document);

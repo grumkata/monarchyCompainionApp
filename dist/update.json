@@ -4,9 +4,16 @@
  "files": {
   "assets/bob/bob.js": "69834c6b2d0472deccb15df76fc1e37e185d7b49c4ef7c1de1126b3903adaca6",
   "assets/doom/doom-wasm.js": "cbddc09bda339b5da52f56f134884fe422217a2ff49f786e37e4b715d29a943c",
-  "assets/images/textures/table-surface.svg": "e30fb4f5f11d074ddef2e58a6766e6f1cfee3b5e4042554c4f76ac66f9ded93d",
-  "assets/images/tokens/_default-ally.svg": "2fb6046d2dd9e0a33d9cd87252b7a56ae917a41a1eafdb5730952db37c8bddd8",
-  "assets/images/tokens/_default-enemy.svg": "71304e0c351fdc88818d867c5952ec10b7187b567a951bd1fe1b107dd4c6dd3b",
+  "assets/fonts/barlow-condensed-bold.woff2": "3787a5a419171630e6890cfa47c4da067474d005cd0ff8dc11ec090fdc3ee2b8",
+  "assets/fonts/barlow-condensed.woff2": "460f141ec8f6c9a1516bfd2bd9fe71656246d7a9d04a0955faf53158d8970c4c",
+  "assets/fonts/cinzel.woff2": "09941fb1c169c38fd414536b37690057fc01b3117a5c63dd6571186540c8f370",
+  "assets/fonts/crimson-text-bold.woff2": "e2ca4f57a77f4db70d61c4d16e748545ce2000e0252be1f67fa1c964040f9b9b",
+  "assets/fonts/crimson-text-italic.woff2": "ded83489adaeec098ee0d639252e72be7de219f759b939ba4b2e606e5e68b272",
+  "assets/fonts/crimson-text.woff2": "538c7067580f457dd3dd98ebaabeb19405c12bdd01674d3db8fd9948ee73c862",
+  "assets/fonts/unifraktur-maguntia.woff2": "a467466874b50cd9ffbe10e5caccd9b261f2bc2252bcfa7d160c744ed9da6f15",
+  "assets/images/textures/table-surface.svg": "b19fa2ddcc2591a42f0d175c501d5b473c7566573d34fa9d912c28a243bab3c5",
+  "assets/images/tokens/_default-ally.svg": "f0e5ebd9d391b5f68b88a9688526bfc4d4fc324525661e6613a61db95a767899",
+  "assets/images/tokens/_default-enemy.svg": "24d52be38d070ec1309521954acb926cd179cc796162b89e3eec83f53962345e",
   "assets/tex/00cb3055673d88eb.png": "0780d7d760d9eea66ce431a3e455c04313855e6ddae29ad9ff0d4c73e81ddbe2",
   "assets/tex/03991d86b4b140c3.png": "c42d27be0d4ccf2a18ca2ad90fcd124d432ac3944255ab99631616356acc83bd",
   "assets/tex/16930e294abee5d5.png": "eb949d861ce389ffa42693f96941de76ea0c1e377c763deffd25e6c01e8438c0",
@@ -91,7 +98,7 @@
   "assets/tex/ec62a96f1cff3ea9.png": "e88abfc5d7247e8dd6f6b6a4a60d51dd2f34bc3b5957c153be967cc7691e4bbb",
   "assets/tex/f9e2715e820d1be0.jpg": "3da65ba700181f0abe1254128066e3489b8f9ce27ec411bda98a3227445747de",
   "assets/tex/fb220079c1bf9fac.png": "33e5e73ab19995afcf772fb9dec88313200c2d71ebd00cca8e105567a0e5af2c",
-  "cover.html": "cf69a5d92409acacd9325068e9b5868684bdde628394a687c246a3248baf1ec0",
-  "monarchy.html": "337fc47ebdd4adad2b721f1d861496f77a898269fda22796ddc44310f6d98f2b"
+  "cover.html": "deca7df5e2294190e2ac266598adf9fb354edc6f109a9fc632ef6aca68b47d00",
+  "monarchy.html": "abd9ebbd19dcd48d390d6978b351fe738bfe023ad7cae7245c419746880860ed"
  }
 }

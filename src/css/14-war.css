@@ -223,6 +223,44 @@ body.field-on .gmr{ z-index:1210; }
 .wb-pen:disabled{ opacity:.35; cursor:default; }
 .wb-pen:disabled.on{ opacity:.7; }
 
+/* ── A COMPASS ROSE, for the eight ways a thing can face ───────
+   A sunk well with a gilt ring, eight lozenges stood round it, the chosen
+   one Or, and a needle that swings to it the short way round (66-workbench.js).
+   The lozenge is the app's own shape, and a rose is what a map has always
+   used to say which way. */
+.wb-rose{ position:relative; width:128px; height:128px; margin:4px 0 2px 8px; border-radius:50%;
+  background:
+    radial-gradient(circle, var(--m-sable-0) 0 30%, transparent 30.5%),
+    repeating-conic-gradient(from -22.5deg, rgba(201,162,39,.10) 0 45deg, transparent 45deg 90deg),
+    radial-gradient(circle, var(--m-sable-2), var(--m-sable-0) 70%);
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 0 0 14px rgba(0,0,0,.18), inset 0 3px 8px rgba(0,0,0,.6); }
+.wb-rose::before{ content:''; position:absolute; inset:24px; border-radius:50%;
+  box-shadow:inset 0 0 0 1px rgba(201,162,39,.28); pointer-events:none; }
+.wb-needle{ position:absolute; left:50%; top:50%; width:4px; height:44px; margin:-44px 0 0 -2px;
+  transform-origin:50% 100%; transform:rotate(var(--a, 0deg));
+  background:linear-gradient(180deg, var(--m-or-hi), var(--m-or) 60%, var(--m-or-lo));
+  clip-path:polygon(50% 0, 100% 100%, 0 100%); pointer-events:none;
+  transition:transform .42s var(--pop, cubic-bezier(.2,1.3,.4,1)); }
+.wb-rose .wb-pt{ position:absolute; left:50%; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; padding:0;
+  clip-path:var(--m-lozenge); background:var(--m-sable-3); box-shadow:none;
+  transform:rotate(var(--p)) translateY(-52px) rotate(calc(-1 * var(--p)));
+  transition:background var(--t-hover) var(--settle), transform var(--t-hover) var(--settle); }
+.wb-rose .wb-pt::after{ content:''; position:absolute; inset:4px; clip-path:var(--m-lozenge);
+  background:var(--m-sable-0); transition:background var(--t-hover) var(--settle); }
+.wb-rose .wb-pt:hover{ background:var(--m-or-lo);
+  transform:rotate(var(--p)) translateY(-52px) rotate(calc(-1 * var(--p))) scale(1.18); }
+.wb-rose .wb-pt.on{ background:var(--m-or); }
+.wb-rose .wb-pt.on::after{ background:var(--m-or-hi); }
+.wb-rose-v{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1;
+  min-width:38px; text-align:center; font-family:var(--m-f-tally); font-weight:700; font-size:15px;
+  color:var(--m-argent-hi); pointer-events:none; text-shadow:0 1px 2px rgba(0,0,0,.8); }
+@media (prefers-reduced-motion:reduce){ .wb-needle{ transition:none; } }
+
+/* the dock's own foot says how to choose something; with a bench open the
+   choosing is done, and the bench has its own foot of actions — unless there
+   is something in your hand, which the foot is the place to say */
+body:not(.holding) .tbx.benching .tbx-foot{ display:none; }
+
 /* a terrain is its sky over its ground, with its name on it */
 .wb-terrains{ display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
 .wb-ter{ position:relative; height:52px; border:0; padding:0; cursor:pointer; overflow:hidden;
@@ -834,3 +872,32 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
 .au-prow button:hover { background: var(--m-or); color: var(--m-sable); }
 .au-add { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--m-line); }
 .au-picked { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: italic 12px/1.2 var(--m-f-hand); color: var(--m-quiet); }
+
+/* ══ THE KEYBOARD CAN SEE WHERE IT IS ══════════════════════════
+   20-shell.css rings whatever has the keys, two pixels OUTSIDE it — and
+   nearly every control at the table is cut to a pennon, a plaque or a
+   lozenge with clip-path, which clips the ring along with everything else.
+   Tab through the toolbox and the focus went from tab to tile to button
+   with nothing on screen to say so. Inside the cut, then: the same gilt,
+   drawn four pixels in, where the cut cannot reach it. */
+.gmr-b:focus-visible, .tbx-kind:focus-visible, .tbx-tab:focus-visible, .tbx-tile:focus-visible,
+.tbx-x:focus-visible, .wb-back:focus-visible, .wb-pen:focus-visible, .wb-act:focus-visible,
+.wb-ter:focus-visible, .wb-face:focus-visible, .insp-b:focus-visible, .insp-x:focus-visible,
+.kit-b:focus-visible, .kit-chip:focus-visible, .cin button:focus-visible, .hud button:focus-visible{
+  outline:2px solid var(--m-or-hi); outline-offset:-4px; }
+/* and the sweep with it, wherever the hover has one — "never just the ring" */
+.tbx-kind:focus-visible, .tbx-tab:focus-visible, .wb-pen:focus-visible, .wb-act:not(.go):focus-visible,
+.wb-back:focus-visible, .insp-b:focus-visible, .tbx-x:focus-visible, .insp-x:focus-visible{
+  background-position:0 0; color:var(--m-sable); outline-color:var(--m-sable); }
+/* a lozenge is too small to ring inside: it lights instead */
+.wb-step:focus-visible{ outline:none; background:var(--m-or-hi); transform:scale(1.14); }
+.wb-rose .wb-pt:focus-visible{ outline:none; background:var(--m-or-hi); }
+
+/* ══ AND A PRESS IS FELT ══════════════════════════════════════
+   The shared press (20-shell.css) is a pixel down — and a tile's own hover
+   lifts it two pixels UP with a transform of its own, which outranks the
+   press, so a tile did not move at all when you pressed it. It settles
+   into the dock instead. */
+.tbx-tile:active{ transform:translateY(0) scale(.97); transition-duration:.06s; }
+.tbx-kind:active, .tbx-tab:active, .wb-pen:active, .wb-act:active{ transform:translateY(1px); }
+.wb-rose .wb-pt:active{ transform:rotate(var(--p)) translateY(-52px) rotate(calc(-1 * var(--p))) scale(.86); }
