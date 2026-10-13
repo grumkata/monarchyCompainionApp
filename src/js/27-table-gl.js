@@ -175,8 +175,98 @@ function buildTable() {
   /* it casts (onto the pieces layer it never reaches, harmlessly) but above
      all it RECEIVES — a chest standing on the wood darkens the wood */
   tableObj = casts(normalise(body, true));
+  /* after casts(): the inlay lies IN the top, it must not shadow it */
+  const inl = inlay();
+  if (inl) tableObj.add(inl);
   uScene.add(tableObj);
   buildRoom();
+}
+
+/* ══ THE ROUND TABLE ═══════════════════════════════════════════
+   A plain disc of oak is any table in any game. This one is a monarch's:
+   the round table at Winchester, painted for Henry VIII, is a place for each
+   knight round a rose — so this one has its places inlaid, in the way a
+   cabinetmaker would rather than a painter. A double band of pale holly
+   inside the rim, eight seat lines running in to a ring at the middle, and a
+   rose of two woods at its heart. Faint, so the oak stays the oak and the
+   pieces stay the thing you look at; it is there when the table is empty,
+   and it is what you see when you look down at it.
+
+   One canvas, drawn once, on a disc a hair above the top, in the table's own
+   local space — so it pans, tilts and turns with the wood for nothing. It
+   takes the shadows that fall on the top, and throws none of its own. */
+function inlay() {
+  const N = 1024, c = doc.createElement('canvas');
+  c.width = c.height = N;
+  const x = c.getContext('2d'), C = N / 2, R = N / 2;
+  const holly = 'rgba(232,206,160,', ebony = 'rgba(38,22,12,';
+  const ring = (r, w, col) => { x.beginPath(); x.arc(C, C, r * R, 0, Math.PI * 2);
+                                x.lineWidth = w; x.strokeStyle = col; x.stroke(); };
+  /* the banding: holly between two black stringing lines */
+  ring(0.905, 3, ebony + '.30)');
+  ring(0.885, 9, holly + '.20)');
+  ring(0.865, 3, ebony + '.30)');
+  /* the eight places, pale, running in to the ring round the rose */
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const r0 = 0.235, r1 = 0.858;
+    x.beginPath();
+    x.moveTo(C + Math.cos(a) * r0 * R, C + Math.sin(a) * r0 * R);
+    x.lineTo(C + Math.cos(a) * r1 * R, C + Math.sin(a) * r1 * R);
+    x.lineWidth = 5; x.strokeStyle = holly + '.10)'; x.stroke();
+    /* a lozenge at each place's foot, by the band, where a name would go */
+    const lx = C + Math.cos(a) * 0.80 * R, ly = C + Math.sin(a) * 0.80 * R;
+    /* a true lozenge, long along its own line, whichever way the line runs */
+    x.save(); x.translate(lx, ly); x.rotate(a);
+    x.beginPath(); x.moveTo(16, 0); x.lineTo(0, 8); x.lineTo(-16, 0); x.lineTo(0, -8); x.closePath();
+    x.fillStyle = holly + '.15)'; x.fill();
+    x.strokeStyle = ebony + '.26)'; x.lineWidth = 2; x.stroke();
+    x.restore();
+  }
+  ring(0.235, 3, ebony + '.28)');
+  ring(0.220, 7, holly + '.16)');
+  /* the rose: five outer petals, five inner turned half a petal, a boss of seeds */
+  /* the petals are one piece of veneer each layer, so they are filled as ONE
+     shape — filled one by one, their overlaps stacked into a pale cloud */
+  const petals = (n, r, pr, off, fill, line) => {
+    x.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = off + (i / n) * Math.PI * 2, px = C + Math.cos(a) * r * R, py = C + Math.sin(a) * r * R;
+      x.moveTo(px + pr * R, py); x.arc(px, py, pr * R, 0, Math.PI * 2);
+    }
+    x.fillStyle = fill; x.fill(); x.lineWidth = 2.5; x.strokeStyle = line; x.stroke();
+  };
+  petals(5, 0.085, 0.072, -Math.PI / 2, holly + '.15)', ebony + '.30)');
+  petals(5, 0.050, 0.046, -Math.PI / 2 + Math.PI / 5, ebony + '.12)', ebony + '.28)');
+  x.beginPath(); x.arc(C, C, 0.034 * R, 0, Math.PI * 2);
+  x.fillStyle = holly + '.26)'; x.fill(); x.lineWidth = 2.5; x.strokeStyle = ebony + '.34)'; x.stroke();
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    x.beginPath(); x.arc(C + Math.cos(a) * 0.018 * R, C + Math.sin(a) * 0.018 * R, 4, 0, Math.PI * 2);
+    x.fillStyle = ebony + '.35)'; x.fill();
+  }
+  /* and the barbs between the outer petals, the way a heraldic rose is drawn */
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + Math.PI / 5 + (i / 5) * Math.PI * 2;
+    const tx = C + Math.cos(a) * 0.168 * R, ty = C + Math.sin(a) * 0.168 * R;
+    const bx = C + Math.cos(a) * 0.118 * R, by = C + Math.sin(a) * 0.118 * R;
+    const nx = -Math.sin(a) * 0.016 * R, ny = Math.cos(a) * 0.016 * R;
+    x.beginPath(); x.moveTo(tx, ty); x.lineTo(bx + nx, by + ny); x.lineTo(bx - nx, by - ny); x.closePath();
+    x.fillStyle = ebony + '.22)'; x.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = uRen ? uRen.capabilities.getMaxAnisotropy() : 4;
+  const geo = new THREE.CircleGeometry(0.5, 128);
+  geo.rotateX(-Math.PI / 2);                     /* lying in the top, facing up out of it */
+  const m = B3(new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false,
+                 roughness: 0.62, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }),
+               { room: 'tavern', steps: 9, tint: 0.20, hard: 0.26, rim: 0 });
+  const disc = new THREE.Mesh(geo, m);
+  disc.position.y = 0.0006;
+  disc.castShadow = false; disc.receiveShadow = true;
+  disc.renderOrder = 1;
+  return disc;
 }
 
 /* ══ THE ROOM ══════════════════════════════════════════════════
