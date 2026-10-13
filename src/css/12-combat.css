@@ -632,6 +632,24 @@ body.seated .zl{opacity:0}
 .toast{bottom:auto;top:64px}
 /* on the body now (28-table-boot.js), over the wood and its canvases, under the chat */
 #table-toast{z-index:1450;pointer-events:none}
+/* A NOTICE IS CRIED ON A SCROLL. It was a dark strip with a coloured bar
+   down its left — every app's snackbar. Now it is the argent motto ribbon
+   the chat and the toolbox are titled on, lettered in sable, its folded-back
+   ends in your own livery: the table telling you something, in your colours. */
+#table-toast{clip-path:none;background:none;box-shadow:none;isolation:isolate;
+  padding:8px 30px 9px;color:var(--m-sable);text-shadow:0 1px 0 rgba(255,255,255,.35);white-space:nowrap}
+#table-toast::after{content:'';position:absolute;inset:0;z-index:-1;
+  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%,9px 50%);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.55),transparent 22%,transparent 70%,rgba(60,40,20,.28)),
+    linear-gradient(90deg,rgba(90,70,40,.35),transparent 18%,transparent 82%,rgba(90,70,40,.35)),
+    var(--m-argent)}
+#table-toast::before{content:'';position:absolute;z-index:-2;left:-13px;right:-13px;top:6px;bottom:-6px;
+  background:
+    linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.5)),
+    var(--m-house,#6f6656);
+  clip-path:polygon(0 0,22px 0,22px 100%,0 100%,9px 50%,0 0,
+    calc(100% - 22px) 0,calc(100% - 22px) 100%,100% 100%,calc(100% - 9px) 50%,100% 0,calc(100% - 22px) 0)}
 /* ══ THE PIECES ══
    Drawn by the WebGL layer (gl.js): counters and large-unit shields get real
    moulded geometry and a plastic sheen. The DOM elements keep their boxes, so
