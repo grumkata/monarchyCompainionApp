@@ -630,6 +630,8 @@ body{display:block;padding:0}
 .zl.live{opacity:1;transform:none;color:var(--m-or);transition-duration:.12s}
 body.seated .zl{opacity:0}
 .toast{bottom:auto;top:64px}
+/* on the body now (28-table-boot.js), over the wood and its canvases, under the chat */
+#table-toast{z-index:1450}
 /* ══ THE PIECES ══
    Drawn by the WebGL layer (gl.js): counters and large-unit shields get real
    moulded geometry and a plastic sheen. The DOM elements keep their boxes, so

@@ -172,7 +172,7 @@ function mount() {
 }
 
 function say(t) {
-  const el = doc.getElementById('toast');
+  const el = doc.getElementById('table-toast');
   if (!el) return;
   el.textContent = t; el.classList.add('on');
   clearTimeout(say._t); say._t = setTimeout(() => el.classList.remove('on'), 2200);

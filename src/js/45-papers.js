@@ -503,7 +503,7 @@ root.addEventListener('monarchy:where', e => {
 });
 
 function toast(m) {
-  const t = doc.getElementById('toast'); if (!t) return;
+  const t = doc.getElementById('table-toast'); if (!t) return;
   t.textContent = m; t.classList.add('on');
   setTimeout(() => t.classList.remove('on'), 2200);
 }

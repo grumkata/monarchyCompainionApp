@@ -1720,7 +1720,7 @@ function scaleUnder(e) {
    screen for something you only look at while your hand is moving */
 let sizeT = 0;
 function size(name, k) {
-  const el = doc.getElementById('toast');
+  const el = doc.getElementById('table-toast');
   if (!el) return;
   el.textContent = name + '  ' + Math.round(k * 100) + '%';
   el.classList.add('on');

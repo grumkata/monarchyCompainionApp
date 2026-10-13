@@ -88,4 +88,8 @@
   <div class="cb" id="chat-body"></div>
   <div class="cin"><textarea id="chat-in" rows="1" placeholder="Talk, or /r 3 4d6"></textarea><button id="chat-img" class="pic" type="button" title="Send a picture (or paste one, or drop one here)" aria-label="Send a picture"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg></button><button id="chat-go">Send</button><input type="file" id="chat-file" accept="image/*" hidden></div>
 </aside>
-<div class="toast" id="toast"></div>
+<!-- ITS OWN ID. It was id="toast" too — and so is the hall's, which comes
+     first in the one document, so every table notice (the inspector's, the
+     papers', the pocket's, the room editor's) was written into the hall's
+     toast, which is display:none at the table. They all said nothing. -->
+<div class="toast" id="table-toast"></div>

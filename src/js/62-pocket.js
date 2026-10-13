@@ -120,7 +120,7 @@ function release(e) {
   else if (!(root.Kit && root.Kit.over(e.clientX, e.clientY))) hint('Put it down on the table itself');
 }
 function hint(m) {
-  const t = doc.getElementById('toast'); if (!t) return;
+  const t = doc.getElementById('table-toast'); if (!t) return;
   t.textContent = m; t.classList.add('on');
   clearTimeout(hint._t); hint._t = setTimeout(() => t.classList.remove('on'), 1900);
 }

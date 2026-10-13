@@ -116,7 +116,7 @@ function edit(id) { if (root.Hand && root.Hand.editThing) root.Hand.editThing(id
 
 /* the one line of feedback, in the toast the table already owns */
 function said(text) {
-  const el = doc.getElementById('toast');
+  const el = doc.getElementById('table-toast');
   if (!el) return;
   el.textContent = text;
   el.classList.add('on', 'show');
