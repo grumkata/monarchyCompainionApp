@@ -143,11 +143,7 @@ input.pu-seek, input.pu-vr { -webkit-appearance: none; appearance: none; flex: 1
 .pu-list::-webkit-scrollbar-thumb { background: var(--m-line); }
 .pu-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin-bottom: 2px; transition: background var(--t-wipe, .2s) ease; }
 .pu-row:hover { background: var(--m-sable-3); }
-/* the one playing is lit, and marked with a small gilt lozenge before it
-   rather than a bar down its edge */
-.pu-row.now { position: relative; padding-left: 16px; background: linear-gradient(90deg, rgba(201, 162, 39, .2), transparent); }
-.pu-row.now::before { content: ''; position: absolute; left: 4px; top: 50%; width: 7px; height: 9px; margin-top: -4.5px;
-  background: var(--m-or); clip-path: var(--m-lozenge); }
+.pu-row.now { background: linear-gradient(90deg, rgba(201, 162, 39, .2), transparent); box-shadow: inset 2px 0 0 var(--m-or); }
 .pu-rmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .mu-ui.host .pu-rmain { cursor: pointer; }
 .pu-th { flex: 0 0 56px; height: 32px; background: #000; overflow: hidden; box-shadow: 0 0 0 1px var(--m-line); }
@@ -186,17 +182,3 @@ input.pu-seek, input.pu-vr { -webkit-appearance: none; appearance: none; flex: 1
 .au-where select option { background: var(--m-sable-2); color: var(--m-argent); }
 
 @media (prefers-reduced-motion: reduce) { .mu-ui, .mu-ui * { animation: none !important; } }
-
-/* ══ THE PLATE, AS A BANNER ══════════════════════════════════════
-   Its corners were cut on the bend like every panel used to be; it hangs
-   now, like every banner at the table — a forked foot, a gilt thread round
-   it — and folded, it is a forked ribbon rather than a pill. */
-.mu-ui { --pu-tail: 16px; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - var(--pu-tail)), 0 100%);
-  padding-bottom: var(--pu-tail); box-shadow: none; isolation: isolate; }
-.mu-ui::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(180deg, var(--m-or), var(--m-or-lo)); opacity: .7;
-  clip-path: polygon(evenodd,
-    4px 4px, calc(100% - 4px) 4px, calc(100% - 4px) calc(100% - 6px), 50% calc(100% - var(--pu-tail) - 5px), 4px calc(100% - 6px), 4px 4px,
-    5.5px 5.5px, 5.5px calc(100% - 8.4px), 50% calc(100% - var(--pu-tail) - 6.6px), calc(100% - 5.5px) calc(100% - 8.4px), calc(100% - 5.5px) 5.5px, 5.5px 5.5px); }
-.mu-ui.folded { --pu-tail: 0px; clip-path: var(--m-band); padding: 0 8px; }
-.mu-ui.folded::after { display: none; }

@@ -282,33 +282,11 @@ function apply() {
   /* the floor rides with the wood, from its own layer under the table */
   const under = doc.getElementById('tblu');
   if (under) under.style.transform = m;
-  sayZoom();
+  if (zl) zl.textContent = Math.round(T.k * 100) + '%';
   /* the camera moved, so every model painted over the wood has to be
      redrawn — the GL layer rests when nothing has changed */
   if (root.TableGL && root.TableGL.invalidate) root.TableGL.invalidate(3);
   if (root.__onView) root.__onView();
-}
-
-/* ── THE ZOOM, SAID WHILE IT IS CHANGING ──────────────────────
-   The corner used to say "18%" all evening. It was the raw scale of the
-   wood against its own coordinate space, which is a number about the
-   implementation: the whole table on screen is 18% on one window and 23% on
-   another, and neither means anything to somebody at the table.
-
-   So it is measured from the fit — the whole table on screen is 100%, twice
-   as close is 200% — and it is only there while it is moving, the way a game
-   shows a zoom level: up as the wheel turns, gone a moment after it stops.
-   Fitting the table changes it without saying so; nobody asked. */
-let zlT = 0, fitting = false;
-function sayZoom() {
-  if (!zl) return;
-  const pct = Math.round(T.k / (ZOOM_MIN || T.k) * 100) + '%';
-  if (zl.textContent === pct) return;
-  zl.textContent = pct;
-  if (fitting) return;
-  zl.classList.add('live');
-  clearTimeout(zlT);
-  zlT = setTimeout(() => zl.classList.remove('live'), 1300);
 }
 
 /* ── KEEPING THE RULER SQUARE TO THE SCREEN ───────────────────
@@ -456,10 +434,6 @@ function restandProps() {
    the table, so a flat cos() estimate always ran the front edge off the
    bottom of the screen. (proto's note, and its fix) */
 function fitTable() {
-  fitting = true;
-  try { fitWood(); sayZoom(); } finally { fitting = false; }
-}
-function fitWood() {
   if (!vp) return;
   if (peeking) unpeek(true);          /* the camera is about to be set down by hand */
   const VW = vp.clientWidth, VH = vp.clientHeight;
@@ -1388,9 +1362,6 @@ function wire() {
        the same step the wheel does, aimed at the middle of the view. With a
        piece selected they still nudge it, below — that is the one thing a
        selection is for. */
-    /* AN ARROW SOMETHING NEARER HAS ALREADY USED — walking the toolbox's
-       tiles, or the rows of the menu — is not also a zoom or a nudge */
-    if (e.defaultPrevented) return;
     const t = M && M.state.sel ? M.get(M.state.sel) : null;
     const held = !!t && (!M.mayTouch || M.mayTouch(t));
     if (!held && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
@@ -1720,7 +1691,7 @@ function scaleUnder(e) {
    screen for something you only look at while your hand is moving */
 let sizeT = 0;
 function size(name, k) {
-  const el = doc.getElementById('table-toast');
+  const el = doc.getElementById('toast');
   if (!el) return;
   el.textContent = name + '  ' + Math.round(k * 100) + '%';
   el.classList.add('on');

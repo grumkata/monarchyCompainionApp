@@ -50,13 +50,12 @@ let q = '', gsel = '';
 function build() {
   if (dock) return dock;
   dock = doc.createElement('aside');
-  dock.className = 'tbx m-banner';
+  dock.className = 'tbx';
   dock.id = 'tbx';
   dock.hidden = true;
   dock.innerHTML =
-    `<span class="tbx-pole m-pole" aria-hidden="true"></span>
-     <header class="tbx-head">
-       <span class="tbx-what m-band" id="tbx-what">Toolbox</span>
+    `<header class="tbx-head">
+       <span class="tbx-what" id="tbx-what">Toolbox</span>
        <span class="tbx-count" id="tbx-count"></span>
        <button class="tbx-x" id="tbx-x" title="Close the toolbox  (B)">&#10005;</button>
      </header>
@@ -95,7 +94,6 @@ function build() {
   /* the dock is a control, never the table: nothing pressed on it pans, and
      the wheel over it scrolls it rather than zooming the wood beneath */
   dock.addEventListener('pointerdown', e => e.stopPropagation());
-  dock.addEventListener('dblclick', lateDouble);
   dock.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
 
   pill = doc.createElement('div');
@@ -115,18 +113,10 @@ function show(list, openId) {
   const n = openId ? Math.max(0, kinds.findIndex(k => k.id === openId)) : sel;
   pickKind(kinds[Math.min(n, kinds.length - 1)] || kinds[0]);
   paintFoot();
-  /* the keys come with it, onto the kind it opened on (walk, below) — unless
-     they are in the middle of something, a word half-typed in the chat */
-  const a = doc.activeElement;
-  if (!a || a === doc.body || !a.matches('input,textarea,select,[contenteditable="true"]')) {
-    const on = kindsEl.querySelector('.tbx-kind.on');
-    if (on) on.focus({ preventScroll: true });
-  }
 }
 
 function hide() {
   if (!dock) return;
-  tipOff();                         /* the tile it named is gone from under the pointer, and never said leave */
   closeBench();
   if (root.Music && root.Music.panel) root.Music.panel(null);       /* the audio panel stops painting while it is shut */
   dock.hidden = true;
@@ -144,24 +134,10 @@ function docked(on) {
 const isUp = () => !!dock && !dock.hidden;
 
 /* ── the kinds ── */
-/* A REPAINT KEEPS THE KEYS. The kinds are redrawn when a model's textures
-   land and the grid whenever what is in it changes, and both are innerHTML —
-   so whatever had focus was thrown away with the old button, mid-walk. The
-   same button on the new row takes it back. */
-function keepFocus(box, attr, paint) {
-  const a = doc.activeElement;
-  const had = a && box.contains(a) ? a.getAttribute(attr) : null;
-  paint();
-  if (had == null) return;
-  const to = [...box.querySelectorAll('[' + attr + ']')].find(x => x.getAttribute(attr) === had);
-  if (to) to.focus({ preventScroll: true });
-}
-function paintKinds() { keepFocus(kindsEl, 'data-n', paintKinds_); }
-function paintKinds_() {
+function paintKinds() {
   kindsEl.innerHTML = kinds.map((k, n) =>
-    `<button class="tbx-kind" data-n="${n}" data-k="${esc(k.id)}" title="${esc(k.name)}  (${n + 1})">
-       <span class="tbx-kshield"><span class="tbx-kfig${k.icon ? ' tbx-kico' : ''}">${
-         k.icon || F().html(k.fig, k.figv || {}, 34)}</span></span>
+    `<button class="tbx-kind" data-n="${n}" title="${esc(k.name)}  (${n + 1})">
+       <span class="tbx-kfig${k.icon ? ' tbx-kico' : ''}">${k.icon || F().html(k.fig, k.figv || {}, 40)}</span>
        <b>${esc(k.name)}</b>
      </button>`).join('');
   kindsEl.querySelectorAll('.tbx-kind').forEach(b =>
@@ -185,14 +161,7 @@ function pickKind(k) {
   sel = Math.max(0, kinds.indexOf(k));
   q = ''; gsel = '';
   if (find) find.value = '';
-  /* the name turns over on its ribbon, the way a scroll is turned to the next
-     entry, rather than one word replacing another in place */
-  if (what.textContent !== k.name && what.animate && !calm())
-    what.animate([{ transform: 'rotateX(88deg)', opacity: .2 }, { transform: 'none', opacity: 1 }],
-                 { duration: 280, easing: 'cubic-bezier(.16,.84,.24,1)' });
   what.textContent = k.name;
-  /* each kind is its own tincture, and its shields are painted in it */
-  dock.dataset.kind = k.id;
   /* THE AUDIO TAB HOLDS A PANEL, NOT THINGS: no shelf, no grid, nothing to carry out */
   const aud = k.id === 'audio';
   audioEl.hidden = !aud;
@@ -208,20 +177,7 @@ function pickKind(k) {
   grid.hidden = false; foot.hidden = false;
   opts = root.Toolbox.options(k.id) || [];
   paintGrid();
-  deal();
   markSel();
-}
-/* A KIND IS DEALT, not swapped: its tiles come in one after another, quick
-   enough to be over before you have read the first name (STYLE.md: "the
-   toolbox deals its slots"). Only when a kind is turned to — a filter or a
-   repaint replaces the tiles without dealing them again. */
-let dealT = 0;
-function deal() {
-  grid.classList.remove('dealing');
-  void grid.offsetWidth;
-  grid.classList.add('dealing');
-  clearTimeout(dealT);
-  dealT = setTimeout(() => grid.classList.remove('dealing'), 700);
 }
 
 /* ══ THE SHELF ═════════════════════════════════════════════════
@@ -253,8 +209,7 @@ function shown() {
   });
 }
 
-function paintGrid() { keepFocus(grid, 'data-id', paintGrid_); }
-function paintGrid_() {
+function paintGrid() {
   if (openKind && openKind.id === 'audio') return;
   const gs = groupsOf(opts);
   const big = opts.length > SHELF_AT;
@@ -271,10 +226,10 @@ function paintGrid_() {
 
   const list = shown();
   count.textContent = list.length ? String(list.length) : '';
-  grid.innerHTML = list.length ? list.map((o, n) =>
-    `<button class="tbx-tile${o.custom ? ' custom' : ''}${o.soon ? ' soon' : ''}" data-id="${esc(optKey(o))}" style="--n:${Math.min(n, 14)}"
+  grid.innerHTML = list.length ? list.map(o =>
+    `<button class="tbx-tile${o.custom ? ' custom' : ''}${o.soon ? ' soon' : ''}" data-id="${esc(optKey(o))}"
              title="${esc(o.soon ? (o.name || '') + ' — coming in a later update' : (o.name || ''))}">
-       <span class="tbx-shield"><span class="tbx-fig">${F().html(o, o.v || {}, 78)}</span></span>
+       <span class="tbx-fig">${F().html(o, o.v || {}, 88)}</span>
        ${o.custom ? '<span class="tbx-plus"></span>' : ''}
        <i class="tbx-nm">${esc(o.name || '')}${o.soon ? ' <em class="tbx-soon">soon</em>' : ''}</i>
      </button>`).join('')
@@ -315,34 +270,11 @@ function wireTile(b, o) {
   b.addEventListener('pointerup', () => { down = null; });
   b.addEventListener('click', e => {
     if (e.detail > 1) return;               /* the second of a double click */
-    twice = { o, t: performance.now() };
-    const sh = b.querySelector('.tbx-shield');
-    liftRect = sh ? sh.getBoundingClientRect() : null;
-    liftId = b.dataset.id;
     choose(o);
   });
-  b.addEventListener('dblclick', e => { e.stopPropagation(); twice = null; quick(o); });
-  /* every name is on its ribbon already: the tip is only for one the ribbon
-     had to cut short — otherwise it is the same words, again, on top of the
-     next shield along */
-  b.addEventListener('pointerenter', () => {
-    const nm = b.querySelector('.tbx-nm');
-    if (nm && nm.scrollHeight > nm.clientHeight + 1) tipOn(b, o.name);
-  });
+  b.addEventListener('dblclick', () => quick(o));
+  b.addEventListener('pointerenter', () => tipOn(b, o.name));
   b.addEventListener('pointerleave', tipOff);
-}
-
-/* ── AND A DOUBLE CLICK STILL MEANS "AS IT IS" ──────────────────
-   The foot has always promised it, and it could never happen: the first
-   click opens the bench, the bench takes the grid's place, and the second
-   click lands on the bench — so the tile never heard a double click at all.
-   The dock remembers which tile the first click was on, and a double click
-   anywhere in it a moment later takes that thing as it is. */
-let twice = null;
-function lateDouble() {
-  if (!twice || performance.now() - twice.t > 650) { twice = null; return; }
-  const o = twice.o; twice = null;
-  quick(o);
 }
 
 /* ONE CLICK OPENS THE BENCH. Everything the thing can be, decided while
@@ -379,7 +311,6 @@ function quick(o) {
 
 /* ══ THE BENCH ═════════════════════════════════════════════════ */
 function openBench(o) {
-  tipOff();
   if (!root.Workbench) { grab(o); return; }
   build();
   grid.hidden = true; shelf.hidden = true;
@@ -395,50 +326,7 @@ function openBench(o) {
     back: () => closeBench(true),
     changed: () => { if (held) { paintHeld(); paintFoot(); } }
   });
-  liftFrom(liftRect);
 }
-/* ══ LIFTED OFF THE ROLL ════════════════════════════════════════
-   The bench used to appear in place of the grid in one cut, so nothing said
-   that the big shield on the bench was the little one you had just pressed.
-   It is the same shield, so it moves like it: the bench's oak shield grows out
-   of the exact rect the tile occupied (a FLIP — the end is laid out, and it
-   is played back from the start), and the bench's fields rise in after it.
-   Transform and opacity only (STYLE.md §6⅓). Not for anyone who has asked
-   the system for reduced motion. */
-let liftRect = null, liftId = null;
-const calm = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
-function liftFrom(r0) {
-  liftRect = null;
-  const st = bench && bench.querySelector('.wb-stage');
-  if (!r0 || !r0.width || !st || !st.animate || calm()) return;
-  const r1 = st.getBoundingClientRect();
-  if (!r1.width) return;
-  const k = r0.width / r1.width;
-  const dx = (r0.left + r0.width / 2) - (r1.left + r1.width / 2);
-  const dy = (r0.top + r0.height / 2) - (r1.top + r1.height / 2);
-  const ease = 'cubic-bezier(.16,.84,.24,1)';
-  st.animate([{ transform: `translate(${dx}px,${dy}px) scale(${k})` }, { transform: 'none' }],
-             { duration: 380, easing: ease });
-  [...bench.querySelectorAll('.wb-top, .wb-field, .wb-acts')].forEach((e, i) =>
-    e.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }],
-              { duration: 300, delay: 90 + Math.min(i, 8) * 35, easing: ease, fill: 'backwards' }));
-}
-
-/* and back: the shield shrinks from the bench into its own place on the roll */
-function lowerInto(r0, id) {
-  if (!r0 || !r0.width || !id || calm()) return;
-  const t = [...grid.querySelectorAll('.tbx-tile')].find(x => x.dataset.id === id);
-  const sh = t && t.querySelector('.tbx-shield');
-  if (!sh || !sh.animate) return;
-  const r1 = sh.getBoundingClientRect();
-  if (!r1.width) return;
-  const k = r0.width / r1.width;
-  const dx = (r0.left + r0.width / 2) - (r1.left + r1.width / 2);
-  const dy = (r0.top + r0.height / 2) - (r1.top + r1.height / 2);
-  sh.animate([{ transform: `translate(${dx}px,${dy}px) scale(${k})`, zIndex: 5 }, { transform: 'none', zIndex: 5 }],
-             { duration: 340, easing: 'cubic-bezier(.16,.84,.24,1)' });
-}
-
 /* the same bench, for a thing already on the wood (67-inspector.js) */
 function editThing(id) {
   if (!root.Workbench) return;
@@ -453,16 +341,12 @@ function editThing(id) {
 }
 function closeBench(repaint) {
   if (!bench || bench.hidden) return;
-  const st = bench.querySelector('.wb-stage');
-  const from = st ? st.getBoundingClientRect() : null, id = liftId;
-  liftId = null;
   if (root.Workbench) root.Workbench.close();
   bench.hidden = true; bench.innerHTML = '';
   dock.classList.remove('benching');
   grid.hidden = false;
   if (repaint && openKind) { opts = root.Toolbox.options(openKind.id) || []; paintGrid(); }
   else shelf.hidden = !(opts.length > SHELF_AT || groupsOf(opts).length > 1);
-  if (repaint) lowerInto(from, id);
 }
 
 /* ── the name of whatever you point at, once, beside it ── */
@@ -729,9 +613,6 @@ function mount() {
       else if (root.Toolbox) root.Toolbox.shut();
       return;
     }
-    if (/^Arrow/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && walk(e.key)) {
-      e.preventDefault(); return;
-    }
     if (e.key >= '1' && e.key <= '9' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const n = +e.key - 1;
       if (n < kinds.length) { e.preventDefault(); sel = n; pickKind(kinds[n]); }
@@ -742,47 +623,6 @@ function mount() {
   });
 
   root.addEventListener('resize', () => { if (held) at(last.x, last.y); });
-}
-
-/* ══ THE ARROWS, INSIDE THE BOX ════════════════════════════════
-   A hundred and forty-eight models are a hundred and forty-eight Tab
-   presses. With the keys in the dock, the arrows walk it the way a game's
-   inventory is walked: left and right along the kinds (turning to each),
-   down off them into the grid, round the grid by its own columns, and up
-   off its top row back to the kinds. Enter on a tile is a click — the
-   bench — because it is a button. Only while the keys are IN the dock: an
-   arrow anywhere else still looks round the table (23-table3d.js). */
-function walk(key) {
-  const a = doc.activeElement;
-  if (!dock || !a || !dock.contains(a)) return false;
-  const kb = [...kindsEl.querySelectorAll('.tbx-kind')];
-  const tiles = grid.hidden ? [] : [...grid.querySelectorAll('.tbx-tile')];
-  const k = kb.indexOf(a);
-  if (k >= 0) {
-    if (key === 'ArrowLeft' || key === 'ArrowRight') {
-      const n = (k + (key === 'ArrowRight' ? 1 : -1) + kb.length) % kb.length;
-      sel = n; pickKind(kinds[n]);
-      const to = kindsEl.querySelectorAll('.tbx-kind')[n];
-      if (to) to.focus({ preventScroll: true });
-      return true;
-    }
-    if (key === 'ArrowDown' && tiles.length) { tiles[0].focus(); return true; }
-    return key === 'ArrowUp';                    /* nowhere above the kinds; just do not zoom */
-  }
-  const t = tiles.indexOf(a);
-  if (t < 0) return false;
-  const cols = Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(' ').length);
-  let n = t;
-  if (key === 'ArrowRight') n = Math.min(tiles.length - 1, t + 1);
-  if (key === 'ArrowLeft')  n = Math.max(0, t - 1);
-  if (key === 'ArrowDown')  n = Math.min(tiles.length - 1, t + cols);
-  if (key === 'ArrowUp') {
-    if (t < cols) { const on = kindsEl.querySelector('.tbx-kind.on'); if (on) on.focus(); return true; }
-    n = t - cols;
-  }
-  tiles[n].focus();
-  tiles[n].scrollIntoView({ block: 'nearest' });
-  return true;
 }
 
 /* the table pans and zooms without telling anyone; re-place each frame —

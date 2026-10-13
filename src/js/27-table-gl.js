@@ -168,247 +168,15 @@ function buildTable() {
      across it — at the room's own settings the steps turned that shadow
      into a torn silhouette. More bands, softer mix: the wood is stylised
      without the shadow on it becoming a shape. */
-  body.add(mesh(WOOD.Table_Round_A.prims.map(pr => roundTop(pr, 128)), WOOD_TEX, DRESS.timber,
+  body.add(mesh(WOOD.Table_Round_A.prims, WOOD_TEX, DRESS.timber,
                 { room: 'tavern', steps: 9, tint: 0.20, hard: 0.26, rim: 0.10 }));
   /* TOP SURFACE AT THE ORIGIN, not the model's middle: the plane the pieces
      live on IS the table top, so that is the part that has to line up. */
   /* it casts (onto the pieces layer it never reaches, harmlessly) but above
      all it RECEIVES — a chest standing on the wood darkens the wood */
   tableObj = casts(normalise(body, true));
-  /* after casts(): the inlay lies IN the top, it must not shadow it */
-  const inl = inlay();
-  if (inl) tableObj.add(inl);
   uScene.add(tableObj);
   buildRoom();
-}
-
-/* ══ THE TOP IS TURNED, NOT CUT ════════════════════════════════
-   The model's top is a 32-sided polygon. At the size it is drawn — the wood
-   filling most of the screen — every one of those straight sides showed on
-   the rim: a facet ninety pixels long, the plainest "low-poly asset" tell in
-   the room. So the top slab is rebuilt at 128 sides, and the rest of the
-   model (apron, legs) is kept exactly as it was.
-
-   The new slab is painted EXACTLY as the old one was. The model's UVs on the
-   top and the underside are an affine map of position, mirrored across a
-   diagonal; on the edge band they run linearly with the angle, mirrored at
-   the same two angles. 128 is a multiple of 32, so every old vertex angle is
-   also a new one and no new triangle straddles an old seam: a new point on a
-   face takes its UV from the old triangle it lies in, carried out to the
-   circle; a new point on the edge is interpolated by angle between the old
-   points either side of it. Anything about the model that is not what this
-   expects, and the model is left alone. */
-function roundTop(prim, segs) {
-  const P = prim.p, N = prim.n, U = prim.u, I = prim.i;
-  if (!P || !N || !U || !I) return prim;
-  const nv = P.length / 3, Y = a => P[a * 3 + 1], NY = a => N[a * 3 + 1];
-  let ymax = -Infinity;
-  for (let a = 0; a < nv; a++) ymax = Math.max(ymax, Y(a));
-  /* the slab: every triangle wholly within its thickness (the apron under
-     it starts a good deal lower) */
-  const floor = ymax - 0.05, keep = [], slab = [];
-  for (let t = 0; t < I.length; t += 3) {
-    const tri = [I[t], I[t + 1], I[t + 2]];
-    (tri.every(a => Y(a) >= floor) ? slab : keep).push(tri);
-  }
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (const tri of slab) for (const a of tri) if (NY(a) > 0.9) {
-    x0 = Math.min(x0, P[a * 3]); x1 = Math.max(x1, P[a * 3]);
-    z0 = Math.min(z0, P[a * 3 + 2]); z1 = Math.max(z1, P[a * 3 + 2]);
-  }
-  if (!slab.length || !isFinite(x0)) return prim;
-  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  const ang = a => Math.atan2(P[a * 3 + 2] - cz, P[a * 3] - cx);
-  const rad = a => Math.hypot(P[a * 3] - cx, P[a * 3 + 2] - cz);
-  const wrap = d => d > Math.PI ? d - 2 * Math.PI : d < -Math.PI ? d + 2 * Math.PI : d;
-
-  /* the faces, as fans: each old triangle with its angular sector and the
-     affine map from (x, z) to its UVs */
-  const fans = { up: [], down: [] };
-  for (const tri of slab) {
-    const side = tri.every(a => NY(a) > 0.9) ? 'up' : tri.every(a => NY(a) < -0.9) ? 'down' : null;
-    if (!side) continue;
-    const rim = tri.filter(a => rad(a) > 1e-4);
-    if (rim.length !== 2) return prim;
-    let lo = ang(rim[0]), hi = lo + wrap(ang(rim[1]) - lo);
-    if (hi < lo) { const t = lo; lo = hi; hi = t; }
-    const [a, b, c] = tri, X = k => P[k * 3], Z = k => P[k * 3 + 2];
-    const det = (X(b) - X(a)) * (Z(c) - Z(a)) - (X(c) - X(a)) * (Z(b) - Z(a));
-    if (Math.abs(det) < 1e-12) continue;
-    const map = (x, z) => {
-      const s = ((x - X(a)) * (Z(c) - Z(a)) - (X(c) - X(a)) * (z - Z(a))) / det;
-      const t = ((X(b) - X(a)) * (z - Z(a)) - (x - X(a)) * (Z(b) - Z(a))) / det;
-      return [U[a * 2] + s * (U[b * 2] - U[a * 2]) + t * (U[c * 2] - U[a * 2]),
-              U[a * 2 + 1] + s * (U[b * 2 + 1] - U[a * 2 + 1]) + t * (U[c * 2 + 1] - U[a * 2 + 1])];
-    };
-    fans[side].push({ lo, hi, map, y: Y(a) });
-  }
-  const onFan = (fan, th) => {
-    for (const f of fan) for (const t of [th, th + 2 * Math.PI, th - 2 * Math.PI])
-      if (t >= f.lo - 1e-6 && t <= f.hi + 1e-6) return f;
-    return null;
-  };
-
-  /* the edge, as rings: the slab's sloped and upright vertices, grouped by
-     height and by which way they face — two rings to a strip */
-  const rings = {};
-  for (const tri of slab) for (const a of tri) {
-    const ny = NY(a);
-    if (Math.abs(ny) > 0.9) continue;
-    const cls = ny > 0.3 ? 'up' : ny < -0.3 ? 'down' : 'flat', key = cls + Y(a).toFixed(4);
-    const r = rings[key] || (rings[key] = { cls, y: Y(a), pts: new Map(), r: 0, nr: 0, ny: 0, n: 0 });
-    const th = +ang(a).toFixed(5);
-    if (!r.pts.has(th)) r.pts.set(th, [U[a * 2], U[a * 2 + 1]]);
-    r.r += rad(a); r.nr += Math.hypot(N[a * 3], N[a * 3 + 2]); r.ny += ny; r.n++;
-  }
-  const strips = ['up', 'flat', 'down'].map(cls => Object.values(rings)
-    .filter(r => r.cls === cls).sort((p, q) => q.y - p.y));
-  if (strips.some(st => st.length !== 2) || !fans.up.length || !fans.down.length) return prim;
-  for (const st of strips) for (const r of st) {
-    r.r /= r.n; r.nr /= r.n; r.ny /= r.n;
-    r.list = [...r.pts.entries()].sort((p, q) => p[0] - q[0]);
-    if (r.list.length < 3) return prim;
-  }
-  const along = (r, th) => {
-    const L = r.list;
-    for (let k = 0; k < L.length; k++) {
-      const [ta, ua] = L[k], [tb0, ub] = L[(k + 1) % L.length];
-      const tb = k + 1 < L.length ? tb0 : tb0 + 2 * Math.PI;
-      for (const t of [th, th + 2 * Math.PI]) if (t >= ta - 1e-6 && t <= tb + 1e-6) {
-        const f = tb > ta ? (t - ta) / (tb - ta) : 0;
-        return [ua[0] + f * (ub[0] - ua[0]), ua[1] + f * (ub[1] - ua[1])];
-      }
-    }
-    return L[0][1];
-  };
-
-  const p = Array.from(P), n = Array.from(N), u = Array.from(U), idx = [];   /* the pack may hand typed arrays */
-  for (const tri of keep) idx.push(tri[0], tri[1], tri[2]);
-  const put = (x, y, z, nx, ny, nz, uv) => {
-    p.push(x, y, z); n.push(nx, ny, nz); u.push(uv[0], uv[1]); return p.length / 3 - 1;
-  };
-  const TH = k => -Math.PI + 2 * Math.PI * (k % segs) / segs;
-  /* the two faces */
-  for (const side of ['up', 'down']) {
-    const fan = fans[side], y = fan[0].y, R = side === 'up' ? strips[0][0].r : strips[2][1].r;
-    const sy = side === 'up' ? 1 : -1;
-    const mid = put(cx, y, cz, 0, sy, 0, fan[0].map(cx, cz));
-    const rim = [];
-    for (let k = 0; k < segs; k++) {
-      const th = TH(k), x = cx + R * Math.cos(th), z = cz + R * Math.sin(th);
-      const f = onFan(fan, th + 1e-7) || onFan(fan, th);
-      if (!f) return prim;
-      rim.push(put(x, y, z, 0, sy, 0, f.map(x, z)));
-    }
-    for (let k = 0; k < segs; k++) {
-      const a = rim[k], b = rim[(k + 1) % segs];
-      if (side === 'up') idx.push(mid, b, a); else idx.push(mid, a, b);
-    }
-  }
-  /* the edge: a bevel, the upright band, a bevel */
-  for (const [hi, lo] of strips) {
-    const ring = r => {
-      const out = [], l = Math.hypot(r.nr, r.ny) || 1;
-      for (let k = 0; k < segs; k++) {
-        const th = TH(k), c = Math.cos(th), s = Math.sin(th);
-        out.push(put(cx + r.r * c, r.y, cz + r.r * s, r.nr * c / l, r.ny / l, r.nr * s / l, along(r, th)));
-      }
-      return out;
-    };
-    const A = ring(hi), B = ring(lo);
-    for (let k = 0; k < segs; k++) {
-      const k1 = (k + 1) % segs;
-      idx.push(A[k], A[k1], B[k], A[k1], B[k1], B[k]);
-    }
-  }
-  return Object.assign({}, prim, { p, n, u, i: idx });
-}
-
-/* ══ THE ROUND TABLE ═══════════════════════════════════════════
-   A plain disc of oak is any table in any game. This one is a monarch's:
-   the round table at Winchester, painted for Henry VIII, is a place for each
-   knight round a rose — so this one has its places inlaid, in the way a
-   cabinetmaker would rather than a painter. A double band of pale holly
-   inside the rim, eight seat lines running in to a ring at the middle, and a
-   rose of two woods at its heart. Faint, so the oak stays the oak and the
-   pieces stay the thing you look at; it is there when the table is empty,
-   and it is what you see when you look down at it.
-
-   One canvas, drawn once, on a disc a hair above the top, in the table's own
-   local space — so it pans, tilts and turns with the wood for nothing. It
-   takes the shadows that fall on the top, and throws none of its own. */
-function inlay() {
-  const N = 1024, c = doc.createElement('canvas');
-  c.width = c.height = N;
-  const x = c.getContext('2d'), C = N / 2, R = N / 2;
-  const holly = 'rgba(232,206,160,', ebony = 'rgba(38,22,12,';
-  const ring = (r, w, col) => { x.beginPath(); x.arc(C, C, r * R, 0, Math.PI * 2);
-                                x.lineWidth = w; x.strokeStyle = col; x.stroke(); };
-  /* the banding: holly between two black stringing lines */
-  ring(0.905, 3, ebony + '.30)');
-  ring(0.885, 9, holly + '.20)');
-  ring(0.865, 3, ebony + '.30)');
-  /* the eight places, pale, running in to the ring round the rose */
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
-    const r0 = 0.235, r1 = 0.858;
-    x.beginPath();
-    x.moveTo(C + Math.cos(a) * r0 * R, C + Math.sin(a) * r0 * R);
-    x.lineTo(C + Math.cos(a) * r1 * R, C + Math.sin(a) * r1 * R);
-    x.lineWidth = 5; x.strokeStyle = holly + '.10)'; x.stroke();
-    /* a lozenge at each place's foot, by the band, where a name would go */
-    const lx = C + Math.cos(a) * 0.80 * R, ly = C + Math.sin(a) * 0.80 * R;
-    /* a true lozenge, long along its own line, whichever way the line runs */
-    x.save(); x.translate(lx, ly); x.rotate(a);
-    x.beginPath(); x.moveTo(16, 0); x.lineTo(0, 8); x.lineTo(-16, 0); x.lineTo(0, -8); x.closePath();
-    x.fillStyle = holly + '.15)'; x.fill();
-    x.strokeStyle = ebony + '.26)'; x.lineWidth = 2; x.stroke();
-    x.restore();
-  }
-  ring(0.235, 3, ebony + '.28)');
-  ring(0.220, 7, holly + '.16)');
-  /* the rose: five outer petals, five inner turned half a petal, a boss of seeds */
-  /* the petals are one piece of veneer each layer, so they are filled as ONE
-     shape — filled one by one, their overlaps stacked into a pale cloud */
-  const petals = (n, r, pr, off, fill, line) => {
-    x.beginPath();
-    for (let i = 0; i < n; i++) {
-      const a = off + (i / n) * Math.PI * 2, px = C + Math.cos(a) * r * R, py = C + Math.sin(a) * r * R;
-      x.moveTo(px + pr * R, py); x.arc(px, py, pr * R, 0, Math.PI * 2);
-    }
-    x.fillStyle = fill; x.fill(); x.lineWidth = 2.5; x.strokeStyle = line; x.stroke();
-  };
-  petals(5, 0.085, 0.072, -Math.PI / 2, holly + '.15)', ebony + '.30)');
-  petals(5, 0.050, 0.046, -Math.PI / 2 + Math.PI / 5, ebony + '.12)', ebony + '.28)');
-  x.beginPath(); x.arc(C, C, 0.034 * R, 0, Math.PI * 2);
-  x.fillStyle = holly + '.26)'; x.fill(); x.lineWidth = 2.5; x.strokeStyle = ebony + '.34)'; x.stroke();
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2;
-    x.beginPath(); x.arc(C + Math.cos(a) * 0.018 * R, C + Math.sin(a) * 0.018 * R, 4, 0, Math.PI * 2);
-    x.fillStyle = ebony + '.35)'; x.fill();
-  }
-  /* and the barbs between the outer petals, the way a heraldic rose is drawn */
-  for (let i = 0; i < 5; i++) {
-    const a = -Math.PI / 2 + Math.PI / 5 + (i / 5) * Math.PI * 2;
-    const tx = C + Math.cos(a) * 0.168 * R, ty = C + Math.sin(a) * 0.168 * R;
-    const bx = C + Math.cos(a) * 0.118 * R, by = C + Math.sin(a) * 0.118 * R;
-    const nx = -Math.sin(a) * 0.016 * R, ny = Math.cos(a) * 0.016 * R;
-    x.beginPath(); x.moveTo(tx, ty); x.lineTo(bx + nx, by + ny); x.lineTo(bx - nx, by - ny); x.closePath();
-    x.fillStyle = ebony + '.22)'; x.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.encoding = THREE.sRGBEncoding;
-  t.anisotropy = uRen ? uRen.capabilities.getMaxAnisotropy() : 4;
-  const geo = new THREE.CircleGeometry(0.5, 128);
-  geo.rotateX(-Math.PI / 2);                     /* lying in the top, facing up out of it */
-  const m = B3(new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false,
-                 roughness: 0.62, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }),
-               { room: 'tavern', steps: 9, tint: 0.20, hard: 0.26, rim: 0 });
-  const disc = new THREE.Mesh(geo, m);
-  disc.position.y = 0.0006;
-  disc.castShadow = false; disc.receiveShadow = true;
-  disc.renderOrder = 1;
-  return disc;
 }
 
 /* ══ THE ROOM ══════════════════════════════════════════════════
@@ -860,7 +628,7 @@ const TAVERN_PLAN = [
   { p:'R', m:'Prop_Support', x:2.9, y:0.2, z:2.2, r:-90, sx:1, sy:1, sz:0.5, over:1 },
   /* ── the hearth, dead ahead ─────────────────────────────── */
   { p:'T', m:'Fireplace', x:0, y:0, z:-2.62, r:0 },
-  { p:'T', m:'Cauldron', x:0, y:0.235, z:-2.24, r:0, s:0.45 },   /* ON the hearth stone, whose top is 0.234 */
+  { p:'T', m:'Cauldron', x:0, y:0.02, z:-2.24, r:0, s:0.45 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.7, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.58, r:90, s:1 },
   { p:'T', m:'FireLog', x:-1.95, y:0.045, z:-2.46, r:90, s:1 },
@@ -1102,9 +870,6 @@ function layRoom() {
     cheeseRec = BATCH.pop();
     cheese.position.set(crow.x, FLOOR_Y + (crow.y || 0), crow.z);
   }
-  /* the hearth's back and its logs belong to the fireplace, wherever the
-     plan has put it */
-  for (const row of plan) if (row.p === 'T' && row.m === 'Fireplace') dressHearth(row, T, TB);
   /* whatever the plan says about a chandelier is where its flames go, and
      no chandelier means no flames */
   aimChandelier(plan);
@@ -1119,92 +884,6 @@ function layRoom() {
   for (const rec of over) BATCH.push(rec);
   flushRoom(overGroup, 'over');
   if (cheeseRec) { BATCH.push(cheeseRec); flushRoom(cheese, 'cheese'); }
-}
-
-/* ══ A FIREPLACE HAS A BACK, AND ITS LOGS LIE ON THE HEARTH ═════
-   Looking across the table from your chair, the hearth was a stone arch
-   with the WALL showing through it — plaster and the timber cross-brace of
-   the frame, as if the fireplace were a doorway. The model does have a
-   fireback, sloping, 0.62m in from its own front; it is simply set so far
-   into the far wall that the back lands inside the wall's slab, and the
-   wall's face (2.90m out) is drawn over it.
-
-   And the three logs in it were buried. The hearth stone's top is 0.234m
-   up; the logs were laid at 0.05, so a 9cm log topped out at 0.19 — inside
-   the stone, every one of them. The grate looked swept because, as far as
-   anybody could see, it was.
-
-   So both are dressed from the plan's own Fireplace row, in its own frame:
-   a soot-black firebrick back stood a hand's depth inside the opening, in
-   front of where any wall can be, and the logs laid on the stone across the
-   grate, charred. Move the fireplace in the room editor and its back and its
-   logs go with it — a fireplace's insides are not coordinates in the room.
-
-   NOT A FIRE. grumkata asked for the light out of the hearth, and the glow
-   that was standing in for flames went with it; this puts back nothing that
-   shines. The brick is Lambert, lit by the same sky term as every wall, and
-   reads as a cold hearth with the night's fire burned down. */
-const HEARTH = { top: 0.234, back: -0.26, w: 0.96, lintel: 1.22 };
-const HEARTH_LOGS = [            /* fireplace-local x, z, how high, turn */
-  [-0.08, -0.15, 0, 98], [0.07, -0.03, 0, 79], [0.0, -0.09, 0.068, 93]];
-let sootTex = null;
-function firebrick() {
-  if (sootTex) return sootTex;
-  const c = doc.createElement('canvas');
-  c.width = 256; c.height = 256;
-  const x = c.getContext('2d');
-  x.fillStyle = '#120c08'; x.fillRect(0, 0, 256, 256);
-  /* firebrick in running bond, every brick its own burnt shade — from a
-     fixed seed, so the room is the same room every time it is laid */
-  let seed = 11;
-  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const BW = 64, BH = 22;
-  for (let row = 0, y = 0; y < 256; row++, y += BH) {
-    for (let bx = (row % 2) ? -BW / 2 : 0; bx < 256; bx += BW) {
-      const v = 22 + rnd() * 16, r = v * (1.25 + rnd() * 0.2);
-      x.fillStyle = `rgb(${r | 0},${(v * 0.82) | 0},${(v * 0.62) | 0})`;
-      x.fillRect(bx + 2, y + 2, BW - 4, BH - 4);
-    }
-  }
-  /* soot: black where the smoke went up the middle, heaviest at the top */
-  const g = x.createRadialGradient(128, 30, 10, 128, 60, 220);
-  g.addColorStop(0, 'rgba(0,0,0,.88)'); g.addColorStop(0.55, 'rgba(0,0,0,.55)');
-  g.addColorStop(1, 'rgba(0,0,0,.18)');
-  x.fillStyle = g; x.fillRect(0, 0, 256, 256);
-  /* and a grey of old ash along the foot, where the fire sat */
-  const a = x.createLinearGradient(0, 256, 0, 196);
-  a.addColorStop(0, 'rgba(92,84,76,.35)'); a.addColorStop(1, 'rgba(92,84,76,0)');
-  x.fillStyle = a; x.fillRect(0, 196, 256, 60);
-  sootTex = new THREE.CanvasTexture(c);
-  sootTex.encoding = THREE.sRGBEncoding;
-  return sootTex;
-}
-function dressHearth(row, T, TB) {
-  const s = row.s == null ? 1 : row.s;
-  const ry = (row.r || 0) * Math.PI / 180, C = Math.cos(ry), S = Math.sin(ry);
-  const base = FLOOR_Y + (row.y || 0);
-  /* fireplace-local to room, the same turn put() gives a row */
-  const at = (lx, lz) => [row.x + s * (lx * C + lz * S), row.z + s * (-lx * S + lz * C)];
-
-  const h = HEARTH.lintel - HEARTH.top;
-  const geo = new THREE.PlaneGeometry(HEARTH.w, h);
-  geo.translate(0, HEARTH.top + h / 2, HEARTH.back);
-  const back = new THREE.Mesh(geo, B3(new THREE.MeshLambertMaterial({ map: firebrick() }),
-    { room: 'tavern', rim: 0, steps: 6, tint: 0.30, hard: 0.5 }));
-  back.position.set(row.x, base, row.z);
-  back.rotation.y = ry;
-  back.scale.setScalar(s);
-  back.castShadow = back.receiveShadow = false;
-  back.userData.plan = 1;
-  roomGroup.add(back);
-
-  if (!T || !T.FireLog) return;
-  for (const [lx, lz, up, turn] of HEARTH_LOGS) {
-    const [wx, wz] = at(lx, lz);
-    /* 0.031 is half a log's own depth at this scale: it lies ON the stone */
-    put(T, TB, 'FireLog', DRESS.char, wx, base + s * (HEARTH.top + 0.031 + up), wz,
-        ry + turn * Math.PI / 180, 0.85 * s);
-  }
 }
 
 /* ══ THE PEOPLE AT THE TABLE ═══════════════════════════════════
@@ -1814,10 +1493,41 @@ function glow(colour, size) {
 function fire() {
   const T = (typeof TAVERN !== 'undefined') ? TAVERN : null;
 
-  /* THE EMBERS ARE NOT HERE ANY MORE. They were three logs placed by
-     coordinate, once, at a height that put them inside the hearth stone —
-     and as plain lit timber they were no longer embers anyway. The hearth's
-     logs are laid by dressHearth() now, from the plan, on the stone. */
+  /* the embers in the hearth: real geometry, really glowing */
+  if (T && T.FireLog) {
+    for (const p of [[-0.16, 0, 0.1], [0.15, 0.02, -0.05], [0, 0.09, 0.06]]) {
+      const g = mesh(T.FireLog.prims, TAVERN_TEX, DRESS.tavern);
+      g.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = o.receiveShadow = false;
+        /* ── A COAL IS NOT LIT, IT IS THE LIGHT ───────────
+           These were Standard with an emissive on top, sitting twenty
+           centimetres from a point light of intensity 3.4 with inverse
+           square falloff — so their diffuse term alone came out around
+           eighty, the emissive added three more, and every channel
+           clipped. The fire had a flat WHITE CARD lying in it.
+
+           Basic takes no light at all, which is the honest description
+           of a coal: its brightness is its own and tickFire sets it
+           directly, so it glows and breathes and never clips. */
+        /* -- AND NOW A COAL IS JUST A LOG -----------------------
+           It was Basic and unlit precisely so it could be brighter than
+           the room and breathe on tickFire's clock. That is a light, in
+           every way that matters to somebody looking at the screen, so it
+           goes with the rest of them: an ordinary lit material, taking
+           the sky term like every other piece of timber in the room.
+
+           Not pushed to emberMats either, so tickFire has nothing left to
+           animate even if something ever calls it again. */
+        o.material = new THREE.MeshLambertMaterial({
+          map: o.material.map, color: 0x6b5a4c });
+      });
+      g.position.set(p[0], FLOOR_Y + 0.05 + p[1], -RZ + 0.62 + p[2]);
+      g.rotation.y = Math.random() * 3;
+      g.scale.setScalar(0.85);
+      roomGroup.add(g);
+    }
+  }
   /* THE HALO IS GONE TOO. Two additive sprites over the hearth, and they
      were the single brightest thing in the picture -- the thing you would
      point at if somebody asked you to point at the light from the
@@ -2295,10 +2005,6 @@ const DRESS = {
            wood:  { mul: [0.09, 0.075, 0.06], rough: 0.97, metalness: 0.0 } },
   tavern:{ metal: { mul: [0.28, 0.25, 0.21], rough: 0.58, metalness: 0.60 },
            wood:  { mul: [0.34, 0.29, 0.23], rough: 0.74, metalness: 0.0 } },
-  /* the logs on the hearth (dressHearth): the same timber, burnt — about
-     half the albedo of the log pile beside it and pulled toward black */
-  char:  { metal: { mul: [0.10, 0.09, 0.08], rough: 0.95, metalness: 0.0 },
-           wood:  { mul: [0.15, 0.115, 0.095], rough: 0.95, metalness: 0.0 } },
   /* A LAMP HAS TO LOOK LIT. There are five lanterns on the walls and every
      one of them was a dark lump of tin, because a wall lamp in this room is
      a MODEL and the light in the room comes from somewhere else entirely.

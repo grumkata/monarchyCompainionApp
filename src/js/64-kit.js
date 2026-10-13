@@ -31,17 +31,11 @@ const live = () => !!(S() && S().live);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/* CHARGES, NOT ICONS. A page, a sticky note, a pencil and a target are the
-   icons of every app there is; on a shield they read as stickers. What a
-   shield carries is a charge, so the four are charged as heraldry would:
-   a helm for the people you play, a scroll for your notes, a quill to draw
-   with, and the manicule — the pointing hand scribes drew in the margin —
-   to point. Filled silhouettes, the way a charge is painted. */
 const ICON = {
-  sheets: '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5.5 21.5V10C5.5 5.6 8.4 2.6 12 2.6s6.5 3 6.5 7.4v11.5z M7.2 10.4h9.6v1.7H7.2z M11.4 13.4h1.2v6.8h-1.2z M8.2 14.6a.75.75 0 1 1-1.5 0 .75.75 0 1 1 1.5 0z M8.2 16.8a.75.75 0 1 1-1.5 0 .75.75 0 1 1 1.5 0z M17.3 14.6a.75.75 0 1 1-1.5 0 .75.75 0 1 1 1.5 0z M17.3 16.8a.75.75 0 1 1-1.5 0 .75.75 0 1 1 1.5 0z"/></svg>',
-  notes:  '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5 2.8h14a2.1 2.1 0 0 1 0 4.2H5a2.1 2.1 0 0 1 0-4.2z M5 17h14a2.1 2.1 0 0 1 0 4.2H5a2.1 2.1 0 0 1 0-4.2z M6.6 7.4h10.8v9.2H6.6z M8.6 9.4h6.8v1.2H8.6z M8.6 11.6h6.8v1.2H8.6z M8.6 13.8h4.4V15H8.6z"/></svg>',
-  draw:   '<svg viewBox="0 0 24 24"><path fill-rule="nonzero" d="M21.2 2.6c-6.8.4-11.6 4.9-13.7 11.4l-1 3.2 3.2-1.1c6.4-2.3 10.6-7 11.5-13.5z M17.6 6l1 1-8.4 8.4-1-1z M7.3 16.3l1.2 1.2-5 5-1.2-1.2z"/></svg>',
-  point:  '<svg viewBox="0 0 24 24"><path fill-rule="nonzero" d="M1.8 8.6h3.6v9.2H1.8z M6.2 10.2a1.6 1.6 0 0 1 1.6-1.6h4.6v9.6H7.8a1.6 1.6 0 0 1-1.6-1.6z M11.6 8.6h9.3a1.35 1.35 0 0 1 0 2.7h-9.3z M11.6 11.7h3.6a1.05 1.05 0 0 1 0 2.1h-3.6z M11.6 14.1h3.3a1.05 1.05 0 0 1 0 2.1h-3.3z M11.6 16.5h2.8a.85.85 0 0 1 0 1.7h-2.8z M7.6 6.4h4.6a1.1 1.1 0 0 1 0 2.2H7.6z"/></svg>'
+  sheets: '<svg viewBox="0 0 24 24"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19M9 11h7M9 14h7M9 17h4.5"/></svg>',
+  notes:  '<svg viewBox="0 0 24 24"><path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5M7.5 9h9M7.5 12.5h6"/></svg>',
+  draw:   '<svg viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L16.6 4a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z"/><path d="M14.5 6.1l3.4 3.4"/></svg>',
+  point:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6"/></svg>'
 };
 const NAMES = { sheets: 'Your characters  (C)', notes: 'Your notes  (N)',
                 draw: 'Draw  (D)', point: 'Point  (P)' };
@@ -55,7 +49,7 @@ function mount() {
   el.className = 'kit';
   el.innerHTML = `<div class="kit-rail">${['sheets', 'notes', 'draw', 'point'].map(k =>
       `<button class="kit-b" data-kit="${k}" title="${NAMES[k]}">${ICON[k]}</button>`).join('')}</div>
-    <div class="kit-card m-banner" hidden></div>`;
+    <div class="kit-card" hidden></div>`;
   doc.body.appendChild(el);
   rail = el.querySelector('.kit-rail');
   card = el.querySelector('.kit-card');
@@ -135,12 +129,9 @@ function paint() {
   if (panel === 'draw' && !tool) panel = null;
   card.hidden = !panel;
   if (!panel) { card.innerHTML = ''; return; }
-  /* hung from its own pole like every banner at the table; the words scroll
-     inside the cloth so the pole is never cut off at its edge */
-  card.innerHTML = '<span class="m-pole" aria-hidden="true"></span><div class="kit-scroll">' +
-                   (panel === 'sheets' ? sheetsCard()
+  card.innerHTML = panel === 'sheets' ? sheetsCard()
                  : panel === 'notes'  ? notesCard()
-                 : drawCard()) + '</div>';
+                 : drawCard();
   card.dataset.panel = panel;
 }
 

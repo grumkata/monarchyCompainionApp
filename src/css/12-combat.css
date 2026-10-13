@@ -610,8 +610,8 @@ body{display:block;padding:0}
   font-family:var(--m-f-mark);font-size:30px;font-weight:400;letter-spacing:.01em;
   text-transform:none;line-height:1;text-shadow:0 2px 0 rgba(0,0,0,.8),0 0 18px rgba(0,0,0,.9)}
 .hud.tl em{display:block;font-family:var(--m-f-hand);font-style:italic;font-size:12.5px;letter-spacing:0;
-  text-transform:none;color:var(--m-quiet);margin-top:6px;padding-top:8px;font-weight:400;
-  background:var(--m-rule-indented) 0 0 / auto 6px repeat-x;max-width:640px}
+  text-transform:none;color:var(--m-quiet);margin-top:6px;padding-top:5px;font-weight:400;
+  border-top:1px solid var(--m-line);max-width:640px}
 .hud.tl em b{color:var(--m-or);font-style:normal;font-family:var(--m-f-cap);font-size:10px;letter-spacing:.08em}
 .hud.br{bottom:15px;right:17px;display:flex;gap:6px;align-items:center}
 .hud button{font-family:var(--m-f-cap);font-size:9px;font-weight:700;letter-spacing:var(--m-track);
@@ -623,33 +623,8 @@ body{display:block;padding:0}
     transform var(--t-press) var(--snap)}
 .hud button:hover{background-position:0 0;color:var(--m-sable)}
 .zl{font-family:var(--m-f-tally);font-size:15px;font-weight:600;letter-spacing:.06em;
-  color:var(--m-quiet);padding-right:8px;font-variant-numeric:tabular-nums;
-  /* up while the zoom moves, gone a moment after (23-table3d.js sayZoom) */
-  opacity:0;transform:translateY(4px);pointer-events:none;
-  transition:opacity .6s var(--settle),transform .6s var(--settle)}
-.zl.live{opacity:1;transform:none;color:var(--m-or);transition-duration:.12s}
-body.seated .zl{opacity:0}
+  color:var(--m-quiet);padding-right:8px;font-variant-numeric:tabular-nums}
 .toast{bottom:auto;top:64px}
-/* on the body now (28-table-boot.js), over the wood and its canvases, under the chat */
-#table-toast{z-index:1450;pointer-events:none}
-/* A NOTICE IS CRIED ON A SCROLL. It was a dark strip with a coloured bar
-   down its left — every app's snackbar. Now it is the argent motto ribbon
-   the chat and the toolbox are titled on, lettered in sable, its folded-back
-   ends in your own livery: the table telling you something, in your colours. */
-#table-toast{clip-path:none;background:none;box-shadow:none;isolation:isolate;
-  padding:8px 30px 9px;color:var(--m-sable);text-shadow:0 1px 0 rgba(255,255,255,.35);white-space:nowrap}
-#table-toast::after{content:'';position:absolute;inset:0;z-index:-1;
-  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%,9px 50%);
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.55),transparent 22%,transparent 70%,rgba(60,40,20,.28)),
-    linear-gradient(90deg,rgba(90,70,40,.35),transparent 18%,transparent 82%,rgba(90,70,40,.35)),
-    var(--m-argent)}
-#table-toast::before{content:'';position:absolute;z-index:-2;left:-13px;right:-13px;top:6px;bottom:-6px;
-  background:
-    linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.5)),
-    var(--m-house,#6f6656);
-  clip-path:polygon(0 0,22px 0,22px 100%,0 100%,9px 50%,0 0,
-    calc(100% - 22px) 0,calc(100% - 22px) 100%,100% 100%,calc(100% - 9px) 50%,100% 0,calc(100% - 22px) 0)}
 /* ══ THE PIECES ══
    Drawn by the WebGL layer (gl.js): counters and large-unit shields get real
    moulded geometry and a plastic sheen. The DOM elements keep their boxes, so
@@ -776,16 +751,9 @@ body.seated .zl{opacity:0}
 .chatdock{position:fixed;top:0;right:0;bottom:0;width:300px;z-index:1500;
   display:flex;flex-direction:column;color:var(--m-text);
   background:
-    /* each merlon wears a gilt cap and a face a shade up from the cloth.
-       THE FACE GOES OVER THE GOLD, not under it: the first layer listed is
-       the one on top, and with the Or first every merlon was a solid block
-       of gold — a strip of hazard tape down the edge of the chat instead of
-       a battlement. The face is transparent for its top 2px, which is what
-       leaves the cap; a hairline down its inner side lets the gilt show the
-       merlon's edge the way a lit stone does. */
-    linear-gradient(90deg,transparent 0 10px,rgba(201,162,39,.45) 10px 11px,transparent 11px) 0 6px / 12px 18px repeat-y,
-    linear-gradient(transparent 0 2px,var(--m-sable-3) 2px) 0 6px / 12px 36px repeat-y,
+    /* each merlon wears a gilt cap and a face a shade up from the cloth */
     linear-gradient(var(--m-or),var(--m-or)) 0 6px / 12px 36px repeat-y,
+    linear-gradient(transparent 0 2px,var(--m-sable-3) 2px) 0 6px / 12px 36px repeat-y,
     linear-gradient(var(--m-house),var(--m-house)) 12px 0 / 4px 100% no-repeat,
     linear-gradient(var(--m-line),var(--m-line)) 18px 0 / 1px 100% no-repeat,
     repeating-linear-gradient(90deg,rgba(0,0,0,.16) 0 1px,transparent 1px 4px),

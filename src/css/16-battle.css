@@ -82,10 +82,6 @@ body.bt-dragging .bt-plate, body.bt-dragging .bt-pp { opacity: 0; pointer-events
 .bt-manav { display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform-origin: bottom center; z-index: 1003; }
 .bt-manav b { font: 700 34px/30px var(--m-f-tally, 'Barlow Condensed', sans-serif); color: #e9f6ff; -webkit-text-stroke: 5px #04141f; paint-order: stroke fill; }
 .bt-manav i { font: 700 9px var(--m-f-cap, Cinzel, serif); letter-spacing: .2em; text-transform: uppercase; font-style: normal; color: #a9c4f2; -webkit-text-stroke: 3px #04141f; paint-order: stroke fill; }
-/* the word under the number rides a motto scroll, like every name at the table */
-.bt-manav i { margin-top: 3px; padding: 3px 12px 3px; color: #171310; -webkit-text-stroke: 0; font-size: 8px;
-  clip-path: polygon(0 0,100% 0,calc(100% - 6px) 50%,100% 100%,0 100%,6px 50%);
-  background: linear-gradient(180deg,#f6f1e4,#d8d0bb 70%,#a89f8a); text-shadow: none; }
 .bt-manain { width: 84px; height: 40px; z-index: 1006; text-align: center; background: #07131c; color: #e9f6ff; border: 1px solid #58b8ef; border-radius: 4px; outline: none; pointer-events: auto; font: 700 28px var(--m-f-tally, 'Barlow Condensed', sans-serif); box-shadow: 0 0 0 3px #58b8ef44; }
 .bt-rarr { display: flex; align-items: center; justify-content: center; color: #f6d77a; -webkit-text-stroke: 3px #000; paint-order: stroke fill; cursor: pointer; font-family: Georgia, serif; font-weight: 700; border-radius: 50%; }
 .bt-rarr:hover { color: #fff; }
@@ -266,85 +262,3 @@ body.bt-dragging .bt-plate, body.bt-dragging .bt-pp { opacity: 0; pointer-events
 .fld-back span { color: var(--m-argent-hi, #f4efe2); }
 .fld-back:hover { box-shadow: inset 0 0 0 1px var(--m-or, #c9a227), 0 6px 18px #0009; }
 body.field-on .fld-back { display: inline-flex; }
-
-/* ══ THE FIGHT, IN MONARCHY'S SHAPES ════════════════════════════
-   Everything above was written in a dialect of its own — rounded boxes with
-   a one-pixel gold border, pill-shaped tags, a bordered button, a browser's
-   checkbox — which made the fight the one place at the table you could have
-   mistaken for any other web app. It speaks the table's language now
-   (20-shell.css, THE SILHOUETTES):
-     · a CARD is cloth: a gilt thread round it and a forked foot, its name on
-       an argent scroll
-     · a BUTTON is a forked ribbon, the one that commits in Or, the one that
-       destroys in Gules; a lesser act is a pennon; a step is a lozenge
-     · a NUMBER or a WORD is written on a line
-     · a YES/NO is a wax seal — hatched and open, or poured and set
-     · a TAG is a pennon, a PORTRAIT a shield
-     · the bars over the pieces are BATONS, pointed at both ends */
-.bt-pp, .bt-plate{ border:0; border-radius:0; box-shadow:none; isolation:isolate; --m-tail:22px;
-  padding-bottom:calc(var(--m-tail) + 10px) !important;
-  clip-path:polygon(0 0,100% 0,100% 100%,50% calc(100% - var(--m-tail)),0 100%);
-  background:
-    repeating-linear-gradient(90deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
-    linear-gradient(90deg,rgba(0,0,0,.32),transparent 10%,transparent 90%,rgba(0,0,0,.32)),
-    linear-gradient(180deg,var(--m-sable-2,#221c16),var(--m-sable,#171310) 70%,#120e0b);
- }
-/* NO UNFURL HERE: the board re-places its cards every frame and toggles them
-   in and out of display as it does, which restarts any entrance on every
-   frame — the card was held at the first instant of its own animation */
-.bt-pp::after, .bt-plate::after{ content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
-  background:linear-gradient(180deg,var(--m-or,#c9a227),var(--m-or-lo,#86621c)); opacity:.7;
-  clip-path:polygon(evenodd,
-    4px 4px,calc(100% - 4px) 4px,calc(100% - 4px) calc(100% - 6px),50% calc(100% - var(--m-tail) - 5px),4px calc(100% - 6px),4px 4px,
-    5.5px 5.5px,5.5px calc(100% - 8.4px),50% calc(100% - var(--m-tail) - 6.6px),calc(100% - 5.5px) calc(100% - 8.4px),calc(100% - 5.5px) 5.5px,5.5px 5.5px); }
-/* the card's name on a scroll */
-.bt-pph{ display:table; margin:2px auto 10px; padding:4px 22px 5px; color:var(--m-sable,#171310); text-shadow:0 1px 0 rgba(255,255,255,.35);
-  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%,9px 50%);
-  background:linear-gradient(180deg,rgba(255,255,255,.55),transparent 22%,transparent 70%,rgba(60,40,20,.28)), var(--m-argent,#ded8c8); }
-/* buttons */
-.bt-b, .bt-ab{ border:0; border-radius:0; clip-path:polygon(0 0,100% 0,calc(100% - 7px) 50%,100% 100%,0 100%,7px 50%);
-  padding:8px 16px; color:var(--m-text,#ded8c8);
-  background:linear-gradient(115deg,var(--m-or,#c9a227) 0 50%,transparent calc(50% + .5px)) 102% 0 / 260% 100% no-repeat, var(--m-sable-3,#30271e);
-  transition:background-position var(--t-wipe,.22s) var(--settle), color var(--t-wipe,.22s) var(--settle); }
-.bt-b:hover, .bt-ab:not(.ro):hover{ background-position:0 0; color:var(--m-sable,#171310); }
-.bt-b.bt-or{ color:var(--m-sable,#171310); background:linear-gradient(115deg,var(--m-house,#a3232b) 0 50%,transparent calc(50% + .5px)) 102% 0 / 260% 100% no-repeat, var(--m-or,#c9a227); }
-.bt-b.bt-or:hover{ color:var(--m-house-ink,#ded8c8); }
-.bt-b.bt-bad{ color:var(--m-gules-hi,#c9443a); background:linear-gradient(115deg,var(--m-gules,#a3232b) 0 50%,transparent calc(50% + .5px)) 102% 0 / 260% 100% no-repeat, var(--m-sable-3,#30271e); }
-.bt-b.bt-bad:hover{ color:var(--m-argent-hi,#f4efe2); background-position:0 0; }
-.bt-row .bt-b, .bt-tadd .bt-b, .bt-mrow .bt-b, .bt-fgt .bt-b{ padding:7px 15px; }
-.bt-ab{ clip-path:polygon(0 0,100% 0,calc(100% - 8px) 50%,100% 100%,0 100%); padding:7px 16px 7px 9px; }
-.bt-stp u{ border:0; border-radius:0; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); width:22px; height:22px;
-  background:var(--m-or,#c9a227); color:var(--m-sable,#171310); line-height:22px; }
-.bt-stp u:hover{ background:var(--m-or-hi,#ecd27a); }
-/* written on a line */
-.bt-num, .bt-txt, .bt-sel, .bt-f, .bt-manain{ border:0; border-radius:0; box-shadow:none;
-  background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; padding-bottom:7px; }
-.bt-num:focus, .bt-txt:focus, .bt-sel:focus, .bt-f.on, .bt-manain:focus{ box-shadow:none; filter:brightness(1.35); }
-.bt-f{ height:38px; line-height:30px; }
-.bt-manain{ color:#e9f6ff; }
-/* a yes or a no is a seal */
-.bt-pp .bt-chk input{ -webkit-appearance:none; appearance:none; flex:none; width:24px; height:24px; margin:0; cursor:pointer;
-  clip-path:var(--m-wax);
-  background:repeating-linear-gradient(135deg,rgba(201,162,39,.45) 0 1.5px,transparent 1.5px 4px), var(--m-sable-0,#0b0907);
-  transition:transform var(--t-hover,.16s) var(--pop); }
-.bt-pp .bt-chk input:checked{ background:radial-gradient(circle at 50% 50%, transparent 0 40%, rgba(0,0,0,.25) 41% 47%, transparent 48%), var(--m-wax-melt);
-  transform:rotate(-12deg); }
-.bt-pp .bt-chk:hover input{ transform:rotate(-12deg) scale(1.1); }
-/* tags and portraits */
-.bt-k{ border-radius:0; padding:2px 10px 2px 6px; clip-path:polygon(0 0,100% 0,calc(100% - 5px) 50%,100% 100%,0 100%); }
-.bt-pic{ border:0; border-radius:0; clip-path:var(--m-shield); filter:brightness(.85); }
-.bt-pic.on{ box-shadow:none; filter:none; outline:2px solid var(--m-or-hi,#ecd27a); outline-offset:-4px; }
-.bt-pic:hover{ filter:none; }
-/* the bars over the pieces: batons */
-.bt-cap, .bt-mor{ border:0; border-radius:0; box-shadow:none;
-  clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 50%,calc(100% - 7px) 100%,7px 100%,0 50%); background:#000d; }
-.bt-cap .bt-gh, .bt-cap .bt-fl, .bt-hbar, .bt-hbar i{ border-radius:0; }
-.bt-hbar{ border:0; clip-path:polygon(4px 0,calc(100% - 4px) 0,100% 50%,calc(100% - 4px) 100%,4px 100%,0 50%); }
-/* what the board says to you: dark scrolls, not boxes */
-.bt-tip, .bt-dmark, .bt-toast{ border:0; border-radius:0; padding:6px 22px 7px;
-  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%,9px 50%);
-  background:linear-gradient(180deg,var(--m-sable-3,#30271e),var(--m-sable-0,#0b0907));
-  box-shadow:none; }
-.bt-tip b{ color:var(--m-or,#c9a227); }
-.bt-tqi, .bt-ti:hover{ border-radius:0; }
-.bt-fgt{ background:none; box-shadow:none; background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; padding-bottom:14px; }

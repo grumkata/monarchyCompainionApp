@@ -1512,26 +1512,23 @@ body.holding #vp, body.holding #vp *{ cursor:crosshair !important; }
 
    `outline` and not `border`, because a border changes the box and
    would nudge every piece the moment it was picked.                */
-/* BLAZON: A BORDURE INDENTED OR. The ring was a straight gilt outline with
-   two corners cut — at the size a piece is drawn, a gold box. A chosen piece
-   now wears a bordure, the band heraldry puts round a shield to mark one
-   coat from another, and its edge is INDENTED, the zigzag line of
-   partition: a frame no other app draws round a selection. It lies on the
-   face, so it tilts with the wood; a soft gilt glow under it, no outline. */
+/* BLAZON: the ring is Or, and its outer frame is cut on the bend at two
+   corners — the same --m-cut every panel takes — so a chosen piece wears
+   the house mark rather than a generic focus glow */
 .prop.t3-thing.sel > .face{
-  outline:0;
-  box-shadow:0 0 20px rgba(201,162,39,.26);
+  outline:2px solid var(--m-or);
+  outline-offset:3px;
+  box-shadow:0 0 0 1px rgba(24,16,6,.55), 0 0 22px rgba(201,162,39,.32);
 }
-/* a counter's face is clear — the figure stands in the GL layer — so a glow
-   round it is only a lit rectangle on the wood; the bordure is enough */
-.prop.t3-thing.t3-token.sel > .face{ box-shadow:none; }
 .prop.t3-thing.sel > .face::after{
-  content:''; position:absolute; inset:-11px; pointer-events:none;
-  border:6px solid transparent;
-  border-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M0 5 L3 1 L6 5 L9 1 L12 5 L15 1 L18 5 L21 1 L24 5 M0 19 L3 23 L6 19 L9 23 L12 19 L15 23 L18 19 L21 23 L24 19 M5 0 L1 3 L5 6 L1 9 L5 12 L1 15 L5 18 L1 21 L5 24 M19 0 L23 3 L19 6 L23 9 L19 12 L23 15 L19 18 L23 21 L19 24' fill='none' stroke='%23140c04' stroke-opacity='.55' stroke-width='3' stroke-linejoin='miter'/><path d='M0 5 L3 1 L6 5 L9 1 L12 5 L15 1 L18 5 L21 1 L24 5 M0 19 L3 23 L6 19 L9 23 L12 19 L15 23 L18 19 L21 23 L24 19 M5 0 L1 3 L5 6 L1 9 L5 12 L1 15 L5 18 L1 21 L5 24 M19 0 L23 3 L19 6 L23 9 L19 12 L23 15 L19 18 L23 21 L19 24' fill='none' stroke='%23e6c25a' stroke-width='1.4' stroke-linejoin='miter'/></svg>") 6 round;
+  content:''; position:absolute; inset:-10px; pointer-events:none;
+  background:
+    linear-gradient(135deg,var(--m-or) 0 7px,transparent 7.5px) left top / 16px 16px no-repeat,
+    linear-gradient(315deg,var(--m-or) 0 7px,transparent 7.5px) right bottom / 16px 16px no-repeat;
+  border:1px solid rgba(201,162,39,.3);
 }
 /* the piece you are actually holding does not need a ring as well */
-.prop.t3-thing.lift.sel > .face::after{ opacity:.45; }
+.prop.t3-thing.lift.sel > .face{ outline-color:rgba(201,162,39,.45); }
 /* and a PEEK (23-table3d.js) is a clean view of the thing: the ring is for the
    table, and flown in to 340% it is a picture frame round what you are reading */
 body.peeking .prop.t3-thing.sel > .face{ outline-color:transparent; box-shadow:none; }
@@ -1543,45 +1540,21 @@ body.peeking .prop.t3-thing.sel > .face::after{ display:none; }
    notation fell through to a handler that did not exist, and the
    words vanished. Speech sits in the same dock as the rolls,
    quieter than them, because most of a session is talking.     */
-/* THE NAME OVER THE WORDS, the way a roll already had it. Speech used to be a
-   row — name, then words beside it — and a roll a column, so the dock read
-   in two shapes, and every line of speech was indented by however long the
-   speaker's name happened to be. One shape now: the name on its own line,
-   what was said or thrown under it, all of it on one left edge. */
 .cl.said{
-  display:block; padding:5px 11px; line-height:1.45;
+  display:flex; gap:9px; align-items:baseline;
+  padding:5px 11px; line-height:1.45;
 }
 .cl.said > b{
-  display:block; font-family:var(--m-f-cap); font-size:9px; font-weight:700;
-  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); margin-bottom:1px;
+  flex:0 0 auto; font-family:var(--m-f-cap); font-size:9px; font-weight:700;
+  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); padding-top:3px;
 }
 .cl.said .stxt{ color:var(--m-text); font-size:14px; }
-.cl.roll{ padding:5px 11px; }
-/* A RUN BY ONE SPEAKER is signed once (57-chat-net.js thread): the lines after
-   the first drop the name and close up under it */
-.cl.cont{ margin-top:-10px; padding-top:0; }
-.cl.cont > b:first-child{ display:none; }
-/* THE DOCK BEFORE ANYBODY HAS SPOKEN. It was an empty dark column, which on
-   the first evening says nothing about what it is for. A line in the dock's
-   own quiet hand, gone the moment the first line arrives. */
-.chatdock .cb:empty::before{
-  content:'The table is quiet.\A Say something, or roll \2014  /r 2d6';
-  white-space:pre-line; display:block; margin:18px 11px 0; padding-top:14px; text-align:center;
-  background:var(--m-rule-engrailed) 50% 0 / auto 6px repeat-x;
-  font-family:var(--m-f-hand); font-style:italic; font-size:14px; line-height:1.6;
-  color:var(--m-hush);
-}
 .cl.said.emote{ font-style:italic; }
-/* THE GM IS NOT LOUDER, THEY ARE MARKED. Same size, same weight — and a
-   small crown before the name, where the gilt bar down the edge used to be
-   (a coloured bar down a box's left side is the web's callout, and it said
-   "highlighted", not "the one running the table"). A run of their lines is
-   signed once, so the crown heads the whole of it. */
+/* THE GM IS NOT LOUDER, THEY ARE MARKED. Same size, same weight — a gilt
+   rule down the edge, the way a marginal hand marks a passage. At a table
+   you can tell who is running it without them shouting. */
+.cl.said.gm{ box-shadow:inset 2px 0 0 var(--m-or); padding-left:9px; }
 .cl.said.gm > b{ color:var(--m-or); }
-.cl.said.gm > b::before{ content:''; display:inline-block; width:12px; height:9px; margin:0 5px -1px 0;
-  background:var(--m-or);
-  -webkit-mask:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 18'><path d='M1 6l5 4 6-9 6 9 5-4-2 10H3z M3 17h18v1H3z'/></svg>") center/contain no-repeat;
-  mask:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 18'><path d='M1 6l5 4 6-9 6 9 5-4-2 10H3z M3 17h18v1H3z'/></svg>") center/contain no-repeat; }
 /* the table noticing something, rather than anybody saying it */
 .cl.note{ padding:3px 0 3px 9px; }
 .cl.note .stxt{ font-family:var(--m-f-hand); font-style:italic; font-size:13px;
@@ -1975,10 +1948,6 @@ body.chest-open .kit > *, body.reading .kit > *, body.field-on .kit > *{ pointer
 .pk-card.t-blue{ background:linear-gradient(172deg,#dce7ef 0%,#b9cbdb 100%); }
 .pk-card.t-red{ background:linear-gradient(172deg,#f2d8ce 0%,#dcb0a0 100%); }
 .pk-card:hover{ transform:translateY(-2px) rotate(-1.5deg); }
-/* the same seal the note is pinned under when it is up in your hand,
-   pressed over the top edge — half of it shows, the rest is round the back */
-.pk-card::before{ content:''; position:absolute; z-index:2; left:50%; top:-7px; width:16px; height:15px;
-  margin-left:-8px; pointer-events:none; clip-path:var(--m-wax); background:var(--m-wax-melt); }
 .pk-txt{ position:relative; z-index:1; display:block; font-family:'Crimson Text',serif;
   font-size:10px; line-height:1.25; color:#241a10; white-space:pre-wrap; word-break:break-word; }
 .pk-sk{ position:absolute; inset:0; width:100%; height:100%; }
@@ -2037,72 +2006,6 @@ body.pk-dragging, body.pk-dragging *{ cursor:grabbing !important; }
 .pk-tint.t-blue{ background:#c4d5e3; }
 .pk-tint.t-red{ background:#e0b8a8; }
 .pk-tint.on{ outline:2px solid var(--m-or); outline-offset:2px; }
-
-/* ── THE NOTE'S TOOLS ARE A RIBBON, AND DONE IS A SEAL ──────────
-   The bar under a note was a framed box of framed buttons, two rows of
-   them — a toolbar. Now it is a sable ribbon cut in a swallow's notch at
-   each end, the words lettered on it with nothing round them; the inks
-   are lozenges and the papers little shields, and the one in use is
-   ringed in gilt in its own shape rather than turned into a square. You
-   finish a note the way you finish a charter: Done is a wax seal pressed
-   over the ribbon's end. And the note itself is pinned under a seal at
-   its head, so it reads as a letter you are holding, not a text box. */
-#pk-ed .pk-sheet::before{ content:''; position:absolute; z-index:2; left:50%; top:-15px; width:36px; height:34px;
-  margin-left:-18px; pointer-events:none; clip-path:var(--m-wax);
-  background:radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(0,0,0,.22) 35% 41%, transparent 42%),
-    var(--m-wax-melt);
-  filter:drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
-#pk-ed .pk-bar{ position:relative; isolation:isolate; flex-wrap:nowrap; gap:2px; max-width:none;
-  padding:9px 74px 9px 30px !important; background:none; box-shadow:none;
-  filter:drop-shadow(0 8px 14px rgba(0,0,0,.55)); }
-#pk-ed .pk-bar::before{ content:''; position:absolute; z-index:-1; left:0; right:26px; top:0; bottom:0;
-  pointer-events:none;
-  background:
-    repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px),
-    linear-gradient(180deg,var(--m-sable-2),var(--m-sable) 70%,#120e0b);
-  clip-path:polygon(0 0,100% 0,calc(100% - 14px) 50%,100% 100%,0 100%,14px 50%); }
-#pk-ed .pk-bar::after{ content:''; position:absolute; z-index:-1; left:18px; right:44px; top:4px; bottom:4px;
-  pointer-events:none; opacity:.55;
-  background:linear-gradient(90deg,var(--m-or),var(--m-or-lo)) 0 0/100% 1px no-repeat,
-             linear-gradient(90deg,var(--m-or),var(--m-or-lo)) 0 100%/100% 1px no-repeat; }
-#pk-ed .pk-b{ padding:6px 9px !important; background:none; box-shadow:none; color:var(--m-quiet);
-  transition:color var(--t-hover) var(--settle); }
-#pk-ed .pk-b:hover, #pk-ed .pk-b:focus-visible{ color:var(--m-argent-hi); box-shadow:none; outline:none; }
-#pk-ed .pk-b.on{ color:var(--m-or-hi); background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; }
-#pk-ed .pk-b.bad{ color:#d98679; }
-#pk-ed .pk-b.bad:hover, #pk-ed .pk-b.bad:focus-visible{ color:#ffb3a6; background:none; }
-#pk-ed .pk-b.gilt{ position:absolute; right:0; top:50%; width:58px; height:54px; margin-top:-27px;
-  padding:0 !important; color:var(--m-argent-hi); font-size:9px; letter-spacing:.12em;
-  text-shadow:0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,170,150,.25);
-  clip-path:var(--m-wax);
-  background:radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(0,0,0,.22) 39% 43%, transparent 44%),
-    var(--m-wax-melt);
-  transition:transform var(--t-hover) var(--pop), filter var(--t-hover) var(--settle); }
-#pk-ed .pk-b.gilt:hover{ color:var(--m-argent-hi); filter:brightness(1.12); transform:rotate(-8deg) scale(1.05); }
-#pk-ed .pk-b.gilt:focus-visible{ filter:brightness(1.3); transform:rotate(-10deg) scale(1.08); }
-#pk-ed .pk-b.gilt:active{ transform:scale(.9); }
-#pk-ed .pk-pens, #pk-ed .pk-tints{ gap:3px; padding:0 8px !important; }
-/* an ink or a paper is drawn by its ::before; the ring it wears when it is
-   the one in use is its ::after, the same shape a size larger, behind it */
-#pk-ed .pk-pen, #pk-ed .pk-tint{ position:relative; isolation:isolate; width:24px; height:26px;
-  background:none !important; box-shadow:none; clip-path:none; outline:none; }
-#pk-ed .pk-pen::before, #pk-ed .pk-tint::before,
-#pk-ed .pk-pen::after, #pk-ed .pk-tint::after{ content:''; position:absolute; pointer-events:none; }
-#pk-ed .pk-pen::before{ inset:3px; background:var(--pen); clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.3); }
-#pk-ed .pk-tint::before{ inset:4px 5px 3px; clip-path:var(--m-shield);
-  background:linear-gradient(180deg,rgba(255,255,255,.35),transparent 60%),var(--paper,#eadbb5); }
-#pk-ed .pk-tint.t-cream{ --paper:#eadbb5; }
-#pk-ed .pk-tint.t-blue{ --paper:#c4d5e3; }
-#pk-ed .pk-tint.t-red{ --paper:#e0b8a8; }
-/* every ink has a faint argent edge, or the black one is a hole in the ribbon */
-#pk-ed .pk-pen::after{ z-index:-1; inset:0; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
-  background:rgba(244,232,204,.26); }
-#pk-ed .pk-tint::after{ z-index:-1; inset:1px 2px 0; clip-path:var(--m-shield); }
-#pk-ed .pk-pen.on::after, #pk-ed .pk-tint.on::after{ background:var(--m-or); }
-#pk-ed .pk-pen:hover::after, #pk-ed .pk-tint:hover::after,
-#pk-ed .pk-pen:focus-visible::after, #pk-ed .pk-tint:focus-visible::after{ background:var(--m-or-lo); }
-#pk-ed .pk-pen.on, #pk-ed .pk-tint.on{ outline:none; }
 
 /* ── A LINE ON THE WOOD (61-ink.js) ───────────────────────────
    No card, no edges, no shadow of its own box: it is ink. The line takes
@@ -2281,100 +2184,3 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
 #bob-star .bs-pop{ position:absolute; left:0; top:0; z-index:3; pointer-events:none; font:900 34px/1 'Arial Black','Segoe UI Black',Impact,sans-serif;
   -webkit-text-stroke:2px #101828; paint-order:stroke fill; text-shadow:0 3px 0 rgba(0,0,0,.4); }
 #bob-star .bs-got small{ display:block; margin-top:14px; font-size:.42em; letter-spacing:.06em; -webkit-text-stroke:2px #1d2c74; }
-
-/* ══ THE CHAT, IN MONARCHY'S OWN SHAPES ════════════════════════
-   The hanging already had its embattled edge. What was still a web form
-   in it was the rest: an Or tab with CHAT on it, a text box with a border,
-   a SEND button, dice in little squares. Now:
-     · its name rides the motto scroll, argent, at the top of the cloth
-     · you write on a LINE, an indented one, the way a clerk writes a roll
-     · Send is WAX — saying something at the table is setting your seal to it
-     · a die is a LOZENGE, the shape the dice already are (STYLE.md §6½) */
-.chatdock > .plaque{ align-self:center; margin:12px 0 2px 6px; padding:5px 26px 6px;
-  font-family:var(--m-f-cap); font-size:11px; font-weight:700; letter-spacing:var(--m-track);
-  text-transform:uppercase; background:none; clip-path:none; box-shadow:none; border:0; }
-.cin{ align-items:flex-end; gap:8px; padding:14px 12px 14px 26px; border-top:0; background:transparent;
-  position:relative; }
-.cin::before{ content:''; position:absolute; left:22px; right:10px; top:0; height:6px;
-  background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
-.cin textarea{ background:transparent; box-shadow:none; padding:6px 2px 8px; font-style:normal;
-  background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; transition:filter var(--t-hover) var(--settle); }
-.cin textarea:focus{ box-shadow:none; filter:brightness(1.3); }
-.cin textarea::placeholder{ color:var(--m-hush); font-style:italic; }
-/* the quill-and-picture: a device, not a button with a border */
-.cin button.pic{ background:none; box-shadow:none; color:var(--m-quiet); width:28px; }
-.cin button.pic:hover{ background:none; box-shadow:none; color:var(--m-or); transform:rotate(-8deg); }
-/* SEND IS A SEAL */
-.cin #chat-go{ width:50px; height:46px; padding:0; margin-bottom:-4px; flex:0 0 50px;
-  font-family:var(--m-f-cap); font-size:8.5px; font-weight:700; letter-spacing:.14em;
-  color:var(--m-argent-hi); text-shadow:0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,170,150,.25);
-  clip-path:var(--m-wax);
-  background:
-    radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(0,0,0,.22) 39% 43%, transparent 44%),
-    var(--m-wax-melt);
-  transition:transform var(--t-hover) var(--pop), filter var(--t-hover) var(--settle); }
-.cin #chat-go:hover{ background:
-    radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(0,0,0,.22) 39% 43%, transparent 44%),
-    var(--m-wax-melt); color:var(--m-argent-hi); transform:rotate(-10deg) scale(1.06); filter:brightness(1.12); }
-.cin #chat-go:active{ transform:scale(.9); }
-.cin #chat-go:focus-visible{ outline:none; filter:brightness(1.3); transform:rotate(-10deg) scale(1.08); }
-/* a die, a lozenge */
-.rdice i{ position:relative; display:grid; place-items:center; min-width:0; width:30px; height:30px; padding:0;
-  clip-path:var(--m-lozenge); box-shadow:none; background:var(--m-sable-3); font-size:14px; }
-.rdice i.cn{ width:auto; height:auto; clip-path:var(--m-pennon); padding:3px 12px 3px 7px; }
-.rdice i.gone{ background:transparent; opacity:.4; }
-/* a die walked up keeps its arrow, tucked into the lozenge's wide waist */
-.rdice i.up::before{ position:absolute; left:4px; top:50%; transform:translateY(-50%); margin:0; font-size:8px; }
-
-/* ══ THE KIT'S CARD IS A BANNER ═════════════════════════════════
-   The same cloth as the toolbox and the menu (.m-banner), hung from a pole
-   beside the player's shields, its rows divided by lines of partition and
-   its choices pennons. */
-.kit{ gap:30px; }
-/* no unfurl: the card is redrawn on every change of the kit, and an entrance on
-   it never got past its first frame (the same as the fight's cards) */
-.kit-card{ overflow:visible; max-height:none; width:280px; background:none; box-shadow:none; --m-tail:26px;
-  padding:14px 0 calc(var(--m-tail) + 10px) !important; animation:none; }
-.kit-scroll{ max-height:min(64vh,520px); overflow-y:auto; }
-.kit-scroll::-webkit-scrollbar{ width:4px; }
-.kit-scroll::-webkit-scrollbar-thumb{ background:var(--m-line); }
-.kit-row{ box-shadow:none; background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; padding-bottom:12px !important; }
-.kit-chip{ box-shadow:none; clip-path:var(--m-pennon); padding:6px 15px 6px 9px !important;
-  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
-  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle); }
-.kit-chip:hover, .kit-chip.on{ box-shadow:none; background-position:0 0; color:var(--m-sable); }
-.kit-chip.bad:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
-.kit-find{ width:calc(100% - 28px); margin:0 14px 6px; background:var(--m-rule-indented) 0 100% / auto 6px repeat-x;
-  border:0; outline:none; color:var(--m-argent-hi); font:italic 15px var(--m-f-hand); padding:4px 2px 8px; }
-.kit-find:focus{ box-shadow:none; filter:brightness(1.35); }
-.kit-notes .kit-none{ grid-column:1/-1; }
-/* the chat's oldest lines go up into the cloth rather than under a hard edge */
-.chatdock .cb{ -webkit-mask:linear-gradient(180deg,transparent 0,#000 22px); mask:linear-gradient(180deg,transparent 0,#000 22px); }
-.kit-scroll{ -webkit-mask:linear-gradient(180deg,#000 calc(100% - 18px),transparent); mask:linear-gradient(180deg,#000 calc(100% - 18px),transparent); }
-
-/* ══ THE ROOM EDITOR, HUNG LIKE THE REST ════════════════════════
-   Still small and still out of the way of the room it is for — but a
-   banner on its pole beside the wall's shields, not a dark box over the
-   crown: its name on the motto scroll, its rows written on lines, its acts
-   pennons, and shutting it a seal. */
-#room-ed{ left:76px; top:70px; max-height:calc(100vh - 90px); background:none; border:0; box-shadow:none; --m-tail:24px; }
-#room-ed .re-head{ background:none; border:0; box-shadow:none; justify-content:center; padding:12px 40px 8px; position:relative; }
-#room-ed .re-head .m-band{ font-size:10px; }
-#room-ed .re-head .re-x{ position:absolute; right:12px; top:50%; margin-top:-12px; width:24px; height:24px; padding:0;
-  color:var(--m-argent-hi); font-size:10px; font-weight:700; clip-path:var(--m-wax);
-  background:radial-gradient(circle at 50% 50%, transparent 0 44%, rgba(0,0,0,.25) 45% 51%, transparent 52%), var(--m-wax-melt); }
-#room-ed .re-list{ border:0; margin:0 10px; }
-#room-ed .re-row{ padding:4px 6px 6px; background:var(--m-rule-indented) 0 100% / auto 5px repeat-x; }
-#room-ed .re-row:hover{ background-color:transparent; color:var(--m-argent-hi); }
-#room-ed .re-row.on{ box-shadow:none; color:var(--m-sable);
-  background:linear-gradient(115deg,var(--m-or) 0 100%) 0 0 / 100% 100% no-repeat; clip-path:var(--m-band); padding-left:14px; }
-#room-ed .re-add, #room-ed .re-foot{ border:0; margin:0 10px; padding:9px 0 4px;
-  background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
-#room-ed .re-add select{ border:0; background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; padding-bottom:7px; }
-#room-ed button:not(.re-x):not(.re-row){ border:0; clip-path:var(--m-pennon); padding:6px 13px 6px 8px; background:var(--m-sable-3); }
-#room-ed button:not(.re-x):not(.re-row):hover{ background:var(--m-or); color:var(--m-sable); }
-/* the rows are lines of the list, not buttons-shaped-like-buttons */
-#room-ed button.re-row{ clip-path:none; border:0; letter-spacing:.06em; font-size:8px; }
-#room-ed button.re-row.on{ clip-path:var(--m-band); }
-#room-ed #re-del:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
-#room-ed .re-fields input{ background:var(--m-rule-indented) 0 100% / auto 5px repeat-x; border:0; padding-bottom:6px; }

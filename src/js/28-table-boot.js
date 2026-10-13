@@ -111,13 +111,6 @@ function boot(tableId) {
     const cd = doc.querySelector('#table-app .chatdock');
     if (cd) doc.body.appendChild(cd);
   });
-  /* AND THE TABLE'S NOTICES, for the same reason: inside #table-app their
-     z-index counted only there, under the table's own canvas, so a notice
-     was raised and painted behind the wood */
-  tryTo(() => {
-    const t = doc.getElementById('table-toast');
-    if (t && t.parentNode !== doc.body) doc.body.appendChild(t);
-  });
   tryTo(() => root.TableModel.load(id));
   tryTo(() => root.TableProps.mount());
   tryTo(() => root.Toolbox.mount());

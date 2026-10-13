@@ -51,10 +51,7 @@ function mount() {
   b.id = 'tm-open';
   b.className = 'tm-open';
   b.title = 'Menu  ·  Esc';
-  /* A CROWN, not three bars: the table's decisions are the crown's, and three
-     bars are every website's corner (14-war.css, the left wall) */
-  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="nonzero" d="M3 18.2h18v2.6H3z M3.6 16.8L2.2 7.6l5.1 4.1L12 4.4l4.7 7.3 5.1-4.1-1.4 9.2z M13.4 3.1a1.4 1.4 0 1 1-2.8 0 1.4 1.4 0 1 1 2.8 0z M3.4 6.3a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 1 1 2.4 0z M23 6.3a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 1 1 2.4 0z"/></svg>';
-  b.setAttribute('aria-label', 'The table\u2019s menu');
+  b.innerHTML = '<i></i><i></i><i></i>';
   b.addEventListener('click', toggle);
   doc.body.appendChild(b);
 
@@ -64,7 +61,6 @@ function mount() {
   el.hidden = true;
   el.addEventListener('click', onClick);
   el.addEventListener('input', onRange);
-  el.addEventListener('keydown', onKeys);
   doc.body.appendChild(el);
 }
 
@@ -73,26 +69,7 @@ function mount() {
    rearranges itself is a menu you have to read every time. The only thing
    that changes is which of the two hosting lines is showing, and that IS
    the state you came here to look at. */
-/* ── THE KEYS STAY WHERE THEY WERE ────────────────────────────
-   Every press on the card redraws it, and a redraw replaces every button —
-   so a keyboard that had walked to "Settings" and pressed it was left
-   holding nothing, focus dropped to the page, and the next arrow scrolled
-   the window instead. Whatever had focus is found again by what it does
-   (its data-tm, its option and value, its slider) on the card that replaced
-   it; failing that, the first row. */
 function draw() {
-  const a = el && el.contains(doc.activeElement) ? doc.activeElement : null;
-  const key = a && (a.dataset.tm ? '[data-tm="' + a.dataset.tm + '"]'
-                  : a.dataset.opt ? '[data-opt="' + a.dataset.opt + '"][data-v="' + a.dataset.v + '"]'
-                  : a.dataset.range ? '[data-range="' + a.dataset.range + '"]' : '');
-  drawCard();
-  if (!a) return;
-  let to = null;
-  try { to = key && el.querySelector(key); } catch (e) {}
-  (to || first()).focus({ preventScroll: true });
-}
-const first = () => (el && el.querySelector('.tm-row:not([disabled]), .tm-chip')) || el;
-function drawCard() {
   if (view === 'settings') return drawSettings();
   const word = live() ? S().word : '';
   const role = live() ? S().role : '';
@@ -101,7 +78,7 @@ function drawCard() {
   const local = net && net.mode === 'local';
 
   el.innerHTML =
-    '<div class="tm-card m-banner"><span class="m-pole" aria-hidden="true"></span>' +
+    '<div class="tm-card">' +
       '<div class="tm-head">' +
         '<b>' + esc(tableName()) + '</b>' +
         (live()
@@ -170,9 +147,7 @@ function drawSettings() {
 
   const groups = O ? O.groups() : [];
   el.innerHTML =
-    /* the switches scroll INSIDE the banner, so the pole and its fleurs are
-       not cut off at the cloth's edge the way overflow would cut them */
-    '<div class="tm-card tm-set m-banner"><span class="m-pole" aria-hidden="true"></span><div class="tm-scroll">' +
+    '<div class="tm-card tm-set">' +
       '<div class="tm-head"><b>Settings</b></div>' +
       groups.map((g, i) =>
         '<div class="tm-grp">' + esc(g.name) + '</div>' +
@@ -187,7 +162,7 @@ function drawSettings() {
         }).join('')
       ).join('') +
       '<div class="tm-rows">' + row('back', 'Back') + '</div>' +
-    '</div></div>';
+    '</div>';
 }
 function setOpt(k, v) {
   if (k === '__full') {
@@ -321,32 +296,10 @@ function note(text, bad) {
 }
 
 /* ══ OPENING AND SHUTTING ══════════════════════════════════════ */
-/* OPENED, IT HAS THE KEYS: the first row takes focus, so Escape-then-Enter
-   hosts, and the arrows walk the rows (onKeys). A mouse that opened it sees
-   no ring — :focus-visible knows the difference. Shut, the keys go back to
-   the TABLE, not to the mark: the table is where every key means something
-   (Space turns the fight over, the arrows look round), and a mark holding
-   focus would have taken Space for itself and opened the menu again. */
 function show() { mount(); said = ''; view = 'main'; draw(); el.hidden = false; open = true;
-                  doc.body.classList.add('menuing');
-                  const r = first(); if (r && r !== el) r.focus({ preventScroll: true }); }
-function shut() { if (!el) return;
-                  const a = doc.activeElement;
-                  if (a && el.contains(a) && a.blur) a.blur();
-                  el.hidden = true; open = false;
+                  doc.body.classList.add('menuing'); }
+function shut() { if (!el) return; el.hidden = true; open = false;
                   doc.body.classList.remove('menuing'); }
-/* up and down the card, round the ends; a slider keeps its own arrows */
-function onKeys(e) {
-  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
-  if (e.target && e.target.type === 'range') return;
-  const all = [...el.querySelectorAll('button:not([disabled]), input[type=range]')];
-  if (!all.length) return;
-  e.preventDefault();
-  const i = all.indexOf(doc.activeElement);
-  const n = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1
-          : (i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length);
-  all[n].focus({ preventScroll: false });
-}
 function toggle() { open ? shut() : show(); }
 
 /* ── ESCAPE, AND WHAT ELSE ESCAPE ALREADY MEANS ───────────────

@@ -41,102 +41,48 @@ body.field-on .gmr{ z-index:1210; }
 .gmr-b:hover{ box-shadow:inset 0 0 0 1px var(--m-or), var(--m-lift); }
 .gmr-b.on{ background:var(--m-or); color:var(--m-sable); }
 
-/* ══ THE TOOLBOX: A BANNER ON A POLE ══════════════════════════
-   Not a panel. A length of Sable cloth hung from a gilt pole at your left
-   hand, its hem stitched in gold, its foot forked like a standard's — and
-   it UNFURLS from the pole when it opens, the way cloth comes down off a
-   roller. Along the pole hang the seven kinds as shields, each in its own
-   tincture; under them the kind's name rides a ribbon; and the things
-   themselves are laid out below as a roll of arms — shields, with their
-   names on ribbons across their points. (The silhouettes: 20-shell.css.) */
-.tbx{ position:fixed; left:76px; top:62px; bottom:8px; width:396px; z-index:1200;
-  display:flex; flex-direction:column; color:var(--m-text); }
+/* ══ THE TOOLBOX DOCK ══════════════════════════════════════════
+   At your left hand, the height of the screen, beside the rail. */
+.tbx{ position:fixed; left:68px; top:58px; bottom:16px; width:396px; z-index:1200;
+  display:flex; flex-direction:column; color:var(--m-text);
+  background:var(--m-marks), linear-gradient(176deg, var(--m-sable-2), var(--m-sable) 62%);
+  box-shadow:var(--m-frame), var(--m-lift);
+  clip-path:var(--m-cut);
+  animation:tbx-in .22s var(--pop, cubic-bezier(.2,1.3,.4,1)) both; }
 .tbx[hidden]{ display:none; }
-.tbx > .m-pole, .tbx > .tbx-drop{ position:absolute; }
-
-/* ── THE SEVEN KINDS: shields hung from the pole on straps ── */
-.tbx-kind[data-k="scenes"],  .tbx[data-kind="scenes"]  { --kt:var(--m-gules); }
-.tbx-kind[data-k="people"],  .tbx[data-kind="people"]  { --kt:var(--m-azure); }
-.tbx-kind[data-k="art"],     .tbx[data-kind="art"]     { --kt:var(--m-purpure); }
-.tbx-kind[data-k="models"],  .tbx[data-kind="models"]  { --kt:var(--m-vert); }
-.tbx-kind[data-k="papers"],  .tbx[data-kind="papers"]  { --kt:var(--m-tenne); }
-.tbx-kind[data-k="notes"],   .tbx[data-kind="notes"]   { --kt:var(--m-murrey); }
-.tbx-kind[data-k="audio"],   .tbx[data-kind="audio"]   { --kt:var(--m-bleu); }
-.tbx-kinds{ order:-1; display:grid; grid-template-columns:repeat(7,1fr); gap:0; padding:0 12px; margin-top:4px; }
-.tbx-kind{ position:relative; border:0; padding:9px 0 0; background:none; cursor:pointer; min-width:0;
-  display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--m-quiet);
-  transform-origin:50% 0;
-  animation:tbx-hang .5s var(--pop) both; animation-delay:calc(.12s + var(--i, 0) * 35ms); }
-.tbx-kind:nth-child(1){ --i:0 } .tbx-kind:nth-child(2){ --i:1 } .tbx-kind:nth-child(3){ --i:2 }
-.tbx-kind:nth-child(4){ --i:3 } .tbx-kind:nth-child(5){ --i:4 } .tbx-kind:nth-child(6){ --i:5 }
-.tbx-kind:nth-child(7){ --i:6 }
-@keyframes tbx-hang{ from{ opacity:0; transform:translateY(-12px) rotate(-9deg); } }
-/* the straps, from the pole to the shield's chief */
-.tbx-kind::before{ content:''; position:absolute; top:-2px; left:50%; width:22px; height:13px; margin-left:-11px;
-  background:linear-gradient(90deg,transparent 0 3px,var(--m-or-lo) 3px 5px,transparent 5px 17px,
-    var(--m-or-lo) 17px 19px,transparent 19px); transition:height var(--t-hover) var(--settle); }
-.tbx-kshield{ position:relative; width:44px; height:50px; flex:0 0 50px; clip-path:var(--m-shield);
-  background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 40%,var(--m-or-lo));
-  transition:transform var(--t-hover) var(--settle); }
-.tbx-kshield::before{ content:''; position:absolute; inset:2px 2px 3px; clip-path:var(--m-shield);
-  background:radial-gradient(ellipse at 40% 22%, rgba(255,255,255,.16), transparent 58%),
-    color-mix(in srgb, var(--kt, var(--m-sable-3)) 62%, #090705);
-  transition:background var(--t-wipe) var(--settle); }
-.tbx-kfig{ position:absolute; left:50%; top:5px; width:34px; height:34px; margin-left:-17px; z-index:1; }
-.tbx-kind b{ font-family:var(--m-f-cap); font-size:8px; letter-spacing:.12em; text-transform:uppercase;
-  font-weight:700; line-height:1; white-space:nowrap; transition:color var(--t-hover) var(--settle); }
-.tbx-kico{ display:grid; place-items:center; color:var(--m-argent-hi); }
-.tbx-kico svg{ width:22px; height:22px; }
-/* touched, it swings on its straps; chosen, it is let down a hand's breadth and its field is Or */
-.tbx-kind:hover{ color:var(--m-text); }
-.tbx-kind:hover .tbx-kshield{ animation:m-swing .7s var(--settle); }
-.tbx-kind.on{ color:var(--m-or); padding-top:15px; }
-.tbx-kind.on::before{ height:19px; }
-.tbx-kind.on .tbx-kshield::before{ background:radial-gradient(ellipse at 40% 22%, rgba(255,255,255,.35), transparent 58%), var(--m-or); }
-.tbx-kind.on .tbx-kico{ color:var(--m-sable); }
-.tbx.benching .tbx-kinds{ opacity:.5; }
-@keyframes m-swing{ 0%{ transform:rotate(0) } 22%{ transform:rotate(-7deg) } 50%{ transform:rotate(4deg) }
-  76%{ transform:rotate(-1.5deg) } 100%{ transform:rotate(0) } }
-
-/* ── THE KIND'S NAME, ON ITS RIBBON, with the seal that shuts the banner ── */
-.tbx-head{ position:relative; display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 54px 8px;
-  border:0; }
-.tbx-what{ flex:0 0 auto; font-family:var(--m-f-cap); font-size:12px; font-weight:700;
-  letter-spacing:var(--m-track); text-transform:uppercase; color:var(--m-or); }
-.tbx-count{ position:absolute; left:24px; top:50%; transform:translateY(-50%);
-  font-family:var(--m-f-tally); font-size:14px; color:var(--m-hush); }
-/* SHUT IS A SEAL. The banner is closed the way a letter is: press the wax */
-.tbx-x{ position:absolute; right:18px; top:50%; width:30px; height:30px; margin-top:-15px; border:0; padding:0;
-  cursor:pointer; font-size:12px; font-weight:700; color:var(--m-argent-hi); clip-path:var(--m-wax);
-  background:radial-gradient(circle at 50% 50%, transparent 0 46%, rgba(0,0,0,.25) 47% 52%, transparent 53%),
-    var(--m-wax-melt);
-  text-shadow:0 1px 0 rgba(0,0,0,.6);
-  transition:transform var(--t-hover) var(--pop); }
-.tbx-x:hover{ transform:rotate(-14deg) scale(1.08); }
-.tbx-x:active{ transform:scale(.9); }
-.insp-x{ width:28px; height:28px; border:0; cursor:pointer; font-size:13px; color:var(--m-text);
+@keyframes tbx-in{ from{ opacity:0; translate:-18px 0; } }
+.tbx-head{ display:flex; align-items:center; gap:10px; padding:14px 14px 8px 20px;
+  border-bottom:1px solid var(--m-line); }
+.tbx-what{ font-family:var(--m-f-cap); font-size:12px; font-weight:700; letter-spacing:var(--m-track);
+  text-transform:uppercase; color:var(--m-or); flex:1; }
+.tbx-count{ font-family:var(--m-f-tally); font-size:14px; color:var(--m-quiet); }
+.tbx-x, .insp-x{ width:28px; height:28px; border:0; cursor:pointer; font-size:13px; color:var(--m-text);
   background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
   transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle); }
-.insp-x:hover{ background-position:0 0; color:var(--m-sable); }
+.tbx-x:hover, .insp-x:hover{ background-position:0 0; color:var(--m-sable); }
 
-/* ── THE SHELF: a line to write on, and the library's pennons ── */
-.tbx-shelf{ padding:0 18px 6px; display:flex; flex-direction:column; gap:7px; }
+.tbx-kinds{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; padding:8px 10px; }
+.tbx-kind{ position:relative; height:66px; border:0; padding:4px 2px 2px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:2px;
+  color:var(--m-quiet); background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-0);
+  box-shadow:inset 0 0 0 1px var(--m-line);
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle); }
+.tbx-kind b{ font-family:var(--m-f-cap); font-size:8px; letter-spacing:.14em; text-transform:uppercase;
+  font-weight:700; position:relative; z-index:1; }
+.tbx-kfig{ position:relative; width:40px; height:40px; flex:0 0 40px; }
+.tbx-kind:hover{ color:var(--m-text); box-shadow:inset 0 0 0 1px var(--m-or); }
+.tbx-kind.on{ background-position:0 0; color:var(--m-sable); }
+
+.tbx-shelf{ padding:0 12px 6px; display:flex; flex-direction:column; gap:6px; }
 .tbx-shelf[hidden]{ display:none; }
 .tbx-find{ display:none; }
 .tbx-shelf.findable .tbx-find{ display:block; }
-/* NOT A BOX: the words are written on an indented line, the way a herald
-   writes a name into a roll */
-.tbx-find input{ width:100%; box-sizing:border-box; background:transparent; border:0; color:var(--m-argent-hi);
-  font-family:var(--m-f-hand); font-style:italic; font-size:16px; padding:4px 4px 7px 22px; outline:none;
-  background:
-    var(--m-rule-indented) 0 100% / auto 6px repeat-x,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='4.5' fill='none' stroke='%23c9a227' stroke-width='1.6'/%3E%3Cpath d='M10 10l4 4' stroke='%23c9a227' stroke-width='1.8'/%3E%3C/svg%3E") 0 45% / 14px 14px no-repeat;
-  transition:filter var(--t-hover) var(--settle); }
-.tbx-find input::placeholder{ color:var(--m-hush); }
-.tbx-find input:focus{ filter:brightness(1.35); }
-.tbx-find input::-webkit-search-cancel-button{ filter:sepia(1) saturate(3) hue-rotate(5deg); }
+.tbx-find input{ width:100%; box-sizing:border-box; background:var(--m-sable-0); border:0; color:var(--m-argent-hi);
+  font-family:var(--m-f-hand); font-size:15px; padding:7px 10px; outline:none;
+  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 2px 4px rgba(0,0,0,.6); }
+.tbx-find input:focus{ box-shadow:inset 0 0 0 1px var(--m-or), inset 0 2px 4px rgba(0,0,0,.6); }
 .tbx-tabs{ display:flex; flex-wrap:wrap; gap:4px; }
-.tbx-tab{ border:0; cursor:pointer; padding:5px 13px 5px 9px; font-family:var(--m-f-cap); font-size:9px;
+.tbx-tab{ border:0; cursor:pointer; padding:5px 12px 5px 9px; font-family:var(--m-f-cap); font-size:9px;
   font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--m-text);
   background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
   clip-path:var(--m-pennon);
@@ -144,58 +90,30 @@ body.field-on .gmr{ z-index:1210; }
 .tbx-tab i{ font-style:normal; font-family:var(--m-f-tally); font-size:11px; margin-left:6px; opacity:.7; }
 .tbx-tab:hover, .tbx-tab.on{ background-position:0 0; color:var(--m-sable); }
 
-/* ── THE ROLL OF ARMS: every thing a shield, its name on a ribbon ── */
-.tbx-grid{ flex:1; min-height:0; overflow-y:auto; padding:6px 16px 14px;
-  display:grid; grid-template-columns:repeat(3,1fr); gap:12px 8px; align-content:start; }
+.tbx-grid{ flex:1; min-height:0; overflow-y:auto; padding:6px 12px 12px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(106px,1fr)); gap:6px; align-content:start; }
 .tbx-grid[hidden]{ display:none; }
 .tbx-grid::-webkit-scrollbar, .tbx-bench::-webkit-scrollbar{ width:5px; }
 .tbx-grid::-webkit-scrollbar-thumb, .tbx-bench::-webkit-scrollbar-thumb{ background:var(--m-line); }
-.tbx-tile{ position:relative; border:0; padding:0; cursor:pointer; min-width:0; background:none;
-  display:flex; flex-direction:column; align-items:center; color:var(--m-text); outline:none; }
-.tbx-shield{ position:relative; width:94px; height:106px; flex:0 0 106px; clip-path:var(--m-shield);
-  background:linear-gradient(160deg,var(--m-or),var(--m-or-lo) 55%,#4a3510);
-  transition:transform var(--t-hover) var(--settle), background var(--t-hover) var(--settle); }
-.tbx-shield::before{ content:''; position:absolute; inset:2px 2px 3px; clip-path:var(--m-shield);
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 34%, rgba(255,226,170,.17), transparent 70%),
-    color-mix(in srgb, var(--kt, var(--m-sable-3)) 34%, #0a0806); }
-.tbx-fig{ position:absolute; left:50%; top:9px; width:78px; height:78px; margin-left:-39px; z-index:1; }
-/* dealt in when a kind is turned to (47-hand.js deal): each shield is laid down in turn */
-.tbx-grid.dealing .tbx-tile{ animation:tbx-deal .34s var(--settle) both; animation-delay:calc(var(--n, 0) * 22ms); }
-@keyframes tbx-deal{ from{ opacity:0; transform:translateY(12px) scale(.94); } }
-/* the name, on a ribbon across the shield's point */
-.tbx-nm{ position:relative; z-index:2; margin-top:-17px; max-width:104px; padding:3px 13px 4px;
-  font-style:normal; font-family:var(--m-f-hand); font-size:13px; line-height:1.15; text-align:center;
-  color:var(--m-argent-hi); clip-path:var(--m-band);
-  background:
-    linear-gradient(90deg,rgba(0,0,0,.45) 0 8px,transparent 14px calc(100% - 14px),rgba(0,0,0,.45) calc(100% - 8px)),
-    linear-gradient(180deg,var(--m-sable-3),var(--m-sable-2) 55%,var(--m-sable-0));
-  overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-  transition:color var(--t-wipe) var(--settle); }
-.tbx-tile:hover{ filter:drop-shadow(0 7px 8px rgba(0,0,0,.65)); }
-.tbx-tile:hover .tbx-shield{ transform:translateY(-3px); background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 50%,var(--m-or-lo)); }
-.tbx-tile:hover .tbx-nm{ color:var(--m-or-hi); }
-/* the keys light the shield and counterchange the ribbon, never draw a box round it */
-.tbx-tile:focus-visible .tbx-shield{ transform:translateY(-3px); background:var(--m-or-hi); }
-.tbx-tile:focus-visible .tbx-nm{ color:var(--m-sable);
-  background:linear-gradient(180deg,var(--m-or-hi),var(--m-or)); }
-/* a shield not yet blazoned: what you make yourself — hatched, the + on its chief */
-.tbx-tile.custom .tbx-shield::before{ background:
-    repeating-linear-gradient(135deg,rgba(201,162,39,.10) 0 2px,transparent 2px 7px),
-    radial-gradient(ellipse 70% 55% at 50% 34%, rgba(255,226,170,.14), transparent 70%),
-    #0d0a07; }
+.tbx-tile{ position:relative; border:0; padding:6px 4px 7px; cursor:pointer; min-width:0;
+  display:flex; flex-direction:column; align-items:center; gap:5px; color:var(--m-text);
+  background:radial-gradient(ellipse at 50% 38%, rgba(236,210,122,.10), transparent 70%), var(--m-sable-0);
+  box-shadow:inset 0 0 0 1px var(--m-line);
+  transition:box-shadow var(--t-hover) var(--settle), transform var(--t-hover) var(--settle); }
+.tbx-tile:hover{ box-shadow:inset 0 0 0 1px var(--m-or), 0 6px 16px rgba(0,0,0,.5); transform:translateY(-2px); }
+.tbx-fig{ position:relative; width:88px; height:88px; flex:0 0 88px; }
+.tbx-nm{ font-style:normal; font-family:var(--m-f-hand); font-size:13px; line-height:1.15; text-align:center;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; min-height:2.3em; }
 .tbx-tile.custom .tbx-nm{ color:var(--m-or); }
-.tbx-plus{ position:absolute; left:50%; top:4px; margin-left:-9px; z-index:3; width:18px; height:18px;
-  background:var(--m-or); clip-path:var(--m-lozenge); }
+.tbx-plus{ position:absolute; right:8px; top:8px; width:18px; height:18px; background:var(--m-or);
+  clip-path:var(--m-lozenge); }
 .tbx-plus::after{ content:'+'; position:absolute; inset:0; display:grid; place-items:center;
   font:700 14px/1 var(--m-f-tally); color:var(--m-sable); }
 .tbx-none{ grid-column:1/-1; font-family:var(--m-f-hand); font-style:italic; color:var(--m-quiet);
   text-align:center; margin:30px 0; }
-/* the foot: a line of partition, then the words, above the fork */
-.tbx-foot{ padding:12px 22px 4px; font-family:var(--m-f-hand); text-align:center;
-  font-size:13px; font-style:italic; color:var(--m-quiet); line-height:1.35;
-  background:var(--m-rule-indented) 50% 0 / auto 6px repeat-x; background-clip:border-box;
-  margin:0 14px; }
+.tbx-foot{ padding:9px 16px 12px; border-top:1px solid var(--m-line); font-family:var(--m-f-hand);
+  font-size:13px; font-style:italic; color:var(--m-quiet); line-height:1.35; }
 .tbx-foot b{ font-style:normal; color:var(--m-or); font-family:var(--m-f-cap); letter-spacing:.06em; }
 
 /* a piece carried back over the dock: it is about to go back in the box */
@@ -305,44 +223,6 @@ body.field-on .gmr{ z-index:1210; }
 .wb-pen:disabled{ opacity:.35; cursor:default; }
 .wb-pen:disabled.on{ opacity:.7; }
 
-/* ── A COMPASS ROSE, for the eight ways a thing can face ───────
-   A sunk well with a gilt ring, eight lozenges stood round it, the chosen
-   one Or, and a needle that swings to it the short way round (66-workbench.js).
-   The lozenge is the app's own shape, and a rose is what a map has always
-   used to say which way. */
-.wb-rose{ position:relative; width:128px; height:128px; margin:4px 0 2px 8px; border-radius:50%;
-  background:
-    radial-gradient(circle, var(--m-sable-0) 0 30%, transparent 30.5%),
-    repeating-conic-gradient(from -22.5deg, rgba(201,162,39,.10) 0 45deg, transparent 45deg 90deg),
-    radial-gradient(circle, var(--m-sable-2), var(--m-sable-0) 70%);
-  box-shadow:inset 0 0 0 1px var(--m-line), inset 0 0 0 14px rgba(0,0,0,.18), inset 0 3px 8px rgba(0,0,0,.6); }
-.wb-rose::before{ content:''; position:absolute; inset:24px; border-radius:50%;
-  box-shadow:inset 0 0 0 1px rgba(201,162,39,.28); pointer-events:none; }
-.wb-needle{ position:absolute; left:50%; top:50%; width:4px; height:44px; margin:-44px 0 0 -2px;
-  transform-origin:50% 100%; transform:rotate(var(--a, 0deg));
-  background:linear-gradient(180deg, var(--m-or-hi), var(--m-or) 60%, var(--m-or-lo));
-  clip-path:polygon(50% 0, 100% 100%, 0 100%); pointer-events:none;
-  transition:transform .42s var(--pop, cubic-bezier(.2,1.3,.4,1)); }
-.wb-rose .wb-pt{ position:absolute; left:50%; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; padding:0;
-  clip-path:var(--m-lozenge); background:var(--m-sable-3); box-shadow:none;
-  transform:rotate(var(--p)) translateY(-52px) rotate(calc(-1 * var(--p)));
-  transition:background var(--t-hover) var(--settle), transform var(--t-hover) var(--settle); }
-.wb-rose .wb-pt::after{ content:''; position:absolute; inset:4px; clip-path:var(--m-lozenge);
-  background:var(--m-sable-0); transition:background var(--t-hover) var(--settle); }
-.wb-rose .wb-pt:hover{ background:var(--m-or-lo);
-  transform:rotate(var(--p)) translateY(-52px) rotate(calc(-1 * var(--p))) scale(1.18); }
-.wb-rose .wb-pt.on{ background:var(--m-or); }
-.wb-rose .wb-pt.on::after{ background:var(--m-or-hi); }
-.wb-rose-v{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1;
-  min-width:38px; text-align:center; font-family:var(--m-f-tally); font-weight:700; font-size:15px;
-  color:var(--m-argent-hi); pointer-events:none; text-shadow:0 1px 2px rgba(0,0,0,.8); }
-@media (prefers-reduced-motion:reduce){ .wb-needle{ transition:none; } }
-
-/* the dock's own foot says how to choose something; with a bench open the
-   choosing is done, and the bench has its own foot of actions — unless there
-   is something in your hand, which the foot is the place to say */
-body:not(.holding) .tbx.benching .tbx-foot{ display:none; }
-
 /* a terrain is its sky over its ground, with its name on it */
 .wb-terrains{ display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
 .wb-ter{ position:relative; height:52px; border:0; padding:0; cursor:pointer; overflow:hidden;
@@ -386,70 +266,6 @@ body:not(.holding) .tbx.benching .tbx-foot{ display:none; }
 .wb-act.bad:hover{ color:var(--m-argent-hi); }
 .wb-img .wb-act{ flex:0 0 auto; padding:7px 10px; }
 
-/* ══ THE BENCH, IN MONARCHY'S SHAPES ═══════════════════════════
-   The last web form at the table. Its stage was a rectangle, its fields
-   were boxes with borders, its actions sat in a boxed bar — the outline of
-   every settings page there has ever been. Now:
-     · THE THING STANDS ON A SHIELD of lit oak, the way a charge is set on a
-       field — the bench is where a thing is given its arms
-     · a word is WRITTEN ON A LINE; several are written on a sheet of RULED
-       VELLUM, the paper the records are kept on
-     · a number sits IN A SHIELD between the two Or lozenges
-     · a picture is chosen from a row of PORTRAIT SHIELDS
-     · the actions are FORKED RIBBONS, the one that commits in Or */
-.wb-stage{ width:236px; height:258px; margin:6px auto 10px; isolation:isolate; overflow:visible;
-  clip-path:var(--m-shield);
-  background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 40%,var(--m-or-lo)); box-shadow:none; }
-.wb-stage::before{ content:''; position:absolute; inset:3px 3px 4px; z-index:-1; clip-path:var(--m-shield);
-  background:
-    radial-gradient(ellipse 60% 50% at 50% 38%, rgba(255,214,150,.34), transparent 72%),
-    repeating-linear-gradient(88deg, rgba(0,0,0,.10) 0 2px, transparent 2px 9px),
-    linear-gradient(180deg, #5a3a22, #3b2415 70%, #2a190e); }
-.wb-stage .wb-art, .wb-stage .wb-page{ width:200px; height:200px; margin-top:-24px; }
-.wb-shot{ width:210px; height:210px; margin-top:-26px; }
-/* a counter stands high on the shield, so its name plate rides the field and not the point */
-.wb-tok{ margin-top:-62px; transform:scale(.88); }
-.wb-note{ width:170px; min-height:150px; margin-top:-26px; }
-/* a word, written on a line */
-.wb-in{ background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; box-shadow:none;
-  padding:5px 2px 9px; font-size:17px; transition:filter var(--t-hover) var(--settle); }
-.wb-in:focus{ box-shadow:none; filter:brightness(1.35); }
-.wb-in::placeholder, .wb-area::placeholder{ font-style:italic; color:var(--m-hush); }
-/* several words, on a sheet of ruled vellum */
-.wb-area{ background:
-    linear-gradient(90deg, transparent 22px, rgba(163,35,43,.35) 22px 23px, transparent 23px),
-    repeating-linear-gradient(180deg, transparent 0 21px, rgba(40,28,16,.16) 21px 22px),
-    linear-gradient(176deg, #efe4c8, #e1d1aa);
-  color:var(--m-ink, #241a10); box-shadow:0 6px 12px rgba(0,0,0,.5);
-  font-size:15px; line-height:22px; padding:3px 12px 6px 30px; min-height:72px; transform:rotate(-.6deg); }
-.wb-area::placeholder{ color:rgba(36,26,16,.45); }
-.wb-area:focus{ box-shadow:0 6px 12px rgba(0,0,0,.5), 0 0 0 1px var(--m-or); }
-/* a number, written on its own short line between the two Or lozenges */
-.wb-num{ width:56px; padding:2px 0 8px; box-shadow:none; font-size:21px;
-  background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; transition:filter var(--t-hover) var(--settle); }
-.wb-num:focus{ box-shadow:none; filter:brightness(1.4); }
-.wb-tally{ gap:8px; }
-/* a picture, from a row of portrait shields */
-.wb-faces{ gap:6px 4px; }
-.wb-face{ aspect-ratio:auto; height:62px; clip-path:var(--m-shield); box-shadow:none; overflow:hidden;
-  background:linear-gradient(160deg,var(--m-or),var(--m-or-lo) 60%,#4a3510); }
-.wb-face::before{ content:''; position:absolute; inset:2px 2px 3px; clip-path:var(--m-shield);
-  background:radial-gradient(circle at 50% 40%, #3b2e22, var(--m-sable-0) 72%); }
-.wb-face i{ inset:2px 2px 3px; clip-path:var(--m-shield); }
-.wb-face:hover{ box-shadow:none; background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 60%); }
-.wb-face.on{ box-shadow:none; background:var(--m-or-hi); }
-.wb-face.on::before{ background:radial-gradient(circle at 50% 40%, #6a5230, #2a1f12 72%); }
-.wb-face.own b{ position:relative; }
-/* the actions: forked ribbons on the cloth, no bar round them */
-.wb-acts{ border-top:0; padding:16px 14px 10px; gap:8px;
-  background:linear-gradient(180deg, transparent, var(--m-sable) 34%);
-  box-shadow:none; }
-.wb-acts::before{ content:''; position:absolute; left:14px; right:14px; top:4px; height:6px;
-  background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
-.wb-act{ clip-path:var(--m-band); box-shadow:none; padding:11px 18px; }
-.wb-act.go{ clip-path:var(--m-band); }
-.wb-img .wb-act{ clip-path:var(--m-pennon); padding:7px 16px 7px 10px; }
-
 /* ══ THE INSPECTOR ═════════════════════════════════════════════
    What a selection says: a plaque at the foot of the table. */
 .insp{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:1150;
@@ -476,7 +292,7 @@ body.holding .insp{ display:none; }
    ends — so framing a fight, fitting the table and the centre of the view
    all mean the part of the screen you can actually see. The GL layers aim
    at #vp's live box (27-table-gl.js aim), so they follow it. */
-body.tbx-on #vp, body.muster-on #vp{ left:484px; }
+body.tbx-on #vp, body.muster-on #vp{ left:476px; }
 body.tbx-on .hud.tl, body.muster-on .hud.tl{ display:none; }
 body.tbx-on .insp, body.tbx-on .tbx-pill, body.muster-on .insp, body.muster-on .tbx-pill{ margin-left:88px; }
 
@@ -905,32 +721,10 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
 #selbar-home, .seldock{ display:none !important; }
 
 /* a scene kind that is not built yet: shown, dimmed, and says so (25-toolbox.js) */
-/* SEALED, NOT BROKEN. Dimmed, the preview of a scene with no map in it is an
-   empty dark rectangle, and two of them beside Combat read as tiles that had
-   failed to load — and they still lifted under the pointer like anything
-   else you could take. A thing that is coming is a letter not yet opened:
-   the preview stays faint, the app's own wax (the hall's seal, the table's
-   Roll) is pressed across it, and it does not rise to meet the hand. */
 .tbx-tile.soon{ cursor:default; }
-.tbx-tile.soon:hover{ filter:none; }
-.tbx-tile.soon:hover .tbx-shield{ transform:none; background:linear-gradient(160deg,var(--m-or),var(--m-or-lo) 55%,#4a3510); }
-.tbx-tile.soon .tbx-fig{ opacity:.3; filter:grayscale(.8); }
-.tbx-tile.soon .tbx-shield::before{ background:#0d0a07; }
-.tbx-tile.soon::before{ content:''; position:absolute; left:50%; top:30px; width:42px; height:42px; z-index:3;
-  margin-left:-20px; transform:rotate(-14deg); clip-path:var(--m-wax); pointer-events:none;
-  background:
-    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(0,0,0,.28) 35% 39%, transparent 40%),
-    radial-gradient(circle at 50% 50%, rgba(255,190,170,.22) 0 20%, transparent 21%),
-    var(--m-wax-melt);
-  filter:drop-shadow(0 3px 3px rgba(0,0,0,.6)); }
-.tbx-tile.soon:hover::before{ transform:rotate(-8deg) scale(1.04); transition:transform var(--t-hover) var(--settle); }
-/* and the device pressed into the wax: a fleur, so it is a seal and not a blot */
-.tbx-tile.soon::after{ content:''; position:absolute; left:50%; top:40px; width:20px; height:22px; margin-left:-10px;
-  z-index:4; pointer-events:none; transform:rotate(-14deg); background:rgba(70,6,10,.62);
-  -webkit-mask:var(--m-fleur) center/contain no-repeat; mask:var(--m-fleur) center/contain no-repeat; }
-.tbx-tile.soon .tbx-nm{ color:var(--m-quiet); }
-.tbx-soon{ display:block; font-style:normal; font-family:var(--m-f-cap); font-size:8px; font-weight:700;
-  letter-spacing:.14em; text-transform:uppercase; color:var(--m-or); margin-top:1px; }
+.tbx-tile.soon .tbx-fig{ opacity:.38; filter:grayscale(.7); }
+.tbx-soon{ font-style:normal; font-family:var(--m-f-cap); font-size:8px; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--m-or); vertical-align:middle; }
 
 
 /* the three phases were squeezed under End Turn until "Enemies" was cut in half.
@@ -1040,177 +834,3 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
 .au-prow button:hover { background: var(--m-or); color: var(--m-sable); }
 .au-add { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--m-line); }
 .au-picked { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: italic 12px/1.2 var(--m-f-hand); color: var(--m-quiet); }
-
-/* ── AUDIO, IN MONARCHY'S SHAPES ──────────────────────────────
-   The tab was two boxed wells of form controls. A section is divided from
-   the next by a line of partition, not a frame; you write a link on a line;
-   to commit is a forked Or ribbon, to do anything else a pennon; a small
-   act is a lozenge; and the sound board is what the toolbox is — a roll of
-   shields, each one a sound, pressed to sound it at every seat. */
-.au{ gap:16px; }
-.au-sec{ background:none; box-shadow:none; padding:4px 6px 12px;
-  background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; }
-.au-sec:last-child{ background:none; }
-.au-sec h4{ font-size:10.5px; letter-spacing:var(--m-track); }
-.au-play input, .au-add input:not([type=range]):not([type=file]), .au-add select, .au-pname{
-  background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; box-shadow:none; padding:6px 2px 9px;
-  color:var(--m-argent-hi); }
-.au-play input:focus, .au-add input:focus, .au-add select:focus, .au-pname:focus{ box-shadow:none; filter:brightness(1.35); }
-.au-play input::placeholder, .au-pname::placeholder{ font-style:italic; color:var(--m-hush); }
-.au-go{ clip-path:var(--m-band); padding:10px 20px; }
-.au-go:hover{ filter:none; background:var(--m-or-hi); }
-.au-ghost, .au-hbtns button, .au-seg button{ clip-path:var(--m-pennon); box-shadow:none; padding:7px 14px 7px 8px;
-  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
-  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle); }
-.au-ghost:hover, .au-hbtns button:hover, .au-hbtns button.on, .au-seg button:hover, .au-seg button.on{
-  background-position:0 0; color:var(--m-sable); }
-.au-seg{ gap:4px; }
-.au-prow button{ clip-path:var(--m-lozenge); box-shadow:none; background:var(--m-sable-3); flex-basis:28px; height:28px; }
-.au-prow button:hover{ background:var(--m-or); }
-.au-add{ border-top:0; padding-top:14px; background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
-.au-pgrid{ grid-template-columns:repeat(3,1fr); gap:8px 6px; }
-.au-pad{ position:relative; isolation:isolate; min-height:0; aspect-ratio:.86; padding:0 10px 22%; box-shadow:none;
-  display:grid; place-items:center; text-align:center; clip-path:var(--m-shield); white-space:normal;
-  background:linear-gradient(160deg,var(--m-or),var(--m-or-lo) 55%,#4a3510); color:var(--m-argent-hi);
-  font:600 12px/1.15 var(--m-f-cap); text-shadow:0 1px 2px rgba(0,0,0,.7);
-  transition:transform var(--t-hover) var(--settle), background var(--t-hover) var(--settle); }
-.au-pad::before{ content:''; position:absolute; inset:2px 2px 3px; z-index:-1; clip-path:var(--m-shield);
-  background:radial-gradient(ellipse 70% 55% at 50% 34%, rgba(255,226,170,.15), transparent 70%),
-    color-mix(in srgb, var(--m-bleu) 34%, #0a0806); transition:background var(--t-wipe) var(--settle); }
-.au-pad:hover{ background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 50%,var(--m-or-lo)); color:var(--m-sable); text-shadow:none; }
-.au-pad:hover::before{ background:var(--m-or); }
-.au-pad:active{ transform:scale(.94); }
-
-/* ══ THE KEYBOARD CAN SEE WHERE IT IS ══════════════════════════
-   20-shell.css rings whatever has the keys, two pixels OUTSIDE it — and
-   nearly every control at the table is cut to a pennon, a plaque or a
-   lozenge with clip-path, which clips the ring along with everything else.
-   Tab through the toolbox and the focus went from tab to tile to button
-   with nothing on screen to say so. Inside the cut, then: the same gilt,
-   drawn four pixels in, where the cut cannot reach it. */
-.gmr-b:focus-visible, .tbx-tab:focus-visible,
-.wb-back:focus-visible, .wb-pen:focus-visible, .wb-act:focus-visible,
-.wb-ter:focus-visible, .wb-face:focus-visible, .insp-b:focus-visible, .insp-x:focus-visible,
-.kit-b:focus-visible, .kit-chip:focus-visible, .cin button:focus-visible, .hud button:focus-visible{
-  outline:2px solid var(--m-or-hi); outline-offset:-4px; }
-/* and the sweep with it, wherever the hover has one — "never just the ring" */
-.tbx-tab:focus-visible, .wb-pen:focus-visible, .wb-act:not(.go):focus-visible,
-.wb-back:focus-visible, .insp-b:focus-visible, .insp-x:focus-visible{
-  background-position:0 0; color:var(--m-sable); outline-color:var(--m-sable); }
-/* a shield or a seal is lit, never ringed: a ring is a box drawn round it */
-.tbx-kind:focus-visible, .tbx-tile:focus-visible, .tbx-x:focus-visible{ outline:none; }
-.tbx-kind:focus-visible .tbx-kshield{ background:var(--m-argent-hi); }
-.tbx-kind:focus-visible b{ color:var(--m-argent-hi); }
-.tbx-x:focus-visible{ transform:rotate(-14deg) scale(1.12); filter:brightness(1.3); }
-/* a lozenge is too small to ring inside: it lights instead */
-.wb-step:focus-visible{ outline:none; background:var(--m-or-hi); transform:scale(1.14); }
-.wb-rose .wb-pt:focus-visible{ outline:none; background:var(--m-or-hi); }
-
-/* ══ AND A PRESS IS FELT ══════════════════════════════════════
-   The shared press (20-shell.css) is a pixel down — and a tile's own hover
-   lifts it two pixels UP with a transform of its own, which outranks the
-   press, so a tile did not move at all when you pressed it. It settles
-   into the dock instead. */
-.tbx-tile:active{ transform:translateY(0) scale(.97); transition-duration:.06s; }
-.tbx-kind:active, .tbx-tab:active, .wb-pen:active, .wb-act:active{ transform:translateY(1px); }
-.wb-rose .wb-pt:active{ transform:rotate(var(--p)) translateY(-52px) rotate(calc(-1 * var(--p))) scale(.86); }
-
-/* ══ THE LEFT WALL: SHIELDS ON NAILS ═══════════════════════════
-   The table's own controls — the menu's mark, the GM's toolbox, a player's
-   kit — were a stack of pennon-cut tiles with a hamburger on top, which is
-   a website's corner. They are SHIELDS now, each hung on a gilt nail down
-   the left wall the way a hall hangs its arms: Sable field, Or device, a
-   gilt edge. Touched, a shield swings on its nail; chosen, its field is
-   counterchanged to Or. The crown is the table's menu — its decisions. */
-.tm-open, .gmr-b, .kit-b{ position:relative; width:44px !important; height:56px !important; padding:0 !important;
-  /* row, said outright: the menu's button was three bars in a column once
-     (20-shell.css), and that column put its crown off to the left */
-  border:0; cursor:pointer; display:flex !important; flex-direction:row; align-items:flex-start; justify-content:center;
-  color:var(--m-or); clip-path:none !important; box-shadow:none !important;
-  background:radial-gradient(circle at 50% 3.5px, var(--m-or-hi) 0 1.6px, var(--m-or-lo) 2.2px, transparent 3.2px) no-repeat !important;
-  transform-origin:50% 3px; filter:drop-shadow(0 6px 6px rgba(0,0,0,.55)); }
-.tm-open::before, .gmr-b::before, .kit-b::before{ content:''; position:absolute; left:2px; right:2px; top:6px; bottom:0;
-  clip-path:var(--m-shield); background:linear-gradient(160deg,var(--m-or-hi),var(--m-or) 40%,var(--m-or-lo)); }
-.tm-open::after, .gmr-b::after, .kit-b::after{ content:''; position:absolute; left:4px; right:4px; top:8px; bottom:3px;
-  clip-path:var(--m-shield);
-  background:radial-gradient(ellipse at 40% 20%, rgba(255,255,255,.12), transparent 60%),
-    linear-gradient(180deg,var(--m-sable-3),var(--m-sable) 70%);
-  transition:background var(--t-wipe) var(--settle); }
-/* the charges are painted, not drawn in outline (64-kit.js, CHARGES) */
-.tm-open svg, .gmr-b svg, .kit-b svg{ position:relative; z-index:1; margin-top:15px; width:20px !important; height:20px !important;
-  fill:currentColor; stroke:none; filter:drop-shadow(0 1px 0 rgba(0,0,0,.55)); }
-.tm-open:hover, .gmr-b:hover, .kit-b:hover{ animation:m-swing .7s var(--settle); }
-.tm-open:hover::after, .gmr-b:hover::after, .kit-b:hover::after{
-  background:radial-gradient(ellipse at 40% 20%, rgba(255,255,255,.2), transparent 60%),
-    linear-gradient(180deg,#3d3226,var(--m-sable-2) 70%); }
-.gmr-b.on, .kit-b.on, body.menuing .tm-open{ color:var(--m-sable); background-color:transparent !important; }
-.gmr-b.on::after, .kit-b.on::after, body.menuing .tm-open::after{
-  background:radial-gradient(ellipse at 40% 20%, rgba(255,255,255,.4), transparent 60%), var(--m-or); }
-.tm-open{ position:fixed !important; left:16px; top:6px; }
-.tm-open i{ display:none !important; }
-.gmr, .kit-rail{ gap:4px; }
-/* the keys: the shield lights, never a box round it */
-.tm-open:focus-visible, .gmr-b:focus-visible, .kit-b:focus-visible{ outline:none; }
-.tm-open:focus-visible::before, .gmr-b:focus-visible::before, .kit-b:focus-visible::before{ background:var(--m-argent-hi); }
-
-/* ══ THE INSPECTOR AND THE HAND: A MOTTO ACROSS THE FOOT ════════
-   Whatever you have hold of is named on a scroll at the foot of the table —
-   argent, forked, its tails folded back behind it, the thing's name written
-   in the mark's hand the way a motto is written under arms. Its acts are
-   engraved on the same scroll and counterchange to Sable under the hand;
-   Remove does it in Gules; letting go is the seal at its end. The pill that
-   says what is in your hand is the same scroll. */
-.insp, .tbx-pill{ background:none !important; box-shadow:none !important; clip-path:none !important;
-  isolation:isolate; padding:7px 34px 8px !important; gap:4px; color:var(--m-sable); }
-.insp::after, .tbx-pill::after{ content:''; position:absolute; inset:0; z-index:-1; clip-path:var(--m-band);
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.55),transparent 22%,transparent 70%,rgba(60,40,20,.28)),
-    linear-gradient(90deg,rgba(90,70,40,.35),transparent 12%,transparent 88%,rgba(90,70,40,.35)),
-    var(--m-argent); }
-.insp::before, .tbx-pill::before{ content:''; position:absolute; z-index:-2; left:-18px; right:-18px; top:8px; bottom:-8px;
-  background:
-    linear-gradient(90deg,#6f6656 0 26px,transparent 26px calc(100% - 26px),#6f6656 calc(100% - 26px)),
-    linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.45));
-  clip-path:polygon(0 0,28px 0,28px 100%,0 100%,11px 50%,0 0,
-    calc(100% - 28px) 0,calc(100% - 28px) 100%,100% 100%,calc(100% - 11px) 50%,100% 0,calc(100% - 28px) 0);
-  filter:drop-shadow(0 6px 6px rgba(0,0,0,.5)); }
-.insp{ animation:insp-in .32s var(--pop) both; }
-@keyframes insp-in{ from{ opacity:0; translate:0 14px; scale:.9 1; } }
-.insp-k{ color:rgba(23,19,16,.55); font-size:8px; }
-.insp-n{ font-family:var(--m-f-mark); font-size:21px; letter-spacing:0; color:var(--m-sable); margin:0 10px 0 4px;
-  text-shadow:0 1px 0 rgba(255,255,255,.4); max-width:240px; }
-.insp-b{ clip-path:var(--m-band); box-shadow:none; padding:7px 15px; color:var(--m-sable);
-  background:linear-gradient(115deg,var(--m-sable) 0 50%,transparent calc(50% + .5px)) 102% 0 / var(--m-sweep-size) no-repeat,
-    rgba(23,19,16,.08); }
-.insp-b:hover, .insp-b:focus-visible{ background-position:0 0; color:var(--m-argent-hi); outline:none; }
-.insp-b.bad{ color:var(--m-gules);
-  background:linear-gradient(115deg,var(--m-gules) 0 50%,transparent calc(50% + .5px)) 102% 0 / var(--m-sweep-size) no-repeat,
-    rgba(163,35,43,.08); }
-.insp-b.bad:hover, .insp-b.bad:focus-visible{ color:var(--m-argent-hi); background-position:0 0; }
-.insp-x{ width:28px; height:28px; margin-left:6px; padding:0; color:var(--m-argent-hi); font-size:11px; font-weight:700;
-  clip-path:var(--m-wax); box-shadow:none;
-  background:radial-gradient(circle at 50% 50%, transparent 0 46%, rgba(0,0,0,.25) 47% 52%, transparent 53%), var(--m-wax-melt);
-  transition:transform var(--t-hover) var(--pop); }
-.insp-x:hover, .insp-x:focus-visible{ background:radial-gradient(circle at 50% 50%, transparent 0 46%, rgba(0,0,0,.25) 47% 52%, transparent 53%), var(--m-wax-melt);
-  color:var(--m-argent-hi); transform:rotate(-14deg) scale(1.08); outline:none; }
-.tbx-pill{ color:rgba(23,19,16,.7); font-style:italic; }
-.tbx-pill b{ font-family:var(--m-f-mark); font-style:normal; font-weight:400; font-size:19px; letter-spacing:0;
-  color:var(--m-sable); }
-
-/* ══ WHAT SCROLLS, FADES INTO THE CLOTH ═════════════════════════
-   A grid cut off square at the foot of the banner sliced the last row's
-   ribbons in half against the line under it — the hard edge of a web page's
-   scroll box, on a piece of cloth. The roll of arms, the audio and the
-   chat's long talk fade into the cloth at the edge they scroll past. */
-.tbx-grid, .tbx-audio{ -webkit-mask:linear-gradient(180deg,transparent 0,#000 10px,#000 calc(100% - 26px),transparent);
-  mask:linear-gradient(180deg,transparent 0,#000 10px,#000 calc(100% - 26px),transparent); }
-.tbx{ top:70px; }
-
-/* a select at the table is drawn as a word on a line with a lozenge to say
-   it opens — its list is the app's own (42-shell.js) */
-select{ -webkit-appearance:none; appearance:none; border:0; border-radius:0; outline:none; cursor:pointer;
-  padding-right:22px !important;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 1L9 5L5 9L1 5Z' fill='%23c9a227'/%3E%3C/svg%3E") calc(100% - 6px) 50% / 9px 9px no-repeat,
-    var(--m-rule-indented) 0 100% / auto 6px repeat-x !important; }
-select:focus-visible{ filter:brightness(1.3); }

@@ -84,12 +84,8 @@
 <div class="hud tl">The Table</div>
 <div class="hud br"><span class="zl" id="zl">100%</span></div>
 <aside class="chatdock">
-  <div class="plaque m-band">Chat</div>
+  <div class="plaque">Chat</div>
   <div class="cb" id="chat-body"></div>
-  <div class="cin"><textarea id="chat-in" rows="1" placeholder="Talk, or /r 3 4d6"></textarea><button id="chat-img" class="pic" type="button" title="Send a picture (or paste one, or drop one here)" aria-label="Send a picture"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M4 2.5h16V11c0 5.2-3.6 8.8-8 10.5C7.6 19.8 4 16.2 4 11z M6 4.5h12V11c0 4-2.7 6.8-6 8.2-3.3-1.4-6-4.2-6-8.2z M6.4 13.9l3.5-3.7 2.7 2.7 1.8-1.9 3.2 3.4c-.9 2-2.6 3.4-5.6 4.6-2.8-1.2-4.6-2.9-5.6-5.1z M16.4 7.6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0z"/></svg></button><button id="chat-go">Send</button><input type="file" id="chat-file" accept="image/*" hidden></div>
+  <div class="cin"><textarea id="chat-in" rows="1" placeholder="Talk, or /r 3 4d6"></textarea><button id="chat-img" class="pic" type="button" title="Send a picture (or paste one, or drop one here)" aria-label="Send a picture"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg></button><button id="chat-go">Send</button><input type="file" id="chat-file" accept="image/*" hidden></div>
 </aside>
-<!-- ITS OWN ID. It was id="toast" too — and so is the hall's, which comes
-     first in the one document, so every table notice (the inspector's, the
-     papers', the pocket's, the room editor's) was written into the hall's
-     toast, which is display:none at the table. They all said nothing. -->
-<div class="toast" id="table-toast"></div>
+<div class="toast" id="toast"></div>

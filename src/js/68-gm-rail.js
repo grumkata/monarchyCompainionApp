@@ -22,8 +22,7 @@
 const T = () => root.TableModel;
 
 const ICON = {
-  /* a coffer, banded and locked: the charge for what the toolbox holds (64-kit.js, CHARGES) */
-  box:   '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2.5 10.2C2.5 6.3 6.6 3.8 12 3.8s9.5 2.5 9.5 6.4z M2.5 11.6h19v8.6h-19z M10.6 13h2.8v4h-2.8z M6.3 4.9h1.2v5.3H6.3z M16.5 4.9h1.2v5.3h-1.2z M6.3 11.6h1.2v8.6H6.3z M16.5 11.6h1.2v8.6h-1.2z"/></svg>'
+  box:   '<svg viewBox="0 0 24 24"><path d="M3.5 9.5h17v10h-17z"/><path d="M3.5 9.5l2.2-4h12.6l2.2 4M9.5 13h5"/></svg>'
 };
 const NAMES = { box: 'Toolbox  (B)' };
 

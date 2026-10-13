@@ -309,7 +309,6 @@ function read() {
   const p = shell();
   const from = paper() && paper().getBoundingClientRect();
   openId = laidId;
-  p.classList.remove('picking');
   p.hidden = false;
   doc.getElementById('tp-scrim').hidden = false;
   doc.body.classList.add('reading');
@@ -328,13 +327,11 @@ function pick() {
   const p = shell();
   docksAway();
   p.hidden = false;
-  p.classList.add('picking');                /* a roll of names, not a page the height of the window */
   doc.getElementById('tp-scrim').hidden = false;
   doc.body.classList.add('reading');
   openId = null; rec = null;
   p.innerHTML =
-    `<span class="m-pole" aria-hidden="true"></span>
-     <div class="tp-head"><span class="plaque">Papers</span>
+    `<div class="tp-head"><span class="plaque">Papers</span>
        <button class="tp-x" data-tp-close>&#10005;</button></div>
      <div class="tp-pickers">${list.map(c => {
         const d = root.Sheet.derived(root.Sheet.fill(c));
@@ -368,18 +365,14 @@ root.addEventListener('monarchy:sheets', () => {
 
 function paint() {
   const p = el(); if (!p || !rec) return;
-  /* it hangs from a rod and is sealed at its foot (20-shell.css, CHARTER) */
-  const nm = root.Characters.nameOf(rec), initial = (String(nm || '').trim().match(/[A-Za-z0-9]/) || ['\u2720'])[0].toUpperCase();
   p.innerHTML =
-    `<span class="m-pole" aria-hidden="true"></span>
-     <div class="tp-head">
-       <span class="plaque">${esc(nm)}</span>
+    `<div class="tp-head">
+       <span class="plaque">${esc(root.Characters.nameOf(rec))}</span>
        ${readOnly(rec) ? '<span class="tp-ro-note">Reading only &mdash; this is ' + esc(rec.__byName || 'another player') + '&rsquo;s sheet</span>' : ''}
        <button class="tp-x" data-tp-away title="Take it off the table">&#8615;</button>
        <button class="tp-x" data-tp-close title="Put it back down (Esc)">&#10005;</button>
      </div>
-     <div class="tp-leaf" id="tp-leaf">${root.Sheet.render(rec)}</div>
-     <span class="tp-seal" aria-hidden="true"><b>${esc(initial)}</b></span>`;
+     <div class="tp-leaf" id="tp-leaf">${root.Sheet.render(rec)}</div>`;
   const ro = readOnly(rec);
   p.classList.toggle('tp-ro', ro);
   if (ro) {
@@ -510,7 +503,7 @@ root.addEventListener('monarchy:where', e => {
 });
 
 function toast(m) {
-  const t = doc.getElementById('table-toast'); if (!t) return;
+  const t = doc.getElementById('toast'); if (!t) return;
   t.textContent = m; t.classList.add('on');
   setTimeout(() => t.classList.remove('on'), 2200);
 }
