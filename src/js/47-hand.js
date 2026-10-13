@@ -314,7 +314,13 @@ function wireTile(b, o) {
     choose(o);
   });
   b.addEventListener('dblclick', e => { e.stopPropagation(); twice = null; quick(o); });
-  b.addEventListener('pointerenter', () => tipOn(b, o.name));
+  /* every name is on its ribbon already: the tip is only for one the ribbon
+     had to cut short — otherwise it is the same words, again, on top of the
+     next shield along */
+  b.addEventListener('pointerenter', () => {
+    const nm = b.querySelector('.tbx-nm');
+    if (nm && nm.scrollHeight > nm.clientHeight + 1) tipOn(b, o.name);
+  });
   b.addEventListener('pointerleave', tipOff);
 }
 

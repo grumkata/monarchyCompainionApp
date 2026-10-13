@@ -309,6 +309,7 @@ function read() {
   const p = shell();
   const from = paper() && paper().getBoundingClientRect();
   openId = laidId;
+  p.classList.remove('picking');
   p.hidden = false;
   doc.getElementById('tp-scrim').hidden = false;
   doc.body.classList.add('reading');
@@ -327,6 +328,7 @@ function pick() {
   const p = shell();
   docksAway();
   p.hidden = false;
+  p.classList.add('picking');                /* a roll of names, not a page the height of the window */
   doc.getElementById('tp-scrim').hidden = false;
   doc.body.classList.add('reading');
   openId = null; rec = null;
