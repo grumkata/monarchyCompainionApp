@@ -373,6 +373,88 @@ root.addEventListener('unhandledrejection', () => warn('Something went wrong in 
 root.addEventListener('webglcontextlost', () =>
   warn('The graphics card dropped a 3D view. It should come back by itself.' + STUCK), true);
 
+/* ══ THE HERALD'S WHISPER: A TOOLTIP IN THE APP'S OWN HAND ═══════
+   Every hint in the app was a `title`, and a title is drawn by the operating
+   system: a grey box in the system font with a one-pixel border, the single
+   most website thing left on a screen that is otherwise a hall hung with
+   banners. Any element with a title now has it read out on a dark forked
+   scroll instead — a short name in engraved capitals, a sentence in the
+   book's hand — and the key at the end of it, "Toolbox  (B)", is set as a
+   small Or lozenge, the way a game prints the key to press.
+
+   The title is taken off the element when it is first pointed at (so the
+   system's box can never appear as well) and kept as its aria-label, so a
+   screen reader still hears it. A title set again later — a button that
+   changes what it says — is simply read again next time. */
+const KEYISH = /^(esc|delete|del|space|enter|tab|shift|ctrl|alt|home|end|pg ?up|pg ?dn|[a-z0-9]|[\[\]\/]|(ctrl|shift|alt)\s*\+\s*\S{1,6})$/i;
+let tipEl = null, tipFor = null, tipT = 0;
+function tipText(el) {
+  const t = el.getAttribute('title');
+  if (t != null) {
+    el.dataset.mtip = t;
+    if (!el.hasAttribute('aria-label') && t.trim()) el.setAttribute('aria-label', t.replace(/\s{2,}/g, ' '));
+    el.removeAttribute('title');
+  }
+  return el.dataset.mtip || '';
+}
+function tipParse(t) {
+  t = String(t).trim();
+  let key = '', note = '';
+  const m = /^(.*?)\s*\(([^()]{1,24})\)\s*$/.exec(t) || /^(.*?)\s+\u00b7\s+(\S{1,10})\s*$/.exec(t);
+  if (m && m[1].trim()) {
+    const k = m[2].trim();
+    if (KEYISH.test(k)) key = k; else note = k;
+    t = m[1].trim();
+  }
+  return { t, key, note, say: t.split(/\s+/).length > 4 || /[.!?,;]/.test(t) };
+}
+function tipShow(el) {
+  const raw = tipText(el);
+  if (!raw.trim()) return;
+  if (!tipEl) {
+    tipEl = doc.createElement('div'); tipEl.id = 'm-tip'; tipEl.setAttribute('aria-hidden', 'true');
+    doc.body.appendChild(tipEl);
+  }
+  const p = tipParse(raw);
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  tipEl.className = p.say ? 'say' : '';
+  tipEl.innerHTML = '<b>' + esc(p.t) + '</b>' + (p.key ? '<kbd>' + esc(p.key) + '</kbd>' : '') +
+                    (p.note ? '<i>' + esc(p.note) + '</i>' : '');
+  const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let x = r.left + r.width / 2 - w / 2, y = r.top - h - 10;
+  if (y < 6) y = r.bottom + 10;                         /* no room above: below */
+  x = Math.max(6, Math.min(root.innerWidth - w - 6, x));
+  tipEl.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  tipEl.classList.add('on');
+}
+function tipHide() { clearTimeout(tipT); tipFor = null; if (tipEl) tipEl.classList.remove('on'); }
+const tipHost = t => {
+  const el = t && t.closest && t.closest('[title], [data-mtip]');
+  if (!el || el.matches('input, textarea, select, iframe, option')) return null;
+  return el;
+};
+doc.addEventListener('pointerover', e => {
+  const el = tipHost(e.target);
+  if (el === tipFor) return;
+  tipHide();
+  if (!el || e.pointerType === 'touch') return;
+  tipText(el);                                          /* the system's box must never get its turn */
+  tipFor = el;
+  tipT = setTimeout(() => { if (tipFor === el && el.isConnected) tipShow(el); }, 420);
+}, true);
+doc.addEventListener('pointerout', e => {
+  if (tipFor && !(e.relatedTarget && tipFor.contains(e.relatedTarget))) tipHide();
+}, true);
+doc.addEventListener('focusin', e => {
+  const el = tipHost(e.target);
+  if (!el || !el.matches(':focus-visible')) return;
+  tipHide(); tipFor = el;
+  tipT = setTimeout(() => { if (tipFor === el) tipShow(el); }, 260);
+}, true);
+['pointerdown', 'wheel', 'keydown', 'focusout'].forEach(ev => doc.addEventListener(ev, tipHide, true));
+root.addEventListener('scroll', tipHide, true);
+root.addEventListener('blur', tipHide);
+
 /* the tavern hangs your arms behind your seat (27-table-gl.js) */
 root.Shell = { show, openTable, backToHall, under, rehearse, livery, arms: readArms, seat, warn,
                get at() { return at; } };

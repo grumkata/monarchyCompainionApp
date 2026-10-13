@@ -937,6 +937,23 @@ body.at-table #pickmenu { z-index: 960; }
   transform: rotate(-14deg) scale(1.1); }
 #tp .tp-head .tp-x:first-of-type { right: 38px; }
 
+/* ══ THE HERALD'S WHISPER (42-shell.js) ═════════════════════════
+   What the system's grey tooltip box used to say, on a dark forked scroll:
+   a name in engraved capitals, a sentence in the book's hand, and the key
+   to press as an Or lozenge. Unscoped: it serves the hall and the table. */
+#m-tip { position: fixed; left: 0; top: 0; z-index: 99990; pointer-events: none;
+  display: flex; align-items: center; gap: 9px; max-width: 300px; padding: 6px 22px 7px;
+  clip-path: var(--m-band); color: var(--m-argent-hi);
+  background: linear-gradient(180deg, var(--m-sable-3), var(--m-sable-0));
+  opacity: 0; transition: opacity .12s var(--settle); }
+#m-tip.on { opacity: 1; }
+#m-tip b { font: 700 10px/1.25 var(--m-f-cap); letter-spacing: .14em; text-transform: uppercase; color: var(--m-or); }
+#m-tip.say b { font: italic 400 13.5px/1.3 var(--m-f-hand); letter-spacing: 0; text-transform: none; color: var(--m-argent-hi); }
+#m-tip kbd { flex: none; display: grid; place-items: center; min-width: 22px; height: 20px; padding: 0 7px;
+  font: 700 11px/1 var(--m-f-tally); letter-spacing: .04em; color: var(--m-sable); background: var(--m-or);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%); }
+#m-tip i { flex: none; font: italic 12px/1.2 var(--m-f-hand); color: var(--m-quiet); }
+
 </style>
 <style>html,body{background:transparent!important}</style>
 </head>
