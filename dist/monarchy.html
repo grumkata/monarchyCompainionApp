@@ -3388,19 +3388,20 @@ to{opacity:1;transform:translateZ(10px) scale(1)}
    an overlay would float above the table and read as chrome.
 
    `outline` and not `border`, because a border changes the box and
-   would nudge every piece the moment it was picked.                *//* BLAZON: the ring is Or, and its outer frame is cut on the bend at two
-   corners — the same --m-cut every panel takes — so a chosen piece wears
-   the house mark rather than a generic focus glow */body.at-table .prop.t3-thing.sel > .face{
-  outline:2px solid var(--m-or);
-  outline-offset:3px;
-  box-shadow:0 0 0 1px rgba(24,16,6,.55), 0 0 22px rgba(201,162,39,.32);
-}body.at-table .prop.t3-thing.sel > .face::after{
-  content:''; position:absolute; inset:-10px; pointer-events:none;
-  background:
-    linear-gradient(135deg,var(--m-or) 0 7px,transparent 7.5px) left top / 16px 16px no-repeat,
-    linear-gradient(315deg,var(--m-or) 0 7px,transparent 7.5px) right bottom / 16px 16px no-repeat;
-  border:1px solid rgba(201,162,39,.3);
-}/* the piece you are actually holding does not need a ring as well */body.at-table .prop.t3-thing.lift.sel > .face{ outline-color:rgba(201,162,39,.45); }/* and a PEEK (23-table3d.js) is a clean view of the thing: the ring is for the
+   would nudge every piece the moment it was picked.                *//* BLAZON: A BORDURE INDENTED OR. The ring was a straight gilt outline with
+   two corners cut — at the size a piece is drawn, a gold box. A chosen piece
+   now wears a bordure, the band heraldry puts round a shield to mark one
+   coat from another, and its edge is INDENTED, the zigzag line of
+   partition: a frame no other app draws round a selection. It lies on the
+   face, so it tilts with the wood; a soft gilt glow under it, no outline. */body.at-table .prop.t3-thing.sel > .face{
+  outline:0;
+  box-shadow:0 0 20px rgba(201,162,39,.26);
+}/* a counter's face is clear — the figure stands in the GL layer — so a glow
+   round it is only a lit rectangle on the wood; the bordure is enough */body.at-table .prop.t3-thing.t3-token.sel > .face{ box-shadow:none; }body.at-table .prop.t3-thing.sel > .face::after{
+  content:''; position:absolute; inset:-11px; pointer-events:none;
+  border:6px solid transparent;
+  border-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M0 5 L3 1 L6 5 L9 1 L12 5 L15 1 L18 5 L21 1 L24 5 M0 19 L3 23 L6 19 L9 23 L12 19 L15 23 L18 19 L21 23 L24 19 M5 0 L1 3 L5 6 L1 9 L5 12 L1 15 L5 18 L1 21 L5 24 M19 0 L23 3 L19 6 L23 9 L19 12 L23 15 L19 18 L23 21 L19 24' fill='none' stroke='%23140c04' stroke-opacity='.55' stroke-width='3' stroke-linejoin='miter'/><path d='M0 5 L3 1 L6 5 L9 1 L12 5 L15 1 L18 5 L21 1 L24 5 M0 19 L3 23 L6 19 L9 23 L12 19 L15 23 L18 19 L21 23 L24 19 M5 0 L1 3 L5 6 L1 9 L5 12 L1 15 L5 18 L1 21 L5 24 M19 0 L23 3 L19 6 L23 9 L19 12 L23 15 L19 18 L23 21 L19 24' fill='none' stroke='%23e6c25a' stroke-width='1.4' stroke-linejoin='miter'/></svg>") 6 round;
+}/* the piece you are actually holding does not need a ring as well */body.at-table .prop.t3-thing.lift.sel > .face::after{ opacity:.45; }/* and a PEEK (23-table3d.js) is a clean view of the thing: the ring is for the
    table, and flown in to 340% it is a picture frame round what you are reading */body.at-table.peeking .prop.t3-thing.sel > .face{ outline-color:transparent; box-shadow:none; }body.at-table.peeking .prop.t3-thing.sel > .face::after{ display:none; }/* ══ SOMEONE SAID SOMETHING ════════════════════════════════════
    Chat could only ever roll dice: anything that was not dice
    notation fell through to a handler that did not exist, and the
