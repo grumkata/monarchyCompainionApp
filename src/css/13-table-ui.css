@@ -1967,6 +1967,10 @@ body.chest-open .kit > *, body.reading .kit > *, body.field-on .kit > *{ pointer
 .pk-card.t-blue{ background:linear-gradient(172deg,#dce7ef 0%,#b9cbdb 100%); }
 .pk-card.t-red{ background:linear-gradient(172deg,#f2d8ce 0%,#dcb0a0 100%); }
 .pk-card:hover{ transform:translateY(-2px) rotate(-1.5deg); }
+/* the same seal the note is pinned under when it is up in your hand,
+   pressed over the top edge — half of it shows, the rest is round the back */
+.pk-card::before{ content:''; position:absolute; z-index:2; left:50%; top:-7px; width:16px; height:15px;
+  margin-left:-8px; pointer-events:none; clip-path:var(--m-wax); background:var(--m-wax-melt); }
 .pk-txt{ position:relative; z-index:1; display:block; font-family:'Crimson Text',serif;
   font-size:10px; line-height:1.25; color:#241a10; white-space:pre-wrap; word-break:break-word; }
 .pk-sk{ position:absolute; inset:0; width:100%; height:100%; }

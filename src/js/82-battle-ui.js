@@ -88,7 +88,14 @@ function build() {
   doc.addEventListener('pointerover', ev => { const m = ev.target.closest && ev.target.closest('.bt-mini'); if (m !== U.overMini) { U.overMini = m || null; U.nbuf = ''; } }, true);
   root.addEventListener('keydown', onKey, true);
   /* a click on the bare wood (not a pan, not a figure, not a card) lets go of the figure you had, and of the card */
-  doc.addEventListener('pointerdown', ev => { U.down = { x: ev.clientX, y: ev.clientY, t: ev.target }; }, true);
+  doc.addEventListener('pointerdown', ev => {
+    U.down = { x: ev.clientX, y: ev.clientY, t: ev.target };
+    /* A PRESS SAYS YOU HAVE READ IT. The hover kept showing over the thing
+       you pressed — and the card that press opened came up under it, its
+       own title hidden behind the line that had just told you what it was.
+       It stays away from that one until the pointer leaves it. */
+    if (tip) { tip.style.display = 'none'; tipQuiet = ev.target.closest && ev.target.closest('[data-tk],[data-tip]'); }
+  }, true);
   doc.addEventListener('click', ev => {
     const d = U.down; U.down = null;
     if (!V.isUp() || (!V.sel && !U.pop) || !d) return;
@@ -160,9 +167,11 @@ function tokenTip(n, c) {
   const e = B().effectsOf([{ n, c: c || 1 }])[0];
   return '<b>' + esc(n) + (c > 1 ? ' &times;' + c : '') + '</b>' + esc(ruleOf(n)) + (e && e.auto ? '<em>' + esc(e.auto) + '</em>' : '');
 }
+let tipQuiet = null;      /* the one just pressed: no hover on it until the pointer has left */
 function onHoverTip(ev) {
   const c = ev.target.closest && ev.target.closest('[data-tk],[data-tip]');
-  if (!c) { tip.style.display = 'none'; return; }
+  if (c !== tipQuiet) tipQuiet = null;
+  if (!c || c === tipQuiet) { tip.style.display = 'none'; return; }
   if (c.dataset.tip != null) { const [h, ...r] = c.dataset.tip.split('|'); tip.innerHTML = '<b>' + esc(h) + '</b>' + esc(r.join('|')); }
   else tip.innerHTML = tokenTip(c.dataset.tk, +c.dataset.c || 0);
   tip.style.display = '';
