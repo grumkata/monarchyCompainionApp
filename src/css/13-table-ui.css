@@ -2273,3 +2273,30 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
 /* the chat's oldest lines go up into the cloth rather than under a hard edge */
 .chatdock .cb{ -webkit-mask:linear-gradient(180deg,transparent 0,#000 22px); mask:linear-gradient(180deg,transparent 0,#000 22px); }
 .kit-scroll{ -webkit-mask:linear-gradient(180deg,#000 calc(100% - 18px),transparent); mask:linear-gradient(180deg,#000 calc(100% - 18px),transparent); }
+
+/* ══ THE ROOM EDITOR, HUNG LIKE THE REST ════════════════════════
+   Still small and still out of the way of the room it is for — but a
+   banner on its pole beside the wall's shields, not a dark box over the
+   crown: its name on the motto scroll, its rows written on lines, its acts
+   pennons, and shutting it a seal. */
+#room-ed{ left:76px; top:70px; max-height:calc(100vh - 90px); background:none; border:0; box-shadow:none; --m-tail:24px; }
+#room-ed .re-head{ background:none; border:0; box-shadow:none; justify-content:center; padding:12px 40px 8px; position:relative; }
+#room-ed .re-head .m-band{ font-size:10px; }
+#room-ed .re-head .re-x{ position:absolute; right:12px; top:50%; margin-top:-12px; width:24px; height:24px; padding:0;
+  color:var(--m-argent-hi); font-size:10px; font-weight:700; clip-path:var(--m-wax);
+  background:radial-gradient(circle at 50% 50%, transparent 0 44%, rgba(0,0,0,.25) 45% 51%, transparent 52%), var(--m-wax-melt); }
+#room-ed .re-list{ border:0; margin:0 10px; }
+#room-ed .re-row{ padding:4px 6px 6px; background:var(--m-rule-indented) 0 100% / auto 5px repeat-x; }
+#room-ed .re-row:hover{ background-color:transparent; color:var(--m-argent-hi); }
+#room-ed .re-row.on{ box-shadow:none; color:var(--m-sable);
+  background:linear-gradient(115deg,var(--m-or) 0 100%) 0 0 / 100% 100% no-repeat; clip-path:var(--m-band); padding-left:14px; }
+#room-ed .re-add, #room-ed .re-foot{ border:0; margin:0 10px; padding:9px 0 4px;
+  background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
+#room-ed .re-add select{ border:0; background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; padding-bottom:7px; }
+#room-ed button:not(.re-x):not(.re-row){ border:0; clip-path:var(--m-pennon); padding:6px 13px 6px 8px; background:var(--m-sable-3); }
+#room-ed button:not(.re-x):not(.re-row):hover{ background:var(--m-or); color:var(--m-sable); }
+/* the rows are lines of the list, not buttons-shaped-like-buttons */
+#room-ed button.re-row{ clip-path:none; border:0; letter-spacing:.06em; font-size:8px; }
+#room-ed button.re-row.on{ clip-path:var(--m-band); }
+#room-ed #re-del:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
+#room-ed .re-fields input{ background:var(--m-rule-indented) 0 100% / auto 5px repeat-x; border:0; padding-bottom:6px; }

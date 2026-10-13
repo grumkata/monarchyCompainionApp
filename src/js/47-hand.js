@@ -185,6 +185,11 @@ function pickKind(k) {
   sel = Math.max(0, kinds.indexOf(k));
   q = ''; gsel = '';
   if (find) find.value = '';
+  /* the name turns over on its ribbon, the way a scroll is turned to the next
+     entry, rather than one word replacing another in place */
+  if (what.textContent !== k.name && what.animate && !calm())
+    what.animate([{ transform: 'rotateX(88deg)', opacity: .2 }, { transform: 'none', opacity: 1 }],
+                 { duration: 280, easing: 'cubic-bezier(.16,.84,.24,1)' });
   what.textContent = k.name;
   /* each kind is its own tincture, and its shields are painted in it */
   dock.dataset.kind = k.id;

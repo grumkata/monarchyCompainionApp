@@ -72,8 +72,16 @@ function paint() {
               && t.kind !== 'scene' && !doc.body.classList.contains('field-on');
   if (!may) { bar.hidden = true; shownId = null; return; }
   const box = T().mayUseBox();
+  /* A DIFFERENT THING, A FRESH SCROLL: the motto is re-written, so it rolls
+     open again from its middle — only when what you hold changes, not on
+     every repaint of the same thing */
+  const fresh = shownId !== t.id && !bar.hidden;
   shownId = t.id;
   bar.hidden = false;
+  if (fresh && bar.animate && !(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches))
+    bar.animate([{ transform: 'translateX(-50%) scaleX(.72)', opacity: .4 },
+                 { transform: 'translateX(-50%)', opacity: 1 }],
+                { duration: 300, easing: 'cubic-bezier(.3,1.6,.5,1)' });
   const name = t.name || KIND[t.kind] || 'Thing';
   const turn = t.kind === 'art' || t.kind === 'page' || t.kind === 'model' || t.kind === 'note';
   bar.innerHTML =

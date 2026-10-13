@@ -34,8 +34,15 @@ function here() { return doc.body.classList.contains('at-table'); }
 function load() { rows = GL().planRows(); }
 function commit(save) { GL().setPlan(rows.map(r => Object.assign({}, r)), save); }
 
+/* the floor and the ceiling are rows with no place of their own: they are
+   the room, and cannot be nudged, copied or deleted like a stool can */
+const shell = r => r.k === 'floor' || r.k === 'ceil';
+
 function label(r, i) {
   if (r.k === 'floor') return 'the floorboards';
+  /* the ceiling is a row with no model and no place, so it was listed as
+     "undefined (NaN, NaN)" */
+  if (r.k === 'ceil') return 'the ceiling';
   return r.m + '  (' + (+r.x).toFixed(2) + ', ' + (+r.z).toFixed(2) + ')';
 }
 
@@ -51,7 +58,7 @@ function paint() {
   });
   const cur = rows[sel];
   const f = doc.getElementById('re-fields');
-  if (f) f.hidden = !cur || cur.k === 'floor';
+  if (f) f.hidden = !cur || shell(cur);
 }
 
 /* SIZE, WHEN SIZE IS THREE NUMBERS.
@@ -74,7 +81,7 @@ function setSize(r, v) {
 
 function fields() {
   const r = rows[sel];
-  if (!r || r.k === 'floor') return;
+  if (!r || shell(r)) return;
   const set = (id, v) => { const e = doc.getElementById(id); if (e) e.value = (+v).toFixed(2); };
   set('re-x', r.x); set('re-y', r.y || 0); set('re-z', r.z);
   set('re-r', r.r || 0); set('re-s', sizeOf(r));
@@ -82,7 +89,7 @@ function fields() {
 
 function bump(k, d) {
   const r = rows[sel];
-  if (!r || r.k === 'floor') return;
+  if (!r || shell(r)) return;
   r[k] = +(((+r[k]) || 0) + d).toFixed(3);
   commit(false); fields(); paint();
 }
@@ -102,9 +109,11 @@ function mount() {
 
   panel = doc.createElement('div');
   panel.id = 'room-ed';
+  panel.className = 'm-banner';             /* hung like every other banner at the table */
   panel.hidden = true;
   panel.innerHTML =
-    '<div class="re-head">The Tavern<button class="re-x" id="re-close">✕</button></div>' +
+    '<span class="m-pole" aria-hidden="true"></span>' +
+    '<div class="re-head"><span class="m-band">The Tavern</span><button class="re-x" id="re-close">✕</button></div>' +
     '<div class="re-list" id="re-list"></div>' +
     '<div class="re-fields" id="re-fields" hidden>' +
       '<label>across<input id="re-x" type="number" step="0.05"></label>' +
@@ -141,7 +150,7 @@ function mount() {
   doc.getElementById('re-close').onclick = () => toggle(false);
   doc.getElementById('re-addb').onclick = add;
   doc.getElementById('re-dup').onclick = () => {
-    const r = rows[sel]; if (!r || r.k === 'floor') return;
+    const r = rows[sel]; if (!r || shell(r)) return;
     rows.push(Object.assign({}, r, { x: r.x + 0.4 }));
     sel = rows.length - 1; commit(false); paint(); fields();
   };
@@ -162,7 +171,7 @@ function mount() {
   ['x', 'y', 'z', 'r', 's'].forEach(k => {
     const e = doc.getElementById('re-' + k);
     e.oninput = () => {
-      const r = rows[sel]; if (!r || r.k === 'floor') return;
+      const r = rows[sel]; if (!r || shell(r)) return;
       const v = parseFloat(e.value);
       if (!isFinite(v)) return;
       if (k === 's') setSize(r, v); else r[k] = v;
