@@ -49,7 +49,7 @@ function mount() {
   el.className = 'kit';
   el.innerHTML = `<div class="kit-rail">${['sheets', 'notes', 'draw', 'point'].map(k =>
       `<button class="kit-b" data-kit="${k}" title="${NAMES[k]}">${ICON[k]}</button>`).join('')}</div>
-    <div class="kit-card" hidden></div>`;
+    <div class="kit-card m-banner" hidden></div>`;
   doc.body.appendChild(el);
   rail = el.querySelector('.kit-rail');
   card = el.querySelector('.kit-card');
@@ -129,9 +129,12 @@ function paint() {
   if (panel === 'draw' && !tool) panel = null;
   card.hidden = !panel;
   if (!panel) { card.innerHTML = ''; return; }
-  card.innerHTML = panel === 'sheets' ? sheetsCard()
+  /* hung from its own pole like every banner at the table; the words scroll
+     inside the cloth so the pole is never cut off at its edge */
+  card.innerHTML = '<span class="m-pole" aria-hidden="true"></span><div class="kit-scroll">' +
+                   (panel === 'sheets' ? sheetsCard()
                  : panel === 'notes'  ? notesCard()
-                 : drawCard();
+                 : drawCard()) + '</div>';
   card.dataset.panel = panel;
 }
 

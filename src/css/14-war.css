@@ -1193,3 +1193,12 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
 .tbx-pill{ color:rgba(23,19,16,.7); font-style:italic; }
 .tbx-pill b{ font-family:var(--m-f-mark); font-style:normal; font-weight:400; font-size:19px; letter-spacing:0;
   color:var(--m-sable); }
+
+/* ══ WHAT SCROLLS, FADES INTO THE CLOTH ═════════════════════════
+   A grid cut off square at the foot of the banner sliced the last row's
+   ribbons in half against the line under it — the hard edge of a web page's
+   scroll box, on a piece of cloth. The roll of arms, the audio and the
+   chat's long talk fade into the cloth at the edge they scroll past. */
+.tbx-grid, .tbx-audio{ -webkit-mask:linear-gradient(180deg,transparent 0,#000 10px,#000 calc(100% - 26px),transparent);
+  mask:linear-gradient(180deg,transparent 0,#000 10px,#000 calc(100% - 26px),transparent); }
+.tbx{ top:70px; }

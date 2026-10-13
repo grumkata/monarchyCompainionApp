@@ -282,7 +282,7 @@ html body .m-band{ position:relative; isolation:isolate; display:inline-flex; al
    cloth. It comes down off the pole when it appears. Children paint over
    the cloth without being told: the cloth and hem sit at negative z inside
    the banner's own isolation. */
-html body .m-banner{ isolation:isolate; padding-bottom:calc(var(--m-tail) + 8px);
+html body .m-banner{ position:relative; isolation:isolate; padding-bottom:calc(var(--m-tail) + 8px);
   clip-path:polygon(-40px -10px,calc(100% + 40px) -10px,calc(100% + 40px) 16px,100% 16px,100% 100%,
     50% calc(100% - var(--m-tail)),0 100%,0 16px,-40px 16px);
   animation:m-unfurl .46s var(--settle) both; }

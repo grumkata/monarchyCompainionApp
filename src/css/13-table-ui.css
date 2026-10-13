@@ -2247,3 +2247,29 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
 .rdice i.gone{ background:transparent; opacity:.4; }
 /* a die walked up keeps its arrow, tucked into the lozenge's wide waist */
 .rdice i.up::before{ position:absolute; left:4px; top:50%; transform:translateY(-50%); margin:0; font-size:8px; }
+
+/* ══ THE KIT'S CARD IS A BANNER ═════════════════════════════════
+   The same cloth as the toolbox and the menu (.m-banner), hung from a pole
+   beside the player's shields, its rows divided by lines of partition and
+   its choices pennons. */
+.kit{ gap:30px; }
+/* no unfurl: the card is redrawn on every change of the kit, and an entrance on
+   it never got past its first frame (the same as the fight's cards) */
+.kit-card{ overflow:visible; max-height:none; width:280px; background:none; box-shadow:none; --m-tail:26px;
+  padding:14px 0 calc(var(--m-tail) + 10px) !important; animation:none; }
+.kit-scroll{ max-height:min(64vh,520px); overflow-y:auto; }
+.kit-scroll::-webkit-scrollbar{ width:4px; }
+.kit-scroll::-webkit-scrollbar-thumb{ background:var(--m-line); }
+.kit-row{ box-shadow:none; background:var(--m-rule-indented) 50% 100% / auto 6px repeat-x; padding-bottom:12px !important; }
+.kit-chip{ box-shadow:none; clip-path:var(--m-pennon); padding:6px 15px 6px 9px !important;
+  background:var(--m-sweep) 102% 0 / var(--m-sweep-size) no-repeat, var(--m-sable-3);
+  transition:background-position var(--t-wipe) var(--settle), color var(--t-wipe) var(--settle); }
+.kit-chip:hover, .kit-chip.on{ box-shadow:none; background-position:0 0; color:var(--m-sable); }
+.kit-chip.bad:hover{ background:var(--m-gules); color:var(--m-argent-hi); }
+.kit-find{ width:calc(100% - 28px); margin:0 14px 6px; background:var(--m-rule-indented) 0 100% / auto 6px repeat-x;
+  border:0; outline:none; color:var(--m-argent-hi); font:italic 15px var(--m-f-hand); padding:4px 2px 8px; }
+.kit-find:focus{ box-shadow:none; filter:brightness(1.35); }
+.kit-notes .kit-none{ grid-column:1/-1; }
+/* the chat's oldest lines go up into the cloth rather than under a hard edge */
+.chatdock .cb{ -webkit-mask:linear-gradient(180deg,transparent 0,#000 22px); mask:linear-gradient(180deg,transparent 0,#000 22px); }
+.kit-scroll{ -webkit-mask:linear-gradient(180deg,#000 calc(100% - 18px),transparent); mask:linear-gradient(180deg,#000 calc(100% - 18px),transparent); }
