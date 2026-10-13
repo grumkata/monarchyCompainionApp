@@ -289,8 +289,15 @@ html body .m-band{ position:relative; isolation:isolate; display:inline-flex; al
    the cloth without being told: the cloth and hem sit at negative z inside
    the banner's own isolation. */
 html body .m-banner{ position:relative; isolation:isolate; padding-bottom:calc(var(--m-tail) + 8px);
-  clip-path:polygon(-40px -10px,calc(100% + 40px) -10px,calc(100% + 40px) 16px,100% 16px,100% 100%,
-    50% calc(100% - var(--m-tail)),0 100%,0 16px,-40px 16px);
+  /* THE FOOT, as three lists of points: the cut itself, the gilt thread's
+     two edges five pixels inside it, and the cut folded flat against the
+     pole for the banner to unfurl from. Every one is a list, not a whole
+     outline, so the cut can be changed without touching the top. */
+  --m-foot:100% 100%, 50% calc(100% - var(--m-tail)), 0 100%;
+  --m-foot-0:100% 16px, 50% 16px, 0 16px;
+  --m-foot-o:calc(100% - 5px) calc(100% - 7px), 50% calc(100% - var(--m-tail) - 6px), 5px calc(100% - 7px);
+  --m-foot-i:6.5px calc(100% - 9.5px), 50% calc(100% - var(--m-tail) - 7.6px), calc(100% - 6.5px) calc(100% - 9.5px);
+  clip-path:polygon(-40px -10px,calc(100% + 40px) -10px,calc(100% + 40px) 16px,100% 16px,var(--m-foot),0 16px,-40px 16px);
   animation:m-unfurl .46s var(--settle) both; }
 .m-banner::before{ content:''; position:absolute; inset:7px 0 0; z-index:-2; pointer-events:none;
   background:
@@ -302,12 +309,42 @@ html body .m-banner{ position:relative; isolation:isolate; padding-bottom:calc(v
 .m-banner::after{ content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
   background:linear-gradient(180deg,var(--m-or),var(--m-or-lo)); opacity:.75;
   clip-path:polygon(evenodd,
-    5px 13px,calc(100% - 5px) 13px,calc(100% - 5px) calc(100% - 7px),
-    50% calc(100% - var(--m-tail) - 6px),5px calc(100% - 7px),5px 13px,
-    6.5px 14.5px,6.5px calc(100% - 9.5px),50% calc(100% - var(--m-tail) - 7.6px),
-    calc(100% - 6.5px) calc(100% - 9.5px),calc(100% - 6.5px) 14.5px,6.5px 14.5px); }
+    5px 13px,calc(100% - 5px) 13px,var(--m-foot-o),5px 13px,
+    6.5px 14.5px,var(--m-foot-i),calc(100% - 6.5px) 14.5px,6.5px 14.5px); }
 @keyframes m-unfurl{ from{ clip-path:polygon(-40px -10px,calc(100% + 40px) -10px,calc(100% + 40px) 16px,
-  100% 16px,100% 16px,50% 16px,0 16px,0 16px,-40px 16px); } }
+  100% 16px,var(--m-foot-0),0 16px,-40px 16px); } }
+
+/* ── AND THE FOOT IS CUT LIKE YOURS ─────────────────────────────
+   The banner you made in the hall has a hem — swallow-tailed, a pennon's
+   point, dagged, a gonfalon's three tails, rounded — and every banner the
+   table hangs for you (the toolbox, the menu, the kit, the room) is cut
+   the same, so the chrome is your livery and not only your colour. Shell
+   puts the cut on <html> (42-shell.js livery). Swallow and square keep the
+   fork above: a square foot is a box, and that is the one thing a banner
+   here may not be. The round one is an ellipse sampled at seventeen
+   points, close enough that no facet shows at the width of the toolbox;
+   every list keeps its own count in --m-foot-0, or the unfurl would snap
+   instead of letting the cloth down. */
+html[data-hem="pennon"] body .m-banner{
+  --m-foot:100% calc(100% - var(--m-tail)), 50% 100%, 0% calc(100% - var(--m-tail));
+  --m-foot-0:100% 16px, 50% 16px, 0% 16px;
+  --m-foot-o:calc(100% - 5px) calc(100% - var(--m-tail) - 6px), 50% calc(100% - 6px), 5px calc(100% - var(--m-tail) - 6px);
+  --m-foot-i:6.5px calc(100% - var(--m-tail) - 7.6px), 50% calc(100% - 7.6px), calc(100% - 6.5px) calc(100% - var(--m-tail) - 7.6px); }
+html[data-hem="dagged"] body .m-banner{
+  --m-foot:100% calc(100% - var(--m-tail) * 0.55), 91.667% 100%, 83.333% calc(100% - var(--m-tail) * 0.55), 75% 100%, 66.667% calc(100% - var(--m-tail) * 0.55), 58.333% 100%, 50% calc(100% - var(--m-tail) * 0.55), 41.667% 100%, 33.333% calc(100% - var(--m-tail) * 0.55), 25% 100%, 16.667% calc(100% - var(--m-tail) * 0.55), 8.333% 100%, 0% calc(100% - var(--m-tail) * 0.55);
+  --m-foot-0:100% 16px, 91.667% 16px, 83.333% 16px, 75% 16px, 66.667% 16px, 58.333% 16px, 50% 16px, 41.667% 16px, 33.333% 16px, 25% 16px, 16.667% 16px, 8.333% 16px, 0% 16px;
+  --m-foot-o:calc(100% - 5px) calc(100% - var(--m-tail) * 0.55 - 6px), 91.667% calc(100% - 6px), 83.333% calc(100% - var(--m-tail) * 0.55 - 6px), 75% calc(100% - 6px), 66.667% calc(100% - var(--m-tail) * 0.55 - 6px), 58.333% calc(100% - 6px), 50% calc(100% - var(--m-tail) * 0.55 - 6px), 41.667% calc(100% - 6px), 33.333% calc(100% - var(--m-tail) * 0.55 - 6px), 25% calc(100% - 6px), 16.667% calc(100% - var(--m-tail) * 0.55 - 6px), 8.333% calc(100% - 6px), 5px calc(100% - var(--m-tail) * 0.55 - 6px);
+  --m-foot-i:6.5px calc(100% - var(--m-tail) * 0.55 - 7.6px), 8.333% calc(100% - 7.6px), 16.667% calc(100% - var(--m-tail) * 0.55 - 7.6px), 25% calc(100% - 7.6px), 33.333% calc(100% - var(--m-tail) * 0.55 - 7.6px), 41.667% calc(100% - 7.6px), 50% calc(100% - var(--m-tail) * 0.55 - 7.6px), 58.333% calc(100% - 7.6px), 66.667% calc(100% - var(--m-tail) * 0.55 - 7.6px), 75% calc(100% - 7.6px), 83.333% calc(100% - var(--m-tail) * 0.55 - 7.6px), 91.667% calc(100% - 7.6px), calc(100% - 6.5px) calc(100% - var(--m-tail) * 0.55 - 7.6px); }
+html[data-hem="gonfalon"] body .m-banner{
+  --m-foot:100% calc(100% - var(--m-tail)), 84% calc(100% - var(--m-tail) * 0.45), 68% calc(100% - var(--m-tail)), 58% 100%, 42% 100%, 32% calc(100% - var(--m-tail)), 16% calc(100% - var(--m-tail) * 0.45), 0% calc(100% - var(--m-tail));
+  --m-foot-0:100% 16px, 84% 16px, 68% 16px, 58% 16px, 42% 16px, 32% 16px, 16% 16px, 0% 16px;
+  --m-foot-o:calc(100% - 5px) calc(100% - var(--m-tail) - 6px), 84% calc(100% - var(--m-tail) * 0.45 - 6px), 68% calc(100% - var(--m-tail) - 6px), 58% calc(100% - 6px), 42% calc(100% - 6px), 32% calc(100% - var(--m-tail) - 6px), 16% calc(100% - var(--m-tail) * 0.45 - 6px), 5px calc(100% - var(--m-tail) - 6px);
+  --m-foot-i:6.5px calc(100% - var(--m-tail) - 7.6px), 16% calc(100% - var(--m-tail) * 0.45 - 7.6px), 32% calc(100% - var(--m-tail) - 7.6px), 42% calc(100% - 7.6px), 58% calc(100% - 7.6px), 68% calc(100% - var(--m-tail) - 7.6px), 84% calc(100% - var(--m-tail) * 0.45 - 7.6px), calc(100% - 6.5px) calc(100% - var(--m-tail) - 7.6px); }
+html[data-hem="round"] body .m-banner{
+  --m-foot:100% calc(100% - var(--m-tail)), 99.039% calc(100% - var(--m-tail) * 0.805), 96.194% calc(100% - var(--m-tail) * 0.617), 91.573% calc(100% - var(--m-tail) * 0.444), 85.355% calc(100% - var(--m-tail) * 0.293), 77.779% calc(100% - var(--m-tail) * 0.169), 69.134% calc(100% - var(--m-tail) * 0.076), 59.755% calc(100% - var(--m-tail) * 0.019), 50% 100%, 40.245% calc(100% - var(--m-tail) * 0.019), 30.866% calc(100% - var(--m-tail) * 0.076), 22.221% calc(100% - var(--m-tail) * 0.169), 14.645% calc(100% - var(--m-tail) * 0.293), 8.427% calc(100% - var(--m-tail) * 0.444), 3.806% calc(100% - var(--m-tail) * 0.617), 0.961% calc(100% - var(--m-tail) * 0.805), 0% calc(100% - var(--m-tail));
+  --m-foot-0:100% 16px, 99.039% 16px, 96.194% 16px, 91.573% 16px, 85.355% 16px, 77.779% 16px, 69.134% 16px, 59.755% 16px, 50% 16px, 40.245% 16px, 30.866% 16px, 22.221% 16px, 14.645% 16px, 8.427% 16px, 3.806% 16px, 0.961% 16px, 0% 16px;
+  --m-foot-o:calc(100% - 5px) calc(100% - var(--m-tail)), calc(99.039% - 4.904px) calc(100% - var(--m-tail) * 0.805 - 1.171px), calc(96.194% - 4.619px) calc(100% - var(--m-tail) * 0.617 - 2.296px), calc(91.573% - 4.157px) calc(100% - var(--m-tail) * 0.444 - 3.333px), calc(85.355% - 3.536px) calc(100% - var(--m-tail) * 0.293 - 4.243px), calc(77.779% - 2.778px) calc(100% - var(--m-tail) * 0.169 - 4.989px), calc(69.134% - 1.913px) calc(100% - var(--m-tail) * 0.076 - 5.543px), calc(59.755% - 0.975px) calc(100% - var(--m-tail) * 0.019 - 5.885px), 50% calc(100% - 6px), calc(40.245% + 0.975px) calc(100% - var(--m-tail) * 0.019 - 5.885px), calc(30.866% + 1.913px) calc(100% - var(--m-tail) * 0.076 - 5.543px), calc(22.221% + 2.778px) calc(100% - var(--m-tail) * 0.169 - 4.989px), calc(14.645% + 3.536px) calc(100% - var(--m-tail) * 0.293 - 4.243px), calc(8.427% + 4.157px) calc(100% - var(--m-tail) * 0.444 - 3.333px), calc(3.806% + 4.619px) calc(100% - var(--m-tail) * 0.617 - 2.296px), calc(0.961% + 4.904px) calc(100% - var(--m-tail) * 0.805 - 1.171px), 5px calc(100% - var(--m-tail));
+  --m-foot-i:6.5px calc(100% - var(--m-tail)), calc(0.961% + 6.375px) calc(100% - var(--m-tail) * 0.805 - 1.483px), calc(3.806% + 6.005px) calc(100% - var(--m-tail) * 0.617 - 2.908px), calc(8.427% + 5.405px) calc(100% - var(--m-tail) * 0.444 - 4.222px), calc(14.645% + 4.596px) calc(100% - var(--m-tail) * 0.293 - 5.374px), calc(22.221% + 3.611px) calc(100% - var(--m-tail) * 0.169 - 6.319px), calc(30.866% + 2.487px) calc(100% - var(--m-tail) * 0.076 - 7.021px), calc(40.245% + 1.268px) calc(100% - var(--m-tail) * 0.019 - 7.454px), 50% calc(100% - 7.6px), calc(59.755% - 1.268px) calc(100% - var(--m-tail) * 0.019 - 7.454px), calc(69.134% - 2.487px) calc(100% - var(--m-tail) * 0.076 - 7.021px), calc(77.779% - 3.611px) calc(100% - var(--m-tail) * 0.169 - 6.319px), calc(85.355% - 4.596px) calc(100% - var(--m-tail) * 0.293 - 5.374px), calc(91.573% - 5.405px) calc(100% - var(--m-tail) * 0.444 - 4.222px), calc(96.194% - 6.005px) calc(100% - var(--m-tail) * 0.617 - 2.908px), calc(99.039% - 6.375px) calc(100% - var(--m-tail) * 0.805 - 1.483px), calc(100% - 6.5px) calc(100% - var(--m-tail)); }
 
 /* the keyboard gets the same sweep plus a ring, never just the ring */
 :focus-visible{ outline:2px solid var(--m-or); outline-offset:2px; }

@@ -288,6 +288,10 @@ function livery() {
   if (c) s.setProperty('--m-house', c); else s.removeProperty('--m-house');
   const ink = c && inkFor(c);
   if (ink) s.setProperty('--m-house-ink', ink); else s.removeProperty('--m-house-ink');
+  /* and the cut of its foot, which every banner at the table copies
+     (20-shell.css, "AND THE FOOT IS CUT LIKE YOURS") */
+  const cut = arms && /^(pennon|dagged|gonfalon|round)$/.test(arms.hem) ? arms.hem : '';
+  if (cut) doc.documentElement.dataset.hem = cut; else delete doc.documentElement.dataset.hem;
   bootArms(H, arms, c);
 }
 
