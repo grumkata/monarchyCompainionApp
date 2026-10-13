@@ -311,6 +311,9 @@ function wireTile(b, o) {
   b.addEventListener('click', e => {
     if (e.detail > 1) return;               /* the second of a double click */
     twice = { o, t: performance.now() };
+    const sh = b.querySelector('.tbx-shield');
+    liftRect = sh ? sh.getBoundingClientRect() : null;
+    liftId = b.dataset.id;
     choose(o);
   });
   b.addEventListener('dblclick', e => { e.stopPropagation(); twice = null; quick(o); });
@@ -387,7 +390,50 @@ function openBench(o) {
     back: () => closeBench(true),
     changed: () => { if (held) { paintHeld(); paintFoot(); } }
   });
+  liftFrom(liftRect);
 }
+/* ══ LIFTED OFF THE ROLL ════════════════════════════════════════
+   The bench used to appear in place of the grid in one cut, so nothing said
+   that the big shield on the bench was the little one you had just pressed.
+   It is the same shield, so it moves like it: the bench's oak shield grows out
+   of the exact rect the tile occupied (a FLIP — the end is laid out, and it
+   is played back from the start), and the bench's fields rise in after it.
+   Transform and opacity only (STYLE.md §6⅓). Not for anyone who has asked
+   the system for reduced motion. */
+let liftRect = null, liftId = null;
+const calm = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function liftFrom(r0) {
+  liftRect = null;
+  const st = bench && bench.querySelector('.wb-stage');
+  if (!r0 || !r0.width || !st || !st.animate || calm()) return;
+  const r1 = st.getBoundingClientRect();
+  if (!r1.width) return;
+  const k = r0.width / r1.width;
+  const dx = (r0.left + r0.width / 2) - (r1.left + r1.width / 2);
+  const dy = (r0.top + r0.height / 2) - (r1.top + r1.height / 2);
+  const ease = 'cubic-bezier(.16,.84,.24,1)';
+  st.animate([{ transform: `translate(${dx}px,${dy}px) scale(${k})` }, { transform: 'none' }],
+             { duration: 380, easing: ease });
+  [...bench.querySelectorAll('.wb-top, .wb-field, .wb-acts')].forEach((e, i) =>
+    e.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }],
+              { duration: 300, delay: 90 + Math.min(i, 8) * 35, easing: ease, fill: 'backwards' }));
+}
+
+/* and back: the shield shrinks from the bench into its own place on the roll */
+function lowerInto(r0, id) {
+  if (!r0 || !r0.width || !id || calm()) return;
+  const t = [...grid.querySelectorAll('.tbx-tile')].find(x => x.dataset.id === id);
+  const sh = t && t.querySelector('.tbx-shield');
+  if (!sh || !sh.animate) return;
+  const r1 = sh.getBoundingClientRect();
+  if (!r1.width) return;
+  const k = r0.width / r1.width;
+  const dx = (r0.left + r0.width / 2) - (r1.left + r1.width / 2);
+  const dy = (r0.top + r0.height / 2) - (r1.top + r1.height / 2);
+  sh.animate([{ transform: `translate(${dx}px,${dy}px) scale(${k})`, zIndex: 5 }, { transform: 'none', zIndex: 5 }],
+             { duration: 340, easing: 'cubic-bezier(.16,.84,.24,1)' });
+}
+
 /* the same bench, for a thing already on the wood (67-inspector.js) */
 function editThing(id) {
   if (!root.Workbench) return;
@@ -402,12 +448,16 @@ function editThing(id) {
 }
 function closeBench(repaint) {
   if (!bench || bench.hidden) return;
+  const st = bench.querySelector('.wb-stage');
+  const from = st ? st.getBoundingClientRect() : null, id = liftId;
+  liftId = null;
   if (root.Workbench) root.Workbench.close();
   bench.hidden = true; bench.innerHTML = '';
   dock.classList.remove('benching');
   grid.hidden = false;
   if (repaint && openKind) { opts = root.Toolbox.options(openKind.id) || []; paintGrid(); }
   else shelf.hidden = !(opts.length > SHELF_AT || groupsOf(opts).length > 1);
+  if (repaint) lowerInto(from, id);
 }
 
 /* ── the name of whatever you point at, once, beside it ── */
