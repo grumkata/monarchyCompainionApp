@@ -489,13 +489,22 @@ html body .tm-row.is-gules:hover {
 }
 /* an answer to the button you just pressed, next to that button — not
    thrown across the screen in 124px type, which is what it used to be */
+/* AND IT IS WRITTEN ON A MOTTO SCROLL, the ribbon a coat of arms carries
+   its words on — not in a box with a coloured bar down its left side, which
+   is the web's "callout" and nothing else. Argent with sable lettering; an
+   answer that went wrong is the same scroll in gules. */
 html body .tm-note {
-  margin: 10px 14px 2px; padding: 9px 11px;
-  font-family: var(--m-f-hand); font-style: italic; font-size: 14px;
-  line-height: 1.45; color: var(--m-text);
-  background: rgba(0,0,0,.34); box-shadow: inset 3px 0 0 var(--m-or);
+  position: relative; margin: 12px 22px 4px; padding: 7px 24px;
+  font-family: var(--m-f-hand); font-style: italic; font-size: 14px; font-weight: 600;
+  line-height: 1.35; text-align: center; color: var(--m-sable);
+  background: linear-gradient(180deg, var(--m-argent-hi), var(--m-argent) 60%, #cdbf9d);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%, 12px 50%);
+  animation: tm-scroll .34s var(--settle) both;
 }
-html body .tm-note.bad { color: var(--m-gules-hi); box-shadow: inset 3px 0 0 var(--m-gules); }
+html body .tm-note.bad { color: var(--m-argent-hi);
+  background: linear-gradient(180deg, #b8323a, var(--m-gules) 60%, var(--m-gules-lo)); }
+@keyframes tm-scroll { from { clip-path: polygon(48% 0, 52% 0, 52% 50%, 52% 100%, 48% 100%, 48% 50%); } }
+@media (prefers-reduced-motion: reduce) { html body .tm-note { animation: none; } }
 html body .tm-row.busy { opacity: .5; pointer-events: none; }
 html body .tm-say {
   margin: 10px 16px 6px; padding-top: 10px; box-shadow: inset 0 1px 0 var(--m-line);

@@ -1569,11 +1569,16 @@ body.peeking .prop.t3-thing.sel > .face::after{ display:none; }
   color:var(--m-hush);
 }
 .cl.said.emote{ font-style:italic; }
-/* THE GM IS NOT LOUDER, THEY ARE MARKED. Same size, same weight — a gilt
-   rule down the edge, the way a marginal hand marks a passage. At a table
-   you can tell who is running it without them shouting. */
-.cl.said.gm{ box-shadow:inset 2px 0 0 var(--m-or); padding-left:9px; }
+/* THE GM IS NOT LOUDER, THEY ARE MARKED. Same size, same weight — and a
+   small crown before the name, where the gilt bar down the edge used to be
+   (a coloured bar down a box's left side is the web's callout, and it said
+   "highlighted", not "the one running the table"). A run of their lines is
+   signed once, so the crown heads the whole of it. */
 .cl.said.gm > b{ color:var(--m-or); }
+.cl.said.gm > b::before{ content:''; display:inline-block; width:12px; height:9px; margin:0 5px -1px 0;
+  background:var(--m-or);
+  -webkit-mask:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 18'><path d='M1 6l5 4 6-9 6 9 5-4-2 10H3z M3 17h18v1H3z'/></svg>") center/contain no-repeat;
+  mask:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 18'><path d='M1 6l5 4 6-9 6 9 5-4-2 10H3z M3 17h18v1H3z'/></svg>") center/contain no-repeat; }
 /* the table noticing something, rather than anybody saying it */
 .cl.note{ padding:3px 0 3px 9px; }
 .cl.note .stxt{ font-family:var(--m-f-hand); font-style:italic; font-size:13px;
