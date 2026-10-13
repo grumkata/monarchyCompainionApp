@@ -983,6 +983,25 @@ body.at-table #pickmenu { z-index: 960; }
 #m-pick b.at::before, #m-pick b:hover::before { color: var(--m-sable); }
 #m-pick b.off { opacity: .4; pointer-events: none; }
 
+/* ══ A SLIDER IS A LINE WITH A LOZENGE ON IT ═════════════════════
+   Every range input in the app (volumes, the interface size, the codex's
+   zoom) was the browser's own slider in the browser's own blue-grey with a
+   round thumb — a settings page. The track is an indented line of partition
+   now, gilt where it has been filled, and the thumb is the app's lozenge.
+   The player's own seek bar (15-player.css) keeps the design it already has. */
+input[type=range]:not(.pu-seek):not(.pu-vr) { -webkit-appearance: none; appearance: none; height: 18px;
+  background: transparent; cursor: pointer; accent-color: var(--m-or); }
+input[type=range]:not(.pu-seek):not(.pu-vr)::-webkit-slider-runnable-track { height: 6px;
+  background: var(--m-rule-indented) 0 0 / auto 6px repeat-x; }
+input[type=range]:not(.pu-seek):not(.pu-vr)::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+  width: 16px; height: 20px; margin-top: -7px; border: 0;
+  background: linear-gradient(160deg, var(--m-or-hi), var(--m-or) 50%, var(--m-or-lo));
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  transition: transform var(--t-hover) var(--pop); }
+input[type=range]:not(.pu-seek):not(.pu-vr):hover::-webkit-slider-thumb,
+input[type=range]:not(.pu-seek):not(.pu-vr):focus-visible::-webkit-slider-thumb { transform: scale(1.25); }
+input[type=range]:not(.pu-seek):not(.pu-vr):focus-visible { outline: none; }
+
 </style>
 <style>
 /* 00-hall.css  — scoped to body.at-hall */
