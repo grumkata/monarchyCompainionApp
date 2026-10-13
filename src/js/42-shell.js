@@ -455,6 +455,109 @@ doc.addEventListener('focusin', e => {
 root.addEventListener('scroll', tipHide, true);
 root.addEventListener('blur', tipHide);
 
+/* ══ A CHOICE UNFURLS, IT DOES NOT DROP DOWN ══════════════════════
+   STYLE.md is plain about it — no <select> at the table — and a few remain
+   (the fight's Holding and Struck-by, the player's On, the room editor's
+   pieces), each opening the operating system's own grey list. Rewriting
+   every one of them would be four controls written four ways; instead the
+   select STAYS, so every listener on it still hears its change, and opening
+   it unfurls a short banner of its choices instead of the system's list.
+   Arrow keys still step it in place; Enter, Space or Alt+Down open the
+   banner; Escape or a click elsewhere puts it away. */
+let pickEl = null, pickFor = null, pickAt = -1;
+function pickClose() {
+  if (pickEl) pickEl.classList.remove('on');
+  pickFor = null; pickAt = -1;
+}
+/* the fight repaints its cards often: a select picked from may have been
+   replaced underneath the banner by an identical one */
+function pickRevive(sel) {
+  if (sel.isConnected) return sel;
+  const keys = Object.keys(sel.dataset);
+  return [...doc.querySelectorAll('select')].find(x =>
+    x.className === sel.className && keys.every(k => x.dataset[k] === sel.dataset[k])) || null;
+}
+function pickChoose(i) {
+  const sel = pickFor && pickRevive(pickFor);
+  pickClose();
+  if (!sel || !sel.options[i]) return;
+  if (sel.selectedIndex !== i) {
+    sel.selectedIndex = i;
+    sel.dispatchEvent(new Event('input', { bubbles: true }));
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  sel.focus({ preventScroll: true });
+}
+function pickMark(i) {
+  if (!pickEl) return;
+  const rows = pickEl.querySelectorAll('[data-pi]');
+  pickAt = Math.max(0, Math.min(rows.length - 1, i));
+  rows.forEach((r, n) => r.classList.toggle('at', n === pickAt));
+  const r = rows[pickAt]; if (r) r.scrollIntoView({ block: 'nearest' });
+}
+function pickOpen(sel) {
+  if (!pickEl) {
+    pickEl = doc.createElement('div'); pickEl.id = 'm-pick';
+    pickEl.addEventListener('pointerdown', e => {
+      e.stopPropagation(); e.preventDefault();
+      const r = e.target.closest('[data-pi]'); if (r) pickChoose(+r.dataset.pi);
+    });
+    pickEl.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+    doc.body.appendChild(pickEl);
+  }
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let html = '', n = 0, group = null;
+  [...sel.options].forEach(o => {
+    const g = o.parentNode && o.parentNode.tagName === 'OPTGROUP' ? o.parentNode.label : null;
+    if (g !== group) { group = g; if (g) html += '<u>' + esc(g) + '</u>'; }
+    html += '<b data-pi="' + n + '" class="' + (o.selected ? 'on' : '') + (o.disabled ? ' off' : '') + '">' +
+            esc(o.textContent) + '</b>';
+    n++;
+  });
+  pickEl.innerHTML = html;
+  pickFor = sel;
+  const r = sel.getBoundingClientRect();
+  pickEl.style.minWidth = Math.max(140, Math.round(r.width + 24)) + 'px';
+  pickEl.classList.add('on');
+  const h = pickEl.offsetHeight, w = pickEl.offsetWidth;
+  let y = r.bottom + 6;
+  if (y + h > root.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+  const x = Math.max(8, Math.min(root.innerWidth - w - 8, r.left - 12));
+  pickEl.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  pickMark(sel.selectedIndex);
+}
+const pickable = t => {
+  const s = t && t.closest && t.closest('select');
+  return s && !s.disabled && !s.multiple && !(s.size > 1) ? s : null;
+};
+doc.addEventListener('pointerdown', e => {
+  if (pickEl && pickEl.contains(e.target)) return;
+  const sel = pickable(e.target);
+  if (!sel) { if (pickFor) pickClose(); return; }
+  e.preventDefault();                                   /* no system list */
+  if (pickFor === sel) { pickClose(); return; }
+  sel.focus({ preventScroll: true });
+  pickOpen(sel);
+}, true);
+doc.addEventListener('mousedown', e => { if (pickable(e.target)) e.preventDefault(); }, true);
+doc.addEventListener('keydown', e => {
+  if (pickFor) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const s = pickFor; pickClose(); s.focus(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation();
+      pickMark(pickAt + (e.key === 'ArrowDown' ? 1 : -1)); return; }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pickChoose(pickAt); return; }
+    if (e.key === 'Tab') pickClose();
+    return;
+  }
+  const sel = pickable(e.target);
+  if (!sel) return;
+  if (e.key === 'Enter' || e.key === ' ' || e.key === 'F4' || (e.altKey && e.key === 'ArrowDown')) {
+    e.preventDefault(); e.stopPropagation(); pickOpen(sel);
+  }
+}, true);
+root.addEventListener('resize', pickClose);
+root.addEventListener('scroll', e => { if (pickFor && !(pickEl && pickEl.contains(e.target))) pickClose(); }, true);
+
 /* the tavern hangs your arms behind your seat (27-table-gl.js) */
 root.Shell = { show, openTable, backToHall, under, rehearse, livery, arms: readArms, seat, warn,
                get at() { return at; } };
