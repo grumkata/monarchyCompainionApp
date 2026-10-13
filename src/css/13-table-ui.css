@@ -1563,8 +1563,8 @@ body.peeking .prop.t3-thing.sel > .face::after{ display:none; }
    own quiet hand, gone the moment the first line arrives. */
 .chatdock .cb:empty::before{
   content:'The table is quiet.\A Say something, or roll \2014  /r 2d6';
-  white-space:pre-line; display:block; margin:18px 11px 0; padding-top:12px;
-  border-top:1px solid var(--m-line);
+  white-space:pre-line; display:block; margin:18px 11px 0; padding-top:14px; text-align:center;
+  background:var(--m-rule-engrailed) 50% 0 / auto 6px repeat-x;
   font-family:var(--m-f-hand); font-style:italic; font-size:14px; line-height:1.6;
   color:var(--m-hush);
 }
@@ -2203,3 +2203,47 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
 #bob-star .bs-pop{ position:absolute; left:0; top:0; z-index:3; pointer-events:none; font:900 34px/1 'Arial Black','Segoe UI Black',Impact,sans-serif;
   -webkit-text-stroke:2px #101828; paint-order:stroke fill; text-shadow:0 3px 0 rgba(0,0,0,.4); }
 #bob-star .bs-got small{ display:block; margin-top:14px; font-size:.42em; letter-spacing:.06em; -webkit-text-stroke:2px #1d2c74; }
+
+/* ══ THE CHAT, IN MONARCHY'S OWN SHAPES ════════════════════════
+   The hanging already had its embattled edge. What was still a web form
+   in it was the rest: an Or tab with CHAT on it, a text box with a border,
+   a SEND button, dice in little squares. Now:
+     · its name rides the motto scroll, argent, at the top of the cloth
+     · you write on a LINE, an indented one, the way a clerk writes a roll
+     · Send is WAX — saying something at the table is setting your seal to it
+     · a die is a LOZENGE, the shape the dice already are (STYLE.md §6½) */
+.chatdock > .plaque{ align-self:center; margin:12px 0 2px 6px; padding:5px 26px 6px;
+  font-family:var(--m-f-cap); font-size:11px; font-weight:700; letter-spacing:var(--m-track);
+  text-transform:uppercase; background:none; clip-path:none; box-shadow:none; border:0; }
+.cin{ align-items:flex-end; gap:8px; padding:14px 12px 14px 26px; border-top:0; background:transparent;
+  position:relative; }
+.cin::before{ content:''; position:absolute; left:22px; right:10px; top:0; height:6px;
+  background:var(--m-rule-embattled) 0 0 / auto 6px repeat-x; }
+.cin textarea{ background:transparent; box-shadow:none; padding:6px 2px 8px; font-style:normal;
+  background:var(--m-rule-indented) 0 100% / auto 6px repeat-x; transition:filter var(--t-hover) var(--settle); }
+.cin textarea:focus{ box-shadow:none; filter:brightness(1.3); }
+.cin textarea::placeholder{ color:var(--m-hush); font-style:italic; }
+/* the quill-and-picture: a device, not a button with a border */
+.cin button.pic{ background:none; box-shadow:none; color:var(--m-quiet); width:28px; }
+.cin button.pic:hover{ background:none; box-shadow:none; color:var(--m-or); transform:rotate(-8deg); }
+/* SEND IS A SEAL */
+.cin #chat-go{ width:50px; height:46px; padding:0; margin-bottom:-4px; flex:0 0 50px;
+  font-family:var(--m-f-cap); font-size:8.5px; font-weight:700; letter-spacing:.14em;
+  color:var(--m-argent-hi); text-shadow:0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,170,150,.25);
+  clip-path:var(--m-wax);
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(0,0,0,.22) 39% 43%, transparent 44%),
+    var(--m-wax-melt);
+  transition:transform var(--t-hover) var(--pop), filter var(--t-hover) var(--settle); }
+.cin #chat-go:hover{ background:
+    radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(0,0,0,.22) 39% 43%, transparent 44%),
+    var(--m-wax-melt); color:var(--m-argent-hi); transform:rotate(-10deg) scale(1.06); filter:brightness(1.12); }
+.cin #chat-go:active{ transform:scale(.9); }
+.cin #chat-go:focus-visible{ outline:none; filter:brightness(1.3); transform:rotate(-10deg) scale(1.08); }
+/* a die, a lozenge */
+.rdice i{ position:relative; display:grid; place-items:center; min-width:0; width:30px; height:30px; padding:0;
+  clip-path:var(--m-lozenge); box-shadow:none; background:var(--m-sable-3); font-size:14px; }
+.rdice i.cn{ width:auto; height:auto; clip-path:var(--m-pennon); padding:3px 12px 3px 7px; }
+.rdice i.gone{ background:transparent; opacity:.4; }
+/* a die walked up keeps its arrow, tucked into the lozenge's wide waist */
+.rdice i.up::before{ position:absolute; left:4px; top:50%; transform:translateY(-50%); margin:0; font-size:8px; }

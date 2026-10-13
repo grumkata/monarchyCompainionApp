@@ -51,7 +51,11 @@ function mount() {
   b.id = 'tm-open';
   b.className = 'tm-open';
   b.title = 'Menu  ·  Esc';
-  b.innerHTML = '<i></i><i></i><i></i>';
+  /* A CROWN, not three bars: the table's decisions are the crown's, and three
+     bars are every website's corner (14-war.css, the left wall) */
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5h16M5 17.5L3.5 7.5l4.6 3.8L12 4.5l3.9 6.8 4.6-3.8-1.5 10"/>' +
+                '<circle cx="12" cy="4" r=".9"/><circle cx="3.4" cy="7" r=".8"/><circle cx="20.6" cy="7" r=".8"/></svg>';
+  b.setAttribute('aria-label', 'The table\u2019s menu');
   b.addEventListener('click', toggle);
   doc.body.appendChild(b);
 
@@ -98,7 +102,7 @@ function drawCard() {
   const local = net && net.mode === 'local';
 
   el.innerHTML =
-    '<div class="tm-card">' +
+    '<div class="tm-card m-banner"><span class="m-pole" aria-hidden="true"></span>' +
       '<div class="tm-head">' +
         '<b>' + esc(tableName()) + '</b>' +
         (live()
@@ -167,7 +171,9 @@ function drawSettings() {
 
   const groups = O ? O.groups() : [];
   el.innerHTML =
-    '<div class="tm-card tm-set">' +
+    /* the switches scroll INSIDE the banner, so the pole and its fleurs are
+       not cut off at the cloth's edge the way overflow would cut them */
+    '<div class="tm-card tm-set m-banner"><span class="m-pole" aria-hidden="true"></span><div class="tm-scroll">' +
       '<div class="tm-head"><b>Settings</b></div>' +
       groups.map((g, i) =>
         '<div class="tm-grp">' + esc(g.name) + '</div>' +
@@ -182,7 +188,7 @@ function drawSettings() {
         }).join('')
       ).join('') +
       '<div class="tm-rows">' + row('back', 'Back') + '</div>' +
-    '</div>';
+    '</div></div>';
 }
 function setOpt(k, v) {
   if (k === '__full') {

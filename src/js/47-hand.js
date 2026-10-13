@@ -50,12 +50,13 @@ let q = '', gsel = '';
 function build() {
   if (dock) return dock;
   dock = doc.createElement('aside');
-  dock.className = 'tbx';
+  dock.className = 'tbx m-banner';
   dock.id = 'tbx';
   dock.hidden = true;
   dock.innerHTML =
-    `<header class="tbx-head">
-       <span class="tbx-what" id="tbx-what">Toolbox</span>
+    `<span class="tbx-pole m-pole" aria-hidden="true"></span>
+     <header class="tbx-head">
+       <span class="tbx-what m-band" id="tbx-what">Toolbox</span>
        <span class="tbx-count" id="tbx-count"></span>
        <button class="tbx-x" id="tbx-x" title="Close the toolbox  (B)">&#10005;</button>
      </header>
@@ -156,8 +157,9 @@ function keepFocus(box, attr, paint) {
 function paintKinds() { keepFocus(kindsEl, 'data-n', paintKinds_); }
 function paintKinds_() {
   kindsEl.innerHTML = kinds.map((k, n) =>
-    `<button class="tbx-kind" data-n="${n}" title="${esc(k.name)}  (${n + 1})">
-       <span class="tbx-kfig${k.icon ? ' tbx-kico' : ''}">${k.icon || F().html(k.fig, k.figv || {}, 40)}</span>
+    `<button class="tbx-kind" data-n="${n}" data-k="${esc(k.id)}" title="${esc(k.name)}  (${n + 1})">
+       <span class="tbx-kshield"><span class="tbx-kfig${k.icon ? ' tbx-kico' : ''}">${
+         k.icon || F().html(k.fig, k.figv || {}, 34)}</span></span>
        <b>${esc(k.name)}</b>
      </button>`).join('');
   kindsEl.querySelectorAll('.tbx-kind').forEach(b =>
@@ -182,6 +184,8 @@ function pickKind(k) {
   q = ''; gsel = '';
   if (find) find.value = '';
   what.textContent = k.name;
+  /* each kind is its own tincture, and its shields are painted in it */
+  dock.dataset.kind = k.id;
   /* THE AUDIO TAB HOLDS A PANEL, NOT THINGS: no shelf, no grid, nothing to carry out */
   const aud = k.id === 'audio';
   audioEl.hidden = !aud;
@@ -197,7 +201,20 @@ function pickKind(k) {
   grid.hidden = false; foot.hidden = false;
   opts = root.Toolbox.options(k.id) || [];
   paintGrid();
+  deal();
   markSel();
+}
+/* A KIND IS DEALT, not swapped: its tiles come in one after another, quick
+   enough to be over before you have read the first name (STYLE.md: "the
+   toolbox deals its slots"). Only when a kind is turned to — a filter or a
+   repaint replaces the tiles without dealing them again. */
+let dealT = 0;
+function deal() {
+  grid.classList.remove('dealing');
+  void grid.offsetWidth;
+  grid.classList.add('dealing');
+  clearTimeout(dealT);
+  dealT = setTimeout(() => grid.classList.remove('dealing'), 700);
 }
 
 /* ══ THE SHELF ═════════════════════════════════════════════════
@@ -247,10 +264,10 @@ function paintGrid_() {
 
   const list = shown();
   count.textContent = list.length ? String(list.length) : '';
-  grid.innerHTML = list.length ? list.map(o =>
-    `<button class="tbx-tile${o.custom ? ' custom' : ''}${o.soon ? ' soon' : ''}" data-id="${esc(optKey(o))}"
+  grid.innerHTML = list.length ? list.map((o, n) =>
+    `<button class="tbx-tile${o.custom ? ' custom' : ''}${o.soon ? ' soon' : ''}" data-id="${esc(optKey(o))}" style="--n:${Math.min(n, 14)}"
              title="${esc(o.soon ? (o.name || '') + ' — coming in a later update' : (o.name || ''))}">
-       <span class="tbx-fig">${F().html(o, o.v || {}, 88)}</span>
+       <span class="tbx-shield"><span class="tbx-fig">${F().html(o, o.v || {}, 78)}</span></span>
        ${o.custom ? '<span class="tbx-plus"></span>' : ''}
        <i class="tbx-nm">${esc(o.name || '')}${o.soon ? ' <em class="tbx-soon">soon</em>' : ''}</i>
      </button>`).join('')
