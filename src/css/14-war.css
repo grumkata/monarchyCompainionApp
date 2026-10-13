@@ -1123,7 +1123,9 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
    gilt edge. Touched, a shield swings on its nail; chosen, its field is
    counterchanged to Or. The crown is the table's menu — its decisions. */
 .tm-open, .gmr-b, .kit-b{ position:relative; width:44px !important; height:56px !important; padding:0 !important;
-  border:0; cursor:pointer; display:flex !important; align-items:flex-start; justify-content:center;
+  /* row, said outright: the menu's button was three bars in a column once
+     (20-shell.css), and that column put its crown off to the left */
+  border:0; cursor:pointer; display:flex !important; flex-direction:row; align-items:flex-start; justify-content:center;
   color:var(--m-or); clip-path:none !important; box-shadow:none !important;
   background:radial-gradient(circle at 50% 3.5px, var(--m-or-hi) 0 1.6px, var(--m-or-lo) 2.2px, transparent 3.2px) no-repeat !important;
   transform-origin:50% 3px; filter:drop-shadow(0 6px 6px rgba(0,0,0,.55)); }
@@ -1134,8 +1136,9 @@ input.mu-name:focus{ box-shadow:inset 0 -1px 0 var(--m-or); }
   background:radial-gradient(ellipse at 40% 20%, rgba(255,255,255,.12), transparent 60%),
     linear-gradient(180deg,var(--m-sable-3),var(--m-sable) 70%);
   transition:background var(--t-wipe) var(--settle); }
+/* the charges are painted, not drawn in outline (64-kit.js, CHARGES) */
 .tm-open svg, .gmr-b svg, .kit-b svg{ position:relative; z-index:1; margin-top:15px; width:20px !important; height:20px !important;
-  fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  fill:currentColor; stroke:none; filter:drop-shadow(0 1px 0 rgba(0,0,0,.55)); }
 .tm-open:hover, .gmr-b:hover, .kit-b:hover{ animation:m-swing .7s var(--settle); }
 .tm-open:hover::after, .gmr-b:hover::after, .kit-b:hover::after{
   background:radial-gradient(ellipse at 40% 20%, rgba(255,255,255,.2), transparent 60%),

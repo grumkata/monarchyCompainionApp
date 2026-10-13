@@ -53,8 +53,7 @@ function mount() {
   b.title = 'Menu  ·  Esc';
   /* A CROWN, not three bars: the table's decisions are the crown's, and three
      bars are every website's corner (14-war.css, the left wall) */
-  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5h16M5 17.5L3.5 7.5l4.6 3.8L12 4.5l3.9 6.8 4.6-3.8-1.5 10"/>' +
-                '<circle cx="12" cy="4" r=".9"/><circle cx="3.4" cy="7" r=".8"/><circle cx="20.6" cy="7" r=".8"/></svg>';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="nonzero" d="M3 18.2h18v2.6H3z M3.6 16.8L2.2 7.6l5.1 4.1L12 4.4l4.7 7.3 5.1-4.1-1.4 9.2z M13.4 3.1a1.4 1.4 0 1 1-2.8 0 1.4 1.4 0 1 1 2.8 0z M3.4 6.3a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 1 1 2.4 0z M23 6.3a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 1 1 2.4 0z"/></svg>';
   b.setAttribute('aria-label', 'The table\u2019s menu');
   b.addEventListener('click', toggle);
   doc.body.appendChild(b);
