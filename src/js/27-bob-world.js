@@ -194,7 +194,8 @@ let W = null;
 function build(r, D) {
   pics();
   const G = D.game, sc = r.scene, col = r.col;
-  W = r.wd = { r, coins: [], foes: [], solids: [], tops: [], signs: [], spr: [], stars: [], posts: [], warps: [], balls: [], spawners: [], fx: [], red: 0, redStar: null, hundred: false, star6: null, king: null, chompObj: null, gate: null, talk: G.talk };
+  W = r.wd = { r, coins: [], foes: [], solids: [], tops: [], signs: [], spr: [], stars: [], posts: [], warps: [], balls: [], spawners: [], fx: [], red: 0,
+                trees: [], boards: [], buddies: [], lids: [], outlines: [], redStar: null, hundred: false, star6: null, king: null, chompObj: null, gate: null, talk: G.talk };
   const ground = (x, y, z, up) => { const f = col.floor(x, (y || 0) + (up == null ? 400 : up), z); return f ? f.h : (y || 0); };
   const act1 = o => !o.acts || /ACT_1\b|ALL_ACTS/.test(o.acts);
   for (const o of G.objs) {
@@ -214,10 +215,11 @@ function build(r, D) {
       case 'chain_chomp': chainChomp(x, ground(x, y, z), z); break;
       case 'wooden_post_1': post(x, ground(x, y, z), z); break;
       case 'wooden_signpost': sign(x, ground(x, y, z), z, yaw, (o.arg || '').replace('DIALOG_', '')); break;
-      case 'breakable_box_small': box(x, ground(x, y, z), z, 140, 0); break;
+      case 'breakable_box_small': box(x, ground(x, y, z), z, 80, 0); break;
       case 'breakable_box_no_coins': box(x, ground(x, y, z), z, 200, 0); break;
       case 'breakable_box_three_coins': box(x, ground(x, y, z), z, 200, 3); break;
-      case 'box_wing_cap': case 'box_star_act_3': ghostBox(x, y, z); break;
+      case 'box_wing_cap': ghostBox(x, y, z, 0); break;
+      case 'box_star_act_3': ghostBox(x, y, z, 3); break;
       case 'cannon_closed': lid(x, ground(x, y, z, 60), z); break;
       case 'bhvChainChompGate': gate(x, y, z, yaw); break;
       case 'bhvBobombBuddy': if (act1(o)) buddy(x, ground(x, y, z), z, (o.arg.match(/DIALOG_(\d+)/) || [])[1]); break;
@@ -229,7 +231,7 @@ function build(r, D) {
       case 'bhvSeesawPlatform': seesaw(x, y, z, yaw); break;
       case 'bhvCheckerboardElevatorGroup': lifts(x, y, z); break;
       case 'bhvOpenableGrill': grills(x, y, z, yaw); break;
-      case 'bhvFloorSwitchGrills': W.grillSwitch = new THREE.Vector3(x, y, z); break;
+      case 'bhvFloorSwitchGrills': W.grillSwitch = skinned('pswitch', new THREE.Vector3(x, y, z)); break;
       case 'bhvFadingWarp': W.warps.push({ id: (o.arg.match(/WARP_NODE_(\w+)/) || [])[1], p: new THREE.Vector3(x, ground(x, y, z, 200), z), yaw }); break;
     }
   }
@@ -242,23 +244,25 @@ function add(o) { W.r.scene.add(o); return o; }
 function tree(x, y, z) {
   const s = add(new THREE.Mesh(new THREE.PlaneGeometry(460, 690), new THREE.MeshLambertMaterial({ map: P.tree, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })));
   s.position.set(x, y + 345, z); s.userData.face = true; W.spr.push(s);
+  W.trees.push(skinned('tree', { s, x, y, z }));
   W.solids.push({ x, z, r: 60, y0: y, y1: y + 690 });
 }
 function coin(x, y, z, v) {
   const s = add(sprite(v === 2 ? P.red : v === 5 ? P.blue : P.coin, 100, 100));
   s.position.set(x, y, z);
-  W.coins.push({ s, p: s.position, v, ph: rnd(0, TAU), shadow: null });
+  W.coins.push(skinned('coin', { s, p: s.position, v, ph: rnd(0, TAU), shadow: null }));
 }
-function heart(x, y, z) { const s = add(sprite(P.heart, 140, 140)); s.position.set(x, y + 80, z); W.heart = { s, p: s.position, used: 0 }; }
-function oneUp(x, y, z) { const s = add(sprite(P.oneup, 110, 110)); s.position.set(x, y + 55, z); W.oneup = { s, p: s.position, home: s.position.clone(), got: false }; }
+function heart(x, y, z) { const s = add(sprite(P.heart, 140, 140)); s.position.set(x, y + 80, z); W.heart = skinned('heart', { s, p: s.position, used: 0 }); }
+function oneUp(x, y, z) { const s = add(sprite(P.oneup, 110, 110)); s.position.set(x, y + 55, z); W.oneup = skinned('oneup', { s, p: s.position, home: s.position.clone(), got: false }); }
 function foe(kind, x, y, z, still) {
   const g = add(kind === 'goomba' ? goomba() : bobomb(0x1a1a24));
   g.position.set(x, y, z);
   const o = { kind, g, p: g.position, home: new THREE.Vector3(x, y, z), yaw: rnd(0, TAU), v: 0, vy: 0, state: 'wander', t: 0, still: !!still, dir: rnd(0, TAU), next: rnd(1, 3), lit: 0, ground: true, sh: shadowDisc(W.r.scene, kind === 'goomba' ? 150 : 130) };
-  W.foes.push(o); return o;
+  W.foes.push(skinned('foe', o)); return o;
 }
 function buddy(x, y, z, dlg) {
   const g = add(bobomb(0xff8fc0)); g.position.set(x, y, z);
+  W.buddies.push(skinned('buddy', { g }));
   W.signs.push({ p: g.position, r: 170, text: dlg, buddy: g });
   W.solids.push({ x, z, r: 70, y0: y, y1: y + 130 });
   shadowDisc(W.r.scene, 130).position.set(x, y + 2, z);
@@ -268,14 +272,14 @@ function chainChomp(x, y, z) {
   const g = add(chomp()); g.position.set(x + 400, y, z);
   const links = []; for (let i = 0; i < 6; i++) { const l = add(new THREE.Mesh(new THREE.TorusGeometry(32, 10, 6, 12), phong(0x3a3a44))); links.push(l); }
   const o = { kind: 'chomp', g, p: g.position, post: new THREE.Vector3(x, y, z), stake: st, sink: 0, pounds: 0, state: 'idle', t: 0, v: new THREE.Vector3(), links, vy: 0, free: false, sh: shadowDisc(W.r.scene, 360) };
-  W.chompObj = o;
+  W.chompObj = skinned('chomp', o);
   W.tops.push({ x, z, r: 50, get h() { return y + 230 - o.sink; }, post: o });
 }
 function post(x, y, z) {
   const m = add(new THREE.Mesh(new THREE.CylinderGeometry(55, 55, 260, 10), lam(0x9a6430))); m.position.set(x, y + 70, z);
   const top = new THREE.Mesh(new THREE.CircleGeometry(55, 10), lam(0x6a3c16)); top.rotation.x = -Math.PI / 2; top.position.y = 130.5; m.add(top);
   const o = { m, x, z, y, sink: 0 };
-  W.posts.push(o);
+  W.posts.push(skinned('post', o));
   W.tops.push({ x, z, r: 58, get h() { return y + 200 - o.sink; }, post: o });
   W.solids.push({ x, z, r: 58, get y0() { return y; }, get y1() { return y + 200 - o.sink; } });
 }
@@ -285,24 +289,28 @@ function sign(x, y, z, yaw, dlg) {
   const board = new THREE.Mesh(new THREE.BoxGeometry(170, 110, 14), [lam(0x8a5a2a), lam(0x8a5a2a), lam(0x8a5a2a), lam(0x8a5a2a), new THREE.MeshLambertMaterial({ map: P.sign }), new THREE.MeshLambertMaterial({ map: P.sign })]);
   board.position.y = 150; g.add(board);
   W.signs.push({ p: g.position, r: 190, text: dlg, yaw });
+  W.boards.push(skinned('sign', { g }));
   W.solids.push({ x, z, r: 45, y0: y, y1: y + 205 });
 }
 function box(x, y, z, s, coins) {
   const m = add(new THREE.Mesh(new THREE.BoxGeometry(s, s, s), new THREE.MeshLambertMaterial({ map: P.cork })));
   m.position.set(x, y + s / 2, z);
   const o = { m, x, z, y, s, coins, broken: false };
-  W.boxes = W.boxes || []; W.boxes.push(o);
+  W.boxes = W.boxes || []; W.boxes.push(skinned('box', o));
   W.tops.push({ x, z, r: s / 2, sq: true, get h() { return o.broken ? -1e9 : y + s; }, box: o });
   W.solids.push({ x, z, r: s / 2, sq: true, get y0() { return o.broken ? 1e9 : y; }, get y1() { return o.broken ? -1e9 : y + s - 2; } });
 }
-function ghostBox(x, y, z) {
+/* a ! box seen as its outline (`colour`: the game's 0 red, 3 yellow) */
+function ghostBox(x, y, z, colour) {
   const m = add(new THREE.Mesh(new THREE.BoxGeometry(200, 200, 200), new THREE.MeshBasicMaterial({ color: 0xff3020, transparent: true, opacity: 0.22, depthWrite: false })));
   m.position.set(x, y + 100, z);
   const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineDashedMaterial({ color: 0xffb0a0, dashSize: 20, gapSize: 14 })); e.computeLineDistances(); m.add(e);
+  W.outlines.push(skinned('outline', { m, colour }));
 }
 function lid(x, y, z) {
   const m = add(new THREE.Mesh(new THREE.CylinderGeometry(115, 120, 20, 16), phong(0x30303a))); m.position.set(x, y + 4, z);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(110, 10, 6, 20), phong(0x8a8a96)); ring.rotation.x = Math.PI / 2; ring.position.y = 10; m.add(ring);
+  W.lids.push(skinned('lid', { m }));
 }
 /* the Chomp's gate: the game's own (levels/bob/chain_chomp_gate), bars a thousand and twenty-three wide and 640 high */
 function gate(x, y, z, yaw) {
@@ -359,7 +367,7 @@ function lifts(x, y, z) {
     const o = { m, x: x + (i ? 380 : 0), z, y0: y - 300, y1: y + 520, ph: i * Math.PI, h: y };
     m.position.set(o.x, o.h, o.z);
     W.tops.push({ x: o.x, z: o.z, r: 150, sq: true, get h() { return o.h + 30; } });
-    return o;
+    return skinned('lift', o);
   });
 }
 function marker(x, y, z) {
@@ -396,11 +404,66 @@ function ball(path, at) {
   const m = add(new THREE.Mesh(new THREE.SphereGeometry(120, 16, 12), phong(0x24242c, { shininess: 110, specular: 0x999999 })));
   const o = { m, p: m.position, path, i: 0, v: new THREE.Vector3(), pit: !path, home: at ? at.clone() : null, a: rnd(0, TAU), sh: shadowDisc(W.r.scene, 260) };
   if (path) m.position.set(path[0], path[1] + 120, path[2]); else m.position.copy(at).setY(at.y + 120);
-  W.balls.push(o); return o;
+  W.balls.push(skinned('ball', o)); return o;
 }
 function king(x, y, z, yaw) {
   const g = add(bobomb(0x1a1a24, true)); g.position.set(x, y, z); g.rotation.y = yaw;
-  W.king = { g, p: g.position, home: new THREE.Vector3(x, y, z), yaw, hp: 3, state: 'wait', t: 0, v: new THREE.Vector3(), vy: 0, sh: shadowDisc(W.r.scene, 420) };
+  W.king = skinned('king', { g, p: g.position, home: new THREE.Vector3(x, y, z), yaw, hp: 3, state: 'wait', t: 0, v: new THREE.Vector3(), vy: 0, sh: shadowDisc(W.r.scene, 420) });
+}
+
+/* ══ THE GAME'S OWN CAST ═══════════════════════════════════════
+   Once the player's own game has given up its pictures (27-bob-rom.js),
+   every stand-in above wears the game's own model (r.cast, 27-bob.js) at
+   the scale and height its behaviour gives it (data/behavior_data.c and
+   src/game/behaviors/ in the decompilation: a Goomba half as big again,
+   the Chomp twice over and 240 up, a post at half, a small box at 0.4,
+   the trees, coins, 1-up, links and iron balls turned square to the
+   camera). The behaviours here still move the same groups and the stand-
+   ins' meshes are only hidden, so how the course plays does not change;
+   anything made later (a Goomba's coin, an explosion) is made in the
+   game's model from the start. */
+const hideStandIn = o => o.traverse(x => { if (x.material) [].concat(x.material).forEach(m => { m.visible = false; }); });
+function holder(parent, x, y, z, s) { const h = new THREE.Group(); h.position.set(x, y, z); if (s) h.scale.setScalar(s); parent.add(h); return h; }
+const SKIN = {
+  tree(o) { hideStandIn(o.s); o.inst = W.r.cast('tree', holder(W.r.scene, o.x, o.y, o.z), { billboard: true }); },
+  coin(c) { hideStandIn(c.s); c.h = holder(W.r.scene, c.p.x, c.p.y - 32, c.p.z); c.inst = W.r.cast(c.v === 2 ? 'redcoin' : 'coin', c.h, { billboard: true }); },
+  foe(o) { hideStandIn(o.g); o.inst = W.r.cast(o.kind === 'goomba' ? 'goomba' : 'bobomb', holder(o.g, 0, 0, 0, o.kind === 'goomba' ? 1.5 : 1)); o.inst.play(0); },
+  buddy(b) { hideStandIn(b.g); b.inst = W.r.cast('buddy', holder(b.g, 0, 0, 0)); b.inst.play(0, 0.5); },
+  chomp(o) {
+    hideStandIn(o.g); o.inst = W.r.cast('chomp', holder(o.g, 0, 240, 0, 2)); o.inst.play(0);
+    hideStandIn(o.stake); W.r.cast('pole', holder(o.stake, 0, -100, 0, 0.5));
+    for (const l of o.links) { hideStandIn(l); W.r.cast('link', holder(l, 0, 40, 0, 2), { billboard: true }); }
+  },
+  king(k) { hideStandIn(k.g); k.inst = W.r.cast('king', holder(k.g, 0, 0, 0)); k.inst.play(5); },
+  post(p) { hideStandIn(p.m); W.r.cast('pole', holder(p.m, 0, -70, 0, 0.5)); },
+  sign(b) { hideStandIn(b.g); W.r.cast('sign', holder(b.g, 0, 0, 0)); },
+  box(b) { hideStandIn(b.m); W.r.cast(b.s < 200 ? 'smallbox' : 'box', holder(b.m, 0, -b.s / 2, 0, b.s / 200)); },
+  outline(o) { hideStandIn(o.m); o.inst = W.r.cast('outline', holder(o.m, 0, -100, 0, 2)); o.inst.state = o.colour; },
+  lid(o) { hideStandIn(o.m); W.r.cast('lid', holder(o.m, 0, -3, 0)); },
+  heart(h) { hideStandIn(h.s); h.h = holder(W.r.scene, h.p.x, h.p.y, h.p.z); W.r.cast('heart', h.h); },
+  oneup(u) { hideStandIn(u.s); u.h = holder(W.r.scene, u.p.x, u.p.y, u.p.z); W.r.cast('oneup', u.h, { billboard: true }); },
+  ball(b) { hideStandIn(b.m); W.r.cast('ironball', holder(b.m, 0, 0, 0), { billboard: true }); },
+  lift(o) { hideStandIn(o.m); W.r.cast('lift', holder(o.m, 0, 4, 0)); },
+  pswitch(p) { W.r.cast('pswitch', holder(W.r.scene, p.x, p.y, p.z)); },
+};
+/* `o` is a stand-in of `kind`: dressed now if the real models are in, else remembered for when they come */
+function skinned(kind, o) {
+  if (W.skinned) SKIN[kind](o); else (W.unskinned || (W.unskinned = [])).push([kind, o]);
+  return o;
+}
+/* the real models are in (27-bob.js, when the player's pictures are) */
+function skin(r) {
+  if (!W || W.skinned || !r.castReady || !r.castReady()) return;
+  W.skinned = true;
+  for (const [kind, o] of (W.unskinned || []).splice(0)) SKIN[kind](o);
+}
+/* a Bob-omb's or a Goomba's blink (curr_obj_random_blink): a one-in-a-hundred chance a frame, then shut, open, shut, open */
+function blink(o, dt) {
+  o.bf = (o.bf || 0) + dt * F;
+  for (; o.bf >= 1; o.bf--) {
+    if (!o.bt) { if (Math.random() < 0.01) { o.inst.state = 1; o.bt = 1; } }
+    else { o.bt++; o.inst.state = o.bt > 15 ? 0 : o.bt > 10 ? 1 : o.bt > 5 ? 0 : 1; if (o.bt > 15) o.bt = 0; }
+  }
 }
 
 /* ══ EVERY FRAME ═══════════════════════════════════════════════ */
@@ -414,20 +477,24 @@ function step(r, t, dt) {
   for (let i = W.coins.length - 1; i >= 0; i--) {
     const c = W.coins[i];
     c.s.scale.x = 100 * Math.max(0.12, Math.abs(Math.cos(t * 5 + c.ph)));
+    if (c.h) { c.h.position.set(c.p.x, c.p.y - 32, c.p.z); c.inst.state = Math.floor(t * F + c.ph * 8) % 8; }
     if (c.p.distanceTo(mc) < 130 && m.act !== 'dead') {
-      r.scene.remove(c.s); W.coins.splice(i, 1);
+      r.scene.remove(c.s); if (c.h) r.scene.remove(c.h); W.coins.splice(i, 1);
       r.api.coin(c.v, c.p);
       if (c.v === 2) { W.red++; popup(r, String(W.red), c.p, '#ff4a3a'); if (W.red === 8) redStar(r); }
       sparkle(r, c.p, c.v === 2 ? 0xff5040 : 0xffe060);
     }
   }
   /* the heart turns and heals; the 1-up hops after you */
+  if (W.heart && W.heart.h) { W.heart.h.position.copy(W.heart.p); W.heart.h.rotation.y = t * 3; }
   if (W.heart) { W.heart.s.material.rotation = 0; W.heart.s.scale.x = 140 * Math.abs(Math.cos(t * 3)); if (W.heart.p.distanceTo(mc) < 220 && t - W.heart.used > 1) { W.heart.used = t; r.api.heal(4); sparkle(r, W.heart.p, 0xff5070); } }
   if (W.oneup && !W.oneup.got) {
     const u = W.oneup; u.p.y = u.home.y + Math.abs(Math.sin(t * 4)) * 30;
-    if (u.p.distanceTo(mc) < 140) { u.got = true; r.scene.remove(u.s); r.api.life(); popup(r, '1-UP', u.p, '#3cd23c'); }
+    if (u.h) u.h.position.copy(u.p);
+    if (u.p.distanceTo(mc) < 140) { u.got = true; r.scene.remove(u.s); if (u.h) r.scene.remove(u.h); r.api.life(); popup(r, '1-UP', u.p, '#3cd23c'); }
   }
   for (const o of W.foes) foeStep(r, o, t, dt, mc);
+  for (const b of W.buddies) if (b.inst) blink(b, dt);
   chompStep(r, t, dt, mc);
   kingStep(r, t, dt, mc);
   ballsStep(r, t, dt, mc);
@@ -529,6 +596,11 @@ function foeStep(r, o, t, dt, mc) {
   /* the fuse burning */
   if (o.kind === 'bobomb' && o.lit && o.state !== 'gone') { if (!o.spark) { o.spark = sprite(P.spark, 40, 40, { blending: THREE.AdditiveBlending, alphaTest: 0 }); g.userData.body.add(o.spark); o.spark.position.set(0, 74, 0); } o.spark.scale.setScalar(30 + Math.sin(t * 40) * 10); o.spark.visible = true; }
   if (o.sh) { const f = r.col.floor(o.p.x, o.p.y + 60, o.p.z); o.sh.visible = g.visible && !!f; if (f) o.sh.position.set(o.p.x, f.h + 2, o.p.z); }
+  /* the real model's own steps: walking (0), faster at a chase, or a Bob-omb held (1); and blinking */
+  if (o.inst) {
+    o.inst.play(o.state === 'held' ? 1 : 0, o.state === 'chase' ? 2 : o.still || o.state === 'squish' || o.state === 'gone' ? 0 : 1);
+    blink(o, dt);
+  }
 }
 function stomp(r, o) { o.state = 'squish'; o.t = 0; const m = r.m; m.vy = 34 * F; m.kind = 'jump'; m.airT = 0; m.cut = false; m.kicked = false; puff(r, o.p, 0xffffff); }
 function explode(r, o) {
@@ -604,6 +676,12 @@ function kingStep(r, t, dt, mc) {
   const dx = m.p.x - k.p.x, dz = m.p.z - k.p.z, dist = Math.hypot(dx, dz), toYaw = Math.atan2(dx, dz);
   const ud = g.userData;
   ud.feet.forEach((f, i) => { f.position.z = 8 + Math.sin(t * 6 + i * Math.PI) * (k.state === 'fight' ? 10 : 0); });
+  /* the King's own animations by what he is doing (king_bobomb.inc.c): standing 5, walking 11, picking Mario up 0
+     and holding him 1, held himself 6, getting up 10, beaten 2, leaping home 8 */
+  if (k.inst) {
+    const A = { wait: 5, talk: 5, fight: 11, grab: k.t < 0.6 ? 0 : 1, held: 6, flying: 6, stunned: 10, beaten: 2, return: 8 }[k.state];
+    if (A != null) k.inst.play(A, 1);
+  }
   if (ud.key) ud.key.rotation.z = t * 2;
   if (k.state === 'wait') {
     if (dist < 1400 && Math.abs(m.p.y - k.p.y) < 300 && m.ground && r.phase === 'play') { k.state = 'talk'; r.api.say('017', () => { k.state = 'fight'; k.t = 0; }); }
@@ -798,9 +876,20 @@ function fxSprite(r, map, at, life, from, to, extra) {
   W.fx.push({ s, b: now(), life, from, to, vy: (extra && extra.vy) || 0 });
   return s;
 }
-function puff(r, at, col, n) { for (let i = 0; i < (n || 4); i++) fxSprite(r, P.smoke, at.clone().add(new THREE.Vector3(rnd(-60, 60), rnd(10, 60), rnd(-60, 60))), rnd(0.4, 0.7), 60, 180, { color: col || 0xffffff, vy: 80 }); }
+function puff(r, at, col, n) {
+  for (let i = 0; i < (n || 4); i++) {
+    const p = at.clone().add(new THREE.Vector3(rnd(-60, 60), rnd(10, 60), rnd(-60, 60)));
+    if (W.skinned) fxModel(r, 'smoke', p, 10, 1, 2); else fxSprite(r, P.smoke, p, rnd(0.4, 0.7), 60, 180, { color: col || 0xffffff, vy: 80 });
+  }
+}
+/* the game's own effect models (an explosion's nine frames, a puff's ten), turned to the camera, growing as they go */
+function fxModel(r, key, at, frames, s0, s1) {
+  const h = holder(r.scene, at.x, at.y, at.z, s0), inst = r.cast(key, h, { billboard: true });
+  if (inst) (W.fxm || (W.fxm = [])).push({ h, inst, b: now(), frames, s0, s1 });
+}
 function sparkle(r, at, col) { for (let i = 0; i < 6; i++) fxSprite(r, P.spark, at.clone().add(new THREE.Vector3(rnd(-70, 70), rnd(-50, 70), rnd(-70, 70))), rnd(0.25, 0.45), 50, 10, { color: col, blending: THREE.AdditiveBlending }); }
 function boom(r, at, big) {
+  if (W.skinned) { fxModel(r, 'boom', at, 9, big ? 2 : 1, big ? 4 : 2); puff(r, at, 0x888888, big ? 6 : 3); r.api.shake(big ? 0.5 : 0.3); return; }
   fxSprite(r, P.boom, at, 0.45, 80, big ? 900 : 560, { blending: THREE.AdditiveBlending });
   for (let i = 0; i < (big ? 12 : 7); i++) fxSprite(r, P.smoke, at.clone().add(new THREE.Vector3(rnd(-120, 120), rnd(-40, 120), rnd(-120, 120))), rnd(0.7, 1.2), 120, big ? 420 : 300, { color: 0x888888, vy: 160 });
   r.api.shake(big ? 0.5 : 0.3);
@@ -814,6 +903,12 @@ function fxStep(r, t, dt) {
     f.s.scale.setScalar(lerp(f.from, f.to, 1 - Math.pow(1 - k, 2)));
     f.s.material.opacity = 1 - k;
     f.s.position.y += f.vy * dt;
+    return true;
+  });
+  if (W.fxm) W.fxm = W.fxm.filter(f => {
+    const k = (n - f.b) * F;
+    if (k >= f.frames) { r.scene.remove(f.h); return false; }
+    f.inst.state = Math.floor(k); f.h.scale.setScalar(lerp(f.s0, f.s1, k / f.frames));
     return true;
   });
   /* the gate, knocked flat */
@@ -876,6 +971,6 @@ function hudStep(r, t) {
   });
 }
 
-root.BobWorld = { build, step, hit, grab, release, floor, solid, talk, get W() { return W; }, text: id => (W && W.talk[id]) };
+root.BobWorld = { build, step, hit, grab, release, floor, solid, talk, rom: r => skin(r), get W() { return W; }, text: id => (W && W.talk[id]) };
 
 })(window, document);

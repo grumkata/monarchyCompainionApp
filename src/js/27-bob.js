@@ -250,6 +250,7 @@ const N64_FRAG = `
 uniform sampler2D map;
 uniform float hasMap, cutout;
 uniform int cc;
+uniform vec4 env;
 uniform vec3 fogColor;
 varying vec2 vUv;
 varying vec4 vShade;
@@ -260,11 +261,14 @@ void main() {
   if (cc == 1) c = vec4(tex.rgb * vShade.rgb, vShade.a);           /* MODULATERGB */
   else if (cc == 2) c = tex * vShade;                              /* MODULATEIA */
   else if (cc == 3) c = tex;                                       /* DECALRGBA */
+  else if (cc == 4) c = tex * vShade;                              /* MODULATERGBA */
+  else if (cc == 5) c = vec4(tex.rgb, tex.a * env.a);              /* DECALFADEA */
+  else if (cc == 6) c = vec4(vShade.rgb, env.a);                   /* SHADEFADEA */
   else c = vShade;                                                 /* SHADE */
   if (cutout > 0.5 && c.a < 0.5) discard;
   gl_FragColor = vec4(mix(c.rgb, fogColor, vFog), c.a);
 }`;
-const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, SHADE: 0 };
+const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, MODULATERGBA: 4, DECALFADEA: 5, SHADEFADEA: 6, SHADE: 0 };
 /* a picture for a baked group: the player's own game's (27-bob-rom.js) when it has been read, else the one that came
    with the earlier model; the trees' shadows have no such copy, so they take the shadow already here for Mario */
 const wrapOf = c => (c & 2 ? THREE.ClampToEdgeWrapping : c & 1 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
@@ -300,6 +304,7 @@ function n64Model(D, groups) {
         lit: { value: m.lit }, fogOn: { value: m.fog }, lightDir: { value: N64_LIGHT }, fogColor: { value: N64_FOG },
         amb: { value: new THREE.Vector3(...(m.amb || [0, 0, 0]).map(v => v / 255)) },
         dif: { value: new THREE.Vector3(...(m.dif || [0, 0, 0]).map(v => v / 255)) },
+        env: { value: new THREE.Vector4(...(m.env || [255, 255, 255, 255]).map(v => v / 255)) },
       },
       side: m.cull ? THREE.FrontSide : THREE.DoubleSide,
       transparent: blend, depthWrite: !blend,
@@ -313,6 +318,114 @@ function n64Model(D, groups) {
   }
   return g;
 }
+/* ══ THE CAST'S OWN MODELS ═════════════════════════════════════
+   Everything that lives in the course, as the game builds it (the baker
+   makes each geo layout a tree): animated parts the game's own
+   animations turn, billboards, switches (a Bob-omb's blink, a coin's
+   eight turns, an explosion's frames), scales and display lists. Only
+   built once the player's own pictures are in (27-bob-rom.js): without
+   them these would be grey, and the course keeps what it had.
+
+   cast(r, key, holder)  a model in `holder` (the object's own group, which
+                         its behaviour moves); its billboards face the
+                         camera at the holder's scale, as geo.c's do
+   inst.play(i, speed)   animation i of the model's table, from its first
+                         frame, at `speed` (1: the game's 30 a second)
+   inst.state            the switches' case (the game's oAnimState) */
+function cast(r, key, holder, opts) {
+  const D = data, C = D && D.cast && D.cast[key];
+  if (!C || !D.romTex) return null;
+  const inst = { key, C, root: new THREE.Group(), holder, top: null, bills: [], switches: [], anim: -1, fr: 0, speed: 1, state: 0,
+                 billboard: !!(opts && opts.billboard) };
+  const visit = (n, parent) => {
+    const node = { k: n.k, c: [], n }, g = new THREE.Group();
+    if (n.k === 'scale') g.scale.setScalar(n.s);
+    if (n.k === 'part') { g.position.fromArray(n.p); g.rotation.order = 'ZYX'; }
+    if (n.k === 'bill') inst.bills.push(node);
+    if (n.k === 'switch') inst.switches.push(node);
+    if (n.dl) {
+      /* each display list built once a visit and shared (geometry and material) by every copy of the model */
+      const T = D.castTpl || (D.castTpl = {}), id = key + '|' + n.dl;
+      g.add((T[id] || (T[id] = n64Model(D, C.dls[n.dl]))).clone());
+    }
+    node.g = g; parent.add(g);
+    for (const c of n.c) node.c.push(visit(c, g));
+    return node;
+  };
+  inst.top = visit(C.tree, inst.root);
+  inst.play = (i, speed) => {
+    if (speed != null) inst.speed = speed;
+    if (i === inst.anim) return;
+    const A = C.anims && C.anims[i];
+    inst.anim = A ? i : -1; inst.fr = A ? A.start : 0;
+  };
+  holder.add(inst.root);
+  (r.castInsts || (r.castInsts = [])).push(inst);
+  castPose(inst, 0);
+  return inst;
+}
+/* the frame on, and the pose laid on: switches set, then the animation's values taken in the order the game takes
+   them (the root's translation first, then three turns for each animated part it meets, a switch only giving the
+   case it shows) */
+function castPose(inst, dt) {
+  const A = inst.anim >= 0 ? inst.C.anims[inst.anim] : null;
+  if (A) {
+    inst.fr += dt * F * inst.speed;
+    if (inst.fr >= A.loopEnd) inst.fr = A.flags & 1 ? A.loopEnd - 1 : A.loopStart + ((inst.fr - A.loopStart) % Math.max(1, A.loopEnd - A.loopStart));
+  }
+  for (const s of inst.switches) s.c.forEach((c, i) => { c.g.visible = i === Math.min(inst.state, s.c.length - 1); });
+  const frame = Math.floor(inst.fr);
+  let type = 0, attr = 0;
+  if (A && !(A.flags & 32)) type = A.flags & 8 ? 3 : A.flags & 16 ? 2 : A.flags & 64 ? 4 : 1;
+  const val = () => { const k = attr++, n = A.i[k * 2], o = A.i[k * 2 + 1]; return A.v[o + (frame < n ? frame : n - 1)]; };
+  const ANG = TAU / 65536;
+  const walk = node => {
+    if (node.k === 'switch') { const c = node.c[Math.min(inst.state, node.c.length - 1)]; if (c) walk(c); return; }
+    if (node.k === 'part' && type) {
+      const p = node.n.p;
+      let x = p[0], y = p[1], z = p[2];
+      if (type === 1) { x += val(); y += val(); z += val(); }
+      else if (type === 2) { x += val(); attr++; z += val(); }
+      else if (type === 3) { attr++; y += val(); attr++; }
+      else if (type === 4) attr += 3;
+      type = 5;
+      node.g.position.set(x, y, z);
+      node.g.rotation.set(val() * ANG, val() * ANG, val() * ANG);
+    }
+    for (const c of node.c) walk(c);
+  };
+  walk(inst.top);
+}
+/* billboards: where their place in the model puts them, turned square to the camera and at the object's own scale
+   (mtxf_billboard drops every scale above them; geo_process_billboard puts back only the object's) */
+const _bp = new THREE.Vector3(), _bs = new THREE.Vector3(), _bm = new THREE.Matrix4(), _bi = new THREE.Matrix4();
+function castFace(inst, cam) {
+  const h = inst.holder;
+  h.updateMatrixWorld(true);
+  _bs.copy(h.scale);
+  const face = g => {
+    g.parent.updateMatrixWorld(false);
+    _bp.copy(g.position).applyMatrix4(g.parent.matrixWorld);
+    _bm.compose(_bp, cam.quaternion, _bs);
+    g.matrix.copy(_bi.copy(g.parent.matrixWorld).invert()).multiply(_bm);
+    g.matrixAutoUpdate = false;
+    g.updateMatrixWorld(true);
+  };
+  if (inst.billboard) face(inst.root);
+  for (const b of inst.bills) if (b.g.parent) face(b.g);
+}
+function castStep(r, dt) {
+  if (!r.castInsts) return;
+  r.castInsts = r.castInsts.filter(inst => {
+    let on = true, o = inst.root;
+    for (; o.parent; o = o.parent) if (!o.visible) on = false;
+    if (o !== r.scene) return false;                               /* taken out of the course: done with */
+    castPose(inst, dt);
+    if (on) castFace(inst, r.cam);
+    return true;
+  });
+}
+
 /* the player's own pictures have come in: every course material takes its picture again */
 function retexture(D) {
   const old = D.texCache || {};
@@ -520,7 +633,7 @@ function world(r, D) {
      cast, applied after the colours are out, as the N64's is: grey, nothing near, most of the way at the far side */
   scene.fog = new THREE.Fog(0xa0a0a0, 4300, 17000);
   r.skyObj = sky(scene);
-  D.n64Mats = [];
+  D.n64Mats = []; D.castTpl = {};
   scene.add(course(D));
   /* the game's own collision for the course (its surface types and all), not the picture of it */
   const C = D.game.col, ty = C.t.map(x => C.types[x[3]]);
@@ -550,6 +663,9 @@ function world(r, D) {
   r.api = api(r);
   /* the course's own object models (the gate, the seesaw, the grills), drawn as the course is */
   r.n64 = name => (D.objs && D.objs[name] ? n64Model(D, D.objs[name]) : null);
+  r.castInsts = [];
+  r.cast = (key, holder, opts) => cast(r, key, holder, opts);
+  r.castReady = () => !!(D.cast && D.romTex);
   if (root.BobWorld) root.BobWorld.build(r, D);
   r.ready = true;
   /* the real pictures, if this computer has read them out of the player's game before */
@@ -726,7 +842,7 @@ function loop() {
       }
     }
     if (r.phase === 'intro' && t - r.p0 > 4.4) { r.phase = 'play'; r.el.classList.add('play'); title(r, false); }
-    if (r.ready && !r.home) { skyStep(r); r.ren.render(r.scene, r.cam); }
+    if (r.ready && !r.home) { castStep(r, dt); skyStep(r); r.ren.render(r.scene, r.cam); }
     twinkles(f, r, t);
     if (r.flashT) {
       const k = (now() - r.flashT) / r.flashD;
@@ -1266,6 +1382,7 @@ function finish() {
   r.el.remove();
 }
 
-root.BobStar = { enter, leave, get on() { return !!run; }, get _run() { return run; } };     /* _run: for the tests */
+root.BobStar = { enter, leave, get on() { return !!run; }, get _run() { return run; },      /* _run, _face: for the tests */
+                 _face: () => { if (run) for (const i of run.castInsts || []) castFace(i, run.cam); } };
 
 })(window, document);
