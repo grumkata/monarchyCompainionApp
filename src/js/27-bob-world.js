@@ -228,6 +228,8 @@ function build(r, D) {
       case 'bhvStar': W.star6 = star(x, y, z, 'Behind Chain Chomp\'s Gate'); break;
       case 'bhvSeesawPlatform': seesaw(x, y, z, yaw); break;
       case 'bhvCheckerboardElevatorGroup': lifts(x, y, z); break;
+      case 'bhvOpenableGrill': grills(x, y, z, yaw); break;
+      case 'bhvFloorSwitchGrills': W.grillSwitch = new THREE.Vector3(x, y, z); break;
       case 'bhvFadingWarp': W.warps.push({ id: (o.arg.match(/WARP_NODE_(\w+)/) || [])[1], p: new THREE.Vector3(x, ground(x, y, z, 200), z), yaw }); break;
     }
   }
@@ -302,19 +304,29 @@ function lid(x, y, z) {
   const m = add(new THREE.Mesh(new THREE.CylinderGeometry(115, 120, 20, 16), phong(0x30303a))); m.position.set(x, y + 4, z);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(110, 10, 6, 20), phong(0x8a8a96)); ring.rotation.x = Math.PI / 2; ring.position.y = 10; m.add(ring);
 }
+/* the Chomp's gate: the game's own (levels/bob/chain_chomp_gate), bars a thousand and twenty-three wide and 640 high */
 function gate(x, y, z, yaw) {
   const g = add(new THREE.Group()); g.position.set(x, y, z); g.rotation.y = yaw;
-  const mat = phong(0x5a5a64);
-  for (let i = -4; i <= 4; i++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 320, 6), mat); b.position.set(i * 55, 160, 0); g.add(b); }
-  [40, 280].forEach(h => { const b = new THREE.Mesh(new THREE.BoxGeometry(500, 20, 20), mat); b.position.set(0, h, 0); g.add(b); });
-  W.gate = { g, x, y, z, yaw, open: false, w: 250 };
+  const model = W.r.n64('chain_chomp_gate');
+  if (model) g.add(model);
+  else {
+    const mat = phong(0x5a5a64);
+    for (let i = -4; i <= 4; i++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 320, 6), mat); b.position.set(i * 55, 160, 0); g.add(b); }
+    [40, 280].forEach(h => { const b = new THREE.Mesh(new THREE.BoxGeometry(500, 20, 20), mat); b.position.set(0, h, 0); g.add(b); });
+  }
+  W.gate = { g, x, y, z, yaw, open: false, w: model ? 512 : 250 };
 }
-/* the seesaw by the Chomp's meadow: a plank on a post that tips the way you stand on it */
+/* the seesaw by the Chomp's meadow: the game's own plank (levels/bob/seesaw_platform), 361 across, 1809 long and 51
+   thick, tipping the way you stand on it */
 function seesaw(x, y, z, yaw) {
-  const L = 1100, Wd = 300;
+  const model = W.r.n64('seesaw_platform');
+  const L = model ? 1808 : 1100, Wd = model ? 360 : 300, top = model ? 51 : 0;
   const g = add(new THREE.Group()); g.position.set(x, y, z); g.rotation.y = yaw;
-  const plank = new THREE.Mesh(new THREE.BoxGeometry(Wd, 40, L), lam(0x8a5a2a)); plank.position.y = -20; g.add(plank);
-  for (let i = -4; i <= 4; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(Wd + 4, 6, 14), lam(0x5a3412)); st.position.set(0, 1, i * 120); g.add(st); }
+  if (model) g.add(model);
+  else {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(Wd, 40, L), lam(0x8a5a2a)); plank.position.y = -20; g.add(plank);
+    for (let i = -4; i <= 4; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(Wd + 4, 6, 14), lam(0x5a3412)); st.position.set(0, 1, i * 120); g.add(st); }
+  }
   const o = { g, x, y, z, yaw, tilt: 0, L, Wd };
   W.seesaw = o;
   /* its top, as a floor: how high it is under (px, pz) for the tip it has now */
@@ -322,8 +334,21 @@ function seesaw(x, y, z, yaw) {
     const c = Math.cos(yaw), s = Math.sin(yaw), dx = px - x, dz = pz - z;
     const across = dx * c - dz * s, along = dx * s + dz * c;
     if (Math.abs(across) > Wd / 2 || Math.abs(along) > L / 2) return null;
-    return y + Math.tan(-o.tilt) * along;
+    return y + top + Math.tan(-o.tilt) * along;
   } });
+}
+/* the grills in the pit (grill_door.inc.c): two doors of bars hung 320 either side of the middle, the one turned
+   round to meet the other; the purple switch beside them swings them open a quarter turn, over 64 frames */
+function grills(x, y, z, yaw) {
+  const doors = [[320, Math.PI, -1], [-320, 0, 1]].map(([dx, turn, sign]) => {
+    const model = W.r.n64('grate_door');
+    if (!model) return null;
+    const g = add(new THREE.Group());
+    g.position.set(x + Math.cos(yaw) * dx, y, z - Math.sin(yaw) * dx);
+    g.rotation.y = yaw + turn; g.add(model);
+    return { g, yaw0: g.rotation.y, sign };
+  }).filter(Boolean);
+  if (doors.length) W.grills = { x, y, z, yaw, doors, open: 0, w: 320 };
 }
 /* the checkerboard lifts below the cliff by the start: two, one going up as the other comes down */
 function lifts(x, y, z) {
@@ -422,6 +447,12 @@ function step(r, t, dt) {
     o.g.rotation.x = -o.tilt;                                       /* the end he stands on goes down */
   }
   if (W.lifts) for (const o of W.lifts) { o.h = lerp(o.y0, o.y1, 0.5 - 0.5 * Math.cos(t * 0.55 + o.ph)); o.m.position.y = o.h; }
+  /* stand on the purple switch and the grills swing open, a quarter turn over 64 frames */
+  if (W.grills) {
+    const G = W.grills, sw = W.grillSwitch;
+    if (!G.opening && sw && m.ground && Math.hypot(m.p.x - sw.x, m.p.z - sw.z) < 130 && Math.abs(m.p.y - sw.y) < 80) G.opening = true;
+    if (G.opening && G.open < 1) { G.open = Math.min(1, G.open + dt * F / 64); for (const d of G.doors) d.g.rotation.y = d.yaw0 - d.sign * G.open * Math.PI / 2; }
+  }
   /* the posts settle into the ground as they are pounded */
   for (const p of W.posts) p.m.position.y = p.y + 70 - p.sink;
   /* the warps: stand still on one for a moment and you come out at the other */
@@ -741,10 +772,14 @@ function solid(r, p) {
   const k = W.king;
   if (k && k.g.visible && k.state !== 'held' && k.state !== 'grab') { const dx = p.x - k.p.x, dz = p.z - k.p.z, d = Math.hypot(dx, dz); if (d < 230 && Math.abs(p.y - k.p.y) < 400) { p.x = k.p.x + dx / (d || 1) * 230; p.z = k.p.z + dz / (d || 1) * 230; } }
   const G = W.gate;
-  if (G && !G.open) {
-    const c = Math.cos(G.yaw), s = Math.sin(G.yaw), lx = (p.x - G.x) * c - (p.z - G.z) * s, lz = (p.x - G.x) * s + (p.z - G.z) * c;
-    if (Math.abs(lx) < G.w && Math.abs(lz) < 60 && p.y < G.y + 330) { const nz = Math.sign(lz || 1) * 60; p.x = G.x + lx * c + nz * s; p.z = G.z - lx * s + nz * c; }
-  }
+  if (G && !G.open) bars(p, G, G.y + 330);
+  /* and the grills, until they have swung */
+  if (W.grills && !W.grills.open) bars(p, W.grills, W.grills.y + 640);
+}
+/* a straight run of bars `w` either side of (x, z), across its yaw: Mario is put back on the side he came from */
+function bars(p, G, top) {
+  const c = Math.cos(G.yaw), s = Math.sin(G.yaw), lx = (p.x - G.x) * c - (p.z - G.z) * s, lz = (p.x - G.x) * s + (p.z - G.z) * c;
+  if (Math.abs(lx) < G.w && Math.abs(lz) < 60 && p.y < top) { const nz = Math.sign(lz || 1) * 60; p.x = G.x + lx * c + nz * s; p.z = G.z - lx * s + nz * c; }
 }
 function talk(r) {
   if (!W) return null;

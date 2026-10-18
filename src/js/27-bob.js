@@ -205,30 +205,113 @@ function pics() {
 }
 
 /* ══ BUILDING THE COURSE ═══════════════════════════════════════
-   Lit the way the N64 lit it: once, into the corners of the triangles (a
-   sun high to one side, a sky bounce from above), and then drawn flat —
-   which is also why it costs nothing to draw. */
-const SUN = new THREE.Vector3(0.45, 1, 0.3).normalize();
-function course(D) {
+   The game's own display lists for it (tools/bake-bob.js reads them out of
+   the decompilation), drawn the way the N64 drew them, because that is what
+   makes it look like Bob-omb Battlefield and not like a model of it:
+
+     light    one light, fixed to the CAMERA — 0x28, 0x28, 0x28 in its own
+              space, up and right and towards you — on the normals the
+              course carries, at the course's own ambient (0x66) and
+              diffuse (0xff), clamped before the texture is laid on. So the
+              cliffs that face you are bright orange and the ones that face
+              away are dark, and that turns as you turn the camera.
+     flat     the parts the game drew flat-shaded (the fences' posts) take
+              one shade per triangle, as the baker left them;
+     colour   texel times shade (MODULATERGB / IA), or the texel alone for
+              the fences (DECALRGBA), worked in the N64's own numbers: no
+              conversion of the pictures in or of the colours out;
+     fog      grey (160, 160, 160), from 980 to 1000 of the depth range of
+              the game's 100-to-30000 frustum: nothing near you, a haze
+              over the far side of the course;
+     layers   opaque, then the fences cut out, then the trees' shadows laid
+              over the grass. */
+const N64_LIGHT = new THREE.Vector3(1, 1, 1).normalize();
+const N64_FOG = new THREE.Vector3(160 / 255, 160 / 255, 160 / 255);
+const N64_VERT = `
+attribute vec4 cn;
+uniform float lit, fogOn;
+uniform vec3 amb, dif, lightDir;
+varying vec2 vUv;
+varying vec4 vShade;
+varying float vFog;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  if (lit > 0.5) {
+    vec3 n = cn.xyz * 255.0;
+    n = mix(n, n - 256.0, step(127.5, n)) / 127.0;
+    vShade = vec4(min(amb + dif * max(dot(normalMatrix * n, lightDir), 0.0), vec3(1.0)), 1.0);
+  } else vShade = cn;
+  vUv = uv;
+  /* the RSP's fog: depth after projection through near 100, far 30000, times 6400, less 6144, over 255 */
+  vFog = fogOn * clamp(1.17181 - 5036.4 / max(-mv.z, 1.0), 0.0, 1.0);
+  gl_Position = projectionMatrix * mv;
+}`;
+const N64_FRAG = `
+uniform sampler2D map;
+uniform float hasMap, cutout;
+uniform int cc;
+uniform vec3 fogColor;
+varying vec2 vUv;
+varying vec4 vShade;
+varying float vFog;
+void main() {
+  vec4 tex = hasMap > 0.5 ? texture2D(map, vUv) : vec4(1.0);
+  vec4 c;
+  if (cc == 1) c = vec4(tex.rgb * vShade.rgb, vShade.a);           /* MODULATERGB */
+  else if (cc == 2) c = tex * vShade;                              /* MODULATEIA */
+  else if (cc == 3) c = tex;                                       /* DECALRGBA */
+  else c = vShade;                                                 /* SHADE */
+  if (cutout > 0.5 && c.a < 0.5) discard;
+  gl_FragColor = vec4(mix(c.rgb, fogColor, vFog), c.a);
+}`;
+const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, SHADE: 0 };
+/* the baked groups as meshes: the course, or one of its own objects (the gate, the seesaw, the grills) */
+function n64Model(D, groups) {
   const g = new THREE.Group(), tl = new THREE.TextureLoader();
-  const tex = D.level.tex.map(u => { const t = tl.load(u); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; });
-  for (const p of D.level.prims) {
-    const geo = new THREE.BufferGeometry();
+  const cache = D.level.texCache || (D.level.texCache = {});
+  const wrap = c => (c & 2 ? THREE.ClampToEdgeWrapping : c & 1 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
+  const texOf = m => {
+    if (!m.tex) return null;
+    const key = m.tex + '|' + m.cms + '|' + m.cmt;
+    if (cache[key]) return cache[key];
+    /* the trees' shadows: the one picture the course has no copy of, so the shadow already here for Mario */
+    let t;
+    if (D.level.tex[m.tex]) t = tl.load(D.level.tex[m.tex]);
+    else { t = pics().shadow.clone(); t.needsUpdate = true; }
+    t.flipY = false;
+    t.encoding = THREE.LinearEncoding;
+    t.wrapS = wrap(m.cms); t.wrapT = wrap(m.cmt);
+    t.anisotropy = 8;
+    return (cache[key] = t);
+  };
+  for (const p of groups) {
+    const m = p.m, geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(p.p, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(p.u, 2));
+    geo.setAttribute('cn', new THREE.BufferAttribute(new Uint8Array(p.c), 4, true));
     geo.setIndex(p.i);
-    const n = p.n, col = new Float32Array(n.length), k = 1.32;
-    for (let i = 0; i < n.length; i += 3) {
-      const l = 0.58 + 0.55 * Math.max(0, n[i] * SUN.x + n[i + 1] * SUN.y + n[i + 2] * SUN.z) + 0.08 * Math.max(0, n[i + 1]);
-      col[i] = Math.min(1.25, p.c[0] * k * l); col[i + 1] = Math.min(1.25, p.c[1] * k * l); col[i + 2] = Math.min(1.25, p.c[2] * k * l);
-    }
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    const mat = new THREE.MeshBasicMaterial({ map: p.t != null ? tex[p.t] : null, vertexColors: true, side: p.cut ? THREE.DoubleSide : THREE.FrontSide,
-                                              alphaTest: p.cut ? 0.5 : 0, transparent: false });
-    g.add(new THREE.Mesh(geo, mat));
+    geo.computeBoundingSphere();
+    const map = texOf(m), blend = m.layer >= 5;
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: N64_VERT, fragmentShader: N64_FRAG,
+      uniforms: {
+        map: { value: map }, hasMap: { value: map ? 1 : 0 }, cutout: { value: m.layer === 4 ? 1 : 0 }, cc: { value: N64_CC[m.cc] || 0 },
+        lit: { value: m.lit }, fogOn: { value: m.fog }, lightDir: { value: N64_LIGHT }, fogColor: { value: N64_FOG },
+        amb: { value: new THREE.Vector3(...(m.amb || [0, 0, 0]).map(v => v / 255)) },
+        dif: { value: new THREE.Vector3(...(m.dif || [0, 0, 0]).map(v => v / 255)) },
+      },
+      side: m.cull ? THREE.FrontSide : THREE.DoubleSide,
+      transparent: blend, depthWrite: !blend,
+    });
+    /* decals sit on the surface they are painted over */
+    if (m.layer === 2 || m.layer === 6) { mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4; }
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.renderOrder = m.layer;
+    g.add(mesh);
   }
   return g;
 }
+function course(D) { return n64Model(D, D.level.groups); }
 function sky(scene) {
   const geo = new THREE.SphereGeometry(60000, 32, 16), col = [], top = new THREE.Color('#3f74de'), hor = new THREE.Color('#bfe0ff'), low = new THREE.Color('#9cc8f5');
   const P = geo.attributes.position;
@@ -365,7 +448,9 @@ function starModel(L) {
 /* ══ THE COURSE IS BUILT (as soon as the file is in) ═══════════ */
 function world(r, D) {
   const scene = r.scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xbfe0ff, 16000, 42000);
+  /* the course does its own fog (the N64's, above); this is the nearest straight-line match to it for Mario and the
+     cast, applied after the colours are out, as the N64's is: grey, nothing near, most of the way at the far side */
+  scene.fog = new THREE.Fog(0xa0a0a0, 4300, 17000);
   sky(scene);
   scene.add(course(D));
   /* the game's own collision for the course (its surface types and all), not the picture of it */
@@ -373,13 +458,17 @@ function world(r, D) {
   r.col = collider([{ p: C.v, i: C.t.flatMap(x => [x[0], x[1], x[2]]), ty }]);
   const M = r.M = mario(D);
   scene.add(M.body);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
-  const sun = new THREE.DirectionalLight(0xfff6e8, 0.62); sun.position.copy(SUN).multiplyScalar(1000); scene.add(sun);
+  /* the game's 45 degrees, and its one light riding with the camera (up, right, towards you) for Mario and the cast
+     as for the course; half as much again from all round, as Mario's own lights have it */
+  r.cam = new THREE.PerspectiveCamera(45, r.W / r.H, 20, 90000);
+  scene.add(r.cam);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+  sun.position.copy(N64_LIGHT); r.cam.add(sun); r.cam.add(sun.target);
   /* his round shadow, laid on whatever is under him */
   const P = pics();
   r.shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: P.shadow, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
   r.shadow.renderOrder = 2; scene.add(r.shadow);
-  r.cam = new THREE.PerspectiveCamera(48, r.W / r.H, 20, 90000);
   /* where the game puts him: falling in, spinning, over the corner by the Bob-omb Buddies */
   const sp = D.game.spawn, f = r.col.floor(sp.p[0], 20000, sp.p[2]);
   r.spawn = new THREE.Vector3(sp.p[0], f ? f.h : sp.p[1], sp.p[2]);
@@ -390,6 +479,8 @@ function world(r, D) {
   r.camR = { yaw: r.spawnYaw + Math.PI, pitch: 0.32, dist: 1050, manual: -9, tgt: r.spawn.clone().setY(r.spawn.y + 140) };
   r.game = { hp: 8, coins: 0, lives: 4, stars: 0 };
   r.api = api(r);
+  /* the course's own object models (the gate, the seesaw, the grills), drawn as the course is */
+  r.n64 = name => (D.objs && D.objs[name] ? n64Model(D, D.objs[name]) : null);
   if (root.BobWorld) root.BobWorld.build(r, D);
   r.ready = true;
 }
