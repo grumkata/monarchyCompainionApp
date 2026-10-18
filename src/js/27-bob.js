@@ -265,25 +265,26 @@ void main() {
   gl_FragColor = vec4(mix(c.rgb, fogColor, vFog), c.a);
 }`;
 const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, SHADE: 0 };
+/* a picture for a baked group: the player's own game's (27-bob-rom.js) when it has been read, else the one that came
+   with the earlier model; the trees' shadows have no such copy, so they take the shadow already here for Mario */
+const wrapOf = c => (c & 2 ? THREE.ClampToEdgeWrapping : c & 1 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
+function n64Tex(D, m) {
+  if (!m.tex) return null;
+  const cache = D.texCache || (D.texCache = {}), key = m.tex + '|' + m.cms + '|' + m.cmt;
+  if (cache[key]) return cache[key];
+  const url = (D.romTex && D.romTex[m.tex]) || (D.level.tex && D.level.tex[m.tex]);
+  let t;
+  if (url) t = new THREE.TextureLoader().load(url);
+  else { t = pics().shadow.clone(); t.needsUpdate = true; }
+  t.flipY = false;
+  t.encoding = THREE.LinearEncoding;
+  t.wrapS = wrapOf(m.cms); t.wrapT = wrapOf(m.cmt);
+  t.anisotropy = 8;
+  return (cache[key] = t);
+}
 /* the baked groups as meshes: the course, or one of its own objects (the gate, the seesaw, the grills) */
 function n64Model(D, groups) {
-  const g = new THREE.Group(), tl = new THREE.TextureLoader();
-  const cache = D.level.texCache || (D.level.texCache = {});
-  const wrap = c => (c & 2 ? THREE.ClampToEdgeWrapping : c & 1 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
-  const texOf = m => {
-    if (!m.tex) return null;
-    const key = m.tex + '|' + m.cms + '|' + m.cmt;
-    if (cache[key]) return cache[key];
-    /* the trees' shadows: the one picture the course has no copy of, so the shadow already here for Mario */
-    let t;
-    if (D.level.tex[m.tex]) t = tl.load(D.level.tex[m.tex]);
-    else { t = pics().shadow.clone(); t.needsUpdate = true; }
-    t.flipY = false;
-    t.encoding = THREE.LinearEncoding;
-    t.wrapS = wrap(m.cms); t.wrapT = wrap(m.cmt);
-    t.anisotropy = 8;
-    return (cache[key] = t);
-  };
+  const g = new THREE.Group(), all = D.n64Mats || (D.n64Mats = []);
   for (const p of groups) {
     const m = p.m, geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(p.p, 3));
@@ -291,7 +292,7 @@ function n64Model(D, groups) {
     geo.setAttribute('cn', new THREE.BufferAttribute(new Uint8Array(p.c), 4, true));
     geo.setIndex(p.i);
     geo.computeBoundingSphere();
-    const map = texOf(m), blend = m.layer >= 5;
+    const map = n64Tex(D, m), blend = m.layer >= 5;
     const mat = new THREE.ShaderMaterial({
       vertexShader: N64_VERT, fragmentShader: N64_FRAG,
       uniforms: {
@@ -308,11 +309,24 @@ function n64Model(D, groups) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.renderOrder = m.layer;
     g.add(mesh);
+    all.push({ mat, m });
   }
   return g;
 }
+/* the player's own pictures have come in: every course material takes its picture again */
+function retexture(D) {
+  const old = D.texCache || {};
+  D.texCache = {};
+  for (const { mat, m } of D.n64Mats || []) {
+    const t = n64Tex(D, m);
+    mat.uniforms.map.value = t; mat.uniforms.hasMap.value = t ? 1 : 0;
+  }
+  for (const t of Object.values(old)) t.dispose();
+}
 function course(D) { return n64Model(D, D.level.groups); }
+/* the sky with no game to read the real one out of: a painted blue, and clouds round the horizon */
 function sky(scene) {
+  const grp = new THREE.Group(); scene.add(grp);
   const geo = new THREE.SphereGeometry(60000, 32, 16), col = [], top = new THREE.Color('#3f74de'), hor = new THREE.Color('#bfe0ff'), low = new THREE.Color('#9cc8f5');
   const P = geo.attributes.position;
   for (let i = 0; i < P.count; i++) {
@@ -321,15 +335,61 @@ function sky(scene) {
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   const s = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, depthWrite: false, fog: false }));
-  s.renderOrder = -10; scene.add(s);
+  s.renderOrder = -10; grp.add(s);
   const P2 = pics();
   for (let i = 0; i < 16; i++) {
     const a = i / 16 * TAU + rnd(-0.15, 0.15), d = 38000;
     const c = new THREE.Sprite(new THREE.SpriteMaterial({ map: P2.cloud, transparent: true, depthWrite: false, fog: false, opacity: rnd(0.75, 0.95) }));
     c.position.set(Math.sin(a) * d, rnd(1500, 5200), Math.cos(a) * d); c.scale.set(rnd(9000, 15000), rnd(4000, 6000), 1); c.renderOrder = -9;
-    scene.add(c);
+    grp.add(c);
   }
-  return s;
+  return grp;
+}
+/* ══ THE REAL SKY ══════════════════════════════════════════════
+   Bob-omb Battlefield's own (the "water" sky, out of the player's game),
+   drawn the way src/game/skybox.c draws it: not a dome round the course
+   but a flat picture behind everything, slid by where the camera looks.
+   The game's picture is 8 by 8 tiles, each 160 by 120 on a 320 by 240
+   screen: once round for a whole turn of the camera (the game works it
+   out as if the view were 90 degrees across), four of those pixels to a
+   degree of looking up or down, and the view's top edge 600 up from the
+   bottom of its 960 when it looks level. A wider screen than the game's
+   4:3 sees further round, at the same scale. */
+const SKY_VERT = `
+varying vec2 vS;
+void main() { vS = vec2(position.x * 0.5 + 0.5, 0.5 - position.y * 0.5); gl_Position = vec4(position.xy, 1.0, 1.0); }`;
+const SKY_FRAG = `
+uniform sampler2D map;
+uniform vec3 at;
+varying vec2 vS;
+void main() {
+  float x = at.x + 160.0 + (vS.x - 0.5) * 240.0 * at.z, y = at.y - vS.y * 240.0;
+  gl_FragColor = texture2D(map, vec2(fract(x / 1280.0), clamp((960.0 - y) / 960.0, 0.0, 1.0)));
+}`;
+function realSky(r, url) {
+  const t = new THREE.TextureLoader().load(url);
+  t.flipY = false; t.encoding = THREE.LinearEncoding; t.generateMipmaps = false;
+  t.minFilter = t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, depthTest: false, depthWrite: false,
+    uniforms: { map: { value: t }, at: { value: new THREE.Vector3() } },
+  }));
+  m.frustumCulled = false; m.renderOrder = -100;
+  if (r.skyObj) r.skyObj.visible = false;
+  if (r.realSky) { r.scene.remove(r.realSky); r.realSky.material.uniforms.map.value.dispose(); }
+  r.scene.add(r.realSky = m);
+}
+/* skybox.c's sums, for where the camera is looking now */
+const _look = new THREE.Vector3();
+function skyStep(r) {
+  if (!r.realSky) return;
+  const f = r.cam.getWorldDirection(_look), U = 65536;
+  const yaw = ((Math.round(Math.atan2(f.x, f.z) / TAU * U) % U) + U) % U;
+  let sx = Math.floor(1280 * yaw / U + 0.5);
+  if (sx > 1280) sx -= Math.floor(sx / 1280) * 1280;
+  const pitch = Math.atan2(f.y, Math.hypot(f.x, f.z)) * 180 / Math.PI;
+  const sy = clamp(Math.round(4 * pitch) + 600, 240, 960);
+  r.realSky.material.uniforms.at.value.set(1280 - sx, sy, r.W / r.H);
 }
 
 /* ══ MARIO ═════════════════════════════════════════════════════
@@ -388,7 +448,9 @@ function enter(box, star, back) {
     '<div class="bs-keys"><span><b>WASD</b> run</span><span><b>Space</b> jump (land and again: double, triple)</span><span><b>J</b> or click: punch, grab, throw, read, talk</span>' +
     '<span><b>Shift</b> crouch; in the air, ground pound</span>' +
     '<span><b>Q</b> / <b>E</b> or drag turn the camera</span><span><b>Esc</b> back to the tavern</span></div>' +
-    '<button class="bs-leave" type="button">Back to the tavern</button>';
+    '<button class="bs-leave" type="button">Back to the tavern</button>' +
+    '<button class="bs-rom" type="button" title="The course\'s pictures and sky are read out of your own copy of Super Mario 64, the way libsm64 does it. Only the pictures are kept, on this computer; the ROM is not.">Real textures: use my SM64 ROM</button>' +
+    '<input class="bs-romfile" type="file" accept=".z64,.n64,.v64,.rom,.bin" hidden><div class="bs-romsay"></div>';
   doc.body.appendChild(el);
   const gl = el.querySelector('.bs-gl'), fx = el.querySelector('.bs-fx');
   const ren = new THREE.WebGLRenderer({ canvas: gl, antialias: true, alpha: true });
@@ -406,7 +468,13 @@ function enter(box, star, back) {
   r.s2.add(r.star2);
   size(r);
   el.querySelector('.bs-leave').addEventListener('click', () => leave());
-  el.addEventListener('pointerdown', e => { if (e.target.closest('.bs-leave')) return; r.drag = { x: e.clientX, y: e.clientY, moved: 0 }; e.preventDefault(); });
+  /* the player's own game, for the real pictures: picked, or dropped anywhere on the course */
+  const romFile = el.querySelector('.bs-romfile');
+  el.querySelector('.bs-rom').addEventListener('click', () => romFile.click());
+  romFile.addEventListener('change', () => { const f = romFile.files && romFile.files[0]; romFile.value = ''; if (f) readRom(r, f); });
+  el.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
+  el.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) { e.preventDefault(); readRom(r, f); } });
+  el.addEventListener('pointerdown', e => { if (e.target.closest('.bs-leave, .bs-rom')) return; r.drag = { x: e.clientX, y: e.clientY, moved: 0 }; e.preventDefault(); });
   root.addEventListener('pointermove', r.onMove = e => { if (!r.drag || !r.camR) return; const dx = e.clientX - r.drag.x, dy = e.clientY - r.drag.y; r.drag.moved += Math.abs(dx) + Math.abs(dy); r.camR.yaw -= dx * 0.006; r.camR.pitch = clamp(r.camR.pitch + dy * 0.004, -0.15, 1.1); r.drag.x = e.clientX; r.drag.y = e.clientY; if (r.drag.moved > 6) r.camR.manual = (now() - r.t0); });
   root.addEventListener('pointerup', r.onUp = e => { if (r.drag && r.drag.moved < 6 && e.button === 0 && r.phase === 'play') r.pressed.add('Mouse'); r.drag = null; });
   el.addEventListener('wheel', e => { e.preventDefault(); e.stopPropagation(); if (r.camR) r.camR.dist = clamp(r.camR.dist * (e.deltaY > 0 ? 1.08 : 0.93), 520, 1900); }, { passive: false });
@@ -451,7 +519,8 @@ function world(r, D) {
   /* the course does its own fog (the N64's, above); this is the nearest straight-line match to it for Mario and the
      cast, applied after the colours are out, as the N64's is: grey, nothing near, most of the way at the far side */
   scene.fog = new THREE.Fog(0xa0a0a0, 4300, 17000);
-  sky(scene);
+  r.skyObj = sky(scene);
+  D.n64Mats = [];
   scene.add(course(D));
   /* the game's own collision for the course (its surface types and all), not the picture of it */
   const C = D.game.col, ty = C.t.map(x => C.types[x[3]]);
@@ -483,6 +552,36 @@ function world(r, D) {
   r.n64 = name => (D.objs && D.objs[name] ? n64Model(D, D.objs[name]) : null);
   if (root.BobWorld) root.BobWorld.build(r, D);
   r.ready = true;
+  /* the real pictures, if this computer has read them out of the player's game before */
+  if (D.romTex) useRom(r, { tex: D.romTex, sky: D.romSky });
+  else if (root.BobROM && D.rom) root.BobROM.kept(D.rom).then(out => { if (out && run === r) useRom(r, out); });
+}
+
+/* ══ THE PLAYER'S OWN GAME ═════════════════════════════════════
+   27-bob-rom.js reads the pictures out of it; here they are put on. */
+const RELEASE = { us: 'US', jp: 'Japanese', eu: 'European', sh: 'Shindou' };
+function readRom(r, file) {
+  const D = data;
+  if (!D || !D.rom || !root.BobROM || r.el.classList.contains('rom-busy')) return;
+  romSay(r, 'Reading ' + file.name + '\u2026');
+  r.el.classList.add('rom-busy');
+  root.BobROM.fromFile(file, D.rom)
+    .then(out => { if (run !== r) return; useRom(r, out); romSay(r, 'The textures and sky are now your ' + (RELEASE[out.ver] || '') + ' cartridge\'s own. They are kept on this computer; the ROM is not.'); })
+    .catch(err => { if (run === r) romSay(r, (err && err.message) || String(err)); })
+    .then(() => r.el.classList.remove('rom-busy'));
+}
+function useRom(r, out) {
+  const D = data;
+  D.romTex = out.tex; D.romSky = out.sky;
+  retexture(D);
+  if (out.sky) realSky(r, out.sky);
+  r.el.classList.add('rom-on');
+  if (root.BobWorld && root.BobWorld.rom) root.BobWorld.rom(r, D);
+}
+function romSay(r, text) {
+  const n = r.el.querySelector('.bs-romsay');
+  n.textContent = text; n.classList.add('on');
+  clearTimeout(r.romSayT); r.romSayT = setTimeout(() => n.classList.remove('on'), 6500);
 }
 /* what the things in the course can do to Mario (27-bob-world.js) */
 function api(r) {
@@ -627,7 +726,7 @@ function loop() {
       }
     }
     if (r.phase === 'intro' && t - r.p0 > 4.4) { r.phase = 'play'; r.el.classList.add('play'); title(r, false); }
-    if (r.ready && !r.home) r.ren.render(r.scene, r.cam);
+    if (r.ready && !r.home) { skyStep(r); r.ren.render(r.scene, r.cam); }
     twinkles(f, r, t);
     if (r.flashT) {
       const k = (now() - r.flashT) / r.flashD;

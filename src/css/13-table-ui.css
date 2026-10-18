@@ -2160,6 +2160,17 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
   border-radius:4px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .25s, background .15s; }
 #bob-star.play .bs-leave{ opacity:.6; pointer-events:auto; }
 #bob-star.play .bs-leave:hover{ opacity:1; background:rgba(30,50,130,.85); }
+/* the real pictures, out of the player's own game (27-bob-rom.js): offered in the corner until they are in */
+#bob-star .bs-rom{ position:absolute; right:16px; bottom:16px; z-index:3; padding:7px 14px 6px; font:700 11px/1 var(--m-f-cap);
+  letter-spacing:.14em; text-transform:uppercase; color:#fff; background:rgba(16,30,80,.6); border:1px solid rgba(255,210,26,.75);
+  border-radius:4px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .25s, background .15s; }
+#bob-star.play:not(.rom-on) .bs-rom{ opacity:.85; pointer-events:auto; }
+#bob-star.play:not(.rom-on) .bs-rom:hover{ opacity:1; background:rgba(30,50,130,.85); }
+#bob-star.rom-busy .bs-rom{ cursor:progress; }
+#bob-star .bs-romsay{ position:absolute; right:16px; bottom:52px; z-index:3; max-width:min(420px, calc(100vw - 32px)); padding:8px 12px;
+  font:600 13px/1.35 'Segoe UI', system-ui, sans-serif; color:#fff; background:rgba(16,24,40,.78); border-radius:4px;
+  pointer-events:none; opacity:0; transition:opacity .3s; }
+#bob-star .bs-romsay.on{ opacity:1; }
 
 /* the course's HUD (27-bob-world.js): lives, coins and stars across the top in the game's white-on-black letters, the
    power meter dropping in when it matters, the game's dark dialog box, and numbers floating off what is got */
