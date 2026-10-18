@@ -239,7 +239,8 @@ void main() {
   if (lit > 0.5) {
     vec3 n = cn.xyz * 255.0;
     n = mix(n, n - 256.0, step(127.5, n)) / 127.0;
-    vShade = vec4(min(amb + dif * max(dot(normalMatrix * n, lightDir), 0.0), vec3(1.0)), 1.0);
+    /* the RSP takes the light into the model's own space and normalises it, so a model's scale never brightens it */
+    vShade = vec4(min(amb + dif * max(dot(normalize(normalMatrix * n), lightDir), 0.0), vec3(1.0)), 1.0);
   } else vShade = cn;
   vUv = uv;
   /* the RSP's fog: depth after projection through near 100, far 30000, times 6400, less 6144, over 255 */
@@ -284,7 +285,8 @@ function n64Tex(D, m) {
   const url = (D.romTex && D.romTex[m.tex]) || (D.level.tex && D.level.tex[m.tex]);
   let t;
   if (url) t = new THREE.TextureLoader().load(url);
-  else { t = pics().shadow.clone(); t.needsUpdate = true; }
+  else if (m.tex === 'generic_0900B000') { t = pics().shadow.clone(); t.needsUpdate = true; }
+  else return null;                                                /* none to be had yet: the shading alone */
   t.flipY = false;
   t.encoding = THREE.LinearEncoding;
   t.wrapS = wrapOf(m.cms); t.wrapT = wrapOf(m.cmt);
@@ -334,12 +336,14 @@ function n64Model(D, groups) {
    cast(r, key, holder)  a model in `holder` (the object's own group, which
                          its behaviour moves); its billboards face the
                          camera at the holder's scale, as geo.c's do
+                         ({ plain: true }: built even without the pictures,
+                         in its shading alone, and dressed when they come)
    inst.play(i, speed)   animation i of the model's table, from its first
                          frame, at `speed` (1: the game's 30 a second)
    inst.state            the switches' case (the game's oAnimState) */
 function cast(r, key, holder, opts) {
   const D = data, C = D && D.cast && D.cast[key];
-  if (!C || !D.romTex) return null;
+  if (!C || (!D.romTex && !(opts && opts.plain))) return null;
   const inst = { key, C, root: new THREE.Group(), holder, top: null, bills: [], switches: [], anim: -1, fr: 0, speed: 1, state: 0,
                  billboard: !!(opts && opts.billboard) };
   const visit = (n, parent) => {

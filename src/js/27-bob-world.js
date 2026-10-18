@@ -231,7 +231,7 @@ function build(r, D) {
       case 'bhvSeesawPlatform': seesaw(x, y, z, yaw); break;
       case 'bhvCheckerboardElevatorGroup': lifts(x, y, z); break;
       case 'bhvOpenableGrill': grills(x, y, z, yaw); break;
-      case 'bhvFloorSwitchGrills': W.grillSwitch = skinned('pswitch', new THREE.Vector3(x, y, z)); break;
+      case 'bhvFloorSwitchGrills': W.grillSwitch = purpleSwitch(x, y, z, yaw); break;
       case 'bhvFadingWarp': W.warps.push({ id: (o.arg.match(/WARP_NODE_(\w+)/) || [])[1], p: new THREE.Vector3(x, ground(x, y, z, 200), z), yaw }); break;
     }
   }
@@ -345,6 +345,13 @@ function seesaw(x, y, z, yaw) {
     return y + top + Math.tan(-o.tilt) * along;
   } });
 }
+/* the switch that opens them: the game's own, there from the start so it can be found (plain, its shape and shading
+   alone, until the player's pictures are in) */
+function purpleSwitch(x, y, z, yaw) {
+  const h = new THREE.Group(); h.position.set(x, y, z); h.rotation.y = yaw; W.r.scene.add(h);
+  W.r.cast('pswitch', h, { plain: true });
+  return new THREE.Vector3(x, y, z);
+}
 /* the grills in the pit (grill_door.inc.c): two doors of bars hung 320 either side of the middle, the one turned
    round to meet the other; the purple switch beside them swings them open a quarter turn, over 64 frames */
 function grills(x, y, z, yaw) {
@@ -444,7 +451,6 @@ const SKIN = {
   oneup(u) { hideStandIn(u.s); u.h = holder(W.r.scene, u.p.x, u.p.y, u.p.z); W.r.cast('oneup', u.h, { billboard: true }); },
   ball(b) { hideStandIn(b.m); W.r.cast('ironball', holder(b.m, 0, 0, 0), { billboard: true }); },
   lift(o) { hideStandIn(o.m); W.r.cast('lift', holder(o.m, 0, 4, 0)); },
-  pswitch(p) { W.r.cast('pswitch', holder(W.r.scene, p.x, p.y, p.z)); },
 };
 /* `o` is a stand-in of `kind`: dressed now if the real models are in, else remembered for when they come */
 function skinned(kind, o) {
