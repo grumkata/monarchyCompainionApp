@@ -264,11 +264,16 @@ void main() {
   else if (cc == 4) c = tex * vShade;                              /* MODULATERGBA */
   else if (cc == 5) c = vec4(tex.rgb, tex.a * env.a);              /* DECALFADEA */
   else if (cc == 6) c = vec4(vShade.rgb, env.a);                   /* SHADEFADEA */
+  else if (cc == 7) c = vec4(mix(vShade.rgb, tex.rgb, tex.a), env.a);     /* BLENDRGBFADEA */
+  else if (cc == 8) c = vec4(mix(vShade.rgb, tex.rgb, tex.a), vShade.a);  /* BLENDRGBA */
+  else if (cc == 9) c = vec4(tex.rgb, env.a);                      /* DECALFADE */
+  else if (cc == 10) c = vec4(tex.rgb * vShade.rgb, tex.a * env.a); /* MODULATERGBFADEA */
   else c = vShade;                                                 /* SHADE */
   if (cutout > 0.5 && c.a < 0.5) discard;
   gl_FragColor = vec4(mix(c.rgb, fogColor, vFog), c.a);
 }`;
-const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, MODULATERGBA: 4, DECALFADEA: 5, SHADEFADEA: 6, SHADE: 0 };
+const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, MODULATERGBA: 4, DECALFADEA: 5, SHADEFADEA: 6, BLENDRGBFADEA: 7,
+                 BLENDRGBA: 8, DECALFADE: 9, MODULATERGBFADEA: 10, SHADE: 0 };
 /* a picture for a baked group: the player's own game's (27-bob-rom.js) when it has been read, else the one that came
    with the earlier model; the trees' shadows have no such copy, so they take the shadow already here for Mario */
 const wrapOf = c => (c & 2 ? THREE.ClampToEdgeWrapping : c & 1 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
@@ -341,6 +346,10 @@ function cast(r, key, holder, opts) {
     const node = { k: n.k, c: [], n }, g = new THREE.Group();
     if (n.k === 'scale') g.scale.setScalar(n.s);
     if (n.k === 'part') { g.position.fromArray(n.p); g.rotation.order = 'ZYX'; }
+    /* a fixed turn (geo.c's rotation and translation-rotation nodes: mtxf_rotate_zxy_and_translate), or a held thing's
+       place; the wing cap's wings are only shown with the wing cap */
+    if (n.k === 'tr') { g.position.fromArray(n.p); g.rotation.order = 'YXZ'; g.rotation.set(n.r[0] * TAU / 65536, n.r[1] * TAU / 65536, n.r[2] * TAU / 65536); if (n.wing) g.visible = false; }
+    if (n.k === 'held') g.position.fromArray(n.p);
     if (n.k === 'bill') inst.bills.push(node);
     if (n.k === 'switch') inst.switches.push(node);
     if (n.dl) {
@@ -368,19 +377,23 @@ function cast(r, key, holder, opts) {
    them (the root's translation first, then three turns for each animated part it meets, a switch only giving the
    case it shows) */
 function castPose(inst, dt) {
-  const A = inst.anim >= 0 ? inst.C.anims[inst.anim] : null;
+  const A = inst.anim !== -1 ? inst.C.anims[inst.anim] : null;      /* by number, or by name (Mario's) */
+  inst.done = false;
   if (A) {
     inst.fr += dt * F * inst.speed;
+    if (inst.fr >= A.loopEnd - 1) inst.done = true;
     if (inst.fr >= A.loopEnd) inst.fr = A.flags & 1 ? A.loopEnd - 1 : A.loopStart + ((inst.fr - A.loopStart) % Math.max(1, A.loopEnd - A.loopStart));
   }
-  for (const s of inst.switches) s.c.forEach((c, i) => { c.g.visible = i === Math.min(inst.state, s.c.length - 1); });
+  inst.clock = (inst.clock || 0) + dt * F;
+  const pick = s => { const v = inst.pick ? inst.pick(s.n.fn, s.n) : null; return Math.min(v == null ? inst.state : v, s.c.length - 1); };
+  for (const s of inst.switches) { s.sel = pick(s); s.c.forEach((c, i) => { c.g.visible = i === s.sel; }); }
   const frame = Math.floor(inst.fr);
   let type = 0, attr = 0;
   if (A && !(A.flags & 32)) type = A.flags & 8 ? 3 : A.flags & 16 ? 2 : A.flags & 64 ? 4 : 1;
   const val = () => { const k = attr++, n = A.i[k * 2], o = A.i[k * 2 + 1]; return A.v[o + (frame < n ? frame : n - 1)]; };
   const ANG = TAU / 65536;
   const walk = node => {
-    if (node.k === 'switch') { const c = node.c[Math.min(inst.state, node.c.length - 1)]; if (c) walk(c); return; }
+    if (node.k === 'switch') { const c = node.c[node.sel]; if (c) walk(c); return; }
     if (node.k === 'part' && type) {
       const p = node.n.p;
       let x = p[0], y = p[1], z = p[2];
@@ -562,7 +575,7 @@ function enter(box, star, back) {
     '<span><b>Shift</b> crouch; in the air, ground pound</span>' +
     '<span><b>Q</b> / <b>E</b> or drag turn the camera</span><span><b>Esc</b> back to the tavern</span></div>' +
     '<button class="bs-leave" type="button">Back to the tavern</button>' +
-    '<button class="bs-rom" type="button" title="The course\'s pictures and sky are read out of your own copy of Super Mario 64, the way libsm64 does it. Only the pictures are kept, on this computer; the ROM is not.">Real textures: use my SM64 ROM</button>' +
+    '<button class="bs-rom" type="button" title="The course\'s textures and sky, and the pictures Mario and the rest of the cast are drawn with, are read out of your own copy of Super Mario 64, the way libsm64 does it. Only the pictures are kept, on this computer; the ROM is not.">Real textures: use my SM64 ROM</button>' +
     '<input class="bs-romfile" type="file" accept=".z64,.n64,.v64,.rom,.bin" hidden><div class="bs-romsay"></div>';
   doc.body.appendChild(el);
   const gl = el.querySelector('.bs-gl'), fx = el.querySelector('.bs-fx');
@@ -670,7 +683,12 @@ function world(r, D) {
   r.ready = true;
   /* the real pictures, if this computer has read them out of the player's game before */
   if (D.romTex) useRom(r, { tex: D.romTex, sky: D.romSky });
-  else if (root.BobROM && D.rom) root.BobROM.kept(D.rom).then(out => { if (out && run === r) useRom(r, out); });
+  else if (root.BobROM && D.rom) root.BobROM.kept(D.rom).then(out => {
+    if (run !== r) return;
+    if (out) useRom(r, out);
+    /* none kept: say, once the course is open, what the button in the corner is for */
+    else setTimeout(() => { if (run === r && !r.romTried && !r.el.classList.contains('rom-on')) romSay(r, 'Choose your own copy of Super Mario 64 (bottom right) and the course, its sky, Mario and everything in it are drawn with the game\'s own textures, models and animations.'); }, 6500);
+  });
 }
 
 /* ══ THE PLAYER'S OWN GAME ═════════════════════════════════════
@@ -679,10 +697,11 @@ const RELEASE = { us: 'US', jp: 'Japanese', eu: 'European', sh: 'Shindou' };
 function readRom(r, file) {
   const D = data;
   if (!D || !D.rom || !root.BobROM || r.el.classList.contains('rom-busy')) return;
+  r.romTried = true;
   romSay(r, 'Reading ' + file.name + '\u2026');
   r.el.classList.add('rom-busy');
   root.BobROM.fromFile(file, D.rom)
-    .then(out => { if (run !== r) return; useRom(r, out); romSay(r, 'The textures and sky are now your ' + (RELEASE[out.ver] || '') + ' cartridge\'s own. They are kept on this computer; the ROM is not.'); })
+    .then(out => { if (run !== r) return; useRom(r, out); romSay(r, 'Bob-omb Battlefield is now drawn with your ' + (RELEASE[out.ver] || '') + ' cartridge\'s own textures, sky, Mario and cast. Only the pictures are kept, on this computer; the ROM is not.'); })
     .catch(err => { if (run === r) romSay(r, (err && err.message) || String(err)); })
     .then(() => r.el.classList.remove('rom-busy'));
 }
@@ -691,6 +710,7 @@ function useRom(r, out) {
   D.romTex = out.tex; D.romSky = out.sky;
   retexture(D);
   if (out.sky) realSky(r, out.sky);
+  realMario(r);
   r.el.classList.add('rom-on');
   if (root.BobWorld && root.BobWorld.rom) root.BobWorld.rom(r, D);
 }
@@ -1112,6 +1132,72 @@ function respawn(r) {
    dive flat out; the ground pound a spin and a tuck; punches and the kick;
    crouching; carrying with both arms up; knocked back; and, still,
    breathing. */
+/* ══ THE REAL MARIO ════════════════════════════════════════════
+   With the player's own game read, Mario is the game's own Mario
+   (actors/mario: his full-detail body, his own animations out of
+   assets/anims), in place of the model he came with: moved exactly as
+   before, but drawn in the animation the game plays for what he is
+   doing (mario_actions_*.c), at the speed it plays it (walking and
+   running at a quarter of his speed a frame), with his own blink, his
+   fists, open hands round what he carries and the peace sign at a star. */
+const BLINK = [1, 2, 1, 0, 1, 2, 1];
+function realMario(r) {
+  if (r.realM || !data || !data.cast || !data.cast.mario) return;
+  const h = new THREE.Group();
+  r.M.body.add(h);
+  const I = cast(r, 'mario', h);
+  if (!I) { r.M.body.remove(h); return; }
+  r.realM = I; r.M.rig.visible = false;
+  I.hand = 0; I.eyes = 0; I.look = 0;
+  /* geo_switch_mario_eyes, _hand, _cap_on_off */
+  I.pick = (fn, n) => {
+    if (fn === 'geo_switch_mario_eyes') { if (I.eyes) return I.eyes - 1; const b = ((n.n * 32 + Math.floor(I.clock)) >> 1) & 31; return b < 7 ? BLINK[b] : 0; }
+    if (fn === 'geo_switch_mario_hand') return I.hand === 0 ? 0 : n.n === 0 ? (I.hand < 5 ? I.hand : 1) : (I.hand < 2 ? I.hand : 0);
+    if (fn === 'geo_switch_mario_cap_on_off') return 0;
+    return null;
+  };
+  I.play('IDLE_HEAD_LEFT', 1);
+}
+const LOOKS = ['IDLE_HEAD_LEFT', 'IDLE_HEAD_RIGHT', 'IDLE_HEAD_CENTER'];
+function animateReal(r, t, dt) {
+  const I = r.realM, m = r.m, held = !!m.held, fwd = m.speed / F;
+  let A, sp = 1;
+  I.hand = held ? 1 : r.cheer ? 2 : 0;
+  I.eyes = m.act === 'dead' ? 8 : 0;
+  if (m.act === 'dead') A = 'DYING_FALL_OVER';
+  else if (r.cheer) A = 'STAR_DANCE';
+  else if (m.act === 'grabbed') A = 'BEING_GRABBED';
+  else if (!m.ground) {
+    const k = m.kind;
+    A = k === 'jump3' ? 'TRIPLE_JUMP' : k === 'backflip' ? 'BACKFLIP' : k === 'sideflip' ? 'SLIDEFLIP'
+      : k === 'longjump' ? (fwd > 16 ? 'FAST_LONGJUMP' : 'SLOW_LONGJUMP') : k === 'dive' ? 'DIVE'
+      : k === 'pound' ? (m.airT < 0.3 ? 'START_GROUND_POUND' : 'GROUND_POUND') : k === 'kick' ? 'AIR_KICK'
+      : k === 'hurt' || k === 'thrown' ? 'BACKWARD_AIR_KB'
+      : k === 'jump2' ? (m.vy > 0 ? 'DOUBLE_JUMP_RISE' : 'DOUBLE_JUMP_FALL')
+      : k === 'jump' ? (held ? 'JUMP_WITH_LIGHT_OBJ' : 'SINGLE_JUMP') : held ? 'FALL_WITH_LIGHT_OBJ' : 'GENERAL_FALL';
+  } else if (m.act === 'punch') A = ['FIRST_PUNCH', 'SECOND_PUNCH', 'GROUND_KICK'][m.punchN] || 'FIRST_PUNCH';
+  else if (m.act === 'throw') A = 'GROUND_THROW';
+  else if (m.act === 'crouch' || (m.act === 'slide' && m.slideCrouch)) A = 'CROUCHING';
+  else if (m.act === 'slide') A = 'SLIDE_DIVE';
+  else if (m.act === 'poundland') A = 'GROUND_POUND_LANDING';
+  else if (m.act === 'hurt') A = 'BACKWARD_AIR_KB';
+  else if (m.skid > 0) A = 'SKID_ON_GROUND';
+  else if (m.speed > 30) {
+    sp = Math.max(0.1, fwd / 4);
+    A = held ? (fwd < 10 ? 'WALK_WITH_LIGHT_OBJ' : 'RUN_WITH_LIGHT_OBJ') : fwd < 8 ? 'TIPTOE' : fwd < 18 ? 'WALKING' : 'RUNNING';
+  } else if (held) A = 'IDLE_WITH_LIGHT_OBJ';
+  else {
+    /* standing: a look left, a look right, a look ahead, and again (act_idle) */
+    if (!LOOKS.includes(I.anim)) I.look = 0;
+    else if (I.done) { I.look = (I.look + 1) % 3; I.anim = -1; }
+    A = LOOKS[I.look];
+  }
+  if (A !== I.anim) I.play(A, sp); else I.speed = sp;
+  /* coming in from the sky, spinning down; and squashed a little on a hard landing, as the model he came with was */
+  const sq = Math.sin(m.squash * Math.PI) * 0.16, h = I.holder;
+  h.scale.set(1 + sq * 0.6, 1 - sq, 1 + sq * 0.6);
+  h.rotation.set(0, m.spinIn && !m.ground ? m.airT * 14 : 0, 0);
+}
 function animate(r, t, dt) {
   const M = r.M, m = r.m;
   /* blinking while he cannot be hurt again */
@@ -1186,6 +1272,7 @@ function animate(r, t, dt) {
   /* coming in from the sky, spinning down as the game brings him in */
   if (m.spinIn && !m.ground) ry = m.airT * 14;
   if (m.ground) m.spinIn = false;
+  if (r.realM) animateReal(r, t, dt);
   M.rig.position.y = M.y0 + lift;
   M.rig.rotation.set(rx, ry, rz);
   const k = 1 - Math.exp(-dt * 18);
