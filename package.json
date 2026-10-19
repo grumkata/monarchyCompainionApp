@@ -1,6 +1,6 @@
 {
   "name": "monarchy",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Monarchy \u2014 TTRPG character companion & table",
   "main": "electron/main.js",
   "private": true,

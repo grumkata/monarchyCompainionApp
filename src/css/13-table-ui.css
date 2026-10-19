@@ -2160,17 +2160,21 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
   border-radius:4px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .25s, background .15s; }
 #bob-star.play .bs-leave{ opacity:.6; pointer-events:auto; }
 #bob-star.play .bs-leave:hover{ opacity:1; background:rgba(30,50,130,.85); }
-/* the real pictures, out of the player's own game (27-bob-rom.js): offered in the corner until they are in */
-#bob-star .bs-rom{ position:absolute; right:16px; bottom:16px; z-index:3; padding:7px 14px 6px; font:700 11px/1 var(--m-f-cap);
-  letter-spacing:.14em; text-transform:uppercase; color:#fff; background:rgba(16,30,80,.6); border:1px solid rgba(255,210,26,.75);
-  border-radius:4px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .25s, background .15s; }
-#bob-star.play:not(.rom-on) .bs-rom{ opacity:.85; pointer-events:auto; }
-#bob-star.play:not(.rom-on) .bs-rom:hover{ opacity:1; background:rgba(30,50,130,.85); }
-#bob-star.rom-busy .bs-rom{ cursor:progress; }
-#bob-star .bs-romsay{ position:absolute; right:16px; bottom:52px; z-index:3; max-width:min(420px, calc(100vw - 32px)); padding:8px 12px;
-  font:600 13px/1.35 'Segoe UI', system-ui, sans-serif; color:#fff; background:rgba(16,24,40,.78); border-radius:4px;
-  pointer-events:none; opacity:0; transition:opacity .3s; }
-#bob-star .bs-romsay.on{ opacity:1; }
+/* the player's own game (27-bob-rom.js): asked for on the white before the course is shown, when this computer has
+   not kept its pictures yet */
+#bob-star .bs-ask{ position:absolute; left:50%; top:50%; z-index:4; display:none; flex-direction:column; gap:14px;
+  width:min(520px, calc(100vw - 32px)); padding:22px 24px 20px; transform:translate(-50%,-50%); color:#fff;
+  background:rgba(14,22,48,.94); border:1px solid rgba(255,210,26,.75); border-radius:6px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
+#bob-star.rom-ask .bs-ask{ display:flex; }
+#bob-star .bs-ask-h{ margin:0; font:700 13px/1 var(--m-f-cap); letter-spacing:.16em; text-transform:uppercase; color:#ffd21a; }
+#bob-star .bs-ask p{ margin:0; font:500 14px/1.45 'Segoe UI', system-ui, sans-serif; color:rgba(255,255,255,.9); }
+#bob-star .bs-ask-do{ display:flex; gap:10px; flex-wrap:wrap; }
+#bob-star .bs-ask button{ padding:8px 14px 7px; font:700 11px/1 var(--m-f-cap); letter-spacing:.14em; text-transform:uppercase; color:#fff;
+  background:rgba(16,30,80,.6); border:1px solid rgba(255,210,26,.75); border-radius:4px; cursor:pointer; transition:background .15s; }
+#bob-star .bs-ask button:hover{ background:rgba(30,50,130,.85); }
+#bob-star .bs-ask .bs-back{ border-color:rgba(255,255,255,.35); }
+#bob-star.rom-busy .bs-ask button{ cursor:progress; opacity:.6; }
+#bob-star .bs-romsay{ min-height:1.35em; font:600 13px/1.35 'Segoe UI', system-ui, sans-serif; color:#ffd21a; }
 /* with the player's ROM in, the game's own HUD and dialog box (27-bob-screen.js): drawn at the game's 240 lines and
    blown up with the pixels kept square, in place of the page's counters, meter and box */
 #bob-star .bs-n64{ position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; image-rendering:pixelated; }
@@ -2196,6 +2200,4 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
 #bob-star .bs-say p{ margin:0; min-height:5.4em; white-space:pre-line; font:700 21px/1.35 'Arial Rounded MT Bold','Segoe UI',Arial,sans-serif; color:#fff; letter-spacing:.01em; }
 #bob-star .bs-say .say-more{ position:absolute; right:18px; bottom:10px; font-style:normal; color:#ff3a2a; opacity:0; }
 #bob-star .bs-say.more .say-more{ opacity:1; animation:gs-nod .6s ease-in-out infinite; }
-#bob-star .bs-pop{ position:absolute; left:0; top:0; z-index:3; pointer-events:none; font:900 34px/1 'Arial Black','Segoe UI Black',Impact,sans-serif;
-  -webkit-text-stroke:2px #101828; paint-order:stroke fill; text-shadow:0 3px 0 rgba(0,0,0,.4); }
 #bob-star .bs-got small{ display:block; margin-top:14px; font-size:.42em; letter-spacing:.06em; -webkit-text-stroke:2px #1d2c74; }

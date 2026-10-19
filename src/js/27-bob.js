@@ -18,11 +18,14 @@
                   home any time. Home is the star iris again, closing on
                   Mario and opening on the tavern.
 
-   Not Mario 64 itself (that is Nintendo's, and needs the game): the course
-   as the game draws it and Mario's own model (tools/bake_bob.py, in
-   assets/bob/, loaded the first time the star is pressed), with movement,
-   collision, camera and animation written here, on the game's own numbers
-   — 30 frames a second turned into seconds — so a jump is a Mario jump.
+   Everything in it is the game's own: the course, its sky, Mario and the
+   whole cast, their animations, the HUD and the effects, out of the
+   decompilation (tools/bake-bob.js, assets/bob/bob.js, loaded the first
+   time the star is pressed) and drawn with the pictures in the player's own
+   ROM (27-bob-rom.js), which it asks for once, before there is anything to
+   see. Movement, collision and camera are written here on the game's own
+   numbers, 30 frames a second turned into seconds, so a jump is a Mario
+   jump.
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
@@ -173,34 +176,10 @@ function canvas(w, h, draw) { const c = doc.createElement('canvas'); c.width = w
 function texOf(c) { const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
 const PIC = {};
 function pics() {
-  if (PIC.ball) return PIC;
-  PIC.ball = texOf(canvas(64, 64, (x) => {
-    const g = x.createRadialGradient(28, 26, 2, 32, 32, 31);
-    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.6, 'rgba(236,232,224,.9)'); g.addColorStop(1, 'rgba(220,214,204,0)');
-    x.fillStyle = g; x.beginPath(); x.arc(32, 32, 31, 0, 7); x.fill();
-  }));
-  PIC.shadow = new THREE.CanvasTexture(canvas(64, 64, (x) => {
-    const g = x.createRadialGradient(32, 32, 0, 32, 32, 31);
-    g.addColorStop(0, 'rgba(0,0,0,.9)'); g.addColorStop(0.75, 'rgba(0,0,0,.8)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-  }));
-  PIC.glint = texOf(canvas(64, 64, (x) => {
-    let g = x.createRadialGradient(32, 32, 0, 32, 32, 14);
-    g.addColorStop(0, 'rgba(255,255,240,1)'); g.addColorStop(1, 'rgba(255,230,150,0)');
-    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-    x.globalCompositeOperation = 'lighter'; x.fillStyle = 'rgba(255,250,220,.95)';
-    x.beginPath(); x.moveTo(0, 32); x.lineTo(32, 29); x.lineTo(64, 32); x.lineTo(32, 35); x.fill();
-    x.beginPath(); x.moveTo(32, 0); x.lineTo(35, 32); x.lineTo(32, 64); x.lineTo(29, 32); x.fill();
-  }));
-  /* the sky: Bob-omb Battlefield's blue, deeper overhead, and soft heaps of cloud round the horizon */
-  PIC.cloud = texOf(canvas(256, 128, (x, w, h) => {
-    for (let i = 0; i < 14; i++) {
-      const cx = rnd(40, w - 40), cy = rnd(55, 95), r = rnd(22, 46);
-      const g = x.createRadialGradient(cx - r * 0.3, cy - r * 0.4, 2, cx, cy, r);
-      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.75, 'rgba(244,248,255,.95)'); g.addColorStop(1, 'rgba(235,242,255,0)');
-      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
-    }
-  }));
+  if (PIC.shadow) return PIC;
+  /* nothing is ever drawn with this: the shadows take the game's own picture before the course is shown
+     (27-bob-screen.js); it only stands in while they are made */
+  PIC.shadow = new THREE.Texture();
   return PIC;
 }
 
@@ -229,20 +208,23 @@ const N64_LIGHT = new THREE.Vector3(1, 1, 1).normalize();
 const N64_FOG = new THREE.Vector3(160 / 255, 160 / 255, 160 / 255);
 const N64_VERT = `
 attribute vec4 cn;
-uniform float lit, fogOn;
+uniform float lit, fogOn, texgen;
 uniform vec3 amb, dif, lightDir;
+uniform vec2 tg, texSize;
 varying vec2 vUv;
 varying vec4 vShade;
 varying float vFog;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  if (lit > 0.5) {
-    vec3 n = cn.xyz * 255.0;
-    n = mix(n, n - 256.0, step(127.5, n)) / 127.0;
-    /* the RSP takes the light into the model's own space and normalises it, so a model's scale never brightens it */
-    vShade = vec4(min(amb + dif * max(dot(normalize(normalMatrix * n), lightDir), 0.0), vec3(1.0)), 1.0);
-  } else vShade = cn;
-  vUv = uv;
+  vec3 n = cn.xyz * 255.0;
+  n = mix(n, n - 256.0, step(127.5, n)) / 127.0;
+  /* the RSP takes the light into the model's own space and normalises it, so a model's scale never brightens it */
+  vec3 nv = normalize(normalMatrix * n);
+  if (lit > 0.5) vShade = vec4(min(amb + dif * max(dot(nv, lightDir), 0.0), vec3(1.0)), 1.0);
+  else vShade = cn;
+  /* G_TEXTURE_GEN, the Power Star's gold: s and t made from the normal as the camera sees it, against the two
+     directions rendering_graph_node.c's guLookAtReflect gives (s up, t right), over gsSPTexture's scale */
+  vUv = texgen > 0.5 ? ((vec2(nv.y, nv.x) + 1.0) * tg / 128.0 + 0.5) / texSize : uv;
   /* the RSP's fog: depth after projection through near 100, far 30000, times 6400, less 6144, over 255 */
   vFog = fogOn * clamp(1.17181 - 5036.4 / max(-mv.z, 1.0), 0.0, 1.0);
   gl_Position = projectionMatrix * mv;
@@ -274,19 +256,17 @@ void main() {
   gl_FragColor = vec4(mix(c.rgb, fogColor, vFog), c.a);
 }`;
 const N64_CC = { MODULATERGB: 1, MODULATEIA: 2, DECALRGBA: 3, MODULATERGBA: 4, DECALFADEA: 5, SHADEFADEA: 6, BLENDRGBFADEA: 7,
-                 BLENDRGBA: 8, DECALFADE: 9, MODULATERGBFADEA: 10, SHADE: 0 };
-/* a picture for a baked group: the player's own game's (27-bob-rom.js) when it has been read, else the one that came
-   with the earlier model; the trees' shadows have no such copy, so they take the shadow already here for Mario */
+                 BLENDRGBA: 8, DECALFADE: 9, MODULATERGBFADEA: 10, MODULATEIFADEA: 10, SHADE: 0 };
+/* a picture for a baked group: the player's own game's (27-bob-rom.js), decoded before the course is built */
 const wrapOf = c => (c & 2 ? THREE.ClampToEdgeWrapping : c & 1 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
 function n64Tex(D, m) {
   if (!m.tex) return null;
   const cache = D.texCache || (D.texCache = {}), key = m.tex + '|' + m.cms + '|' + m.cmt;
   if (cache[key]) return cache[key];
-  const url = (D.romTex && D.romTex[m.tex]) || (D.level.tex && D.level.tex[m.tex]);
-  let t;
-  if (url) t = new THREE.TextureLoader().load(url);
-  else if (m.tex === 'generic_0900B000') { t = pics().shadow.clone(); t.needsUpdate = true; }
-  else return null;                                                /* none to be had yet: the shading alone */
+  const img = D.romImg && D.romImg[m.tex];
+  if (!img) return null;
+  const t = new THREE.Texture(img);
+  t.needsUpdate = true;
   t.flipY = false;
   t.encoding = THREE.LinearEncoding;
   t.wrapS = wrapOf(m.cms); t.wrapT = wrapOf(m.cmt);
@@ -308,6 +288,8 @@ function n64Model(D, groups) {
       vertexShader: N64_VERT, fragmentShader: N64_FRAG,
       uniforms: {
         map: { value: map }, hasMap: { value: map ? 1 : 0 }, cutout: { value: m.layer === 4 ? 1 : 0 }, cc: { value: N64_CC[m.cc] || 0 },
+        texgen: { value: m.tg ? 1 : 0 }, tg: { value: new THREE.Vector2(...(m.tg || [0, 0])) },
+        texSize: { value: new THREE.Vector2(map ? map.image.width : 32, map ? map.image.height : 32) },
         lit: { value: m.lit }, fogOn: { value: m.fog }, lightDir: { value: N64_LIGHT }, fogColor: { value: N64_FOG },
         amb: { value: new THREE.Vector3(...(m.amb || [0, 0, 0]).map(v => v / 255)) },
         dif: { value: new THREE.Vector3(...(m.dif || [0, 0, 0]).map(v => v / 255)) },
@@ -343,7 +325,7 @@ function n64Model(D, groups) {
    inst.state            the switches' case (the game's oAnimState) */
 function cast(r, key, holder, opts) {
   const D = data, C = D && D.cast && D.cast[key];
-  if (!C || (!D.romTex && !(opts && opts.plain))) return null;
+  if (!C || !D.romImg) return null;
   const inst = { key, C, root: new THREE.Group(), holder, top: null, bills: [], switches: [], anim: -1, fr: 0, speed: 1, state: 0,
                  billboard: !!(opts && opts.billboard) };
   const visit = (n, parent) => {
@@ -450,31 +432,11 @@ function retexture(D) {
   for (const { mat, m } of D.n64Mats || []) {
     const t = n64Tex(D, m);
     mat.uniforms.map.value = t; mat.uniforms.hasMap.value = t ? 1 : 0;
+    if (t) mat.uniforms.texSize.value.set(t.image.width, t.image.height);
   }
   for (const t of Object.values(old)) t.dispose();
 }
 function course(D) { return n64Model(D, D.level.groups); }
-/* the sky with no game to read the real one out of: a painted blue, and clouds round the horizon */
-function sky(scene) {
-  const grp = new THREE.Group(); scene.add(grp);
-  const geo = new THREE.SphereGeometry(60000, 32, 16), col = [], top = new THREE.Color('#3f74de'), hor = new THREE.Color('#bfe0ff'), low = new THREE.Color('#9cc8f5');
-  const P = geo.attributes.position;
-  for (let i = 0; i < P.count; i++) {
-    const y = P.getY(i) / 60000, c = y > 0 ? hor.clone().lerp(top, Math.pow(y, 0.6)) : hor.clone().lerp(low, Math.min(1, -y * 4));
-    col.push(c.r, c.g, c.b);
-  }
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  const s = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, depthWrite: false, fog: false }));
-  s.renderOrder = -10; grp.add(s);
-  const P2 = pics();
-  for (let i = 0; i < 16; i++) {
-    const a = i / 16 * TAU + rnd(-0.15, 0.15), d = 38000;
-    const c = new THREE.Sprite(new THREE.SpriteMaterial({ map: P2.cloud, transparent: true, depthWrite: false, fog: false, opacity: rnd(0.75, 0.95) }));
-    c.position.set(Math.sin(a) * d, rnd(1500, 5200), Math.cos(a) * d); c.scale.set(rnd(9000, 15000), rnd(4000, 6000), 1); c.renderOrder = -9;
-    grp.add(c);
-  }
-  return grp;
-}
 /* ══ THE REAL SKY ══════════════════════════════════════════════
    Bob-omb Battlefield's own (the "water" sky, out of the player's game),
    drawn the way src/game/skybox.c draws it: not a dome round the course
@@ -496,8 +458,9 @@ void main() {
   float x = at.x + 160.0 + (vS.x - 0.5) * 240.0 * at.z, y = at.y - vS.y * 240.0;
   gl_FragColor = texture2D(map, vec2(fract(x / 1280.0), clamp((960.0 - y) / 960.0, 0.0, 1.0)));
 }`;
-function realSky(r, url) {
-  const t = new THREE.TextureLoader().load(url);
+function realSky(r, img) {
+  const t = new THREE.Texture(img);
+  t.needsUpdate = true;
   t.flipY = false; t.encoding = THREE.LinearEncoding; t.generateMipmaps = false;
   t.minFilter = t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
@@ -505,8 +468,6 @@ function realSky(r, url) {
     uniforms: { map: { value: t }, at: { value: new THREE.Vector3() } },
   }));
   m.frustumCulled = false; m.renderOrder = -100;
-  if (r.skyObj) r.skyObj.visible = false;
-  if (r.realSky) { r.scene.remove(r.realSky); r.realSky.material.uniforms.map.value.dispose(); }
   r.scene.add(r.realSky = m);
 }
 /* skybox.c's sums, for where the camera is looking now */
@@ -528,9 +489,8 @@ function skyStep(r) {
    HIS axes (x across him, his left; y up; z the way he faces), and turned
    into each bone's own frame through the pose he was built in. */
 function mario(D) {
-  const tl = new THREE.TextureLoader();
-  const t = tl.load(D.mario.tex); t.encoding = THREE.sRGBEncoding; t.flipY = false;
-  const mat = new THREE.MeshLambertMaterial({ map: t });
+  /* only his frame: the game's own Mario (realMario) is what is drawn on it */
+  const mat = new THREE.MeshBasicMaterial({ visible: false });
   const bones = D.mario.bones.map(b => {
     const o = new THREE.Object3D(); o.name = b.name;
     new THREE.Matrix4().fromArray(b.m).decompose(o.position, o.quaternion, o.scale);
@@ -579,8 +539,12 @@ function enter(box, star, back) {
     '<span><b>Shift</b> crouch; in the air, ground pound</span>' +
     '<span><b>Q</b> / <b>E</b> or drag turn the camera</span><span><b>Esc</b> back to the tavern</span></div>' +
     '<button class="bs-leave" type="button">Back to the tavern</button>' +
-    '<button class="bs-rom" type="button" title="The course\'s textures and sky, and the pictures Mario and the rest of the cast are drawn with, are read out of your own copy of Super Mario 64, the way libsm64 does it. Only the pictures are kept, on this computer; the ROM is not.">Real textures: use my SM64 ROM</button>' +
-    '<input class="bs-romfile" type="file" accept=".z64,.n64,.v64,.rom,.bin" hidden><div class="bs-romsay"></div>';
+    '<div class="bs-ask"><div class="bs-ask-h">Bob-omb Battlefield</div><p>Everything here (the course, its sky, Mario and everyone in it, and how they move) is the game\'s own, ' +
+    'read out of your own copy of Super Mario 64, the way libsm64 does it. Choose your ROM (.z64, .n64 or .v64), or drop it here: it is asked for once. ' +
+    'Only the pictures are kept, on this computer; the ROM is not.</p>' +
+    '<div class="bs-ask-do"><button class="bs-rom" type="button">Choose my SM64 ROM</button><button class="bs-back" type="button">Back to the tavern</button></div>' +
+    '<div class="bs-romsay"></div></div>' +
+    '<input class="bs-romfile" type="file" accept=".z64,.n64,.v64,.rom,.bin" hidden>';
   doc.body.appendChild(el);
   const gl = el.querySelector('.bs-gl'), fx = el.querySelector('.bs-fx');
   const ren = new THREE.WebGLRenderer({ canvas: gl, antialias: true, alpha: true });
@@ -598,18 +562,19 @@ function enter(box, star, back) {
   r.s2.add(r.star2);
   size(r);
   el.querySelector('.bs-leave').addEventListener('click', () => leave());
+  el.querySelector('.bs-back').addEventListener('click', () => leave());
   /* the player's own game, for the real pictures: picked, or dropped anywhere on the course */
   const romFile = el.querySelector('.bs-romfile');
   el.querySelector('.bs-rom').addEventListener('click', () => romFile.click());
   romFile.addEventListener('change', () => { const f = romFile.files && romFile.files[0]; romFile.value = ''; if (f) readRom(r, f); });
   el.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
   el.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) { e.preventDefault(); readRom(r, f); } });
-  el.addEventListener('pointerdown', e => { if (e.target.closest('.bs-leave, .bs-rom')) return; r.drag = { x: e.clientX, y: e.clientY, moved: 0 }; e.preventDefault(); });
+  el.addEventListener('pointerdown', e => { if (e.target.closest('.bs-leave, .bs-ask')) return; r.drag = { x: e.clientX, y: e.clientY, moved: 0 }; e.preventDefault(); });
   root.addEventListener('pointermove', r.onMove = e => { if (!r.drag || !r.camR) return; const dx = e.clientX - r.drag.x, dy = e.clientY - r.drag.y; r.drag.moved += Math.abs(dx) + Math.abs(dy); r.camR.yaw -= dx * 0.006; r.camR.pitch = clamp(r.camR.pitch + dy * 0.004, -0.15, 1.1); r.drag.x = e.clientX; r.drag.y = e.clientY; if (r.drag.moved > 6) r.camR.manual = (now() - r.t0); });
   root.addEventListener('pointerup', r.onUp = e => { if (r.drag && r.drag.moved < 6 && e.button === 0 && r.phase === 'play') r.pressed.add('Mouse'); r.drag = null; });
   el.addEventListener('wheel', e => { e.preventDefault(); e.stopPropagation(); if (r.camR) r.camR.dist = clamp(r.camR.dist * (e.deltaY > 0 ? 1.08 : 0.93), 520, 1900); }, { passive: false });
   el.addEventListener('contextmenu', e => e.preventDefault());
-  load().then(D => { if (run === r) world(r, D); }).catch(err => { if (run === r) r.fail = String(err && err.message || err); });
+  load().then(D => { if (run === r) return begin(r, D); }).catch(err => { if (run === r) r.fail = String(err && err.message || err); });
   requestAnimationFrame(loop);
 }
 function size(r) {
@@ -649,7 +614,6 @@ function world(r, D) {
   /* the course does its own fog (the N64's, above); this is the nearest straight-line match to it for Mario and the
      cast, applied after the colours are out, as the N64's is: grey, nothing near, most of the way at the far side */
   scene.fog = new THREE.Fog(0xa0a0a0, 4300, 17000);
-  r.skyObj = sky(scene);
   D.n64Mats = []; D.castTpl = {};
   scene.add(course(D));
   /* the game's own collision for the course (its surface types and all), not the picture of it */
@@ -682,46 +646,59 @@ function world(r, D) {
   r.n64 = name => (D.objs && D.objs[name] ? n64Model(D, D.objs[name]) : null);
   r.castInsts = [];
   r.cast = (key, holder, opts) => cast(r, key, holder, opts);
-  r.castReady = () => !!(D.cast && D.romTex);
+  r.castReady = () => !!(D.cast && D.romImg);
   if (root.BobWorld) root.BobWorld.build(r, D);
-  r.ready = true;
-  /* the real pictures, if this computer has read them out of the player's game before */
-  if (D.romTex) useRom(r, { tex: D.romTex, sky: D.romSky, sheet: D.romSheet });
-  else if (root.BobROM && D.rom) root.BobROM.kept(D.rom).then(out => {
-    if (run !== r) return;
-    if (out) useRom(r, out);
-    /* none kept: say, once the course is open, what the button in the corner is for */
-    else setTimeout(() => { if (run === r && !r.romTried && !r.el.classList.contains('rom-on')) romSay(r, 'Choose your own copy of Super Mario 64 (bottom right) and the course, its sky, Mario and everything in it are drawn with the game\'s own textures, models and animations.'); }, 6500);
-  });
 }
 
-/* ══ THE PLAYER'S OWN GAME ═════════════════════════════════════
-   27-bob-rom.js reads the pictures out of it; here they are put on. */
+/* ══ THE PLAYER'S OWN GAME, FIRST ══════════════════════════════
+   The course is only ever drawn with the game's own pictures, read out
+   of the player's ROM by 27-bob-rom.js: kept on this computer once read,
+   or asked for here, on the white, before there is anything to see. Each
+   picture is decoded before the course is built, so nothing is ever drawn
+   without its own. */
 const RELEASE = { us: 'US', jp: 'Japanese', eu: 'European', sh: 'Shindou' };
+function begin(r, D) {
+  if (D.romOut) return open(r, D, D.romOut);
+  if (!root.BobROM || !D.rom) { r.fail = 'the ROM reader is not there'; return null; }
+  return root.BobROM.kept(D.rom).then(out => {
+    if (run !== r) return null;
+    if (out) return open(r, D, out);
+    r.el.classList.add('rom-ask');
+    return null;
+  });
+}
+const decoded = url => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = url; });
+function open(r, D, out) {
+  r.el.classList.add('rom-busy');
+  const names = Object.keys(out.tex);
+  return Promise.all([Promise.all(names.map(n => decoded(out.tex[n]))), out.sky ? decoded(out.sky) : null]).then(([imgs, sky]) => {
+    if (run !== r) return null;
+    D.romOut = out; D.romTex = out.tex; D.romSheet = out.sheet;
+    D.romImg = {};
+    names.forEach((n, i) => { if (imgs[i]) D.romImg[n] = imgs[i]; });
+    world(r, D);
+    if (sky) realSky(r, sky);
+    realMario(r);
+    r.el.classList.remove('rom-ask');
+    r.el.classList.add('rom-on');
+    return root.BobWorld && root.BobWorld.rom ? root.BobWorld.rom(r, D) : null;
+  }).then(() => { if (run === r && r.scene) r.ready = true; })
+    .catch(err => { if (run === r) { r.el.classList.add('rom-ask'); romSay(r, 'The course could not be built from that ROM: ' + ((err && err.message) || err)); } })
+    .then(() => r.el.classList.remove('rom-busy'));
+}
 function readRom(r, file) {
   const D = data;
-  if (!D || !D.rom || !root.BobROM || r.el.classList.contains('rom-busy')) return;
-  r.romTried = true;
+  if (!D || !D.rom || !root.BobROM || r.scene || r.el.classList.contains('rom-busy')) return;
   romSay(r, 'Reading ' + file.name + '\u2026');
   r.el.classList.add('rom-busy');
   root.BobROM.fromFile(file, D.rom)
-    .then(out => { if (run !== r) return; useRom(r, out); romSay(r, 'Bob-omb Battlefield is now drawn with your ' + (RELEASE[out.ver] || '') + ' cartridge\'s own textures, sky, Mario and cast. Only the pictures are kept, on this computer; the ROM is not.'); })
+    .then(out => { if (run !== r) return null; romSay(r, 'Your ' + (RELEASE[out.ver] || '') + ' cartridge it is.'); r.el.classList.remove('rom-busy'); return open(r, D, out); })
     .catch(err => { if (run === r) romSay(r, (err && err.message) || String(err)); })
     .then(() => r.el.classList.remove('rom-busy'));
-}
-function useRom(r, out) {
-  const D = data;
-  D.romTex = out.tex; D.romSky = out.sky; D.romSheet = out.sheet;
-  retexture(D);
-  if (out.sky) realSky(r, out.sky);
-  realMario(r);
-  r.el.classList.add('rom-on');
-  if (root.BobWorld && root.BobWorld.rom) root.BobWorld.rom(r, D);
 }
 function romSay(r, text) {
   const n = r.el.querySelector('.bs-romsay');
   n.textContent = text; n.classList.add('on');
-  clearTimeout(r.romSayT); r.romSayT = setTimeout(() => n.classList.remove('on'), 6500);
 }
 /* what the things in the course can do to Mario (27-bob-world.js) */
 function api(r) {
@@ -739,12 +716,12 @@ function api(r) {
       M.ground = false; M.kind = 'hurt'; M.airT = 0; M.vy = 22 * F; M.v = -16; M.side = 0; M.act = ''; M.peak = M.p.y;
       r.shake = Math.max(r.shake || 0, 0.25);
     },
-    coin(v) {
+    coin(v, at) {
       const G = g(), before = G.coins;
       G.coins += v; G.hp = Math.min(8, G.hp + v);
-      /* every fifty a life, and a hundred is a star */
-      if (Math.floor(G.coins / 50) > Math.floor(before / 50)) this.life();
-      if (G.coins >= 100 && !r.hundred) { r.hundred = true; const M = m(); spawnStar(r, M.p.x, M.p.y + 450, M.p.z, '100 Coins'); }
+      /* interact_coin: a wedge back for each coin's worth, and the hundredth brings a star (no life for fifty: that is
+         only on the course-complete screen's tally) */
+      if (before < 100 && G.coins >= 100 && at && root.BobWorld) root.BobWorld.coinStar(r, at, '100 Coins');
     },
     heal(n) { g().hp = Math.min(8, g().hp + n); },
     life() { g().lives++; },
@@ -753,13 +730,6 @@ function api(r) {
     shake(d) { r.shake = Math.max(r.shake || 0, d); },
     flash(d, mid) { r.flashT = now(); r.flashD = d; r.flashMid = mid; },
   };
-}
-function spawnStar(r, x, y, z, name) {
-  const W = root.BobWorld && root.BobWorld.W;
-  if (!W) return;
-  /* the world module's own star, so that it turns and can be taken like the others */
-  const s = starModel(r.starData); s.scale.setScalar(220); s.position.set(x, y, z); r.scene.add(s);
-  W.stars.push({ s, p: s.position, name, got: false, y0: y });
 }
 function die(r) {
   const M = r.m;
@@ -899,7 +869,6 @@ function step(r, t, dt) {
   if (root.BobWorld) root.BobWorld.step(r, t, dt);
   /* the shadow on the ground under him */
   root.BobScreen.shade(r.shadow, m.p.x, m.p.y, m.p.z, col, !!m.spawned);
-  stepSprites(r, t, dt);
 }
 function intent(r) {
   const k = r.keys;
@@ -1071,8 +1040,13 @@ function physics(r, t, dt) {
   if (p.y < -3000) { r.api.damage(3, null); respawn(r); }
   m.run += m.v * F * dt;
   m.speed = m.v * F;
-  if (m.ground && m.v > 22 && (m.dust -= dt) < 0) { m.dust = 0.09; puff(r, p, 1, 55); }
+  /* the game's dust (PARTICLE_DUST, 27-bob-world.js draws it): a frame's worth each frame he skids or turns round,
+     digs in from slow (wanting 16 more speed than he has), slides on his belly, or lands at more than 16 */
+  m.dustF = Math.min(1, (m.dustF || 0) + dt * F);
+  const dusty = m.ground && (m.skid > 0 || m.act === 'slide' || (want && (m.held ? 16 : 32) * want.mag - m.v > 16) || (t - m.landT < 4 / F && m.v > 16));
+  if (dusty && m.dustF >= 1 && fx()) { m.dustF = 0; fx().dust(r, p); }
 }
+const fx = () => root.BobWorld && root.BobWorld.fx;
 function slideAt(t) {
   const ty = t.type || '';
   if (/VERY_SLIPPERY/.test(ty)) return 0.98;
@@ -1089,12 +1063,11 @@ function jumpFrom(r, t, force) {
   if (m.held) kind = 0;
   m.chain = kind; m.vy = JUMP[kind] + m.v * CARRY[kind]; m.v *= 0.8;
   air(r, ['jump', 'jump2', 'jump3'][kind]); m.cut = kind < 2;
-  puff(r, m.p, 3, 70);
 }
 function air(r, kind) { const m = r.m; m.ground = false; m.kind = kind; m.airT = 0; m.skid = 0; m.act = ''; m.kicked = false; m.cut = false; m.peak = m.p.y; }
-function longJump(r) { const m = r.m; m.vy = 30 * F; m.v = Math.min(48, m.v * 1.5); air(r, 'longjump'); puff(r, m.p, 3, 70); }
-function backflip(r) { const m = r.m; m.vy = 62 * F; m.v = -16; air(r, 'backflip'); puff(r, m.p, 3, 70); }
-function sideflip(r, want) { const m = r.m; if (want) m.yaw = want.yaw; m.vy = 62 * F; m.v = 8; air(r, 'sideflip'); puff(r, m.p, 3, 70); }
+function longJump(r) { const m = r.m; m.vy = 30 * F; m.v = Math.min(48, m.v * 1.5); air(r, 'longjump'); }
+function backflip(r) { const m = r.m; m.vy = 62 * F; m.v = -16; air(r, 'backflip'); }
+function sideflip(r, want) { const m = r.m; if (want) m.yaw = want.yaw; m.vy = 62 * F; m.v = 8; air(r, 'sideflip'); }
 function dive(r, fromGround) {
   const m = r.m;
   m.v = Math.min(48, m.v + 15); if (fromGround) m.vy = 0.25 * m.v * F * 0.5; else m.vy = Math.max(m.vy, 0);
@@ -1109,15 +1082,15 @@ function throwIt(r) {
 function land(r, t, f) {
   const m = r.m, p = m.p, W = root.BobWorld;
   p.y = f.h; m.ground = true; m.floorN = f.t.ny; m.floorT = f.t; m.squash = 1; m.side = 0;
-  const fell = m.peak - p.y, kind = m.kind, vy = m.vy;
+  const fell = m.peak - p.y, kind = m.kind;
   m.landT = t;
   /* what he landed from decides what the next jump can be */
   m.last = kind === 'jump' || kind === 'kick' ? 0 : kind === 'jump2' ? 1 : kind === 'fall' ? -1 : 2;
   m.vy = 0; m.kind = 'run'; m.actT = 0; m.act = '';
-  if (kind === 'pound') { m.act = 'poundland'; r.api.shake(0.25); puff(r, p, 8, 120); if (W) W.hit(r, 'pound', p.clone().setY(p.y + 10), 140); }
+  /* a ground pound's landing: the game's ring of mist and its eight little stars */
+  if (kind === 'pound') { m.act = 'poundland'; r.api.shake(0.25); if (fx()) fx().pound(r, p); if (W) W.hit(r, 'pound', p.clone().setY(p.y + 10), 140); }
   else if (kind === 'dive') { m.act = 'slide'; m.slideCrouch = false; }
   else if (kind === 'hurt' || kind === 'thrown') { m.act = 'hurt'; m.v = Math.min(m.v, 0); }
-  else if (vy < -900 || fell > 400) puff(r, p, 5, 90);
   /* a long way down is a hard landing (the game's 1150) */
   if (fell > 1150 && kind !== 'pound' && kind !== 'thrown') r.api.damage(3, null);
   if (W && W.stomp) W.stomp(r, kind);
@@ -1339,38 +1312,6 @@ function camera(r, t, dt) {
 }
 
 /* ══ LITTLE THINGS ═════════════════════════════════════════════ */
-function puff(r, p, n, size) {
-  const P = pics();
-  for (let i = 0; i < n; i++) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: P.ball, transparent: true, depthWrite: false, opacity: 0, color: 0xf3ede2 }));
-    const a = rnd(0, TAU);
-    s.position.set(p.x + Math.cos(a) * size * 0.5, p.y + rnd(10, 40), p.z + Math.sin(a) * size * 0.5);
-    s.userData = { b: now(), l: rnd(0.35, 0.55), s: size * rnd(0.8, 1.3), vx: Math.cos(a) * size * 1.5, vz: Math.sin(a) * size * 1.5, y0: s.position.y };
-    r.scene.add(s); r.sprites.push({ g: s });
-  }
-}
-function spark(r, p, spread) {
-  const P = pics();
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: P.glint, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, opacity: 0 }));
-  s.position.set(p.x + rnd(-1, 1) * spread, p.y + rnd(-1, 1) * spread, p.z + rnd(-1, 1) * spread);
-  s.userData = { b: now(), l: rnd(0.4, 0.7), s: rnd(60, 120), glint: true };
-  r.scene.add(s); r.sprites.push({ g: s });
-}
-function stepSprites(r, t, dt) {
-  const n = now();
-  r.sprites = r.sprites.filter(o => {
-    if (!o.g) return true;                                         /* the 2D ones are the canvas's */
-    const s = o.g, u = s.userData, k = (n - u.b) / u.l;
-    if (k >= 1) { r.scene.remove(s); s.material.dispose(); return false; }
-    if (u.glint) { const w = Math.sin(Math.PI * k); s.scale.setScalar(u.s * (0.2 + 0.8 * w)); s.material.opacity = w; s.material.rotation = k * 2; }
-    else {
-      s.scale.setScalar(u.s * (0.5 + 0.7 * easeOut(k)));
-      s.material.opacity = 0.85 * (1 - k);
-      s.position.x += u.vx * dt; s.position.z += u.vz * dt; s.position.y = u.y0 + 30 * k;
-    }
-    return true;
-  });
-}
 /* twinkles on the flat canvas (the star's own light, over the tavern) */
 function twinkles(f, r, t) {
   f.globalCompositeOperation = 'lighter';

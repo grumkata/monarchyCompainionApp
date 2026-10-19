@@ -29,8 +29,10 @@
                  (break them), cannons shut in the ground, the iron balls
                  rolling down the mountain, a heart, a 1-up, the warps
 
-   The characters are built from the same plain shapes the N64 ones are:
-   none of the game's pictures are in here.
+   Each is the game's own model and animation (the decompilation's actors)
+   drawn with the player's own ROM's pictures, and every effect is the actor
+   the game spawns for it. The plain shapes below only stand in while an
+   object is put together: they are never drawn.
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
@@ -198,7 +200,9 @@ function build(r, D) {
   pics();
   const G = D.game, sc = r.scene, col = r.col;
   W = r.wd = { r, coins: [], foes: [], solids: [], tops: [], signs: [], spr: [], stars: [], posts: [], warps: [], balls: [], spawners: [], fx: [], red: 0,
-                trees: [], boards: [], buddies: [], lids: [], outlines: [], redStar: null, hundred: false, star6: null, king: null, chompObj: null, gate: null, talk: G.talk };
+                trees: [], boards: [], buddies: [], lids: [], outlines: [], redStar: null, hundred: false, star6: null, king: null, chompObj: null, gate: null, talk: G.talk,
+                parts: [] };
+  W.skinned = !!(r.castReady && r.castReady());
   const ground = (x, y, z, up) => { const f = col.floor(x, (y || 0) + (up == null ? 400 : up), z); return f ? f.h : (y || 0); };
   const act1 = o => !o.acts || /ACT_1\b|ALL_ACTS/.test(o.acts);
   for (const o of G.objs) {
@@ -384,34 +388,77 @@ function lifts(x, y, z) {
     return skinned('lift', o);
   });
 }
+/* the red coins' Star Marker (bhvRedCoinStarMarker): the game's see-through star, laid flat 60 over the floor at one
+   and a half times its size (three quarters as deep), turning 0x100 a frame */
 function marker(x, y, z) {
-  /* the Star Marker: where the red coins' star will come, as a shadow of one */
-  const s = starModel(); if (!s) return;
-  s.position.set(x, y, z); s.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshBasicMaterial({ color: 0x223355, transparent: true, opacity: 0.45, depthWrite: false }); } });
-  add(s); W.markerObj = s;
+  const f = W.r.col.floor(x, y + 200, z), h = holder(W.r.scene, x, (f ? f.h : y) + 60, z, 1.5);
+  h.scale.z = 1.5 * 0.75; h.rotation.order = 'YXZ'; h.rotation.x = Math.PI / 2;
+  W.r.cast('marker', h, { billboard: false });
+  W.markerObj = h;
 }
-function starModel() {
-  const L = root.GOBLIN_LOOT && root.GOBLIN_LOOT.star;
-  if (!L) return null;
-  const g = new THREE.Group(), tl = new THREE.TextureLoader();
-  for (const pr of L.prims) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pr.p, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(pr.n, 3));
-    if (pr.u) geo.setAttribute('uv', new THREE.Float32BufferAttribute(pr.u, 2));
-    geo.setIndex(pr.i);
-    const tx = tl.load(L.tex[pr.t]); tx.encoding = THREE.sRGBEncoding; tx.flipY = false;
-    g.add(new THREE.Mesh(geo, pr.k === 'matcap' ? new THREE.MeshMatcapMaterial({ matcap: tx }) : new THREE.MeshBasicMaterial({ map: tx, transparent: true })));
+/* a Power Star (bhvStar), turning 0x800 a frame; `from`, if given, is where it comes out of (bhvStarSpawnCoordinates):
+   it spins there for 21 frames, flies in an arc 400 high to its place over 30 more, rises and drops onto it, and only
+   then can be had */
+function star(x, y, z, name, from) {
+  const h = holder(W.r.scene, x, y, z);
+  W.r.cast('star', h, { billboard: false });
+  const o = { s: h, p: h.position, name, got: false, home: new THREE.Vector3(x, y, z), live: !from, acc: 0, t: 0, act: 0, sh: shadowDisc('star') };
+  if (from) {
+    h.position.copy(from);
+    const dx = x - from.x, dz = z - from.z;
+    o.yaw = Math.atan2(dx, dz); o.fv = Math.hypot(dx, dz) / 30; o.vy = (y - from.y) / 30; o.base = from.y;
   }
-  const b = new THREE.Box3().setFromObject(g), c = b.getCenter(new THREE.Vector3()), k = 220 / (b.max.y - b.min.y);
-  g.children.forEach(m => m.position.sub(c)); g.scale.setScalar(k); g.rotation.y = -Math.PI / 2;
-  const o = new THREE.Group(); o.add(g); return o;
-}
-function star(x, y, z, name) {
-  const s = starModel(); if (!s) return null;
-  s.position.set(x, y, z); add(s);
-  const o = { s, p: s.position, name, got: false, y0: y };
   W.stars.push(o); return o;
+}
+/* the hundredth coin's (bhv_spawn_star_no_level_exit): out of the coin, hopping over to 250 above where Mario stands */
+function coinStar(r, at, name) {
+  const m = r.m, home = new THREE.Vector3(m.p.x, m.p.y + 250, m.p.z);
+  const o = star(home.x, home.y, home.z, name, at.clone().setY(home.y));
+  o.kind = 'spawned'; o.fv = Math.hypot(home.x - at.x, home.z - at.z) / 23; o.vy = 50; o.g = -4; o.spin = 0x800;
+  mistVar(at, 0, 0, 46);
+  return o;
+}
+function spawnedStep(o) {
+  const h = o.s;
+  if (o.act === 0 && o.vy < 0 && h.position.y < o.home.y) { o.act = 1; o.fv = 0; o.vy = 20; o.g = -1; }
+  else if (o.act === 1) {
+    if (o.vy < -4) o.vy = -4;
+    if (o.vy < 0 && h.position.y < o.home.y) { o.vy = 0; o.g = 0; o.act = 2; o.live = true; }
+  }
+  if (o.act < 2) twinkles(h.position);
+  else if (o.spin > 0x400) o.spin -= 0x40;
+  o.vy += o.g;
+  h.position.x += Math.sin(o.yaw) * o.fv; h.position.z += Math.cos(o.yaw) * o.fv; h.position.y += o.vy;
+  h.rotation.y += o.spin * U;
+}
+function starStep(o, mc, r) {
+  const h = o.s, m = r.m;
+  for (o.acc += r.dtF; o.acc >= 1; o.acc--) {
+    if (o.kind === 'spawned') { spawnedStep(o); continue; }
+    if (o.live) { h.rotation.y += 0x800 * U; continue; }
+    h.rotation.y += 0x1000 * U;
+    if (o.act === 0) { if (++o.t > 20) { o.act = 1; o.t = 0; } continue; }
+    if (o.act === 1) {
+      h.position.x += Math.sin(o.yaw) * o.fv; h.position.z += Math.cos(o.yaw) * o.fv;
+      o.base += o.vy; h.position.y = o.base + Math.sin(o.t * Math.PI / 30) * 400;
+      twinkles(h.position);
+      if (o.t++ === 30) { o.act = 2; o.t = 0; }
+      continue;
+    }
+    if (o.act === 2) {
+      h.position.y += o.t < 20 ? 20 - o.t : -10;
+      h.rotation.y += (0x1000 - o.t * 0x10) * U - 0x1000 * U;
+      twinkles(h.position);
+      o.t++;
+      if (h.position.y < o.home.y) { h.position.y = o.home.y; o.live = true; }
+    }
+  }
+  shade(o.sh, h.position.x, h.position.y, h.position.z, true);
+  /* sCollectStarHitbox: 80 round, 50 high, against Mario's 37 and 160 */
+  if (o.live && Math.hypot(m.p.x - h.position.x, m.p.z - h.position.z) < 117 && m.p.y < h.position.y + 50 && m.p.y + 160 > h.position.y &&
+      r.phase === 'play' && m.act !== 'dead') {
+    o.got = true; r.scene.remove(h); r.scene.remove(o.sh); r.api.star(h.position, o.name);
+  }
 }
 function pitBall(x, y, z) { ball(null, new THREE.Vector3(x, y, z)); }
 function ball(path, at) {
@@ -492,33 +539,33 @@ function step(r, t, dt) {
     c.s.scale.x = 100 * Math.max(0.12, Math.abs(Math.cos(t * 5 + c.ph)));
     if (c.h) { c.h.position.set(c.p.x, c.p.y - 32, c.p.z); c.inst.state = Math.floor(t * F + c.ph * 8) % 8; }
     if (c.p.distanceTo(mc) < 130 && m.act !== 'dead') {
+      const at = (c.h ? c.h.position : c.p).clone();
       r.scene.remove(c.s); if (c.h) r.scene.remove(c.h); r.scene.remove(c.sh); W.coins.splice(i, 1);
       r.api.coin(c.v, c.p);
-      if (c.v === 2) { W.red++; popup(r, String(W.red), c.p, '#ff4a3a'); if (W.red === 8) redStar(r); }
-      sparkle(r, c.p, c.v === 2 ? 0xff5040 : 0xffe060);
+      /* a red coin's count rises off it (not the eighth's: that one brings the star) */
+      if (c.v === 2) { W.red++; if (W.red < 8) number(W.red, at); else redStar(r); }
+      sparkles(at);
     }
   }
   /* the heart turns and heals; the 1-up hops after you */
   if (W.heart && W.heart.h) { W.heart.h.position.copy(W.heart.p); W.heart.h.rotation.y = t * 3; }
-  if (W.heart) { W.heart.s.material.rotation = 0; W.heart.s.scale.x = 140 * Math.abs(Math.cos(t * 3)); if (W.heart.p.distanceTo(mc) < 220 && t - W.heart.used > 1) { W.heart.used = t; r.api.heal(4); sparkle(r, W.heart.p, 0xff5070); } }
+  if (W.heart) { W.heart.s.material.rotation = 0; W.heart.s.scale.x = 140 * Math.abs(Math.cos(t * 3)); if (W.heart.p.distanceTo(mc) < 220 && t - W.heart.used > 1) { W.heart.used = t; r.api.heal(4); } }
   if (W.oneup && !W.oneup.got) {
     const u = W.oneup; u.p.y = u.home.y + Math.abs(Math.sin(t * 4)) * 30;
     if (u.h) u.h.position.copy(u.p);
     shade(u.sh, u.p.x, u.p.y, u.p.z, true);
-    if (u.p.distanceTo(mc) < 140) { u.got = true; r.scene.remove(u.s); if (u.h) r.scene.remove(u.h); r.scene.remove(u.sh); r.api.life(); popup(r, '1-UP', u.p, '#3cd23c'); }
+    if (u.p.distanceTo(mc) < 140) { u.got = true; r.scene.remove(u.s); if (u.h) r.scene.remove(u.h); r.scene.remove(u.sh); r.api.life(); }
   }
   for (const o of W.foes) foeStep(r, o, t, dt, mc);
   for (const b of W.buddies) if (b.inst) blink(b, dt);
   chompStep(r, t, dt, mc);
   kingStep(r, t, dt, mc);
   ballsStep(r, t, dt, mc);
-  /* stars on their spot, turning; touched, they are got */
-  for (const s of W.stars) {
-    if (s.got) continue;
-    s.s.rotation.y += dt * 2.4; s.p.y = s.y0 + Math.sin(t * 2.2) * 20;
-    if (s.p.distanceTo(mc) < 200 && r.phase === 'play' && m.act !== 'dead') { s.got = true; r.scene.remove(s.s); r.api.star(s.p, s.name); }
-  }
-  if (W.markerObj) W.markerObj.rotation.y += dt * 1.2;
+  /* stars turning on their spot, or on their way to it; touched, they are got */
+  r.dtF = dt * F;
+  for (const s of W.stars) if (!s.got) starStep(s, mc, r);
+  if (W.markerObj) { W.markerF = (W.markerF || 0) + dt * F; for (; W.markerF >= 1; W.markerF--) W.markerObj.rotation.y += 0x100 * U; }
+  partsStep(r, dt);
   /* the seesaw tips toward Mario's weight and back to level without him; the lifts go up and down */
   if (W.seesaw) {
     const o = W.seesaw, c = Math.cos(o.yaw), sn = Math.sin(o.yaw), along = (m.p.x - o.x) * sn + (m.p.z - o.z) * c, across = (m.p.x - o.x) * c - (m.p.z - o.z) * sn;
@@ -538,7 +585,6 @@ function step(r, t, dt) {
   for (const p of W.posts) p.m.position.y = p.y + 70 - p.sink;
   /* the warps: stand still on one for a moment and you come out at the other */
   warps(r, t, dt);
-  fxStep(r, t, dt);
   hudStep(r, t);
 }
 
@@ -569,13 +615,14 @@ function foeStep(r, o, t, dt, mc) {
     if (o.p.y < -2000) { o.state = 'gone'; g.visible = false; o.t = 0; }
   } else if (o.state === 'squish') {
     g.scale.y = Math.max(0.15, 1 - o.t * 6);
-    if (o.t > 0.5) { o.state = 'gone'; g.visible = false; o.sh.visible = false; o.t = 0; coin(o.p.x, o.p.y + 60, o.p.z, 1); }
+    /* obj_die_if_health_non_positive: gone in the game's puff of mist, a coin left */
+    if (o.t > 0.5) { o.state = 'gone'; g.visible = false; o.sh.visible = false; o.t = 0; mistVar(o.p, 0, 0, 46); coin(o.p.x, o.p.y + 60, o.p.z, 1); }
   } else if (o.state === 'knocked') {
     o.vy -= 3600 * dt; o.p.addScaledVector(o.vel, dt); o.p.y += o.vy * dt; g.rotation.x -= dt * 10;
     const f = r.col.floor(o.p.x, o.p.y + 80, o.p.z);
     if (f && o.p.y <= f.h && o.vy < 0) {
       o.p.y = f.h; g.rotation.x = 0;
-      if (o.kind === 'goomba') { o.state = 'gone'; g.visible = false; o.sh.visible = false; o.t = 0; puff(r, o.p, 0xffffff); coin(o.p.x, o.p.y + 60, o.p.z, 1); }
+      if (o.kind === 'goomba') { o.state = 'gone'; g.visible = false; o.sh.visible = false; o.t = 0; mistVar(o.p, 0, 0, 46); coin(o.p.x, o.p.y + 60, o.p.z, 1); }
       else { o.state = 'chase'; o.lit = o.lit || t; }
     }
   } else {
@@ -607,8 +654,14 @@ function foeStep(r, o, t, dt, mc) {
     }
     if (o.kind === 'bobomb' && o.lit && t - o.lit > 4.5) explode(r, o);
   }
-  /* the fuse burning */
-  if (o.kind === 'bobomb' && o.lit && o.state !== 'gone') { if (!o.spark) { o.spark = sprite(P.spark, 40, 40, { blending: THREE.AdditiveBlending, alphaTest: 0 }); g.userData.body.add(o.spark); o.spark.position.set(0, 74, 0); } o.spark.scale.setScalar(30 + Math.sin(t * 40) * 10); o.spark.visible = true; }
+  /* the fuse burning: a puff of the game's smoke every eight frames, every two once it has burned 120 */
+  if (o.kind === 'bobomb' && o.lit && o.state !== 'gone') {
+    for (o.fuseF = (o.fuseF || 0) + dt * F; o.fuseF >= 1; o.fuseF--) {
+      const n = o.fuseN || 0;
+      if (!(n & (n > 120 ? 1 : 7))) fuseSmoke(o.p);
+      o.fuseN = n + 1;
+    }
+  } else o.fuseN = 0;
   if (o.sh) shade(o.sh, o.p.x, o.p.y, o.p.z, g.visible);
   /* the real model's own steps: walking (0), faster at a chase, or a Bob-omb held (1); and blinking */
   if (o.inst) {
@@ -616,16 +669,16 @@ function foeStep(r, o, t, dt, mc) {
     blink(o, dt);
   }
 }
-function stomp(r, o) { o.state = 'squish'; o.t = 0; const m = r.m; m.vy = 34 * F; m.kind = 'jump'; m.airT = 0; m.cut = false; m.kicked = false; puff(r, o.p, 0xffffff); }
+function stomp(r, o) { o.state = 'squish'; o.t = 0; const m = r.m; m.vy = 34 * F; m.kind = 'jump'; m.airT = 0; m.cut = false; m.kicked = false; }
 function explode(r, o) {
   if (o.state === 'gone') return;
   const m = r.m;
-  boom(r, o.p.clone().setY(o.p.y + 60));
+  explosion(o.p); r.api.shake(0.3);
   if (m.held === o) m.held = null;
   if (m.p.distanceTo(o.p) < 300 && m.act !== 'dead') r.api.damage(2, o.p);
-  o.state = 'gone'; o.g.visible = false; o.t = 0; o.lit = 0; if (o.spark) o.spark.visible = false; if (o.sh) o.sh.visible = false;
+  o.state = 'gone'; o.g.visible = false; o.t = 0; o.lit = 0; if (o.sh) o.sh.visible = false;
 }
-function respawnFoe(r, o) { o.p.copy(o.home); o.g.visible = true; o.g.scale.set(1, 1, 1); o.state = 'wander'; o.lit = 0; puff(r, o.p, 0xffffff); }
+function respawnFoe(r, o) { o.p.copy(o.home); o.g.visible = true; o.g.scale.set(1, 1, 1); o.state = 'wander'; o.lit = 0; }
 
 /* ── the Chain Chomp ──────────────────────────────────────────── */
 function chompStep(r, t, dt, mc) {
@@ -641,7 +694,11 @@ function chompStep(r, t, dt, mc) {
       o.p.addScaledVector(to.normalize(), 1600 * dt);
       o.hop = (o.hop || 0) + dt; g.position.y = o.p.y + Math.abs(Math.sin(o.hop * 5)) * 220;
       g.rotation.y = Math.atan2(G.x - o.p.x, G.z - o.p.z);
-      if (d < 200 && !G.open) { G.open = true; G.fall = 0; boom(r, new THREE.Vector3(G.x, G.y + 150, G.z), true); r.api.shake(0.4); }
+      if (d < 200 && !G.open) {
+        G.open = true; G.g.visible = false; r.api.shake(0.4);
+        const at = new THREE.Vector3(G.x, G.y, G.z);
+        mistVar(at, 0, 0, 46); mistVar(at, 0, 127, 200); pieces(at, 30, 3, 4);
+      }
       if (G.open) { o.state = 'away'; o.awayT = 0; o.dir = g.rotation.y; }
     } else if (o.state === 'away') {
       o.awayT += dt; o.p.x += Math.sin(o.dir) * 1700 * dt; o.p.z += Math.cos(o.dir) * 1700 * dt; o.hop += dt;
@@ -723,9 +780,18 @@ function kingStep(r, t, dt, mc) {
     k.vy -= 3600 * dt; k.p.addScaledVector(k.v, dt); k.p.y += k.vy * dt; g.rotation.x += dt * 4;
     const f = r.col.floor(k.p.x, k.p.y + 300, k.p.z);
     if (f && k.p.y <= f.h && k.vy < 0) {
-      k.p.y = f.h; g.rotation.x = 0; r.api.shake(0.5); puff(r, k.p, 0xffffff, 8);
-      if (k.p.y > k.home.y - 300) { k.hp--; popup(r, k.hp > 0 ? 'OOF!' : '', k.p.clone().setY(k.p.y + 400), '#ffffff'); }
-      if (k.hp <= 0) { k.state = 'beaten'; k.t = 0; r.api.say('116', () => { boom(r, k.p.clone().setY(k.p.y + 200), true); g.visible = false; k.sh.visible = false; k.state = 'gone'; star(k.home.x, k.home.y + 300, k.home.z, 'Big Bob-omb on the Summit'); }); }
+      k.p.y = f.h; g.rotation.x = 0; r.api.shake(0.5); mistVar(k.p, 0, 0, 100);
+      if (k.p.y > k.home.y - 300) k.hp--;
+      /* king_bobomb_act_7: his last words, then gone in mist and pieces, and his star flies from 200 over him to its
+         place on the summit (2000, 4500, -4500) */
+      if (k.hp <= 0) {
+        k.state = 'beaten'; k.t = 0;
+        r.api.say('116', () => {
+          g.visible = false; k.sh.visible = false; k.state = 'gone'; r.api.shake(0.3);
+          mistVar(k.p, 0, 0, 200); pieces(k.p, 20, 3, 4);
+          star(2000, 4500, -4500, 'Big Bob-omb on the Summit', k.p.clone().setY(k.p.y + 200));
+        });
+      }
       else { k.state = 'stunned'; k.t = 0; }
     }
     if (k.p.y < k.home.y - 1500) { k.state = 'return'; k.t = 0; k.from = k.p.clone(); }
@@ -783,6 +849,7 @@ function warps(r, t, dt) {
 /* ══ WHAT MARIO DOES TO THINGS (27-bob.js calls these) ═════════ */
 function hit(r, kind, at, rad) {
   if (!W) return;
+  let struck = false;
   for (const o of W.foes) {
     if (o.state === 'gone' || o.state === 'squish' || o.state === 'held' || o.state === 'flying') continue;
     if (o.p.distanceTo(at) > rad + 60 && (kind !== 'pound' || Math.hypot(o.p.x - at.x, o.p.z - at.z) > rad + 40)) continue;
@@ -790,13 +857,20 @@ function hit(r, kind, at, rad) {
     if (o.kind === 'goomba' && kind === 'pound') { stomp(r, o); continue; }
     o.state = 'knocked'; o.vel = new THREE.Vector3(Math.sin(a) * 900, 0, Math.cos(a) * 900); o.vy = 900;
     if (o.kind === 'bobomb') o.lit = o.lit || now();
-    sparkle(r, at, 0xffffff);
+    struck = true;
   }
+  /* bounce_back_from_attack: a punch or a kick that lands throws out the game's six little triangles */
+  if (struck && kind !== 'pound') triangles(r);
   if (W.boxes) for (const b of W.boxes) {
     if (b.broken) continue;
     const cx = b.x, cy = b.y + b.s / 2, cz = b.z;
     if (Math.abs(at.x - cx) < b.s / 2 + rad * 0.6 && Math.abs(at.z - cz) < b.s / 2 + rad * 0.6 && Math.abs(at.y - cy) < b.s / 2 + rad * 0.6) {
-      b.broken = true; r.scene.remove(b.m); if (b.sh) r.scene.remove(b.sh); debris(r, new THREE.Vector3(cx, cy, cz));
+      b.broken = true; r.scene.remove(b.m); if (b.sh) r.scene.remove(b.sh);
+      /* obj_explode_and_spawn_coins(46): mist and thirty brown pieces; a small box (breakable_box_small): mist and
+         twenty little ones */
+      const base = new THREE.Vector3(b.x, b.y, b.z);
+      mistVar(base, 0, 0, 46);
+      if (b.s >= 200) pieces(base, 30, 3, 4); else pieces(base, 20, 0.7, 3);
       for (let i = 0; i < b.coins; i++) coin(cx + rnd(-80, 80), cy + 40, cz + rnd(-80, 80), 1);
     }
   }
@@ -804,14 +878,14 @@ function hit(r, kind, at, rad) {
     /* a pound on the top of a post drives it in */
     for (const p of W.posts) {
       if (Math.hypot(at.x - p.x, at.z - p.z) < 80 && p.sink < 180) {
-        p.sink = Math.min(180, p.sink + 60); puff(r, new THREE.Vector3(p.x, p.y, p.z), 0xd8c8a8);
+        p.sink = Math.min(180, p.sink + 60);
         if (p.sink >= 180 && !p.paid) { p.paid = true; for (let i = 0; i < 5; i++) coin(p.x + Math.cos(i / 5 * TAU) * 160, p.y + 60, p.z + Math.sin(i / 5 * TAU) * 160, 1); }
       }
     }
     const c = W.chompObj;
     if (c && !c.free && Math.hypot(at.x - c.post.x, at.z - c.post.z) < 90) {
       c.pounds++; c.sink = Math.min(200, c.pounds * 66); r.api.shake(0.25);
-      if (c.pounds >= 3) { c.free = true; c.state = 'tothegate'; popup(r, 'FREE!', c.p.clone().setY(c.p.y + 420), '#ffffff'); }
+      if (c.pounds >= 3) { c.free = true; c.state = 'tothegate'; }
     }
   }
 }
@@ -884,63 +958,159 @@ function talk(r) {
   return null;
 }
 
-/* ══ FLOURISHES ════════════════════════════════════════════════ */
-function fxSprite(r, map, at, life, from, to, extra) {
-  const s = sprite(map, from, from, Object.assign({ depthWrite: false, alphaTest: 0 }, extra || {}));
-  s.position.copy(at); r.scene.add(s);
-  W.fx.push({ s, b: now(), life, from, to, vy: (extra && extra.vy) || 0 });
-  return s;
+/* ══ THE GAME'S OWN EFFECTS ════════════════════════════════════
+   Each is the actor the game spawns for it (its model out of the
+   decompilation, its pictures out of the player's ROM), moved a frame at a
+   time as its behaviour moves it:
+
+     sparkles   a coin taken (bhvGoldenCoinSparkles): for three frames a
+                sparkle 15 either way of it and 25 up, through sparkles_geo's
+                frames, the last two at 0.6 its size
+     dust       Mario's (bhvMistParticleSpawner): a mist puff (mist_geo at 50
+                of 255, 30 up, 0.1 its size and 0.5 more a frame, five frames)
+                and a smoke puff (smoke_geo's seven frames), each up to 20 off
+     mist       a thing gone (spawn_mist_particles_variable): twenty mist
+                puffs flung out at 40 to 45 and up at 30 to 50, falling 4 a
+                frame, slowed by the air, fading 21 a frame from 254 and
+                shrinking with it
+     ring       a ground pound (sGlobalMistParticles): twenty out along the
+                ground at 10 to 15, fading 13 a frame and growing as they
+                fade; and eight cartoon stars out at 25, rising 14, shrinking
+     pieces     a box broken (spawn_triangle_break_particles): brown pieces
+                from 100 up, flung out at 30, tumbling, for eighteen frames
+     triangles  a punch or kick that lands (bhvPunchTinyTriangle): six
+                little triangles 100 in front of Mario, 60 up
+     smoke      a lit fuse (bhvBobombFuseSmoke), and an explosion's
+                (bhvExplosion: nine frames growing to twice its size, then
+                its smoke 300 under it at ten times)
+     number     a red coin's count (bhvOrangeNumber), bouncing up off it for
+                35 frames, then the coin's sparkles where it ends
+     twinkles   a new star's trail (bhvSparkleSpawn): a sparkle up to 45
+                off it at any size up to its own, nine frames */
+const U = TAU / 65536;
+function part(key, x, y, z, o) {
+  const r = W.r, h = holder(r.scene, x, y, z, o.s || 1);
+  const inst = r.cast(key, h, { billboard: o.bill !== false });
+  if (!inst) { r.scene.remove(h); return null; }
+  const p = Object.assign({ h, inst, t: 0, acc: 0, life: 30, vx: 0, vy: 0, vz: 0 }, o);
+  if (p.fade != null) {
+    /* its own copy of the materials, for its own opacity (geo_update_layer_transparency's environment alpha) */
+    p.mats = [];
+    inst.root.traverse(m => {
+      if (!m.material || !m.material.uniforms) return;
+      const own = m.material.clone();
+      own.uniforms.map.value = m.material.uniforms.map.value;
+      m.material = own; p.mats.push(own);
+    });
+    alpha(p, p.fade);
+  }
+  W.parts.push(p);
+  partFrame(p);
+  return p;
 }
-function puff(r, at, col, n) {
-  for (let i = 0; i < (n || 4); i++) {
-    const p = at.clone().add(new THREE.Vector3(rnd(-60, 60), rnd(10, 60), rnd(-60, 60)));
-    if (W.skinned) fxModel(r, 'smoke', p, 10, 1, 2); else fxSprite(r, P.smoke, p, rnd(0.4, 0.7), 60, 180, { color: col || 0xffffff, vy: 80 });
+function alpha(p, v) { for (const m of p.mats) m.uniforms.env.value.w = v / 255; }
+function partFrame(p) {
+  p.h.visible = p.t >= 0;
+  if (p.t >= 0 && p.tick) p.tick(p);
+  p.t++;
+  if (p.t >= p.life) p.gone = true;
+}
+function partsStep(r, dt) {
+  W.parts = W.parts.filter(p => {
+    for (p.acc += dt * F; p.acc >= 1 && !p.gone; p.acc--) partFrame(p);
+    if (!p.gone) return true;
+    r.scene.remove(p.h);
+    if (p.end) p.end(p);
+    return false;
+  });
+}
+const drag = (v, k) => { if (!v) return 0; const d = v * v * k * 0.0001; return v > 0 ? (v - d < 0.001 ? 0 : v - d) : (v + d > -0.001 ? 0 : v + d); };
+const spread = n => Math.random() * n - n / 2;
+
+function sparkles(at) {
+  for (let k = 0; k < 3; k++) {
+    part('sparkles', at.x + spread(30), at.y + 25, at.z + spread(30), { t: -k, life: 10,
+      tick: p => { p.inst.state = Math.min(p.t, 7); if (p.t >= 8) p.h.scale.setScalar(0.6); } });
   }
 }
-/* the game's own effect models (an explosion's nine frames, a puff's ten), turned to the camera, growing as they go */
-function fxModel(r, key, at, frames, s0, s1) {
-  const h = holder(r.scene, at.x, at.y, at.z, s0), inst = r.cast(key, h, { billboard: true });
-  if (inst) (W.fxm || (W.fxm = [])).push({ h, inst, b: now(), frames, s0, s1 });
+function dust(r, at) {
+  part('mist', at.x + spread(40), at.y + 30, at.z + spread(40), { life: 5, fade: 50, tick: p => p.h.scale.setScalar(0.1 + 0.5 * p.t) });
+  part('smoke', at.x + spread(40), at.y, at.z + spread(40), { life: 7, tick: p => { p.inst.state = p.t; } });
 }
-function sparkle(r, at, col) { for (let i = 0; i < 6; i++) fxSprite(r, P.spark, at.clone().add(new THREE.Vector3(rnd(-70, 70), rnd(-50, 70), rnd(-70, 70))), rnd(0.25, 0.45), 50, 10, { color: col, blending: THREE.AdditiveBlending }); }
-function boom(r, at, big) {
-  if (W.skinned) { fxModel(r, 'boom', at, 9, big ? 2 : 1, big ? 4 : 2); puff(r, at, 0x888888, big ? 6 : 3); r.api.shake(big ? 0.5 : 0.3); return; }
-  fxSprite(r, P.boom, at, 0.45, 80, big ? 900 : 560, { blending: THREE.AdditiveBlending });
-  for (let i = 0; i < (big ? 12 : 7); i++) fxSprite(r, P.smoke, at.clone().add(new THREE.Vector3(rnd(-120, 120), rnd(-40, 120), rnd(-120, 120))), rnd(0.7, 1.2), 120, big ? 420 : 300, { color: 0x888888, vy: 160 });
-  r.api.shake(big ? 0.5 : 0.3);
+/* cur_obj_spawn_particles over bhvWhitePuffExplosion */
+function mist(at, n, size, o) {
+  for (let i = 0; i < n; i++) {
+    const base = Math.random() * (size / 20 * 0.1) + size * 0.1, yaw = Math.random() * TAU, fv = Math.random() * o.fv[1] + o.fv[0];
+    part('mist', at.x, at.y + o.off, at.z, { s: base, life: 21, fade: 254, base,
+      vx: fv * Math.sin(yaw), vz: fv * Math.cos(yaw), vy: Math.random() * o.vy[1] + o.vy[0],
+      tick: p => {
+        p.vy += o.g; p.h.position.x += p.vx; p.h.position.y += p.vy; p.h.position.z += p.vz;
+        p.vx = drag(p.vx, 30); p.vz = drag(p.vz, 30);
+        if (p.vy > 100) p.vy = 100;
+        p.fade += o.op;
+        if (p.fade < 2) { p.gone = true; p.h.visible = false; return; }
+        p.h.scale.setScalar(p.base * (o.grow ? (254 - p.fade) / 254 : p.fade / 254));
+        alpha(p, p.fade);
+      } });
+  }
 }
-function debris(r, at) { for (let i = 0; i < 8; i++) fxSprite(r, P.cork, at.clone().add(new THREE.Vector3(rnd(-80, 80), rnd(-60, 80), rnd(-80, 80))), rnd(0.5, 0.8), 50, 20, { vy: 300 }); }
-function fxStep(r, t, dt) {
-  const n = now();
-  W.fx = W.fx.filter(f => {
-    const k = (n - f.b) / f.life;
-    if (k >= 1) { r.scene.remove(f.s); f.s.material.dispose(); return false; }
-    f.s.scale.setScalar(lerp(f.from, f.to, 1 - Math.pow(1 - k, 2)));
-    f.s.material.opacity = 1 - k;
-    f.s.position.y += f.vy * dt;
-    return true;
-  });
-  if (W.fxm) W.fxm = W.fxm.filter(f => {
-    const k = (n - f.b) * F;
-    if (k >= f.frames) { r.scene.remove(f.h); return false; }
-    f.inst.state = Math.floor(k); f.h.scale.setScalar(lerp(f.s0, f.s1, k / f.frames));
-    return true;
-  });
-  /* the gate, knocked flat */
-  const G = W.gate; if (G && G.open && G.fall < 1) { G.fall = Math.min(1, G.fall + dt * 2); G.g.rotation.x = -G.fall * Math.PI / 2; G.g.position.y = G.y - G.fall * 20; }
+/* spawn_mist_particles_variable(count, offsetY, size): no count is twenty, a small one four */
+function mistVar(at, count, off, size) {
+  mist(at, !count ? 20 : count > 20 ? count : 4, size, { off, fv: [40, 5], vy: [30, 20], g: -4, op: -21, grow: false });
 }
-function popup(r, text, at, color) {
-  const el = doc.createElement('div'); el.className = 'bs-pop'; el.textContent = text; el.style.color = color;
-  r.el.appendChild(el);
-  W.pops = W.pops || []; W.pops.push({ el, at: at.clone(), b: now() });
+/* a ground pound's landing: PARTICLE_MIST_CIRCLE and PARTICLE_HORIZONTAL_STAR */
+function pound(r, at) {
+  mist(at, 20, 30, { off: 20, fv: [10, 5], vy: [0, 0], g: 0, op: -13, grow: true });
+  for (let k = 0; k < 8; k++) {
+    const yaw = k / 8 * TAU;
+    part('tinystar', at.x, at.y - 20, at.z, { s: 0.28, life: 10, vy: 14,
+      tick: p => { p.h.position.x += 25 * Math.sin(yaw); p.h.position.z += 25 * Math.cos(yaw); p.h.position.y += p.vy; p.inst.state = 4; p.h.scale.setScalar(Math.max(0.001, 0.28 - 0.015 * p.t)); } });
+  }
 }
+function pieces(at, n, size, state) {
+  for (let i = 0; i < n; i++) {
+    const yaw = Math.random() * TAU;
+    part('dirt', at.x, at.y + 100, at.z, { bill: false, s: size, life: 18, vy: spread(50), yaw, pitch: Math.random() * TAU, face: yaw,
+      tick: p => {
+        p.inst.state = state;
+        p.pitch += 0xF00 * U; p.face += 0x500 * U;
+        p.h.rotation.set(p.pitch, p.face, 0, 'YXZ');
+        p.h.position.x += 30 * Math.sin(yaw); p.h.position.z += 30 * Math.cos(yaw); p.h.position.y += p.vy;
+      } });
+  }
+}
+const TRI = [0xD000, 0, 0x3000, 0, 0xDE67, 0x2199, 0x2199, 0x2199, 0xDE67, 0xDE67, 0x2199, 0xDE67];
+function triangles(r) {
+  const m = r.m, at = new THREE.Vector3(m.p.x + Math.sin(m.yaw) * 100, m.p.y + 60, m.p.z + Math.cos(m.yaw) * 100);
+  for (let i = 0; i < 6; i++) {
+    const yaw = m.yaw + (TRI[2 * i] + 0x8000) * U, up = TRI[2 * i + 1] * U, fv = Math.cos(up) * 25, vy = Math.sin(up) * 25;
+    part('dirt', at.x, at.y, at.z, { s: 1.28, life: 7,
+      tick: p => { p.h.position.x += fv * Math.sin(yaw); p.h.position.z += fv * Math.cos(yaw); p.h.position.y += vy; p.inst.state = 5; p.h.scale.setScalar(Math.max(0.001, 1.28 - 0.2 * p.t)); } });
+  }
+}
+function fuseSmoke(at) {
+  part('smoke', at.x + Math.trunc(Math.random() * 80) - 40, at.y + Math.trunc(Math.random() * 80) + 60, at.z + Math.trunc(Math.random() * 80) - 40,
+       { s: 1.2, t: -1, life: 10, tick: p => { p.inst.state = p.t % 7; } });
+}
+function explosion(at) {
+  part('boom', at.x, at.y + 100, at.z, { life: 9, tick: p => { p.inst.state = p.t; p.h.scale.setScalar(p.t / 9 + 1); },
+    end: () => part('smoke', at.x, at.y - 300, at.z, { s: 10, t: -1, life: 10, tick: p => { p.inst.state = p.t % 7; } }) });
+}
+function number(n, at) {
+  part('number', at.x, at.y + 25, at.z, { life: 35, vy: 26,
+    tick: p => { p.inst.state = n; p.h.position.y += p.vy; p.vy -= 2; if (p.vy < -21) p.vy = 14; },
+    end: p => sparkles(p.h.position.clone().setY(p.h.position.y - 30)) });
+}
+function twinkles(at) {
+  const s = Math.random();
+  if (s <= 0) return;
+  part('twinkle', at.x + spread(90), at.y + spread(90), at.z + spread(90), { s, life: 9, tick: p => { p.inst.state = p.t; } });
+}
+/* bhv_hidden_red_coin_star_loop: the eighth red coin, and the star comes out where the Star Marker is, in a puff of mist */
 function redStar(r) {
-  if (!W.redAt) return;
-  if (W.markerObj) { r.scene.remove(W.markerObj); W.markerObj = null; }
-  const s = star(W.redAt.x, W.redAt.y, W.redAt.z, 'Find the 8 Red Coins');
-  sparkle(r, W.redAt, 0xffe080); boom(r, W.redAt, false);
-  r.api.say('RED', null, 'All 8 red coins! A Power Star appears by the Star Marker.');
-  return s;
+  if (!W.redAt) return null;
+  mistVar(W.redAt, 0, 0, 46);
+  return star(W.redAt.x, W.redAt.y, W.redAt.z, 'Find the 8 Red Coins', W.redAt.clone());
 }
 
 /* ══ THE HUD: lives, coins, stars, the power meter ═════════════ */
@@ -978,17 +1148,13 @@ function hudStep(r, t) {
     x.strokeStyle = '#fff'; x.lineWidth = 4; x.beginPath(); x.arc(70, 70, 62, 0, TAU); x.stroke();
   }
   H.power.classList.toggle('on', g.hp < 8 || t - (H.shownT || 0) < 2.5 || (W.king && W.king.state !== 'wait' && W.king.state !== 'gone'));
-  /* the numbers that float up off what was got */
-  if (W.pops) W.pops = W.pops.filter(p => {
-    const k = (now() - p.b) / 1.1;
-    if (k >= 1) { p.el.remove(); return false; }
-    _v.copy(p.at).setY(p.at.y + k * 160).project(r.cam);
-    p.el.style.transform = 'translate(' + ((_v.x * 0.5 + 0.5) * r.W) + 'px,' + ((0.5 - _v.y * 0.5) * r.H) + 'px) translate(-50%,-50%) scale(' + (1 + 0.2 * Math.sin(k * Math.PI)) + ')';
-    p.el.style.opacity = String(1 - k * k);
-    return true;
-  });
 }
 
-root.BobWorld = { build, step, hit, grab, release, floor, solid, talk, rom: (r, D) => { skin(r); if (root.BobScreen && D) root.BobScreen.rom(r, D.romSheet); }, get W() { return W; }, text: id => (W && W.talk[id]) };
+root.BobWorld = { build, step, hit, grab, release, floor, solid, talk, coinStar: (r, at, name) => (W ? coinStar(r, at, name) : null),
+  /* the screen's pictures (27-bob-screen.js), waited for before the course is shown */
+  rom: (r, D) => { skin(r); return root.BobScreen && D ? root.BobScreen.rom(r, D.romSheet) : null; },
+  fx: { dust: (r, at) => W && dust(r, at), pound: (r, at) => W && pound(r, at) },
+  get W() { return W; }, text: id => (W && W.talk[id]),
+  _: { sparkles, mistVar, pound, pieces, triangles, fuseSmoke, explosion, number, twinkles, star, partsStep } };
 
 })(window, document);
