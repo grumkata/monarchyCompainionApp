@@ -196,6 +196,8 @@ function forget() {
     }
     doomed.forEach(k => root.localStorage.removeItem(k));
   } catch (e) {}
+  /* and the pictures read out of the player's own Super Mario 64, kept in IndexedDB (27-bob-rom.js) */
+  if (root.BobROM) root.BobROM.forget();
   return doomed.length;
 }
 

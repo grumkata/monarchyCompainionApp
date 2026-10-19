@@ -2,7 +2,7 @@
  "version": "1.0.9",
  "shell": 1,
  "files": {
-  "assets/bob/bob.js": "afbc3f8d2ac6671c46b569c86347b21a8c82c791560c64cb1c35f817021d31e6",
+  "assets/bob/bob.js": "194c147e11b4c76975f1af5b82ce738669454ef8774f9289950669e9d33c8af2",
   "assets/doom/doom-wasm.js": "cbddc09bda339b5da52f56f134884fe422217a2ff49f786e37e4b715d29a943c",
   "assets/images/textures/table-surface.svg": "e30fb4f5f11d074ddef2e58a6766e6f1cfee3b5e4042554c4f76ac66f9ded93d",
   "assets/images/tokens/_default-ally.svg": "2fb6046d2dd9e0a33d9cd87252b7a56ae917a41a1eafdb5730952db37c8bddd8",
@@ -92,6 +92,6 @@
   "assets/tex/f9e2715e820d1be0.jpg": "3da65ba700181f0abe1254128066e3489b8f9ce27ec411bda98a3227445747de",
   "assets/tex/fb220079c1bf9fac.png": "33e5e73ab19995afcf772fb9dec88313200c2d71ebd00cca8e105567a0e5af2c",
   "cover.html": "cf69a5d92409acacd9325068e9b5868684bdde628394a687c246a3248baf1ec0",
-  "monarchy.html": "602f3283f3fc022975a4ce4f282517ff36e090228fa85e9455ad9e3b8d65a503"
+  "monarchy.html": "cd478b6156251d61007fbce9af2c03ec0d3c22aa94d590dbf0d735216f4e6b3f"
  }
 }

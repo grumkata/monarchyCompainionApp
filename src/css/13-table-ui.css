@@ -2171,6 +2171,10 @@ body.pointing #vp, body.pointing #vp *{ cursor:cell !important; }
   font:600 13px/1.35 'Segoe UI', system-ui, sans-serif; color:#fff; background:rgba(16,24,40,.78); border-radius:4px;
   pointer-events:none; opacity:0; transition:opacity .3s; }
 #bob-star .bs-romsay.on{ opacity:1; }
+/* with the player's ROM in, the game's own HUD and dialog box (27-bob-screen.js): drawn at the game's 240 lines and
+   blown up with the pixels kept square, in place of the page's counters, meter and box */
+#bob-star .bs-n64{ position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; image-rendering:pixelated; }
+#bob-star.n64-hud .bs-hud > div:not(.bs-say), #bob-star.n64-hud .hu-power{ display:none; }
 
 /* the course's HUD (27-bob-world.js): lives, coins and stars across the top in the game's white-on-black letters, the
    power meter dropping in when it matters, the game's dark dialog box, and numbers floating off what is got */

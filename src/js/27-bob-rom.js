@@ -19,7 +19,8 @@
                   sm64tools/n64graphics.c does; the sky's 64 tiles put
                   together as tools/skyconv.c does
      keeping      only the decoded pictures are kept (IndexedDB, this
-                  machine), never the ROM, so it is asked for once
+                  machine), never the ROM, so it is asked for once; the
+                  menu's Forget everything forgets them too
 ══════════════════════════════════════════════════════════════ */
 (function (root, doc) {
 'use strict';
@@ -111,13 +112,33 @@ async function sha1(u8) {
   const h = new Uint8Array(await crypto.subtle.digest('SHA-1', u8));
   return Array.from(h, x => x.toString(16).padStart(2, '0')).join('');
 }
-/* which release this is: by its SHA-1, or (no hashing to be had) by the name and region in its header */
+/* which release this is: by its SHA-1, or (no hashing to be had: a page not served over https) by its header, as
+   asm/rom_header.s writes it: the name, the region, and the version byte (3 for Shindou, named without its spaces) */
 async function version(rom, R) {
   const h = await sha1(rom);
   if (h) return Object.keys(R.sha1).find(v => R.sha1[v] === h) || null;
-  const name = String.fromCharCode(...rom.subarray(0x20, 0x34)).trim();
-  if (name !== 'SUPER MARIO 64') return null;
-  return { E: 'us', P: 'eu', J: 'jp' }[String.fromCharCode(rom[0x3E])] || null;
+  const name = String.fromCharCode(...rom.subarray(0x20, 0x34)).trim(), region = String.fromCharCode(rom[0x3E]), v = rom[0x3F];
+  if (name === 'SUPERMARIO64' && region === 'J' && v === 3) return 'sh';
+  if (name !== 'SUPER MARIO 64' || v !== 0) return null;
+  return { E: 'us', P: 'eu', J: 'jp' }[region] || null;
+}
+/* the screen's small pictures (the HUD's letters, the dialog font, the power meter, the shadows) go on one sheet as
+   well, so the page has one picture to wait for rather than three hundred */
+const SHEET = /^texture_(hud_char|font_char|power_meter|shadow_quarter)/;
+function sheet(list) {
+  const W = 256, at = {};
+  let x = 0, y = 0, row = 0;
+  list.sort((a, b) => b[3] - a[3]);
+  for (const [name, , w, h] of list) {
+    if (x + w > W) { x = 0; y += row; row = 0; }
+    at[name] = [x, y, w, h]; x += w; row = Math.max(row, h);
+  }
+  const H = y + row, px = new Uint8ClampedArray(W * H * 4);
+  for (const [name, p, w, h] of list) {
+    const [x0, y0] = at[name];
+    for (let r = 0; r < h; r++) px.set(p.subarray(r * w * 4, (r + 1) * w * 4), ((y0 + r) * W + x0) * 4);
+  }
+  return { png: png(px, W, H), at };
 }
 /* every picture R lists, out of a ROM of release `ver` */
 function extract(rom, ver, R) {
@@ -130,10 +151,14 @@ function extract(rom, ver, R) {
     }
     return rom.subarray(pos[0], pos[0] + size);
   };
-  const out = { ver, tex: {}, sky: null };
+  const out = { ver, tex: {}, sky: null, sheet: null }, small = [];
   for (const [name, [fmt, w, h, size, at]] of Object.entries(R.tex)) {
-    if (at[ver]) out.tex[name] = png(decode(bytes(at[ver], size), w, h, fmt), w, h);
+    if (!at[ver]) continue;
+    const px = decode(bytes(at[ver], size), w, h, fmt);
+    out.tex[name] = png(px, w, h);
+    if (SHEET.test(name)) small.push([name, px, w, h]);
   }
+  if (small.length) out.sheet = sheet(small);
   if (R.sky && R.sky[1][ver]) out.sky = sky(bytes(R.sky[1][ver], R.sky[0]));
   return out;
 }
@@ -144,7 +169,7 @@ async function fromFile(file, R) {
   if (!ver) throw new Error('That ROM is not Super Mario 64 as it was released (US, Japan, Europe or Shindou).');
   const out = extract(rom, ver, R);
   out.key = keyOf(R);
-  await keep(out);
+  keep(out);                                     /* in the background: the course need not wait for the disk */
   return out;
 }
 
@@ -152,7 +177,7 @@ async function fromFile(file, R) {
    Under a key made of the list asked for, so a course that wants more
    pictures than were kept asks again rather than going without. */
 const DB = 'monarchy-bob', STORE = 'rom';
-function keyOf(R) { let h = 0; const s = JSON.stringify(R.tex) + JSON.stringify(R.sky); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return 'pictures-' + (h >>> 0).toString(36); }
+function keyOf(R) { let h = 0; const s = 'sheet1' + JSON.stringify(R.tex) + JSON.stringify(R.sky); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return 'pictures-' + (h >>> 0).toString(36); }
 function db() {
   return new Promise((ok, no) => {
     const q = indexedDB.open(DB, 1);
@@ -160,23 +185,34 @@ function db() {
     q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error);
   });
 }
+/* a transaction over, however it ends: done, failed, or given up (a full disk shows only as an abort) */
+const settled = (t, ok) => { t.oncomplete = t.onerror = t.onabort = ok; };
 async function keep(out) {
   try {
     const d = await db();
-    await new Promise(ok => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).put(out, 'latest'); t.oncomplete = ok; t.onerror = ok; });
+    await new Promise(ok => { const t = d.transaction(STORE, 'readwrite'); settled(t, ok); t.objectStore(STORE).put(out, 'latest'); });
+    d.close();
   } catch (e) { /* private window, or storage turned off: it is asked for again next time */ }
 }
 async function kept(R) {
   try {
     const d = await db();
-    const v = await new Promise(ok => { const q = d.transaction(STORE).objectStore(STORE).get('latest'); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); });
+    const v = await new Promise(ok => {
+      const t = d.transaction(STORE), q = t.objectStore(STORE).get('latest');
+      q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); t.onabort = () => ok(null);
+    });
+    d.close();
     return v && v.key === keyOf(R) ? v : null;
   } catch (e) { return null; }
 }
 async function forget() {
-  try { const d = await db(); await new Promise(ok => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).delete('latest'); t.oncomplete = ok; t.onerror = ok; }); } catch (e) { /* nothing kept */ }
+  try {
+    const d = await db();
+    await new Promise(ok => { const t = d.transaction(STORE, 'readwrite'); settled(t, ok); t.objectStore(STORE).delete('latest'); });
+    d.close();
+  } catch (e) { /* nothing kept */ }
 }
 
-root.BobROM = { fromFile, kept, forget, _: { bigEndian, mio0, decode, sky, extract, version, keyOf } };
+root.BobROM = { fromFile, kept, forget, _: { bigEndian, mio0, decode, sky, sheet, extract, version, keyOf } };
 
 })(window, document);

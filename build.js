@@ -198,6 +198,7 @@ const JS = [
   'src/js/27-bob.js',             // and the Power Star: out through a star, into Bob-omb Battlefield
   'src/js/27-bob-world.js',       // what lives there: the game's own cast, where the game puts it
   'src/js/27-bob-rom.js',         // and its real pictures, read out of the player's own copy of the game
+  'src/js/27-bob-screen.js',      // and what the game draws over it: HUD, power meter, dialog box, shadows
   'src/js/44-characters.js',     // the hall's roster, reachable from the table
   'src/js/43-tokens.js',          // a token has one home
   'src/js/45-papers.js',          // a record opened at the table

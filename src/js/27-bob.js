@@ -181,7 +181,7 @@ function pics() {
   }));
   PIC.shadow = new THREE.CanvasTexture(canvas(64, 64, (x) => {
     const g = x.createRadialGradient(32, 32, 0, 32, 32, 31);
-    g.addColorStop(0, 'rgba(0,0,0,.62)'); g.addColorStop(0.7, 'rgba(0,0,0,.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    g.addColorStop(0, 'rgba(0,0,0,.9)'); g.addColorStop(0.75, 'rgba(0,0,0,.8)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = g; x.fillRect(0, 0, 64, 64);
   }));
   PIC.glint = texOf(canvas(64, 64, (x) => {
@@ -664,10 +664,10 @@ function world(r, D) {
   scene.add(new THREE.AmbientLight(0xffffff, 0.42));
   const sun = new THREE.DirectionalLight(0xffffff, 0.8);
   sun.position.copy(N64_LIGHT); r.cam.add(sun); r.cam.add(sun.target);
-  /* his round shadow, laid on whatever is under him */
+  /* his round shadow, laid on whatever is under him: mario_geo's GEO_SHADOW(SHADOW_CIRCLE_PLAYER, 0xB4, 100) */
   const P = pics();
-  r.shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: P.shadow, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
-  r.shadow.renderOrder = 2; scene.add(r.shadow);
+  r.shadows = [];
+  r.shadow = root.BobScreen.shadow(r, { type: 'SHADOW_CIRCLE_PLAYER', solid: 0xB4, s: 100 }, 1, P.shadow);
   /* where the game puts him: falling in, spinning, over the corner by the Bob-omb Buddies */
   const sp = D.game.spawn, f = r.col.floor(sp.p[0], 20000, sp.p[2]);
   r.spawn = new THREE.Vector3(sp.p[0], f ? f.h : sp.p[1], sp.p[2]);
@@ -686,7 +686,7 @@ function world(r, D) {
   if (root.BobWorld) root.BobWorld.build(r, D);
   r.ready = true;
   /* the real pictures, if this computer has read them out of the player's game before */
-  if (D.romTex) useRom(r, { tex: D.romTex, sky: D.romSky });
+  if (D.romTex) useRom(r, { tex: D.romTex, sky: D.romSky, sheet: D.romSheet });
   else if (root.BobROM && D.rom) root.BobROM.kept(D.rom).then(out => {
     if (run !== r) return;
     if (out) useRom(r, out);
@@ -711,7 +711,7 @@ function readRom(r, file) {
 }
 function useRom(r, out) {
   const D = data;
-  D.romTex = out.tex; D.romSky = out.sky;
+  D.romTex = out.tex; D.romSky = out.sky; D.romSheet = out.sheet;
   retexture(D);
   if (out.sky) realSky(r, out.sky);
   realMario(r);
@@ -749,7 +749,7 @@ function api(r) {
     heal(n) { g().hp = Math.min(8, g().hp + n); },
     life() { g().lives++; },
     star(p, name) { got(r, (now() - r.t0) / (root.__bobSlow || 1), name); },
-    say(id, done, raw) { say(r, id, done, raw); },
+    say(id, done, raw, zoom) { say(r, id, done, raw, zoom); },
     shake(d) { r.shake = Math.max(r.shake || 0, d); },
     flash(d, mid) { r.flashT = now(); r.flashD = d; r.flashMid = mid; },
   };
@@ -772,15 +772,21 @@ function die(r) {
 }
 
 /* ══ WHAT IS SAID ══════════════════════════════════════════════
-   The game's own box: dark, rounded, the words coming a letter at a time,
-   a page of four (or five) lines at a time, Space or J for the next. The
-   game's buttons are put into the keys that do the same here. */
+   With the player's ROM in, the game's own box in its own letters
+   (27-bob-screen.js; `zoom` for a sign's). Without, a box of the page's:
+   dark, rounded, the words coming a letter at a time, a page of four (or
+   five) lines at a time, Space or J for the next, the game's buttons put
+   into the keys that do the same here. */
 const BUTTONS = [[/\[A\]/g, 'Space'], [/\[B\]/g, 'J'], [/\[Z\]/g, 'Shift'], [/\[R\]/g, 'Q / E'], [/\[C\][▲▼◀▶]?/g, 'Q / E'], [/[『』]/g, '"']];
-function say(r, id, done, raw) {
+function say(r, id, done, raw, zoom) {
   const W = root.BobWorld && root.BobWorld.W, box = W && W.hud && W.hud.say;
   if (!box) return;
   const T = raw ? { text: raw, lines: 4 } : root.BobWorld.text(id);
   if (!T) { if (done) done(); return; }
+  if (!raw && root.BobScreen.talk(r, id, T.text, zoom, () => { r.dlg = null; r.m.act = ''; if (done) done(); })) {
+    r.dlg = { n64: true }; r.m.act = 'talk'; r.m.v = 0;
+    return;
+  }
   let text = T.text;
   BUTTONS.forEach(([re, to]) => { text = text.replace(re, to); });
   const lines = text.split('\n'), pages = [];
@@ -792,6 +798,7 @@ function say(r, id, done, raw) {
 function sayStep(r) {
   const d = r.dlg;
   if (!d) return;
+  if (d.n64) { if (took(r, KEYS_A.concat(KEYS_B))) root.BobScreen.press(r); return; }
   const page = d.pages[d.i] || '';
   d.n = Math.min(page.length, Math.floor((now() - d.t) * 60));
   d.p.textContent = page.slice(0, d.n);
@@ -891,22 +898,15 @@ function step(r, t, dt) {
   camera(r, t, dt);
   if (root.BobWorld) root.BobWorld.step(r, t, dt);
   /* the shadow on the ground under him */
-  const fl = col.floor(m.p.x, m.p.y + 20, m.p.z);
-  if (fl && m.spawned) {
-    const hgt = m.p.y - fl.h, s = 110 * clamp(1 - hgt / 2500, 0.35, 1);
-    r.shadow.visible = true;
-    r.shadow.position.set(m.p.x, fl.h + 3, m.p.z);
-    r.shadow.lookAt(m.p.x + fl.t.nx, fl.h + 3 + fl.t.ny, m.p.z + fl.t.nz);
-    r.shadow.scale.set(s, s, 1);
-    r.shadow.material.opacity = clamp(1 - hgt / 3000, 0.35, 1);
-  } else r.shadow.visible = false;
+  root.BobScreen.shade(r.shadow, m.p.x, m.p.y, m.p.z, col, !!m.spawned);
   stepSprites(r, t, dt);
 }
 function intent(r) {
   const k = r.keys;
   let fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
   let side = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
-  if (r.phase !== 'play') fwd = side = 0;
+  /* nothing moves him while something is being said, whatever he was doing when it began */
+  if (r.phase !== 'play' || r.dlg) fwd = side = 0;
   const mag = Math.min(1, Math.hypot(fwd, side));
   if (!mag) return null;
   const fa = r.camR.yaw + Math.PI;                                  /* the way the camera looks */
@@ -930,7 +930,7 @@ function physics(r, t, dt) {
   const m = r.m, col = r.col, W = root.BobWorld, want = intent(r);
   if (!m.spawned) return;
   const fr = dt * F;
-  const live = r.phase === 'play' && m.act !== 'talk' && m.act !== 'dead' && m.act !== 'grabbed';
+  const live = r.phase === 'play' && !r.dlg && m.act !== 'talk' && m.act !== 'dead' && m.act !== 'grabbed';
   const A = live && took(r, KEYS_A), B = live && took(r, KEYS_B), Zp = live && took(r, KEYS_Z);
   const Ah = r.keys.has('Space'), Zh = live && holding(r, KEYS_Z);
   if (!live) { r.pressed.clear(); }
@@ -988,7 +988,7 @@ function physics(r, t, dt) {
       if (m.skid === 0 && m.act === '') {
         if (B) {
           const talk = W && W.talk(r);
-          if (talk) { r.api.say(talk.text, talk.done); }
+          if (talk) { r.api.say(talk.text, talk.done, null, talk.zoom); }
           else if (m.held) throwIt(r);
           else {
             const g = W && W.grab(r);
